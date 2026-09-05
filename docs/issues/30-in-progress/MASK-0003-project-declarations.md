@@ -1,7 +1,7 @@
 ---
 id: MASK-0003
 title: Implement project declarations and local registration
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0001
 depends_on: ["MASK-0002"]
 ---
