@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0022"
+  ],
+  "reserve_for": "project-source-dump",
+  "purpose": "",
+  "created": "2026-09-05T23:33:40.981244+00:00",
+  "base": "317a04e65a9a1a6360d11b0b5ab5e93a32f91ffe"
+}
