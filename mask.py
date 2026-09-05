@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""MASK — Manage Agent SKills. Python 3.11+, standard library and Git."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+VERSION = '0.1.0'
+PROTOCOL_VERSION = 1
+ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
+PROGRAM_ROOT = Path(__file__).resolve().parent
+
+
+class MaskError(Exception):
+    def __init__(self, code, message, exit_code=3, *, details=None, retryable=False):
+        super().__init__(message)
+        self.code, self.exit_code = code, exit_code
+        self.details, self.retryable = details or {}, retryable
+
+    def as_dict(self):
+        return dict(code=self.code, message=str(self), retryable=self.retryable,
+                    details=self.details, remediation=[dict(kind='inspect', message='Inspect the reported inputs and retry only after resolving the condition.')])
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise MaskError('invocation.invalid', message, 2)
+
+
+def result(command='', dry_run=False):
+    return dict(schema_version=1, tool='mask', tool_version=VERSION, command=command,
+                ok=True, dry_run=dry_run, changed=False, would_change=False,
+                transaction='not_needed', data={}, actions=[], warnings=[], error=None)
+
+
+# One registration table drives argparse and public capability descriptors.
+COMMANDS = {
+    'capabilities': (False, False, []),
+    'init': (True, False, [('source', 'required'), ('remote', 'value'), ('branch', 'value'), ('target', 'repeat')]),
+    'config.show': (False, False, []),
+    'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
+    'skill.list': (False, False, []),
+    'skill.show': (False, False, [('id', 'pos'), ('content', 'flag')]),
+    'skill.validate': (False, False, [('id', 'optional'), ('all', 'flag')]),
+    'project.init': (True, False, [('project', 'value')]),
+    'project.show': (False, False, [('project', 'value')]),
+    'project.set': (True, False, [('project', 'value'), ('skill', 'repeat'), ('clear', 'flag'), ('apply', 'flag')]),
+    'project.require': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
+    'project.unrequire': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
+    'project.set-targets': (True, False, [('project', 'value'), ('targets', 'some'), ('inherit', 'flag'), ('apply', 'flag')]),
+    'project.register': (True, False, [('project', 'value'), ('path', 'optional'), ('apply', 'flag')]),
+    'project.unregister': (True, False, [('project', 'value'), ('path', 'optional'), ('keep-links', 'flag')]),
+    'project.list': (False, False, []),
+    'plan': (False, False, [('project', 'value'), ('all', 'flag')]),
+    'apply': (True, False, [('project', 'value'), ('all', 'flag')]),
+    'link.adopt': (True, False, [('project', 'required'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
+    'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
+    'doctor': (False, False, [('project', 'value'), ('all', 'flag'), ('check', 'flag')]),
+    'source.status': (False, False, []),
+    'source.fetch': (True, True, []),
+    'update': (True, True, []),
+    'self.status': (False, False, []),
+    'self.install': (True, False, [('bin-dir', 'required')]),
+    'self.update': (True, True, []),
+}
+GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
+IMPLEMENTED = {'capabilities'}
+COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
+
+
+def argument(parser, name, shape):
+    kwargs = {'default': argparse.SUPPRESS}
+    positional = shape in {'pos', 'optional', 'many', 'some'}
+    if shape == 'flag':
+        kwargs['action'] = 'store_true'
+    elif shape == 'repeat':
+        kwargs['action'] = 'append'
+    elif shape == 'int':
+        kwargs['type'] = int
+    elif shape == 'required':
+        kwargs['required'] = True
+    elif shape in {'optional', 'many', 'some'}:
+        kwargs['nargs'] = {'optional': '?', 'many': '+', 'some': '*'}[shape]
+    parser.add_argument(name if positional else '--' + name, **kwargs)
+
+
+def make_parser():
+    root = Parser(prog='mask', add_help=False, description=__doc__, allow_abbrev=False)
+    for name, shape in COMMON:
+        argument(root, name, shape)
+    sub = root.add_subparsers(dest='group', parser_class=Parser)
+    groups, leaves = {}, {}
+    for command, (mutates, network, arguments) in COMMANDS.items():
+        parts = command.split('.')
+        if len(parts) == 2:
+            if parts[0] not in groups:
+                group = sub.add_parser(parts[0], add_help=False, allow_abbrev=False)
+                for name, shape in COMMON:
+                    argument(group, name, shape)
+                groups[parts[0]] = group.add_subparsers(dest='subcommand', parser_class=Parser)
+            parent = groups[parts[0]]
+        else:
+            parent = sub
+        parser = parent.add_parser(parts[-1], add_help=False, allow_abbrev=False)
+        for name, shape in COMMON + arguments:
+            argument(parser, name, shape)
+        if mutates:
+            argument(parser, 'dry-run', 'flag')
+        if command in GUARDED:
+            argument(parser, 'expect-plan-hash', 'value')
+        parser.set_defaults(command=command)
+        leaves[command] = parser
+    return root, leaves
+
+
+def capabilities(leaves):
+    descriptors = []
+    for command, (mutates, network, _) in COMMANDS.items():
+        arguments = []
+        for action in leaves[command]._actions:
+            arguments.append(dict(name=action.dest, flags=action.option_strings,
+                                  type='integer' if action.type is int else 'boolean' if isinstance(action, argparse._StoreTrueAction) else 'string',
+                                  required=action.required, repeatable=isinstance(action, argparse._AppendAction) or action.nargs in ('+', '*'),
+                                  nargs=action.nargs, conflicts=CONFLICTS.get(command, {}).get(action.dest, [])))
+        descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
+                                effect='managed_mutation' if mutates else 'observational', network=network,
+                                dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
+    return dict(commands=descriptors, schemas=dict(result=1, project=1, machine=1, state=1),
+                targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+
+
+CONFLICTS = {
+    'project.set': {'skill': ['clear'], 'clear': ['skill']},
+    'project.set-targets': {'targets': ['inherit'], 'inherit': ['targets']},
+    'project.register': {'path': ['project'], 'project': ['path']},
+    'project.unregister': {'path': ['project'], 'project': ['path']},
+    'skill.validate': {'id': ['all'], 'all': ['id']},
+    'recover': {'inspect': ['complete', 'rollback'], 'complete': ['inspect', 'rollback'], 'rollback': ['inspect', 'complete']},
+    'plan': {'project': ['all'], 'all': ['project']},
+    'apply': {'project': ['all'], 'all': ['project']},
+    'doctor': {'project': ['all'], 'all': ['project']},
+}
+
+
+def validate_arguments(args):
+    command = args.command
+    for key, conflicts in CONFLICTS.get(command, {}).items():
+        if getattr(args, key, None) and any(getattr(args, other, None) for other in conflicts):
+            raise MaskError('invocation.invalid', f'{key} conflicts with {", ".join(conflicts)}', 2)
+    required_sets = {'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
+                     'config.set': ('target', 'git_timeout'), 'skill.validate': ('id', 'all'),
+                     'recover': ('inspect', 'complete', 'rollback')}
+    if command in required_sets and not any(getattr(args, key, None) for key in required_sets[command]):
+        raise MaskError('invocation.invalid', 'An explicit operand or mode is required.', 2)
+
+
+def dispatch(args, output, leaves):
+    if args.command == 'capabilities':
+        output['data'] = capabilities(leaves)
+        return
+    raise MaskError('config.command_unavailable', 'This command is not implemented in this version.')
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    before_separator = argv[:argv.index('--')] if '--' in argv else argv
+    machine = '--json' in before_separator
+    output = result()
+    exit_code = 0
+    try:
+        parser, leaves = make_parser()
+        if '--help' in before_separator or '--version' in before_separator:
+            output['command'] = 'help' if '--help' in before_separator else 'version'
+            output['data'] = {'version': VERSION}
+            if output['command'] == 'help':
+                words = [item for item in before_separator if not item.startswith('-')]
+                selected = '.'.join(words[:2])
+                output['data']['help'] = leaves.get(selected, leaves.get(words[0] if words else '', parser)).format_help()
+        else:
+            args = parser.parse_args(argv)
+            if not hasattr(args, 'command'):
+                raise MaskError('invocation.invalid', 'A complete command is required.', 2)
+            output = result(args.command, getattr(args, 'dry_run', False))
+            validate_arguments(args)
+            dispatch(args, output, leaves)
+    except MaskError as error:
+        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        exit_code = error.exit_code
+    except KeyboardInterrupt:
+        error = MaskError('invocation.interrupted', 'Interrupted by user.', 130)
+        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        exit_code = 130
+    except OSError:
+        error = MaskError('filesystem.failed', 'A filesystem operation failed.', 5)
+        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        exit_code = 5
+    except Exception:
+        error = MaskError('internal.invariant', 'An internal invariant failed.', 10)
+        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        exit_code = 10
+    if machine:
+        print(json.dumps(output, ensure_ascii=False, sort_keys=True))
+    elif output['error']:
+        print(f"{output['error']['code']}: {output['error']['message']}", file=sys.stderr)
+    else:
+        print(output['data'].get('help', json.dumps(output, ensure_ascii=False, indent=2)))
+    return exit_code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
