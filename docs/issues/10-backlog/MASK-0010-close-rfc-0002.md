@@ -31,7 +31,7 @@ Not started. Record actual commands, outcomes and commits here. Read the live bo
 
 ## Durable closeout anchor
 
-RFC_BASE_SHA: UNSET — integrator records a real pre-implementation commit at import/planning.
+RFC_BASE_SHA: 3ae8e253886063e246a11925c4f25a7e2490e553
 
 Planned cards: MASK-0005, MASK-0006, MASK-0007, MASK-0008, MASK-0009.
 

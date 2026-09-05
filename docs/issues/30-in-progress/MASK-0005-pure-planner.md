@@ -1,7 +1,7 @@
 ---
 id: MASK-0005
 title: Implement ownership-aware pure reconciliation plans
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0004"]
 ---
