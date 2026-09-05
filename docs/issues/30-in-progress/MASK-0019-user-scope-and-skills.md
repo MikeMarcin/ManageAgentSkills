@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0019"
 title: "Implement user consumers and recovery"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0005"]
 depends_on: []
 ---
