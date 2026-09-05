@@ -1,39 +1,145 @@
-# MASK — Manage Agent SKills
+![MASK — Declare. Preview. Deploy.](docs/assets/readme-header.svg)
 
-MASK is a Python 3.11+ CLI for a private local skill checkout and explicit project declarations. Run it directly with a known interpreter:
+**[Install](#install-and-select-a-source) · [First project](#add-skills-to-a-project) · [Updates](#update-skills-or-the-program) · [Recovery](#recover-or-stop-managing-a-project) · [CLI reference](docs/architecture/cli-contract.md)**
 
-```sh
-python3 /absolute/path/to/ManageAgentSkills/mask.py capabilities --json
-```
+MASK keeps project skill requirements in Git and deploys them as directory symlinks to one local skill checkout. A project declares what it needs in `.mask.json`; MASK validates the source, previews changes, and manages the links used by Claude and Codex.
 
-Capabilities describes implemented commands, arguments and effects. All machine responses use the versioned JSON envelope, including parser errors. See [the CLI contract](docs/architecture/cli-contract.md) for command details and exit codes. All listed v0.1.0 commands are implemented.
+This repository contains the Python CLI. The companion [AgentSkills repository](https://github.com/MikeMarcin/AgentSkills) contains the canonical skill instructions. Both repositories remain private.
 
-Initialize a machine with `init --source /absolute/path/to/AgentSkills`, inspect `skill list`, create a project declaration with `project init --project PATH`, and edit it with `project require ID` or `project unrequire ID`. `project set --skill ID` replaces the whole membership; `--clear` explicitly empties it. Use `--json` and `--dry-run` for previews. Registration is separate: `project register PATH`. Membership commands preserve unrelated requirements and repeat without rewriting files.
+## Requirements
 
-`.mask.json` contains portable skill IDs and optional targets. Complete workflow context is project-local under `.mask/skill-config/implement-rfc/`. `MASK_HOME` (or `--home`) selects machine state, defaulting to `~/.mask`. Source configuration and runtime program location are distinct. Runtime dependencies are Python and Git only; no package download, credential store, daemon, push or automatic synchronization is involved.
+- Python 3.11+ and Git. The runtime uses the Python standard library; there is no pip installation.
+- Local checkouts of ManageAgentSkills and AgentSkills. Cloning and remote updates use your existing Git access.
+- Directory symlink support. Windows needs existing symlink privileges; MASK does not elevate or substitute junctions or copies.
 
-Skills are inspected passively using the `mask-package-v1` frontmatter subset: single-line plain or quoted name/description scalars. MASK never executes a skill installer or hook. Source links/special entries, unsafe IDs, duplicate JSON keys and unsupported schema versions refuse.
+> [!NOTE]
+> Native macOS and Windows checks passed with Python 3.14.7. Linux is best-effort. See the [readiness report](docs/releases/v0.1.0.md) for exact results and limitations.
 
-Register then preview `plan --project PATH`; apply with `apply --project PATH --expect-plan-hash HASH`. Manifest edits can include `--apply --dry-run` to preview the entire prospective deployment. A collision preserves both the manifest and links. Never bypass a collision by deleting user content. `link adopt` records only an exact existing declared skill link with an explicit expected source.
+## Install and select a source
 
-`doctor --all --check` reports drift without repairing it. For interrupted writes, use `recover --inspect`, then explicit `--complete` or `--rollback`. Recovery preserves unexpected content and never resets Git. `project unregister PATH` removes only unchanged owned symlinks and preserves the declaration; `--keep-links` explicitly abandons ownership, including for an unavailable project. Empty created directories are retained and reported after rollback.
-
-Native symlink/recovery checks passed on macOS 26.6.2 and Windows 11 build 26200 with Python 3.14. Windows requires directory symlink privileges; MASK does not elevate or fall back to junctions/copies. The native Windows privilege-error mapping is tested by injecting winerror 1314. Launcher, process-tree timeout, frozen-update, recovery and end-to-end checks also passed on both native platforms. Python 3.11+ is the supported API baseline; these native runs used Python 3.14. Linux remains best-effort and was not part of native acceptance.
-
-Keep repository visibility and inherited-source licensing unchanged. Follow CONTRIBUTING.md, docs/rfcs/README.md and docs/issues/README.md for implementation. Generated machine state is not project source; no ordinary operation requires editing it by hand.
-
-Install a launcher using the selected interpreter:
+Clone both repositories into a directory of your choice:
 
 ```sh
-python3 /absolute/path/to/ManageAgentSkills/mask.py self install --bin-dir /absolute/path/to/bin --json
+git clone https://github.com/MikeMarcin/ManageAgentSkills.git
+git clone https://github.com/MikeMarcin/AgentSkills.git
 ```
 
-On Windows use a known supported interpreter (for example `py -3.14`) for this bootstrap command. MASK writes `mask.cmd` there; POSIX writes `mask`. The launcher records the actual interpreter and checkout paths, quotes spaces, forwards arguments and preserves the exit code. It refuses an unrelated or edited existing launcher. MASK does not change PATH: use the returned absolute launcher immediately, or manually add its directory to PATH if desired. `self status --json` reports discovery and ownership. Installation itself does not configure a skill source.
+On macOS or Linux, run the following from their parent directory using a supported `python3`:
 
-To review a fresh source update, run `source fetch --json`, then `update --dry-run --json`, then `update --expect-plan-hash HASH --json` with the returned hash. Dry-run never fetches and is labeled last-fetched. Update validates a frozen candidate against every registered live declaration, then fast-forwards and reconciles all consumers. Dirty/ahead/diverged/detached or unavailable/colliding projects block; no reset, stash, clean, push or automatic merge is attempted. A shared checkout changes content visible through all links immediately; update between active tasks because hosts may cache instructions.
+```sh
+mask_program="$PWD/ManageAgentSkills/mask.py"
+skill_source="$PWD/AgentSkills"
+mkdir -p "$HOME/.local/bin"
+python3 "$mask_program" self install --bin-dir "$HOME/.local/bin" --json
+"$HOME/.local/bin/mask" init --source "$skill_source" --json
+"$HOME/.local/bin/mask" capabilities --json
+"$HOME/.local/bin/mask" skill list --json
+```
 
-`self update --json` independently fast-forwards the running ManageAgentSkills checkout, verifies the v1 protocol and unchanged schema contracts, and reports `next_invocation_required`. It does not re-execute, update AgentSkills, reinstall or apply links. Ordinary local skill management works while the program checkout is dirty. Existing noninteractive Git authentication is used; user Git credential helpers and checkout filters remain trusted subprocesses, so MASK is not a sandbox. Timeouts terminate the created process tree; uncertain checkout effects retain recovery intent.
+MASK writes a launcher that records the selected interpreter and program checkout. It leaves PATH unchanged. Use the absolute launcher path immediately, or add its directory to PATH yourself before using the shorter `mask` commands below. An unrelated or edited existing launcher is preserved and causes a refusal.
 
-After a partial update, inspect `recover --inspect --json`. Complete only matching recorded intent; rollback never resets an advanced Git checkout. Changed manifests, links or launchers are preserved and block recovery. `project unregister PATH --json` leaves the project's manifest/context and both repositories intact. For an unavailable project, `--keep-links` explicitly abandons its ownership. To remove MASK completely, first unregister the selected consumers, then explicitly remove only the verified owned launcher/program checkout as an ordinary user action, preserving source history and bootstrap backups. There is no purge command. Source relocation is an explicit unregister/setup/register operation; preserve the existing machine directory when setting up another with `--home PATH`.
+On Windows, use PowerShell with a known supported Python installation. For example, if Python 3.14 is installed and the repositories are under `C:\work`:
 
-The named dogfood installation manages only ManageAgentSkills and AgentSkills. Each declares both shared skills and keeps its own workflow context. Verified bootstrap backups remain in each `.mask/bootstrap-retired/implement-rfc-2026-09-05`, outside discovery paths. No source payload is copied into a persistent project fork. See [v0.1.0 readiness](docs/releases/v0.1.0.md) for actual platform evidence, handoffs and limitations.
+```powershell
+$maskBin = Join-Path $env:LOCALAPPDATA 'Programs\MASK'
+New-Item -ItemType Directory -Force -Path $maskBin | Out-Null
+py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin --json
+& "$maskBin\mask.cmd" init --source 'C:\work\AgentSkills' --json
+& "$maskBin\mask.cmd" capabilities --json
+```
+
+The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status --json` reports the program, interpreter and launcher discovery. Installing the launcher and selecting the skill source are separate operations.
+
+## Add skills to a project
+
+Use an existing project root. These examples use `/absolute/path/to/project` as a placeholder; replace it before running them. `project init` creates an empty declaration, while `project register` records the project on this machine.
+
+```sh
+mask project init --project /absolute/path/to/project --json
+mask project register /absolute/path/to/project --json
+mask project require manage-agent-skills --project /absolute/path/to/project --apply --dry-run --json
+```
+
+Inspect the proposed actions and `data.plan_hash`. Apply that same proposal using its returned hash, then check the result:
+
+```sh
+mask project require manage-agent-skills --project /absolute/path/to/project --apply --expect-plan-hash RETURNED_HASH --json
+mask plan --project /absolute/path/to/project --json
+mask doctor --project /absolute/path/to/project --check --json
+```
+
+> [!TIP]
+> A converged plan reports `would_change: false`. If the hash is stale, review a new preview. Preserve collisions rather than deleting existing skill content.
+
+Deploying `implement-rfc` also requires [consumer workflow context](https://github.com/MikeMarcin/AgentSkills#configure-implement-rfc).
+
+| Intent | Command |
+|---|---|
+| Add requirements without removing others | `project require ID ...` |
+| Remove selected requirements | `project unrequire ID ...` |
+| Replace the complete membership | `project set --skill ID --skill OTHER` |
+| Explicitly empty membership | `project set --clear` |
+| Choose agent targets | `project set-targets claude codex` |
+| Restore default targets | `project set-targets --inherit` |
+| Inspect declaration and deployment | `project show --project PATH` |
+| Reconcile existing declarations | `plan --project PATH`, then guarded `apply --project PATH` |
+
+Membership edits change the manifest. Add `--apply` to reconcile a registered project in the same operation; add `--dry-run` to preview it first. Use `--json` for structured results throughout.
+
+## What belongs where
+
+A portable declaration contains skill IDs and optional targets:
+
+```json
+{
+  "schema_version": 1,
+  "skills": ["manage-agent-skills"],
+  "targets": ["claude", "codex"]
+}
+```
+
+| Location | Purpose |
+|---|---|
+| `AgentSkills/skills/<id>/` | Canonical skill payload, including `SKILL.md` |
+| `<project>/.mask.json` | Versioned project requirements |
+| `<project>/.mask/skill-config/implement-rfc/` | Versioned workflow context for that consumer |
+| `<project>/.agents/skills/<id>` | Generated Codex directory symlink |
+| `<project>/.claude/skills/<id>` | Generated Claude directory symlink |
+| `~/.mask/` | Local machine configuration, ownership and recovery state |
+
+Commit declarations and project context. Ignore generated links and `.mask/generated/`; prefer per-entry ignore rules when unrelated real skills share the directory. `--home PATH` overrides `MASK_HOME`, which otherwise defaults to `~/.mask`. Normal operation never requires editing internal state files.
+
+## Update skills or the program
+
+> [!IMPORTANT]
+> A source update affects **every registered project**. Run it between active tasks; all links share one checkout, and running agents may cache instructions.
+
+```sh
+mask source status --json
+mask source fetch --json
+mask update --dry-run --json
+mask update --expect-plan-hash RETURNED_HASH --json
+```
+
+`source fetch` refreshes Git objects and remote-tracking refs without activating content. The dry run performs no fetch and reports last-fetched state. `update` validates a frozen candidate against live project declarations, fast-forwards the source, and reconciles its consumers. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
+
+`mask self update --json` updates only the running ManageAgentSkills checkout. It checks protocol/schema compatibility and returns `next_invocation_required`; the next command loads the new implementation. It does not update skills or reinstall the launcher. Local skill management remains available while the program checkout has authoring changes.
+
+## Recover or stop managing a project
+
+Inspect an interrupted operation with `mask recover --inspect --json`. After checking the recorded intent, choose explicit `--complete` or `--rollback`. Recovery preserves unexpected edits and never resets a Git checkout that has advanced. Git helpers and checkout filters remain trusted subprocesses; MASK is not a sandbox or an atomic deployment system.
+
+`mask project unregister PATH --json` removes only unchanged owned links and preserves the declaration, context and source. `--keep-links` explicitly abandons ownership, including for an unavailable project. Exact existing declared links can be adopted with `link adopt`; consult the [CLI contract](docs/architecture/cli-contract.md) for its required preconditions.
+
+To remove the program, unregister the selected projects first, then explicitly remove the verified owned launcher and program checkout while preserving source history and backups. There is no purge command. Source relocation likewise requires an explicit unregister/setup/register sequence; a new `--home PATH` can preserve the old machine state during setup.
+
+## Development and reference
+
+For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_end.EndToEndTests.test_public_management_sequence` from this checkout. It uses disposable projects and local bare Git remotes. Run `python3 -B scripts/verify_documentation.py` for the RFC/issue structure gate; choose additional tests for the behavior being changed.
+
+- [CLI contract and exit codes](docs/architecture/cli-contract.md)
+- [JSON schemas](schemas/)
+- [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and [issue board](docs/issues/README.md)
+- [Local v0.1.0 readiness and implementation provenance](docs/releases/v0.1.0.md)
+
+Both named repositories currently consume the shared skills. Verified bootstrap copies remain outside discovery roots in each `.mask/bootstrap-retired/implement-rfc-2026-09-05`. Filesystem deployment and bounded workflow invocation were verified; agent UI loading was not. MASK has no daemon, automatic synchronization, global skill installation or publishing command.

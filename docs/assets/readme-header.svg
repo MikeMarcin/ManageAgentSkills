@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="350" viewBox="0 0 1200 350" role="img" aria-labelledby="title desc">
+  <title id="title">MASK — Manage Agent SKills</title>
+  <desc id="desc">Declare project requirements. Preview changes. Deploy shared skills. Python 3.11 and later, JSON CLI, native directory links.</desc>
+  <defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#101c39"/><stop offset="1" stop-color="#281a4d"/></linearGradient><linearGradient id="accent"><stop stop-color="#80d8ff"/><stop offset="1" stop-color="#b89bff"/></linearGradient></defs>
+  <rect width="1200" height="350" rx="24" fill="url(#bg)"/>
+  <circle cx="1170" cy="20" r="195" fill="#b59aff" opacity=".06"/><circle cx="1005" cy="375" r="180" fill="#80d8ff" opacity=".05"/>
+  <g font-family="Arial">
+    <text x="48" y="55" fill="#acb9d3" font-size="14" font-weight="600" letter-spacing="3">MANAGE AGENT SKILLS</text>
+    <text x="45" y="127" fill="#fff" font-size="66" font-weight="700">MASK</text>
+    <text x="48" y="171" fill="#d6dded" font-size="24">Declare. Preview. Deploy.</text>
+    <text x="48" y="206" fill="#acb9d3" font-size="17">Shared skill instructions, explicit project requirements.</text>
+    <rect x="48" y="250" width="132" height="33" rx="16" fill="#223450"/><text x="66" y="272" fill="#9ce5ff" font-size="14">Python 3.11+</text>
+    <rect x="191" y="250" width="103" height="33" rx="16" fill="#302650"/><text x="211" y="272" fill="#d2baff" font-size="14">JSON CLI</text>
+    <rect x="306" y="250" width="150" height="33" rx="16" fill="#223450"/><text x="323" y="272" fill="#c1d6ed" font-size="14">Directory links</text>
+    <rect x="659" y="57" width="491" height="237" rx="16" fill="#10172b" stroke="#414965"/>
+    <circle cx="683" cy="80" r="4" fill="#80d8ff"/><circle cx="699" cy="80" r="4" fill="#b89bff"/><circle cx="715" cy="80" r="4" fill="#69809d"/>
+    <text x="687" y="128" fill="#9cabc4" font-size="14">PROJECT DECLARATION</text>
+    <text x="687" y="159" fill="#f2f5fc" font-family="Courier New" font-size="21">.mask.json</text>
+    <path d="M687 183 H1120" stroke="#35405c"/>
+    <text x="687" y="221" fill="#9ce5ff" font-size="18" font-weight="600">plan</text><path d="M747 215 H775 m-7 -5 7 5 -7 5" fill="none" stroke="#7388a8" stroke-width="2"/>
+    <text x="790" y="221" fill="#d2baff" font-size="18" font-weight="600">guarded apply</text><path d="M926 215 H954 m-7 -5 7 5 -7 5" fill="none" stroke="#7388a8" stroke-width="2"/>
+    <text x="969" y="221" fill="#b6e3d4" font-size="18" font-weight="600">skill links</text>
+    <text x="687" y="264" fill="#9cabc4" font-size="14">Claude + Codex · one canonical source</text>
+  </g>
+</svg>
