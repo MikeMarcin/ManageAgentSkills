@@ -11,3 +11,5 @@ __pycache__/
 /.claude/skills/wizard
 /.mask/attended-review/
 /.mask/sessions/
+/.claude/agents/rfc-*.md
+/.codex/agents/rfc-*.toml
