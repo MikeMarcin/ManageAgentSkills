@@ -1,7 +1,7 @@
 ---
 id: MASK-0005
 title: Implement ownership-aware pure reconciliation plans
-status: In Progress
+status: Done
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0004"]
 ---
@@ -26,4 +26,4 @@ Unmanaged objects/linked parents/unsafe state/unavailable roots become blockers.
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Implemented pure ownership-aware plans with complete selected-project preflight, source supporting-file fingerprints, root identity checks and stable plan hashes. python3 -m unittest tests.test_reconcile_plan: 3 PASS; subprocess snapshots prove no writes, unavailable/poisoned-state/linked-parent/collision cases refuse safely. Commit: this Done move.

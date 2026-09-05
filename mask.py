@@ -16,6 +16,7 @@ PROGRAM_ROOT = Path(__file__).resolve().parent
 
 
 import mask_core as core
+import mask_fs as fs
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -60,7 +61,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+IMPLEMENTED = {'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -156,6 +157,23 @@ def machine_home(args):
 
 def machine_config(home):
     return core.config(core.read_json(home / 'config.json'))
+
+
+def selected_roots(args, state, *, all_default=False):
+    if getattr(args, 'all', False) or all_default and not getattr(args, 'project', None):
+        return [Path(key) for key in sorted(state['projects'])]
+    root = core.project_root(getattr(args, 'project', None))
+    if str(root) not in state['projects']:
+        core.fail('project.not_registered', 'Project is not registered.', 4, root=str(root))
+    return [root]
+
+
+def reconciliation(args, output, home):
+    config = machine_config(home)
+    state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+    roots = selected_roots(args, state)
+    planned = fs.plan(config, state, roots)
+    fs.public_plan(planned, output)
 
 
 def project_dispatch(args, output, home):
@@ -291,6 +309,8 @@ def local_dispatch(args, output, leaves):
                     core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
                 output.update(changed=True, transaction='committed')
         return
+    if command == 'plan':
+        return reconciliation(args, output, home)
     if command.startswith('project.'):
         return project_dispatch(args, output, home)
     config = machine_config(home)

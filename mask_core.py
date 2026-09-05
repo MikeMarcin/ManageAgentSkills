@@ -281,6 +281,8 @@ def metadata(text, expected_id):
 
 def package(source, identifier, content=False):
     skill_id(identifier)
+    if kind(source) != 'directory':
+        fail('source.missing', 'Source checkout is unavailable or linked.')
     base = source / 'skills'
     root = base / identifier
     for path in (base, root):
