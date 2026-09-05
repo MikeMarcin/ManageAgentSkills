@@ -1,7 +1,7 @@
 ---
 id: MASK-0012
 title: Implement portable launchers and separate self update
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0003
 depends_on: ["MASK-0011"]
 ---
