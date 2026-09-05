@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+import unittest
 from tests.support import ENTRY
 from tests.support import Fixture
 
@@ -72,3 +73,24 @@ raise SystemExit(mask.main(['apply', '--project', sys.argv[2], '--home', sys.arg
         self.assertFalse((self.project / '.agents/skills/alpha').is_symlink())
         self.assertFalse((self.home / 'pending.json').exists())
         self.assertTrue(data['data']['retained_directories'])
+
+    def test_replaced_parent_refuses(self):
+        self.call('apply')
+        parent = self.project / '.agents'; moved = self.project / '.agents-retained'
+        parent.rename(moved)
+        parent.symlink_to(moved, target_is_directory=True)
+        before = self.snapshot()
+        self.assertEqual(self.call('apply', code=4)['error']['code'], 'target.parent_link')
+        self.assertEqual(before, self.snapshot())
+
+    @unittest.skipUnless(os.name == 'nt', 'native Windows symlink error mapping')
+    def test_windows_missing_privilege_refusal(self):
+        import mask_fs
+        from unittest.mock import patch
+        from pathlib import Path
+        error = OSError('required privilege not held'); error.winerror = 1314
+        entry = dict(root=str(self.project), relative='.agents/skills/alpha', before=None, after=str(self.source / 'skills/alpha'))
+        with patch.object(Path, 'symlink_to', side_effect=error):
+            with self.assertRaises(mask_fs.c.MaskError) as caught:
+                mask_fs.set_link(entry, 'after')
+        self.assertEqual(caught.exception.code, 'target.symlink_unsupported')

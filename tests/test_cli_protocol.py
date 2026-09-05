@@ -9,7 +9,7 @@ ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
 
 class ProtocolTests(unittest.TestCase):
     def invoke(self, *args):
-        run = subprocess.run([sys.executable, str(ENTRY), *args], capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(ENTRY), *args], capture_output=True, encoding="utf-8")
         payload = json.loads(run.stdout)
         self.assertEqual(run.stderr, '')
         self.assertEqual(payload['ok'], run.returncode == 0)
@@ -40,6 +40,6 @@ class ProtocolTests(unittest.TestCase):
             self.assertTrue(self.invoke(*args, '--json')[1]['ok'])
 
     def test_operand_json_is_not_a_flag(self):
-        run = subprocess.run([sys.executable, str(ENTRY), 'skill', 'show', '--', '--json'], capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(ENTRY), 'skill', 'show', '--', '--json'], capture_output=True, encoding="utf-8")
         self.assertEqual(run.stdout, '')
         self.assertNotEqual(run.returncode, 0)

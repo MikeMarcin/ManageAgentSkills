@@ -163,6 +163,10 @@ def selected_roots(args, state, *, all_default=False):
     if getattr(args, 'all', False) or all_default and not getattr(args, 'project', None):
         return [Path(key) for key in sorted(state['projects'])]
     root = core.project_root(getattr(args, 'project', None))
+    for known in state['projects']:
+        if Path(known).is_dir() and os.path.samefile(root, known):
+            root = Path(known)
+            break
     if str(root) not in state['projects']:
         core.fail('project.not_registered', 'Project is not registered.', 4, root=str(root))
     return [root]
@@ -430,6 +434,8 @@ def dispatch(args, output, leaves):
 
 
 def main(argv=None):
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     argv = list(sys.argv[1:] if argv is None else argv)
     before_separator = argv[:argv.index('--')] if '--' in argv else argv
     machine = '--json' in before_separator

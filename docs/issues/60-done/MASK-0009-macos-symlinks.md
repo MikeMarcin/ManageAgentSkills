@@ -1,7 +1,7 @@
 ---
 id: MASK-0009
 title: Verify native macOS symlink safety
-status: In Progress
+status: Done
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0007"]
 platform: macos
@@ -27,4 +27,4 @@ Native macOS: selected `tests.test_reconcile_plan`, `tests.test_reconcile_apply`
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Native macOS 26.6.2 build 25G83, Python 3.14.7: focused planner/apply/recovery suite PASS (19 tests, 2 Windows-only skips); final affected protocol-inclusive rerun 23 tests PASS, 2 Windows-only skips. Actual directory symlinks, case-insensitive APFS aliases, Unicode/spaced roots, replaced parents and crash recovery exercised. Local disposable fixtures cleaned automatically. Commit: this Done move.

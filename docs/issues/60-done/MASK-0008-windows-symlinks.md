@@ -1,7 +1,7 @@
 ---
 id: MASK-0008
 title: Verify native Windows symlink safety
-status: In Progress
+status: Done
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0007"]
 platform: windows
@@ -27,4 +27,4 @@ Native Windows: `python -m unittest tests.test_reconcile_plan tests.test_reconci
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Native Windows 11 build 26200, Python 3.14: tests.test_reconcile_plan tests.test_reconcile_apply tests.test_recovery — 19 PASS over existing authorized SSH to example-win-host. Covers real directory symlinks, actual junction refusal, case aliases, Unicode/spaces, busy lock and restart recovery. Winerror 1314 refusal is injected on native Windows; privileges were not changed. Fixed extended raw readlink spelling exposed by native run. Temporary test root C:/Users/example/AppData/Local/Temp/mask-native-e_tfvy_0 remains active for final launcher/end-to-end tests; remove at MASK-0016. Commit: this Done move.

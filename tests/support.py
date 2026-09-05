@@ -29,7 +29,7 @@ class Fixture(unittest.TestCase):
         self.git(self.project, 'init', '-b', 'main')
 
     def git(self, root, *args):
-        return subprocess.run(['git', '-C', str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
+        return subprocess.run(['git', '-C', str(root), *args], capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
     def add_skill(self, name, description='Fixture skill'):
         root = self.source / 'skills' / name
@@ -41,7 +41,7 @@ class Fixture(unittest.TestCase):
         environment = dict(os.environ, MASK_HOME=str(self.home), PYTHONDONTWRITEBYTECODE='1')
         if env:
             environment.update(env)
-        run = subprocess.run([sys.executable, str(ENTRY), *map(str, args), '--json'], capture_output=True, text=True, cwd=cwd or self.project, env=environment)
+        run = subprocess.run([sys.executable, str(ENTRY), *map(str, args), '--json'], capture_output=True, encoding="utf-8", cwd=cwd or self.project, env=environment)
         data = json.loads(run.stdout)
         self.assertEqual(run.returncode, code, (run.stdout, run.stderr))
         self.assertEqual(run.stderr, '')

@@ -14,7 +14,19 @@ def link_value(path):
 
 
 def normalized_link(path, raw):
+    if os.name == 'nt':
+        if raw.startswith('\\\\?\\UNC\\'):
+            raw = '\\\\' + raw[8:]
+        elif raw.startswith('\\\\?\\'):
+            raw = raw[4:]
     return Path(os.path.abspath(path.parent / raw))
+
+
+def creation_link_text(source):
+    raw = str(source)
+    if os.name == 'nt' and not raw.startswith('\\\\?\\'):
+        return '\\\\?\\UNC\\' + raw[2:] if raw.startswith('\\\\') else '\\\\?\\' + raw
+    return raw
 
 
 def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply'):
@@ -50,7 +62,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                         packages[identifier] = candidate['packages'][identifier] if candidate else c.package(source, identifier)
                     for target in desired.get('targets', config['default_targets']):
                         relative = f'{c.ADAPTERS[target]}/{identifier}'
-                        expected[relative] = dict(skill=identifier, target=target, link_text=str(source / 'skills' / identifier))
+                        expected[relative] = dict(skill=identifier, target=target, link_text=creation_link_text(source / 'skills' / identifier))
             next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
             next_record['links'] = {}
             leaves = []

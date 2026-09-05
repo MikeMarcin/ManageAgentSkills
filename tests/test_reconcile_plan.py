@@ -1,5 +1,7 @@
 import os
 import json
+import subprocess
+import unittest
 from pathlib import Path
 from tests.support import Fixture
 
@@ -39,3 +41,19 @@ class PlannerTests(Fixture):
         data['projects'][str(self.project)]['links']['../../outside'] = dict(skill='alpha', target='codex', link_text='/wrong')
         path.write_text(json.dumps(data))
         self.assertEqual(self.call('plan', '--all', cwd=self.base, code=3)['error']['code'], 'state.invalid')
+
+    def test_case_aliases_on_case_insensitive_filesystem(self):
+        alias = self.project.with_name(self.project.name.upper())
+        if not alias.exists():
+            self.skipTest('filesystem is case-sensitive')
+        self.assertFalse(self.call('project', 'register', alias)['changed'])
+        self.assertEqual(len(self.call('project', 'list')['data']['projects']), 1)
+        self.assertTrue(self.call('plan', '--project', alias)['data']['applicable'])
+
+    @unittest.skipUnless(os.name == 'nt', 'native Windows junction case')
+    def test_windows_junction_parent_refuses(self):
+        outside = self.base / 'outside'; outside.mkdir()
+        junction = self.project / '.agents'
+        subprocess.run(['cmd', '/c', 'mklink', '/J', str(junction), str(outside)], check=True, capture_output=True)
+        self.assertEqual(self.call('plan')['data']['blockers'][0]['code'], 'target.parent_link')
+        self.assertEqual(list(outside.iterdir()), [])
