@@ -1,7 +1,7 @@
 ---
 id: MASK-0006
 title: Implement serialized journaled symlink effects
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0005"]
 ---
