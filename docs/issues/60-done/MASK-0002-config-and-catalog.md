@@ -1,7 +1,7 @@
 ---
 id: MASK-0002
 title: Implement machine setup and passive skill inspection
-status: In Progress
+status: Done
 rfc: RFC-MASK-0001
 depends_on: ["MASK-0001"]
 ---
@@ -26,4 +26,4 @@ Invalid schemas/IDs/special entries refuse; no-op setup preserves bytes; source 
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Implemented strict JSON/config/package validation, OS writer lock, atomic writes, passive metadata/catalog and fingerprints. python3 -m unittest tests.test_skill_catalog tests.test_cli_protocol: 9 PASS; changed catalog subset rerun 5 PASS. Dry-run/no-op snapshots unchanged, special source links refused, no skill code executed. Commit: this Done move.

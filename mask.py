@@ -14,16 +14,8 @@ ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
 PROGRAM_ROOT = Path(__file__).resolve().parent
 
 
-class MaskError(Exception):
-    def __init__(self, code, message, exit_code=3, *, details=None, retryable=False):
-        super().__init__(message)
-        self.code, self.exit_code = code, exit_code
-        self.details, self.retryable = details or {}, retryable
-
-    def as_dict(self):
-        return dict(code=self.code, message=str(self), retryable=self.retryable,
-                    details=self.details, remediation=[dict(kind='inspect', message='Inspect the reported inputs and retry only after resolving the condition.')])
-
+import mask_core as core
+from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
@@ -67,7 +59,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'capabilities'}
+IMPLEMENTED = {'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate'}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -157,11 +149,87 @@ def validate_arguments(args):
         raise MaskError('invocation.invalid', 'An explicit operand or mode is required.', 2)
 
 
-def dispatch(args, output, leaves):
-    if args.command == 'capabilities':
+def machine_home(args):
+    return Path(getattr(args, 'home', os.environ.get('MASK_HOME', str(Path.home() / '.mask')))).expanduser().resolve()
+
+
+def machine_config(home):
+    return core.config(core.read_json(home / 'config.json'))
+
+
+def local_dispatch(args, output, leaves):
+    command = args.command
+    home = machine_home(args)
+    if command == 'capabilities':
         output['data'] = capabilities(leaves)
         return
-    raise MaskError('config.command_unavailable', 'This command is not implemented in this version.')
+    if command == 'init':
+        source = Path(args.source).expanduser().resolve()
+        core.checkout(source)
+        if source == PROGRAM_ROOT or home.is_relative_to(source / 'skills') or source.is_relative_to(home):
+            core.fail('config.invalid', 'Source, program and machine state must have distinct non-overlapping write locations.')
+        proposal = core.config(dict(schema_version=1, source=dict(root=str(source), remote=getattr(args, 'remote', 'origin'), branch=getattr(args, 'branch', 'main')),
+                                    default_targets=getattr(args, 'target', ['claude', 'codex']), git_timeout_seconds=30))
+        if core.git(source, 'check-ref-format', '--branch', proposal['source']['branch'], optional=True) is None or core.git(source, 'check-ref-format', 'refs/remotes/' + proposal['source']['remote'] + '/mask-check', optional=True) is None:
+            core.fail('config.invalid', 'Invalid Git remote or branch name.')
+        core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+        existing = core.read_json(home / 'config.json', default={})
+        if existing and core.config(existing) != proposal:
+            core.fail('config.already_initialized', 'Machine already has a different configuration.', 4)
+        output['data'] = dict(config=proposal, program_root=str(PROGRAM_ROOT))
+        if not existing:
+            output['would_change'] = True
+            output['actions'] = [dict(kind='config.create', status='planned')]
+            if not output['dry_run']:
+                core.atomic_text(home / 'config.json', core.text_json(proposal), None)
+                if core.kind(home / 'state.json') == 'missing':
+                    core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
+                output.update(changed=True, transaction='committed')
+        return
+    config = machine_config(home)
+    source = Path(config['source']['root'])
+    if command == 'config.show':
+        output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home))
+    elif command == 'config.set':
+        proposal = dict(config)
+        if hasattr(args, 'target'):
+            proposal['default_targets'] = args.target
+        if hasattr(args, 'git_timeout'):
+            proposal['git_timeout_seconds'] = args.git_timeout
+        proposal = core.config(proposal)
+        output['data'] = dict(config=proposal)
+        output['would_change'] = proposal != config
+        if proposal != config and not output['dry_run']:
+            core.atomic_text(home / 'config.json', core.text_json(proposal), core.read_text(home / 'config.json'))
+            output.update(changed=True, transaction='committed')
+    elif command == 'skill.list' or command == 'skill.validate' and getattr(args, 'all', False):
+        entries = core.catalog(source)
+        output['data'] = dict(skills=entries, scope='mask-package-v1')
+        if command == 'skill.validate' and any(not item['valid'] for item in entries):
+            core.fail('skill.invalid', 'One or more packages failed validation.')
+    elif command in ('skill.show', 'skill.validate'):
+        output['data'] = core.package(source, args.id, getattr(args, 'content', False))
+    else:
+        core.fail('config.command_unavailable', 'This command is not implemented in this version.')
+
+
+def dispatch(args, output, leaves):
+    if args.command not in IMPLEMENTED:
+        core.fail('config.command_unavailable', 'This command is not implemented in this version.')
+    mutates = COMMANDS[args.command][0] and not output['dry_run']
+    home = machine_home(args)
+    if mutates:
+        with core.writer_lock(home):
+            if core.kind(home / 'pending.json') != 'missing':
+                core.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
+            local_dispatch(args, output, leaves)
+    else:
+        local_dispatch(args, output, leaves)
+    if output['dry_run'] and output['would_change']:
+        output['transaction'] = 'not_started'
+    for action in output['actions']:
+        if output['changed']:
+            action['status'] = 'applied'
 
 
 def main(argv=None):
