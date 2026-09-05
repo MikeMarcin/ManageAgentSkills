@@ -1,7 +1,7 @@
 ---
 id: MASK-0017
 title: Verify macOS launcher and agent CLI path
-status: Backlog
+status: Done
 rfc: RFC-MASK-0004
 depends_on: ["MASK-0015"]
 platform: macos
@@ -27,4 +27,4 @@ Native macOS focused `tests.test_launcher` and `tests.test_end_to_end`; reuse un
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Native macOS 26.6.2 build 25G83 / Python 3.14.7: tests.test_end_to_end 2 PASS with explicit shared skill/context fixtures; actual launcher forwarding/exit/no-op/collision and PATH test PASS. Named ~/.local/bin/mask installed through self install after dry-run, discovered on existing PATH, repeated install no-op; invalid command exit 2. Actual apply --all converges and doctor --all --check healthy. Linked audit_board.py and resolver invoked in both repos: distinct mask/agent-skills contexts, same canonical asset root. Earlier safety and update checks reused. No agent UI load claim. Commit: this Done move.

@@ -88,6 +88,11 @@ def validate_program(root, candidate):
         c.fail('source.candidate_invalid', 'Program protocol or schema migration requires explicit review.', 4)
 
 
+def on_path(path):
+    found = shutil.which('mask')
+    return bool(found and path.exists() and os.path.samefile(found, path))
+
+
 def dispatch(args, output, home, root):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config_raw = c.read_json(home / 'config.json', default={})
@@ -112,7 +117,7 @@ def dispatch(args, output, home, root):
             c.fail('launcher.collision', 'Existing launcher is unrelated or edited; preserve it.', 4, path=str(path))
         intent['after_state']['launchers'][str(path)] = record
         planned['would_change'] = actual != content or state != intent['after_state'] or os.name != 'nt' and not os.access(path, os.X_OK)
-        output['data'] = dict(launcher=str(path), interpreter=record['interpreter'], on_path=shutil.which('mask') == str(path))
+        output['data'] = dict(launcher=str(path), interpreter=record['interpreter'], on_path=on_path(path))
         if not planned['would_change']:
             return
         intent['after_state']['generation'] += 1
@@ -124,6 +129,7 @@ def dispatch(args, output, home, root):
         pending['launcher'] = dict(path=str(path))
         pending['directories'] = [str(directory)] if c.kind(directory) == 'missing' else []
         fs.execute(planned, home, output, pending=pending)
+        output['data']['on_path'] = on_path(path)
         return
     timeout = (config or {}).get('git_timeout_seconds', 30)
     observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)

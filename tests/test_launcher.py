@@ -13,7 +13,8 @@ class LauncherTests(Fixture):
         before = self.snapshot()
         self.call('self', 'install', '--bin-dir', directory, '--dry-run')
         self.assertEqual(before, self.snapshot())
-        result = self.call('self', 'install', '--bin-dir', directory)
+        result = self.call('self', 'install', '--bin-dir', directory, env={'PATH': str(directory) + os.pathsep + os.environ['PATH']})
+        self.assertTrue(result['data']['on_path'])
         launcher = result['data']['launcher']
         self.assertFalse(self.call('self', 'install', '--bin-dir', directory)['changed'])
         args = [launcher, 'self', 'status', '--home', str(self.home), '--json']
