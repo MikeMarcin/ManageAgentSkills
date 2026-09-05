@@ -1,7 +1,7 @@
 ---
 id: MASK-0013
 title: Verify noninteractive and partial-update boundaries
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0003
 depends_on: ["MASK-0011", "MASK-0012"]
 ---
