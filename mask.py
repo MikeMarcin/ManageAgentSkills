@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 from pathlib import Path
@@ -59,7 +60,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate'}
+IMPLEMENTED = {'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -157,6 +158,110 @@ def machine_config(home):
     return core.config(core.read_json(home / 'config.json'))
 
 
+def project_dispatch(args, output, home):
+    command = args.command
+    state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+    config_raw = core.read_json(home / 'config.json', default={})
+    config = core.config(config_raw) if config_raw else None
+    if command == 'project.list':
+        output['data'] = dict(projects=[dict(record, available=Path(root).is_dir()) for root, record in sorted(state['projects'].items())])
+        return
+    selection = getattr(args, 'project', getattr(args, 'path', None))
+    if command == 'project.unregister' and getattr(args, 'keep_links', False) and selection is not None:
+        root = Path(selection).expanduser().resolve()
+    else:
+        root = core.project_root(selection, initializing=command == 'project.init')
+    path = root / '.mask.json'
+    key = str(root)
+    record = state['projects'].get(key)
+    if command == 'project.init':
+        if core.kind(path) != 'missing':
+            declaration = core.project_manifest(root)
+            output['data'] = dict(root=key, manifest=declaration)
+            return
+        output['data'] = dict(root=key, manifest=dict(schema_version=1, skills=[]))
+        output['would_change'] = True
+        if not output['dry_run']:
+            core.atomic_text(path, core.text_json(output['data']['manifest']), None)
+            output.update(changed=True, transaction='committed')
+        return
+    if command == 'project.unregister':
+        if record is None:
+            output['data'] = dict(root=key, registered=False)
+            return
+        keep = getattr(args, 'keep_links', False)
+        if record['links'] and not keep:
+            core.fail('config.command_unavailable', 'Owned-link removal requires the reconciliation engine.')
+        if not keep:
+            core.registered_root(root, record)
+        after = copy.deepcopy(state)
+        del after['projects'][key]
+        output['data'] = dict(root=key, registered=False, abandoned_paths=[str(root / rel) for rel in record['links']] if keep else [])
+        output['would_change'] = True
+        if not output['dry_run']:
+            core.save_state(home, state, after)
+            output.update(changed=True, transaction='committed')
+        return
+    declaration = core.project_manifest(root)
+    if record:
+        core.registered_root(root, record)
+    output['data'] = dict(root=key, manifest=declaration, registered=record is not None,
+                          configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
+    if command == 'project.show':
+        output['data']['source'] = config['source'] if config else None
+        output['data']['ownership'] = record['links'] if record else {}
+        output['data']['host_load'] = 'not_verified'
+        return
+    if config is None:
+        core.fail('config.missing', 'Initialize the machine source before this operation.')
+    source = Path(config['source']['root'])
+    if getattr(args, 'apply', False):
+        if record is None and command != 'project.register':
+            core.fail('project.not_registered', '--apply requires a registered project.', 4)
+        core.fail('config.command_unavailable', 'The registered-project reconciler is not implemented yet.')
+    if command == 'project.register':
+        if record:
+            return
+        for adapter in ADAPTERS.values():
+            destination = root / adapter
+            if source.is_relative_to(destination) or home.is_relative_to(destination) or destination.is_relative_to(source / 'skills') or root == home:
+                core.fail('config.invalid', 'Managed source, state and destination locations overlap.')
+        for identifier in declaration['skills']:
+            core.package(source, identifier)
+        after = copy.deepcopy(state)
+        after['projects'][key] = core.registry_record(root, declaration, source)
+        output['data']['registered'] = True
+        output['would_change'] = True
+        if not output['dry_run']:
+            core.save_state(home, state, after)
+            output.update(changed=True, transaction='committed')
+        return
+    proposal = copy.deepcopy(declaration)
+    if command == 'project.set':
+        proposal['skills'] = getattr(args, 'skill', [])
+    elif command in ('project.require', 'project.unrequire'):
+        for identifier in args.ids:
+            core.skill_id(identifier)
+        existing = set(proposal['skills'])
+        proposal['skills'] = sorted(existing.union(args.ids) if command.endswith('require') and not command.endswith('unrequire') else existing.difference(args.ids))
+    elif command == 'project.set-targets':
+        if getattr(args, 'inherit', False):
+            proposal.pop('targets', None)
+        else:
+            proposal['targets'] = args.targets
+    proposal = core.manifest(proposal)
+    for identifier in proposal['skills']:
+        core.package(source, identifier)
+    output['data']['manifest'] = proposal
+    output['data']['plan_hash'] = core.digest(dict(command=command, root=key, before=declaration, after=proposal, generation=state['generation'], config=config))
+    output['would_change'] = proposal != declaration
+    if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
+        core.fail('plan.stale', 'The prospective manifest changed since preview.', 4)
+    if proposal != declaration and not output['dry_run']:
+        core.atomic_text(path, core.text_json(proposal), core.read_text(path, 'manifest'))
+        output.update(changed=True, transaction='committed')
+
+
 def local_dispatch(args, output, leaves):
     command = args.command
     home = machine_home(args)
@@ -186,6 +291,8 @@ def local_dispatch(args, output, leaves):
                     core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
                 output.update(changed=True, transaction='committed')
         return
+    if command.startswith('project.'):
+        return project_dispatch(args, output, home)
     config = machine_config(home)
     source = Path(config['source']['root'])
     if command == 'config.show':

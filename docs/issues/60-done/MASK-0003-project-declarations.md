@@ -1,7 +1,7 @@
 ---
 id: MASK-0003
 title: Implement project declarations and local registration
-status: In Progress
+status: Done
 rfc: RFC-MASK-0001
 depends_on: ["MASK-0002"]
 ---
@@ -26,4 +26,4 @@ Incremental commands preserve unrelated requirements; exact set requires explici
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Implemented project discovery, explicit roots, incremental/exact-set edits, target inheritance, alias-safe registry and unavailable-project retention. python3 -m unittest tests.test_manifest_registry tests.test_cli_protocol: 9 PASS. Prospective manifest guard/dry-run covered; --apply refuses until reconciler exists. Commit: this Done move.

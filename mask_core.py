@@ -364,3 +364,50 @@ def state(value):
             if link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
     return value
+
+
+def project_root(selection=None, *, initializing=False, cwd=None):
+    if selection is not None:
+        root = Path(selection).expanduser().resolve()
+        if not root.is_dir():
+            fail('project.not_found', 'Project directory does not exist.', root=str(root))
+        return root
+    cwd = Path(cwd or Path.cwd()).resolve()
+    top = git(cwd, 'rev-parse', '--show-toplevel', optional=True)
+    if top is None:
+        fail('project.not_found', 'Outside Git, select an explicit --project root.')
+    boundary = Path(top).resolve()
+    if initializing:
+        return boundary
+    current = cwd
+    while current.is_relative_to(boundary):
+        if kind(current / '.mask.json') != 'missing':
+            return current
+        if current == boundary:
+            break
+        current = current.parent
+    fail('manifest.missing', 'No declaration found within the current Git worktree.')
+
+
+def project_manifest(root):
+    return manifest(read_json(root / '.mask.json', 'manifest'))
+
+
+def registry_record(root, declaration, source):
+    return dict(root=str(root), root_identity=identity(root), last_manifest=declaration,
+                last_manifest_digest=digest(declaration), last_source_revision=git(source, 'rev-parse', 'HEAD', optional=True), links={})
+
+
+def registered_root(root, record):
+    if not root.is_dir():
+        fail('project.unavailable', 'Registered project is unavailable.', 4, root=str(root))
+    if root.resolve() != root or identity(root) != record['root_identity']:
+        fail('project.identity_changed', 'Registered directory identity changed.', 4, root=str(root))
+
+
+def save_state(home, before, after):
+    if before == after:
+        return False
+    after['generation'] = before['generation'] + 1
+    state(after)
+    return atomic_text(home / 'state.json', text_json(after), read_text(home / 'state.json', 'state', missing=True))
