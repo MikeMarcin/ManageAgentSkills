@@ -87,3 +87,24 @@ with mask_core.writer_lock(Path(sys.argv[2])):
         finally:
             process.communicate('')
         self.call('apply')
+
+    def test_mid_apply_external_manifest_edit_is_preserved(self):
+        script = """
+import sys,json
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import mask,mask_fs
+edited = False
+def checkpoint(label):
+    global edited
+    if label == 'link' and not edited:
+        edited = True
+        Path(sys.argv[3], '.mask.json').write_text('{"schema_version":1,"skills":[]}')
+mask_fs.checkpoint = checkpoint
+raise SystemExit(mask.main(['project','require','beta','--apply','--home',sys.argv[2],'--project',sys.argv[3],'--json']))
+"""
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True, encoding='utf-8')
+        self.assertEqual(run.returncode, 8, run.stdout + run.stderr)
+        self.assertEqual(json.loads((self.project / '.mask.json').read_text())['skills'], [])
+        self.assertTrue((self.home / 'pending.json').exists())
+        self.call('recover', '--complete', code=8)

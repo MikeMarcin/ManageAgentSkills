@@ -264,11 +264,15 @@ def project_dispatch(args, output, home):
         del after['projects'][key]
         output['data'] = dict(root=key, registered=False, abandoned_paths=[str(root / rel) for rel in record['links']] if keep else [])
         output['would_change'] = True
+        output['data']['plan_hash'] = core.digest(dict(command=command, root=key, state=state, after=after, config=config))
+        if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
+            core.fail('plan.stale', 'Registry operation changed since preview.', 4)
         if not output['dry_run']:
             core.save_state(home, state, after)
             output.update(changed=True, transaction='committed')
         return
-    declaration = core.project_manifest(root)
+    declaration_text = core.read_text(path, 'manifest')
+    declaration = core.manifest(core.parse_json(declaration_text, 'manifest'))
     if record:
         core.registered_root(root, record)
     output['data'] = dict(root=key, manifest=declaration, registered=record is not None,
@@ -305,6 +309,9 @@ def project_dispatch(args, output, home):
         after['projects'][key] = core.registry_record(root, declaration, source)
         output['data']['registered'] = True
         output['would_change'] = True
+        output['data']['plan_hash'] = core.digest(dict(command=command, root=key, state=state, after=after, config=config))
+        if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
+            core.fail('plan.stale', 'Registry operation changed since preview.', 4)
         if not output['dry_run']:
             core.save_state(home, state, after)
             output.update(changed=True, transaction='committed')
@@ -338,7 +345,7 @@ def project_dispatch(args, output, home):
     if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
         core.fail('plan.stale', 'The prospective manifest changed since preview.', 4)
     if proposal != declaration and not output['dry_run']:
-        core.atomic_text(path, core.text_json(proposal), core.read_text(path, 'manifest'))
+        core.atomic_text(path, core.text_json(proposal), declaration_text)
         output.update(changed=True, transaction='committed')
 
 

@@ -77,3 +77,71 @@ raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
         self.call('recover', '--complete')
         self.assertEqual(self.git(self.source, 'rev-parse', 'HEAD'), candidate)
         self.assertFalse(self.call('apply')['changed'])
+
+    def test_candidate_directory_case_collision_and_symlink(self):
+        blob = self.git(self.source, 'rev-parse', 'HEAD:skills/alpha/SKILL.md')
+        for entries in ((('100644', 'Docs/a.txt'), ('100644', 'docs/b.txt')), (('120000', 'linked'),)):
+            for mode, name in entries:
+                self.git(self.source, 'update-index', '--add', '--cacheinfo', mode + ',' + blob + ',skills/alpha/' + name)
+            tree = self.git(self.source, 'write-tree')
+            head = self.git(self.source, 'rev-parse', 'HEAD')
+            candidate = self.git(self.source, 'commit-tree', tree, '-p', head, '-m', 'invalid candidate')
+            self.git(self.source, 'read-tree', 'HEAD')
+            self.git(self.source, 'update-ref', 'refs/remotes/origin/main', candidate)
+            self.assertEqual(self.call('update', '--dry-run', code=4)['error']['code'], 'source.candidate_invalid')
+            self.assertEqual(head, self.git(self.source, 'rev-parse', 'HEAD'))
+
+    def test_hooks_suppressed_and_late_apply_failure_retains_intent(self):
+        candidate = self.upstream()
+        marker = self.base / 'hook-ran'
+        hook = self.source / '.git/hooks/post-merge'
+        hook.write_text('#!/bin/sh\necho unsafe > "' + str(marker) + '"\n')
+        hook.chmod(0o755)
+        script = """
+import sys
+sys.path.insert(0,sys.argv[1])
+import mask,mask_fs
+original = mask_fs.restore
+def fail(pending, home, side, **kwargs):
+    if side == 'after': raise OSError('injected late failure')
+    return original(pending,home,side,**kwargs)
+mask_fs.restore = fail
+raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
+"""
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home)], capture_output=True, encoding='utf-8')
+        self.assertEqual(run.returncode, 8, run.stdout)
+        self.assertFalse(marker.exists())
+        self.assertEqual(candidate, self.git(self.source, 'rev-parse', 'HEAD'))
+        self.assertTrue((self.home / 'pending.json').exists())
+        self.call('recover', '--complete')
+
+    def test_diverged_and_unavailable_preflight(self):
+        self.upstream()
+        self.git(self.source, 'commit', '--allow-empty', '-m', 'local divergence')
+        self.assertEqual(self.call('update', code=4)['error']['code'], 'source.diverged')
+        # No fetch is attempted for an unavailable registered consumer.
+        moved = self.base / 'moved project'
+        self.project.rename(moved)
+        result = self.call('update', cwd=self.base, code=4)
+        self.assertEqual(result['error']['code'], 'project.unavailable')
+        self.assertNotIn('fetch_effects', result['data'])
+
+    def test_checkout_failure_retains_journal_without_reset(self):
+        self.upstream()
+        old = self.git(self.source, 'rev-parse', 'HEAD')
+        script = """
+import sys
+sys.path.insert(0,sys.argv[1])
+import mask,mask_core
+original = mask_core.git
+def fail(root,*args,**kwargs):
+    if args and args[0] == 'merge': raise OSError('injected checkout failure')
+    return original(root,*args,**kwargs)
+mask_core.git = fail
+raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
+"""
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home)], capture_output=True, encoding='utf-8')
+        self.assertEqual(run.returncode, 8, run.stdout)
+        self.assertEqual(json.loads(run.stdout)['transaction'], 'partial')
+        self.assertEqual(old, self.git(self.source, 'rev-parse', 'HEAD'))
+        self.call('recover', '--rollback')
