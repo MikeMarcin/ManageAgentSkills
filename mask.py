@@ -18,6 +18,7 @@ PROGRAM_ROOT = Path(__file__).resolve().parent
 import mask_core as core
 import mask_fs as fs
 import mask_git as git_ops
+import mask_install as install_ops
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -62,7 +63,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'source.status', 'source.fetch', 'update', 'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+IMPLEMENTED = {'self.status', 'self.install', 'self.update', 'source.status', 'source.fetch', 'update', 'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -370,6 +371,8 @@ def local_dispatch(args, output, leaves):
                     core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
                 output.update(changed=True, transaction='committed')
         return
+    if command.startswith('self.'):
+        return install_ops.dispatch(args, output, home, PROGRAM_ROOT)
     if command == 'recover':
         mode = 'inspect' if getattr(args, 'inspect', False) else 'complete' if getattr(args, 'complete', False) else 'rollback'
         return fs.recover(home, output, mode)

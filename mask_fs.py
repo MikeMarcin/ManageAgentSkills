@@ -167,8 +167,8 @@ def make_pending(planned, home):
 def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git',), 'recovery')
-    if pending['operation'] not in {'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'update', 'self.update'}:
+             ('git', 'launcher'), 'recovery')
+    if pending['operation'] not in {'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'update', 'self.update', 'self.install'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     for field in ('selected', 'links', 'manifests', 'directories'):
         if not isinstance(pending[field], list):
@@ -183,20 +183,27 @@ def validate_pending(pending, home):
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
         c.fail('recovery.conflict', 'Invalid pending generation.', 8)
-    if c.config(pending['config']) != c.config(c.read_json(home / 'config.json')):
+    current_config = c.read_json(home / 'config.json', default={})
+    if pending['config'] is None:
+        if pending['operation'] not in ('self.install', 'self.update') or current_config:
+            c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
+    elif c.config(pending['config']) != c.config(current_config):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
-    source = Path(pending['config']['source']['root'])
+    source = Path(pending['config']['source']['root']) if pending['config'] else None
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
     if not selected <= before['projects'].keys() | after['projects'].keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
-    if before['launchers'] != after['launchers']:
+    if 'launcher' in pending:
+        from mask_install import validate_launcher_intent
+        validate_launcher_intent(pending)
+    elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
     for root in before['projects'].keys() | after['projects'].keys():
         if root not in selected and before['projects'].get(root) != after['projects'].get(root):
             c.fail('recovery.conflict', 'Pending state changes an unselected project.', 8)
-    allowed_directories = set()
+    allowed_directories = {str(Path(pending['launcher']['path']).parent)} if 'launcher' in pending else set()
     for key in selected:
         record = before['projects'].get(key) or after['projects'][key]
         # Explicit keep-links may abandon an unavailable root without effects.
@@ -242,6 +249,9 @@ def validate_pending(pending, home):
 def check_current(pending, home):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
+    if 'launcher' in pending:
+        from mask_install import check_launcher
+        check_launcher(pending)
     for entry in pending['links']:
         leaf = Path(entry['root']) / entry['relative']
         c.parents_safe(Path(entry['root']), leaf)
@@ -284,6 +294,11 @@ def set_link(entry, side):
 
 def restore(pending, home, side, *, inject=False):
     check_current(pending, home)
+    if 'launcher' in pending:
+        from mask_install import restore_launcher
+        restore_launcher(pending, side)
+        if inject:
+            checkpoint('launcher')
     entries = pending['links'] if side == 'after' else reversed(pending['links'])
     for entry in entries:
         set_link(entry, side)
@@ -291,13 +306,19 @@ def restore(pending, home, side, *, inject=False):
             checkpoint('link')
     for entry in pending['manifests']:
         path = Path(entry['root']) / '.mask.json'
-        c.atomic_text(path, entry[side], c.read_text(path, 'manifest'))
+        actual = c.read_text(path, 'manifest')
+        if actual not in (entry['before'], entry['after']):
+            c.fail('recovery.conflict', 'Manifest changed immediately before replacement.', 8)
+        c.atomic_text(path, entry[side], actual)
         if inject:
             checkpoint('manifest')
     text = pending[side + '_state_text']
     path = home / 'state.json'
     if text is not None:
-        c.atomic_text(path, text, c.read_text(path, 'state', missing=True))
+        actual = c.read_text(path, 'state', missing=True)
+        if actual not in (pending['before_state_text'], pending['after_state_text']):
+            c.fail('recovery.conflict', 'Registry changed immediately before replacement.', 8)
+        c.atomic_text(path, text, actual)
     elif c.kind(path) != 'missing':
         # Only remove the newly created regular registry with exact after bytes.
         if c.read_text(path, 'state') != pending['after_state_text']:
@@ -364,7 +385,7 @@ def recover(home, output, mode):
         from mask_git import recover_git
         recover_git(pending, home, output, mode)
     if mode == 'complete':
-        source = Path(pending['config']['source']['root'])
+        source = Path(pending['config']['source']['root']) if pending['config'] else None
         for key in pending['selected']:
             record = pending['after_state']['projects'].get(key)
             if record:

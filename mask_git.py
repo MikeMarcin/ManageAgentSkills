@@ -103,11 +103,17 @@ def candidate_packages(root, revision, identifiers):
         for identifier in sorted(identifiers):
             if identifier not in available:
                 c.fail('source.candidate_invalid', 'Candidate removes a requested skill.', 4, skill=identifier)
-            files, paths = {}, set()
+            files, paths = {}, {}
             for mode, kind, oid, name in tree(root, revision, 'skills/' + identifier, True):
-                if mode not in ('100644', '100755') or kind != 'blob' or name.casefold() in paths:
+                if mode not in ('100644', '100755') or kind != 'blob' :
                     c.fail('source.candidate_invalid', 'Candidate contains linked, special or case-colliding entries.', 4, skill=identifier)
-                paths.add(name.casefold())
+                parts = name.split('/')
+                for index in range(1, len(parts) + 1):
+                    partial = '/'.join(parts[:index])
+                    value = (partial, index == len(parts))
+                    if partial.casefold() in paths and paths[partial.casefold()] != value:
+                        c.fail('source.candidate_invalid', 'Candidate contains case or file/directory conflicts.', 4)
+                    paths[partial.casefold()] = value
                 if any(part in ('', '.', '..') for part in name.split('/')) or '\\' in name:
                     c.fail('source.candidate_invalid', 'Unsafe candidate path.', 4)
                 files[name] = c.git(root, 'cat-file', 'blob', oid, binary=True)
@@ -212,7 +218,7 @@ def recover_git(pending, home, output, mode):
     remote = config['source']['remote'] if entry['scope'] == 'source' else 'origin'
     branch = config['source']['branch'] if entry['scope'] == 'source' else 'main'
     expected_name = 'AgentSkills' if entry['scope'] == 'source' else 'ManageAgentSkills'
-    observed = checkout_preconditions(root, remote, branch, expected_name, config['git_timeout_seconds'])
+    observed = checkout_preconditions(root, remote, branch, expected_name, (config or {}).get('git_timeout_seconds', 30))
     if observed['revision'] not in (entry['before'], entry['candidate']):
         c.fail('recovery.conflict', 'Checkout changed outside the recorded transition.', 8)
     if mode == 'rollback':
@@ -223,8 +229,11 @@ def recover_git(pending, home, output, mode):
     if entry['scope'] == 'source':
         identifiers = {identifier for key in pending['selected'] for identifier in pending['after_state']['projects'].get(key, {}).get('last_manifest', {}).get('skills', [])}
         candidate_packages(root, entry['candidate'], identifiers)
+    else:
+        from mask_install import validate_program
+        validate_program(root, entry['candidate'])
     if observed['revision'] == entry['before'] and entry['candidate'] != entry['before']:
         if c.git(root, 'merge-base', '--is-ancestor', entry['before'], entry['candidate'], optional=True) is None:
             c.fail('recovery.conflict', 'Recorded candidate is no longer a fast-forward.', 8)
         if not output['dry_run']:
-            advance(root, entry['candidate'], pending, home, output, config['git_timeout_seconds'])
+            advance(root, entry['candidate'], pending, home, output, (config or {}).get('git_timeout_seconds', 30))

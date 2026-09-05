@@ -133,7 +133,8 @@ def read_text(path, family='config', missing=False):
     if observed != 'file':
         fail(family + '.invalid', 'Expected a regular unlinked file.', path=str(path))
     try:
-        return path.read_text(encoding='utf-8')
+        with path.open(encoding='utf-8', newline='') as handle:
+            return handle.read()
     except UnicodeError:
         fail(family + '.invalid', 'Expected UTF-8 text.', path=str(path))
 
@@ -378,6 +379,10 @@ def state(value):
     fields(value, ('schema_version', 'generation', 'projects', 'launchers'), family='state')
     if type(value['generation']) is not int or value['generation'] < 0 or not isinstance(value['projects'], dict) or not isinstance(value['launchers'], dict):
         fail('state.invalid', 'Invalid generation or registry maps.')
+    for key, record in value['launchers'].items():
+        fields(record, ('program_root', 'interpreter', 'content_digest'), family='state')
+        if not isinstance(key, str) or not Path(key).is_absolute() or Path(key).name not in ('mask', 'mask.cmd') or any(not isinstance(record[item], str) or not Path(record[item]).is_absolute() for item in ('program_root', 'interpreter')) or not isinstance(record['content_digest'], str) or not re.fullmatch('sha256:[0-9a-f]{64}', record['content_digest']):
+            fail('state.invalid', 'Invalid launcher ownership.')
     for key, record in value['projects'].items():
         fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), family='state')
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
