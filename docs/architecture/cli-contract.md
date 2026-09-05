@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Normative for RFC-MASK-0001 through RFC-MASK-0004. All listed commands are implemented in local v0.1.0; native verification and scope limits are recorded in docs/releases/v0.1.0.md.
+Normative for RFC-MASK-0001 through RFC-MASK-0005. The JSON result protocol remains v1; local program v0.2.0 adds user scope and state/journal v2. Historical native verification is recorded in docs/releases/v0.1.0.md; the RFC-MASK-0005 closeout records the new acceptance evidence.
 
 ## Common options
 
@@ -28,11 +28,19 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 | `project register` | `[PATH | --project PATH] [--apply]` | Registry; optional links | No |
 | `project unregister` | `[PATH | --project PATH] [--keep-links]` | Registry; unchanged owned links unless keeping | No |
 | `project list` | none | None | No |
-| `plan` | `[--project PATH | --all]` | None | No |
-| `apply` | `[--project PATH | --all] [--expect-plan-hash HASH]` | Validated links/state | No |
-| `link adopt` | `--project PATH --skill ID --target TARGET --expect-source PATH` | Ownership record only | No |
+| `user init` | none | New empty `MASK_HOME/user.json` only | No |
+| `user show` | none | None | No |
+| `user set` | `--skill ID ...` or `--clear`, optional `--apply` | Personal manifest; registered links with apply | No |
+| `user require` | `ID ... [--apply]` | Set union; same apply rule | No |
+| `user unrequire` | `ID ... [--apply]` | Set subtraction; same apply rule | No |
+| `user set-targets` | `TARGET ...` or `--inherit`, optional `--apply` | Explicit targets or remove field | No |
+| `user register` | `[--user-home PATH] [--apply]` | Pinned home and v2 registry; optional links | No |
+| `user unregister` | `[--keep-links]` | Registry; unchanged owned links unless keeping | No |
+| `plan` | `[--project PATH | --user | --all]` | None | No |
+| `apply` | `[--project PATH | --user | --all] [--expect-plan-hash HASH]` | Validated links/state | No |
+| `link adopt` | `(--project PATH | --user) --skill ID --target TARGET --expect-source PATH` | Ownership record only | No |
 | `recover` | Exactly one of `--inspect`, `--complete`, `--rollback` | Only complete/rollback modes | No |
-| `doctor` | `[--project PATH | --all] [--check]` | None | No |
+| `doctor` | `[--project PATH | --user | --all] [--check]` | None | No |
 | `source status` | none | None | No |
 | `source fetch` | none | Source Git bookkeeping/remote refs only | Yes |
 | `update` | `[--expect-plan-hash HASH]` | Source fast-forward + all registered links/state | Yes |
@@ -40,7 +48,7 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 | `self install` | `--bin-dir PATH` | Recognized launcher + ownership record | No |
 | `self update` | none | Program checkout only | Yes |
 
-`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks machine/source and all registered projects. `update` always selects all; it cannot pretend to isolate shared content to one project. `source update` is deliberately not a separate bypass command; use `update` or fetch-only `source fetch`.
+`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks machine/source and all registered projects and the personal consumer. `update` always selects all; it cannot pretend to isolate shared content to one project. `source update` is deliberately not a separate bypass command; use `update` or fetch-only `source fetch`.
 
 A configuration default change does not relink anything until an explicit apply. There is no source-replacement command that silently relocates all ownership. v1 source relocation uses explicit unregister/setup/register as documented. `project init` and inspection can run before machine initialization where their operation does not need a source/registry. A missing source produces a typed refusal for operations that do need it.
 
@@ -52,7 +60,7 @@ Every normal machine-mode response includes:
 {
   "schema_version": 1,
   "tool": "mask",
-  "tool_version": "0.1.0",
+  "tool_version": "0.2.0",
   "command": "project.require",
   "ok": true,
   "dry_run": false,
@@ -137,3 +145,45 @@ mask doctor --all --check --json
 ```
 
 Shell placeholders are illustrative, not executable literal hashes. Tests replace them with the actual parsed value, pass paths as single argv elements, and never use `eval` or concatenate JSON into a shell command.
+
+## User scope and compatibility
+
+Personal declarations use the project v1 membership/target shape at
+`MASK_HOME/user.json`. `user init` only creates that declaration. Registration
+requires an initialized source and an existing user home, defaulting to the
+current OS home. `--user-home` is accepted only at registration; subsequent
+operations use the stored canonical root and its recorded identity. Changing
+`--home` changes the MASK registry, not the deployment home. A different home
+requires explicit unregister/register. One personal consumer is allowed per
+MASK home; separate registries cannot adopt or replace one another's ownership.
+
+Personal destinations use the same relative adapters as projects: `.agents/skills`
+and `.claude/skills`. Registrations reject overlapping managed destination trees
+and linked destination parents. Target lists apply to the entire selection;
+per-skill target overrides and alternate sources are not supported.
+
+`--user`, `--project`, and `--all` are mutually exclusive. `--all` includes both
+scopes. Without selectors, plan/apply retain project discovery, while doctor
+inspects every consumer. `project list` remains project-only; `user show` reports
+personal scope. Plans retain `data.projects` and add `data.users`, each with
+explicit scope, root, and manifest location. Adoption accepts exactly one
+explicit scope selector. Source updates validate and reconcile all consumers.
+
+State v2 preserves `projects` and `launchers` and adds a nullable `user` record
+with the same root identity, manifest cache, revision, and link fields as a
+project record. Root identity is unique across scopes. The first user registration
+is the sole v1-to-v2 transition, journaled even without `--apply`. Reads and
+project-only writes preserve v1 until that transition. Unregistering the user
+retains v2 with `user: null`.
+
+Journal v2 derives consumer scope from its validated before/after registries;
+manifest destinations are recomputed as `<project>/.mask.json` or the current
+`MASK_HOME/user.json`, never accepted as arbitrary serialized write paths.
+V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
+bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
+Capabilities report readable state/journal versions `[1, 2]` and latest version 2.
+The source/configuration and result schemas remain v1.
+
+Additional error families are `user.not_registered`, `user.not_found`,
+`user.already_registered`, `user.unavailable`, `user.identity_changed`, and
+`target.overlap`. Ownership, stale-plan, and recovery errors retain existing codes.

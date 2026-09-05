@@ -2,7 +2,7 @@
 
 **[Install](#install-and-select-a-source) · [First project](#add-skills-to-a-project) · [Updates](#update-skills-or-the-program) · [Recovery](#recover-or-stop-managing-a-project) · [CLI reference](docs/architecture/cli-contract.md)**
 
-MASK keeps project skill requirements in Git and deploys them as directory symlinks to one local skill checkout. A project declares what it needs in `.mask.json`; MASK validates the source, previews changes, and manages the links used by Claude and Codex.
+MASK manages project and personal skill selections as directory symlinks to one local skill checkout. Projects keep requirements in `.mask.json`; personal requirements live in `MASK_HOME/user.json`. MASK validates the source, previews changes, and manages the links used by Claude and Codex.
 
 This repository contains the Python CLI. The companion [AgentSkills repository](https://github.com/MikeMarcin/AgentSkills) contains the canonical skill instructions. Both repositories remain private.
 
@@ -86,6 +86,52 @@ Deploying `implement-rfc` also requires [consumer workflow context](https://gith
 
 Membership edits change the manifest. Add `--apply` to reconcile a registered project in the same operation; add `--dry-run` to preview it first. Use `--json` for structured results throughout.
 
+## Add personal skills
+
+Personal skills apply across projects. Initialize a separate selection and register
+the current user's home, then preview a membership change:
+
+```sh
+mask user init --json
+mask user register --dry-run --json
+mask user register --expect-plan-hash RETURNED_HASH --json
+mask user require manage-agent-skills --apply --dry-run --json
+mask user require manage-agent-skills --apply --expect-plan-hash RETURNED_HASH --json
+mask doctor --user --check --json
+```
+
+Use each preview's returned hash for its matching operation. `user require`,
+`unrequire`, `set --skill ...` / `set --clear`, and `set-targets` have the same
+incremental, exact-set, and target semantics as the project commands. They edit
+only the declaration unless `--apply` is supplied. `user show` reports the pinned
+home, declaration, ownership, and blockers. `user unregister` removes unchanged
+owned links and retains the declaration; `--keep-links` abandons ownership.
+
+Codex links live in `<user-home>/.agents/skills`; Claude links live in
+`<user-home>/.claude/skills`. MASK does not install into the legacy personal
+`.codex/skills` directory. An existing real directory is a collision; imports and
+backups are explicit migration work, never an overwrite option.
+
+`user register --user-home PATH` explicitly selects another existing home, useful
+for fixtures. Registration pins that physical root; later `HOME` changes do not
+redirect it. Unregister before changing the selected root. `--home` continues to
+select MASK's state/configuration directory, independently of the deployment home.
+
+`plan --user` and `apply --user` select personal scope. `--all` and unqualified
+`doctor` include all registered project and personal consumers. Unqualified
+`plan` / `apply` still select the current project. Selections are independent:
+adding or removing a personal requirement never edits a project declaration.
+Hosts decide how duplicate skill names are discovered; MASK does not suppress
+one scope because another declares the same skill.
+
+Existing project-only v1 state is read without conversion. The first user
+registration upgrades state through a recoverable v2 journal. Existing v1
+journals must be recovered before mutation. The JSON result protocol and
+project declarations remain version 1. Older program checkouts refuse the new
+state; finish recovery with a compatible program before changing installations.
+The v0.1 self-updater intentionally refuses changed schema contracts; installing
+this program revision requires an explicit program-checkout update.
+
 ## What belongs where
 
 A portable declaration contains skill IDs and optional targets:
@@ -102,6 +148,8 @@ A portable declaration contains skill IDs and optional targets:
 |---|---|
 | `AgentSkills/skills/<id>/` | Canonical skill payload, including `SKILL.md` |
 | `<project>/.mask.json` | Versioned project requirements |
+| `MASK_HOME/user.json` | Personal requirements, separate from deployment state |
+| `<user-home>/.agents/skills/<id>` / `.claude/skills/<id>` | Generated personal skill links |
 | `<project>/.mask/skill-config/implement-rfc/` | Versioned workflow context for that consumer |
 | `<project>/.agents/skills/<id>` | Generated Codex directory symlink |
 | `<project>/.claude/skills/<id>` | Generated Claude directory symlink |
@@ -112,7 +160,7 @@ Commit declarations and project context. Ignore generated links and `.mask/gener
 ## Update skills or the program
 
 > [!IMPORTANT]
-> A source update affects **every registered project**. Run it between active tasks; all links share one checkout, and running agents may cache instructions.
+> A source update affects **every registered project and personal consumer**. Run it between active tasks; all links share one checkout, and running agents may cache instructions.
 
 ```sh
 mask source status --json
@@ -121,7 +169,7 @@ mask update --dry-run --json
 mask update --expect-plan-hash RETURNED_HASH --json
 ```
 
-`source fetch` refreshes Git objects and remote-tracking refs without activating content. The dry run performs no fetch and reports last-fetched state. `update` validates a frozen candidate against live project declarations, fast-forwards the source, and reconciles its consumers. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
+`source fetch` refreshes Git objects and remote-tracking refs without activating content. The dry run performs no fetch and reports last-fetched state. `update` validates a frozen candidate against live consumer declarations, fast-forwards the source, and reconciles its consumers. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
 
 `mask self update --json` updates only the running ManageAgentSkills checkout. It checks protocol/schema compatibility and returns `next_invocation_required`; the next command loads the new implementation. It does not update skills or reinstall the launcher. Local skill management remains available while the program checkout has authoring changes.
 
@@ -142,4 +190,4 @@ For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_en
 - [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and [issue board](docs/issues/README.md)
 - [Local v0.1.0 readiness and implementation provenance](docs/releases/v0.1.0.md)
 
-Both named repositories currently consume the shared skills. Verified bootstrap copies remain outside discovery roots in each `.mask/bootstrap-retired/implement-rfc-2026-09-05`. Filesystem deployment and bounded workflow invocation were verified; agent UI loading was not. MASK has no daemon, automatic synchronization, global skill installation or publishing command.
+Both named repositories currently consume the shared skills. Verified bootstrap copies remain outside discovery roots in each `.mask/bootstrap-retired/implement-rfc-2026-09-05`. Filesystem deployment and bounded workflow invocation were verified; agent UI loading was not. MASK supports explicit personal skill management. It has no daemon, automatic synchronization or publishing command.
