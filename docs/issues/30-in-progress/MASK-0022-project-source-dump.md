@@ -2,7 +2,7 @@
 schema: implement-rfc.card.v1
 id: MASK-0022
 title: Add a project source dump script
-status: Ready
+status: "In Progress"
 rfcs: []
 depends_on: []
 ---
