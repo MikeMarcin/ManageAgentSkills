@@ -5,6 +5,7 @@
 /.mask/generated/
 /.mask/bootstrap-retired/
 __pycache__/
+/artifacts/
 /.agents/skills/attended-review
 /.claude/skills/attended-review
 /.agents/skills/wizard

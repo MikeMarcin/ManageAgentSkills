@@ -185,6 +185,27 @@ To remove the program, unregister the selected projects first, then explicitly r
 
 For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_end.EndToEndTests.test_public_management_sequence` from this checkout. It uses disposable projects and local bare Git remotes. Run `python3 -B scripts/verify_documentation.py` for the RFC/issue structure gate; choose additional tests for the behavior being changed.
 
+To create a single Markdown file for ChatGPT project sources or a code review:
+
+```sh
+python3 -B scripts/make_project_source_dumps.py
+```
+
+The dump is written to `artifacts/manage_agent_skills_project_source.md` (ignored
+by Git). It includes current working-tree source, tests, schemas, documentation,
+and portable `.mask/skill-config/` context, including new untracked text sources.
+It skips links, local agent directories, other `.mask/` data, virtual environments,
+caches, generated output, and binary file types. Selected text files must be UTF-8
+without NUL bytes; invalid content reports an error before writing the dump.
+This is a source-file filter, not a secret scanner or a Git-ignore filter.
+
+Use `--output PATH` for another destination, `--stdout` to print the dump, or
+`--root PATH` for another checkout. Relative output paths are resolved under the
+selected root; the default root is the checkout containing the script, regardless
+of the working directory. `--include-generated` adds build/output directories
+while keeping links, caches, virtual environments, and local state excluded.
+The selected output file is always excluded from its own dump.
+
 - [CLI contract and exit codes](docs/architecture/cli-contract.md)
 - [JSON schemas](schemas/)
 - [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and [issue board](docs/issues/README.md)
