@@ -1,7 +1,7 @@
 ---
 id: MASK-0002
 title: Implement machine setup and passive skill inspection
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0001
 depends_on: ["MASK-0001"]
 ---
