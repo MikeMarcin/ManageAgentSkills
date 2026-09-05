@@ -1,7 +1,7 @@
 ---
 id: MASK-0006
 title: Implement serialized journaled symlink effects
-status: In Progress
+status: Done
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0005"]
 ---
@@ -26,4 +26,4 @@ Correct links converge; stale owned links remove only when raw value/type agrees
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Implemented one locked journaled executor reused by apply, prospective --apply and unregister. python3 -m unittest tests.test_reconcile_apply tests.test_manifest_registry: 11 PASS. Actual symlinks converge; stale plans and replaced links refuse; injected late failure rolls back core effects and truthfully reports retained empty directories. Strict state/pending schemas added. Commit: this Done move.

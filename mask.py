@@ -61,7 +61,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+IMPLEMENTED = {'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -174,6 +174,10 @@ def reconciliation(args, output, home):
     roots = selected_roots(args, state)
     planned = fs.plan(config, state, roots)
     fs.public_plan(planned, output)
+    if args.command == 'apply':
+        fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
+        if not output['dry_run']:
+            fs.execute(planned, home, output)
 
 
 def project_dispatch(args, output, home):
@@ -209,7 +213,12 @@ def project_dispatch(args, output, home):
             return
         keep = getattr(args, 'keep_links', False)
         if record['links'] and not keep:
-            core.fail('config.command_unavailable', 'Owned-link removal requires the reconciliation engine.')
+            planned = fs.plan(config, state, [root], unregister=[key], operation=command)
+            fs.public_plan(planned, output)
+            fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
+            if not output['dry_run']:
+                fs.execute(planned, home, output)
+            return
         if not keep:
             core.registered_root(root, record)
         after = copy.deepcopy(state)
@@ -236,9 +245,9 @@ def project_dispatch(args, output, home):
     if getattr(args, 'apply', False):
         if record is None and command != 'project.register':
             core.fail('project.not_registered', '--apply requires a registered project.', 4)
-        core.fail('config.command_unavailable', 'The registered-project reconciler is not implemented yet.')
+
     if command == 'project.register':
-        if record:
+        if record and not getattr(args, 'apply', False):
             return
         for adapter in ADAPTERS.values():
             destination = root / adapter
@@ -246,6 +255,13 @@ def project_dispatch(args, output, home):
                 core.fail('config.invalid', 'Managed source, state and destination locations overlap.')
         for identifier in declaration['skills']:
             core.package(source, identifier)
+        if getattr(args, 'apply', False):
+            planned = fs.plan(config, state, [root], register=[key], operation=command)
+            fs.public_plan(planned, output)
+            fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
+            if not output['dry_run']:
+                fs.execute(planned, home, output)
+            return
         after = copy.deepcopy(state)
         after['projects'][key] = core.registry_record(root, declaration, source)
         output['data']['registered'] = True
@@ -270,6 +286,13 @@ def project_dispatch(args, output, home):
     proposal = core.manifest(proposal)
     for identifier in proposal['skills']:
         core.package(source, identifier)
+    if getattr(args, 'apply', False):
+        planned = fs.plan(config, state, [root], proposals={key: proposal}, operation=command)
+        fs.public_plan(planned, output)
+        fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
+        if not output['dry_run']:
+            fs.execute(planned, home, output)
+        return
     output['data']['manifest'] = proposal
     output['data']['plan_hash'] = core.digest(dict(command=command, root=key, before=declaration, after=proposal, generation=state['generation'], config=config))
     output['would_change'] = proposal != declaration
@@ -309,7 +332,7 @@ def local_dispatch(args, output, leaves):
                     core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
                 output.update(changed=True, transaction='committed')
         return
-    if command == 'plan':
+    if command in ('plan', 'apply'):
         return reconciliation(args, output, home)
     if command.startswith('project.'):
         return project_dispatch(args, output, home)
@@ -382,19 +405,27 @@ def main(argv=None):
             validate_arguments(args)
             dispatch(args, output, leaves)
     except MaskError as error:
-        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        output.update(ok=False, error=error.as_dict())
+        if output['transaction'] == 'not_needed':
+            output['transaction'] = 'not_started'
         exit_code = error.exit_code
     except KeyboardInterrupt:
         error = MaskError('invocation.interrupted', 'Interrupted by user.', 130)
-        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        output.update(ok=False, error=error.as_dict())
+        if output['transaction'] == 'not_needed':
+            output['transaction'] = 'not_started'
         exit_code = 130
     except OSError:
         error = MaskError('filesystem.failed', 'A filesystem operation failed.', 5)
-        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        output.update(ok=False, error=error.as_dict())
+        if output['transaction'] == 'not_needed':
+            output['transaction'] = 'not_started'
         exit_code = 5
     except Exception:
         error = MaskError('internal.invariant', 'An internal invariant failed.', 10)
-        output.update(ok=False, error=error.as_dict(), transaction='not_started')
+        output.update(ok=False, error=error.as_dict())
+        if output['transaction'] == 'not_needed':
+            output['transaction'] = 'not_started'
         exit_code = 10
     if machine:
         print(json.dumps(output, ensure_ascii=False, sort_keys=True))

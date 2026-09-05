@@ -357,13 +357,18 @@ def state(value):
         fields(record['root_identity'], ('device', 'inode'), family='state')
         if any(type(v) is not int for v in record['root_identity'].values()):
             fail('state.invalid', 'Invalid root identity.')
-        manifest(record['last_manifest'])
+        previous_manifest = manifest(record['last_manifest'])
+        if not isinstance(record['last_manifest_digest'], str) or record['last_manifest_digest'] != digest(previous_manifest):
+            fail('state.invalid', 'Invalid cached manifest digest.')
+        revision = record['last_source_revision']
+        if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40,64}', revision)):
+            fail('state.invalid', 'Invalid recorded source revision.')
         if not isinstance(record['links'], dict):
             fail('state.invalid', 'Invalid ownership map.')
         for relative, link in record['links'].items():
             fields(link, ('skill', 'target', 'link_text'), family='state')
             skill_id(link['skill'])
-            if link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
+            if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
     return value
 

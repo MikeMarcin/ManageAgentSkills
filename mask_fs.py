@@ -123,3 +123,205 @@ def ensure_applicable(planned, expected=None):
     if planned['blockers']:
         first = planned['blockers'][0]
         raise c.MaskError(first['code'], first['message'], 4, details=first['details'])
+
+
+def checkpoint(label):
+    """Internal failure-injection boundary used by local tests."""
+
+
+def required_directories(intent):
+    directories = set()
+    for entry in intent['links']:
+        if entry['after'] is not None:
+            root = Path(entry['root'])
+            leaf = root / entry['relative']
+            for parent in (leaf.parent.parent, leaf.parent):
+                if c.kind(parent) == 'missing':
+                    directories.add(str(parent))
+    return sorted(directories)
+
+
+def make_pending(planned, home):
+    import uuid
+    intent = copy.deepcopy(planned['intent'])
+    intent.update(schema_version=1, transaction_id=str(uuid.uuid4()), phase='prepared',
+                  base_generation=intent['before_state']['generation'],
+                  before_state_text=c.read_text(home / 'state.json', 'state', missing=True),
+                  after_state_text=c.text_json(intent['after_state']),
+                  directories=required_directories(intent))
+    return intent
+
+
+def validate_pending(pending, home):
+    c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
+                      'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
+             ('git',), 'recovery')
+    if not isinstance(pending['transaction_id'], str) or pending['phase'] not in ('prepared', 'git_started', 'git_advanced'):
+        c.fail('recovery.conflict', 'Invalid pending transaction identity or phase.', 8)
+    before, after = c.state(pending['before_state']), c.state(pending['after_state'])
+    if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
+        c.fail('recovery.conflict', 'Invalid pending generation.', 8)
+    if c.config(pending['config']) != c.config(c.read_json(home / 'config.json')):
+        c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
+    source = Path(pending['config']['source']['root'])
+    if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
+        c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
+    selected = set(pending['selected'])
+    if not selected <= before['projects'].keys() | after['projects'].keys():
+        c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
+    if before['launchers'] != after['launchers']:
+        c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
+    for root in before['projects'].keys() | after['projects'].keys():
+        if root not in selected and before['projects'].get(root) != after['projects'].get(root):
+            c.fail('recovery.conflict', 'Pending state changes an unselected project.', 8)
+    allowed_directories = set()
+    for key in selected:
+        record = before['projects'].get(key) or after['projects'][key]
+        # Explicit keep-links may abandon an unavailable root without effects.
+        touches = any(entry.get('root') == key for entry in pending['links'] + pending['manifests'])
+        if touches:
+            c.registered_root(Path(key), record)
+        for adapter in c.ADAPTERS.values():
+            allowed_directories.update((str(Path(key) / Path(adapter).parent), str(Path(key) / adapter)))
+    if not isinstance(pending['directories'], list) or not set(pending['directories']) <= allowed_directories:
+        c.fail('recovery.conflict', 'Unsafe pending directory intent.', 8)
+    for entry in pending['links']:
+        c.fields(entry, ('root', 'relative', 'skill', 'target', 'before', 'after'), family='recovery')
+        c.skill_id(entry['skill'])
+        if entry['root'] not in selected or entry['target'] not in c.ADAPTERS or entry['relative'] != f"{c.ADAPTERS[entry['target']]}/{entry['skill']}":
+            c.fail('recovery.conflict', 'Unsafe pending link path.', 8)
+        leaf = Path(entry['root']) / entry['relative']
+        for side in ('before', 'after'):
+            raw = entry[side]
+            if raw is not None and (not isinstance(raw, str) or normalized_link(leaf, raw) != source / 'skills' / entry['skill']):
+                c.fail('recovery.conflict', 'Pending link points outside its configured package.', 8)
+        for side, state in (('before', before), ('after', after)):
+            record = state['projects'].get(entry['root'], {}).get('links', {}).get(entry['relative'])
+            raw = entry[side]
+            if raw is not None and (not record or record['link_text'] != raw):
+                c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
+    for entry in pending['manifests']:
+        c.fields(entry, ('root', 'before', 'after'), family='recovery')
+        if entry['root'] not in selected:
+            c.fail('recovery.conflict', 'Unselected manifest intent.', 8)
+        for side in ('before', 'after'):
+            if not isinstance(entry[side], str):
+                c.fail('recovery.conflict', 'Invalid pending manifest bytes.', 8)
+            c.manifest(c.parse_json(entry[side], 'manifest'))
+    for side, expected in (('before', before), ('after', after)):
+        text = pending[side + '_state_text']
+        if text is None and side == 'before' and expected == c.empty_state():
+            continue
+        if not isinstance(text, str) or c.state(c.parse_json(text, 'state')) != expected:
+            c.fail('recovery.conflict', 'Pending state text disagrees with intent.', 8)
+    return pending
+
+
+def check_current(pending, home):
+    """Preflight every recoverable before/after state before any recovery effect."""
+    validate_pending(pending, home)
+    for entry in pending['links']:
+        leaf = Path(entry['root']) / entry['relative']
+        c.parents_safe(Path(entry['root']), leaf)
+        actual = link_value(leaf)
+        if actual['type'] not in ('missing', 'symlink') or actual['link_text'] not in (entry['before'], entry['after']):
+            c.fail('recovery.conflict', 'A pending link was replaced or edited.', 8, path=str(leaf))
+    for entry in pending['manifests']:
+        path = Path(entry['root']) / '.mask.json'
+        if c.read_text(path, 'manifest') not in (entry['before'], entry['after']):
+            c.fail('recovery.conflict', 'A pending manifest was edited.', 8, path=str(path))
+    actual = c.read_text(home / 'state.json', 'state', missing=True)
+    if actual not in (pending['before_state_text'], pending['after_state_text']):
+        c.fail('recovery.conflict', 'Registry changed after the pending operation.', 8)
+
+
+def set_link(entry, side):
+    root = Path(entry['root'])
+    leaf = root / entry['relative']
+    c.parents_safe(root, leaf)
+    actual = link_value(leaf)
+    wanted = entry[side]
+    if actual['type'] not in ('missing', 'symlink') or actual['link_text'] not in (entry['before'], entry['after']):
+        c.fail('recovery.conflict', 'Link precondition changed immediately before effect.', 8, path=str(leaf))
+    if actual['link_text'] == wanted:
+        return
+    if actual['type'] == 'symlink':
+        leaf.unlink()
+    if wanted is not None:
+        leaf.parent.mkdir(parents=True, exist_ok=True)
+        c.parents_safe(root, leaf)
+        if c.kind(leaf) != 'missing':
+            c.fail('target.collision', 'Target appeared before link creation.', 4, path=str(leaf))
+        try:
+            leaf.symlink_to(wanted, target_is_directory=True)
+        except OSError as error:
+            if getattr(error, 'winerror', None) == 1314:
+                c.fail('target.symlink_unsupported', 'Native Windows directory symlink privileges are required.', 5)
+            raise
+
+
+def restore(pending, home, side, *, inject=False):
+    check_current(pending, home)
+    entries = pending['links'] if side == 'after' else reversed(pending['links'])
+    for entry in entries:
+        set_link(entry, side)
+        if inject:
+            checkpoint('link')
+    for entry in pending['manifests']:
+        path = Path(entry['root']) / '.mask.json'
+        c.atomic_text(path, entry[side], c.read_text(path, 'manifest'))
+        if inject:
+            checkpoint('manifest')
+    text = pending[side + '_state_text']
+    path = home / 'state.json'
+    if text is not None:
+        c.atomic_text(path, text, c.read_text(path, 'state', missing=True))
+    elif c.kind(path) != 'missing':
+        # Only remove the newly created regular registry with exact after bytes.
+        if c.read_text(path, 'state') != pending['after_state_text']:
+            c.fail('recovery.conflict', 'Registry changed before rollback.', 8)
+        path.unlink()
+    if inject:
+        checkpoint('state')
+
+
+def clear_pending(home, pending):
+    path = home / 'pending.json'
+    if c.read_json(path, 'recovery') != pending:
+        c.fail('recovery.conflict', 'Pending journal changed before cleanup.', 8)
+    path.unlink()
+
+
+def execute(planned, home, output, *, pending=None):
+    ensure_applicable(planned)
+    if not planned['would_change'] and pending is None:
+        return
+    pending = pending or make_pending(planned, home)
+    validate_pending(pending, home)
+    if c.kind(home / 'pending.json') == 'missing':
+        c.atomic_text(home / 'pending.json', c.text_json(pending), None)
+    checkpoint('intent')
+    try:
+        restore(pending, home, 'after', inject=True)
+        clear_pending(home, pending)
+        output.update(changed=planned['would_change'], transaction='committed')
+        for action in output['actions']:
+            action['status'] = 'applied'
+    except (Exception, KeyboardInterrupt) as error:
+        if pending.get('git'):
+            output.update(changed=True, transaction='partial')
+            c.fail('recovery.required', 'Git update may have effects; inspect and complete recovery.', 8)
+        try:
+            restore(pending, home, 'before')
+            clear_pending(home, pending)
+            residual = [path for path in pending['directories'] if c.kind(Path(path)) != 'missing']
+            output.update(changed=bool(residual), transaction='rolled_back')
+            output['data']['retained_directories'] = residual
+            for action in output['actions']:
+                action['status'] = 'rolled_back'
+        except (Exception, KeyboardInterrupt):
+            output.update(changed=True, transaction='partial')
+            c.fail('recovery.required', 'Partial operation retained its journal; inspect recovery.', 8)
+        if isinstance(error, (c.MaskError, KeyboardInterrupt)):
+            raise error
+        c.fail('filesystem.failed', 'Filesystem operation failed; core effects were rolled back.', 5)
