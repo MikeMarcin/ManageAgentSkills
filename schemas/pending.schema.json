@@ -144,7 +144,33 @@
       }
     },
     "git": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "root",
+        "before",
+        "candidate"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "source",
+            "program"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "before": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "candidate": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        }
+      }
     },
     "launcher": {
       "type": "object",

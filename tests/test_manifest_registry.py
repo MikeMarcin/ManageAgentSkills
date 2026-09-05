@@ -58,3 +58,12 @@ class ManifestRegistryTests(Fixture):
         self.git(self.project, 'worktree', 'add', '-b', 'lane', str(other))
         self.call('project', 'register', self.project); self.call('project', 'register', other)
         self.assertEqual(len(self.call('project', 'list')['data']['projects']), 2)
+
+    def test_show_observes_deployment_without_writing(self):
+        self.init(); self.declare(); self.call('project', 'register', self.project)
+        before = self.snapshot()
+        data = self.call('project', 'show')['data']
+        self.assertTrue(data['source']['fingerprint'].startswith('sha256:'))
+        self.assertEqual(len(data['expected_links']), 2)
+        self.assertTrue(all(entry['type'] == 'missing' for entry in data['actual_links']))
+        self.assertEqual(before, self.snapshot())

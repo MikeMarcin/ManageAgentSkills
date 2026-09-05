@@ -280,6 +280,12 @@ def project_dispatch(args, output, home):
     if command == 'project.show':
         output['data']['source'] = config['source'] if config else None
         output['data']['ownership'] = record['links'] if record else {}
+        if config:
+            inspection = fs.plan(config, state, [root], register=[] if record else [key])
+            output['data']['source'].update(inspection['source'])
+            output['data']['expected_links'] = inspection['intent']['after_state']['projects'].get(key, {}).get('links', {})
+            output['data']['actual_links'] = inspection['projects'][0]['leaves'] if inspection['projects'] else []
+            output['data']['blockers'] = inspection['blockers']
         output['data']['host_load'] = 'not_verified'
         return
     if config is None:

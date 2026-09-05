@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Normative for RFC-MASK-0001 through RFC-MASK-0004. Commands listed here are implementation targets, not claims about software already delivered in this packet.
+Normative for RFC-MASK-0001 through RFC-MASK-0004. All listed commands are implemented in local v0.1.0; native verification and scope limits are recorded in docs/releases/v0.1.0.md.
 
 ## Common options
 
@@ -123,10 +123,10 @@ Skill list returns ID, asset path, description, validation status and issues. Pr
 
 ```text
 mask capabilities --json
-mask project show --project /work/SRV --json
-mask project require implement-rfc --project /work/SRV --apply --dry-run --json
-mask project require implement-rfc --project /work/SRV --apply --expect-plan-hash <returned-hash> --json
-mask plan --project /work/SRV --json
+mask project show --project /work/example-project --json
+mask project require implement-rfc --project /work/example-project --apply --dry-run --json
+mask project require implement-rfc --project /work/example-project --apply --expect-plan-hash <returned-hash> --json
+mask plan --project /work/example-project --json
 
 mask source fetch --json
 mask update --dry-run --json
