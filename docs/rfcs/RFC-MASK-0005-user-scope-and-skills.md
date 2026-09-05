@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0005"
 title: "User-level skill management"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---

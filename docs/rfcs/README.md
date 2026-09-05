@@ -11,7 +11,7 @@ Only the main integrator imports, renumbers, edits tracker rules and confirms te
 | RFC-MASK-0003 | Auto-Verified | Explicit source updates, portable launchers and program updates |
 | RFC-MASK-0004 | Auto-Verified | Bootstrap cutover, native dogfood and bounded v1 closeout |
 
-| RFC-MASK-0005 | Implementing | User-level skill management |
+| RFC-MASK-0005 | Auto-Verified | User-level skill management |
 
 ## Import and verification
 
