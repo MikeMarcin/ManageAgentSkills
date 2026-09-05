@@ -1,7 +1,7 @@
 ---
 id: MASK-0011
 title: Implement candidate-validated source fetch and update
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0003
 depends_on: ["MASK-0010"]
 ---

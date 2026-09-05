@@ -1,7 +1,7 @@
 ---
 id: RFC-MASK-0003
 title: Explicit source updates, portable launchers and program updates
-status: Proposed
+status: Implementing
 owner: MikeMarcin
 created: 2026-09-05
 ---

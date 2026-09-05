@@ -8,7 +8,7 @@ Only the main integrator imports, renumbers, edits tracker rules and confirms te
 |---|---|---|
 | RFC-MASK-0001 | Auto-Verified | Agent-friendly CLI and declarative project state |
 | RFC-MASK-0002 | Auto-Verified | Ownership-safe planning, symlink deployment and recovery |
-| RFC-MASK-0003 | Proposed | Explicit source updates, portable launchers and program updates |
+| RFC-MASK-0003 | Implementing | Explicit source updates, portable launchers and program updates |
 | RFC-MASK-0004 | Proposed | Bootstrap cutover, native dogfood and bounded v1 closeout |
 
 ## Import and verification
