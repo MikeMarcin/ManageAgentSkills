@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0021"
 title: "Close out user scope and live migration"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0005"]
 depends_on: ["MASK-0020"]
 closeout_for: ["RFC-MASK-0005"]
