@@ -1,7 +1,7 @@
 ---
 id: MASK-0007
 title: Add explicit recovery, exact link adoption and doctor
-status: In Progress
+status: Done
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0006"]
 ---
@@ -26,4 +26,4 @@ No recovered path is removed solely because it appears in JSON. Unknown director
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Explicit inspect/complete/rollback, exact ownership adoption and observational doctor implemented. python3 -m unittest tests.test_recovery tests.test_cli_protocol: 10 PASS; recovery subset rerun 6 PASS. Covers OS lock contention and separate-process exit/restart after link, manifest and state effects; changed user content survives recovery refusal. Commit: this Done move.

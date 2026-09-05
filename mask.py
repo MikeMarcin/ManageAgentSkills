@@ -61,7 +61,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+IMPLEMENTED = {'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -168,6 +168,34 @@ def selected_roots(args, state, *, all_default=False):
     return [root]
 
 
+def diagnostics(args, output, home):
+    config = machine_config(home)
+    state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+    roots = selected_roots(args, state, all_default=True)
+    planned = fs.plan(config, state, roots)
+    fs.public_plan(planned, output)
+    issues = list(planned['blockers'])
+    if core.kind(home / 'pending.json') != 'missing':
+        issues.append(MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict())
+    try:
+        core.checkout(Path(config['source']['root']))
+    except MaskError as error:
+        issues.append(error.as_dict())
+    drift = bool(planned['would_change'])
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for relative in state['projects'][str(root)]['links']:
+            tracked = core.git(root, 'ls-files', '--error-unmatch', '--', relative, optional=True) is not None
+            ignored = core.git(root, 'check-ignore', '--quiet', '--no-index', '--', relative, optional=True) is not None
+            if tracked or not ignored:
+                output['warnings'].append(dict(code='project.link_ignore', message='Managed link is tracked or not ignored by Git.', details=dict(path=str(root / relative), tracked=tracked, ignored=ignored)))
+    output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift,
+                          host_load='not_verified', symlink_capability='unknown' if os.name == 'nt' else 'available')
+    if getattr(args, 'check', False) and (issues or drift):
+        core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7)
+
+
 def reconciliation(args, output, home):
     config = machine_config(home)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
@@ -195,6 +223,11 @@ def project_dispatch(args, output, home):
         root = core.project_root(selection, initializing=command == 'project.init')
     path = root / '.mask.json'
     key = str(root)
+    for known, existing_record in state['projects'].items():
+        if root.is_dir() and Path(known).is_dir() and core.identity(root) == existing_record['root_identity'] and os.path.samefile(root, known):
+            root, key = Path(known), known
+            path = root / '.mask.json'
+            break
     record = state['projects'].get(key)
     if command == 'project.init':
         if core.kind(path) != 'missing':
@@ -332,6 +365,15 @@ def local_dispatch(args, output, leaves):
                     core.atomic_text(home / 'state.json', core.text_json(core.empty_state()), None)
                 output.update(changed=True, transaction='committed')
         return
+    if command == 'recover':
+        mode = 'inspect' if getattr(args, 'inspect', False) else 'complete' if getattr(args, 'complete', False) else 'rollback'
+        return fs.recover(home, output, mode)
+    if command == 'doctor':
+        return diagnostics(args, output, home)
+    if command == 'link.adopt':
+        config = machine_config(home)
+        state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+        return fs.adopt(config, state, core.project_root(args.project), args.skill, args.target, args.expect_source, output, home, getattr(args, 'expect_plan_hash', None))
     if command in ('plan', 'apply'):
         return reconciliation(args, output, home)
     if command.startswith('project.'):
@@ -366,15 +408,20 @@ def local_dispatch(args, output, leaves):
 def dispatch(args, output, leaves):
     if args.command not in IMPLEMENTED:
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
-    mutates = COMMANDS[args.command][0] and not output['dry_run']
+    mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False))
     home = machine_home(args)
     if mutates:
         with core.writer_lock(home):
-            if core.kind(home / 'pending.json') != 'missing':
+            if args.command != 'recover' and core.kind(home / 'pending.json') != 'missing':
                 core.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
             local_dispatch(args, output, leaves)
     else:
+        observed = args.command not in ('capabilities',)
+        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json')] if observed else []
         local_dispatch(args, output, leaves)
+        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json')] if observed else []
+        if before != after:
+            core.fail('state.drift', 'Machine state changed during inspection; retry the observational command.', 4)
     if output['dry_run'] and output['would_change']:
         output['transaction'] = 'not_started'
     for action in output['actions']:

@@ -156,6 +156,13 @@ def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
              ('git',), 'recovery')
+    if pending['operation'] not in {'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'update', 'self.update'}:
+        c.fail('recovery.conflict', 'Unknown pending operation.', 8)
+    for field in ('selected', 'links', 'manifests', 'directories'):
+        if not isinstance(pending[field], list):
+            c.fail('recovery.conflict', 'Invalid pending collection.', 8)
+    if any(not isinstance(item, str) for item in pending['selected'] + pending['directories']) or any(not isinstance(item, dict) for item in pending['links'] + pending['manifests']):
+        c.fail('recovery.conflict', 'Invalid pending collection item.', 8)
     if not isinstance(pending['transaction_id'], str) or pending['phase'] not in ('prepared', 'git_started', 'git_advanced'):
         c.fail('recovery.conflict', 'Invalid pending transaction identity or phase.', 8)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
@@ -325,3 +332,80 @@ def execute(planned, home, output, *, pending=None):
         if isinstance(error, (c.MaskError, KeyboardInterrupt)):
             raise error
         c.fail('filesystem.failed', 'Filesystem operation failed; core effects were rolled back.', 5)
+
+
+def recover(home, output, mode):
+    raw = c.read_text(home / 'pending.json', 'recovery', missing=True)
+    if raw is None:
+        output['data'] = dict(pending=None)
+        return
+    pending = c.parse_json(raw, 'recovery')
+    validate_pending(pending, home)
+    output['data'] = dict(pending=pending, recovery_mode=mode)
+    if mode == 'inspect':
+        return
+    check_current(pending, home)
+    if pending.get('git'):
+        c.fail('recovery.conflict', 'Git-update recovery requires explicit source validation.', 8)
+    if mode == 'complete':
+        source = Path(pending['config']['source']['root'])
+        for key in pending['selected']:
+            record = pending['after_state']['projects'].get(key)
+            if record:
+                for identifier in record['last_manifest']['skills']:
+                    c.package(source, identifier)
+    output['would_change'] = True
+    if output['dry_run']:
+        return
+    try:
+        restore(pending, home, 'after' if mode == 'complete' else 'before')
+        clear_pending(home, pending)
+    except (Exception, KeyboardInterrupt):
+        output.update(changed=True, transaction='partial')
+        raise
+    residual = [path for path in pending['directories'] if c.kind(Path(path)) != 'missing']
+    output.update(changed=True, transaction='committed' if mode == 'complete' else 'rolled_back')
+    output['data']['retained_directories'] = residual
+
+
+def adopt(config, state, root, identifier, target, expected_source, output, home, guard=None):
+    c.skill_id(identifier)
+    if target not in c.ADAPTERS:
+        c.fail('config.invalid', 'Unknown agent target.')
+    record = state['projects'].get(str(root))
+    if record is None:
+        c.fail('project.not_registered', 'Adoption requires registration.', 4)
+    c.registered_root(root, record)
+    declaration = c.project_manifest(root)
+    if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
+        c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)
+    source = Path(config['source']['root'])
+    package = c.package(source, identifier)
+    expected = source / 'skills' / identifier
+    if not Path(expected_source).is_absolute() or Path(expected_source).resolve() != expected:
+        c.fail('target.unmanaged_link', 'Expected source does not match the configured package.', 4)
+    relative = f'{c.ADAPTERS[target]}/{identifier}'
+    leaf = root / relative
+    c.parents_safe(root, leaf)
+    current = link_value(leaf)
+    if current['type'] != 'symlink' or normalized_link(leaf, current['link_text']) != expected:
+        c.fail('target.unmanaged_link', 'Only an exact directory symlink can be adopted.', 4)
+    owned = record['links'].get(relative)
+    if owned and owned['link_text'] != current['link_text']:
+        c.fail('target.drift', 'Adoption cannot repair mismatched ownership.', 4)
+    plan_hash = c.digest(dict(config=config, state=state, manifest=declaration, identity=c.identity(root), package=package, leaf=current))
+    output['data'] = dict(root=str(root), plan_hash=plan_hash, path=str(leaf), link_text=current['link_text'])
+    if guard and guard != plan_hash:
+        c.fail('plan.stale', 'Adoption inputs changed since preview.', 4)
+    if owned:
+        return
+    output['would_change'] = True
+    output['actions'] = [dict(kind='link.adopt', status='planned', path=str(leaf))]
+    if not output['dry_run']:
+        c.parents_safe(root, leaf)
+        if link_value(leaf) != current:
+            c.fail('target.drift', 'Link changed before adoption.', 4)
+        after = copy.deepcopy(state)
+        after['projects'][str(root)]['links'][relative] = dict(skill=identifier, target=target, link_text=current['link_text'])
+        c.save_state(home, state, after)
+        output.update(changed=True, transaction='committed')
