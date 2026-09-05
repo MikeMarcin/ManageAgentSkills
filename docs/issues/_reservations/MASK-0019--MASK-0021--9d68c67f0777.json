@@ -1,0 +1,12 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0019",
+    "MASK-0020",
+    "MASK-0021"
+  ],
+  "reserve_for": "user-scope-2026-09-05",
+  "purpose": "",
+  "created": "2026-09-05T23:14:25.772403+00:00",
+  "base": "79810bbbaa5687333c95e140498949fd69143902"
+}
