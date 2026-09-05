@@ -1,5 +1,5 @@
 {
-  "schema": "implement-rfc.project.v1",
+  "schema": "implement-rfc.project.v2",
   "project": "mask",
   "display_name": "MASK (Manage Agent SKills)",
   "session_prefix": "mask",
@@ -13,40 +13,28 @@
   "reservations_dir": "docs/issues/_reservations",
   "allocate_id_command": "python scripts/allocate_issue_id.py",
   "lanes": {
+    "inbox": "00-inbox",
     "backlog": "10-backlog",
     "ready": "20-ready",
-    "platform_ready": {
-      "win": "21-ready-win",
-      "mac": "22-ready-mac",
-      "linux": "23-ready-lin"
-    },
     "in_progress": "30-in-progress",
     "parked": "40-parked",
     "blocked": "50-blocked",
     "done": "60-done"
   },
   "lane_statuses": {
+    "00-inbox": "Inbox",
     "10-backlog": "Backlog",
     "20-ready": "Ready",
-    "21-ready-win": "Ready",
-    "22-ready-mac": "Ready",
-    "23-ready-lin": "Ready",
     "30-in-progress": "In Progress",
     "40-parked": "Parked",
     "50-blocked": "Blocked",
     "60-done": "Done"
   },
-  "rfc_link_field": "rfc",
   "terminal_rfc_status": "Auto-Verified",
-  "closeout_card": {
-    "front_matter": {
-      "closeout": "true"
-    }
-  },
   "structure_gate": [
     "python scripts/verify_documentation.py --root ."
   ],
-  "attended_review_skill": null,
+  "attended_review_skill": "attended-review",
   "station_registry_doc": "docs/development/remote-stations.md",
   "workstreams": {
     "main": {
@@ -64,5 +52,26 @@
     "rfc-critical-reviewer": [
       "Prioritize ownership checks, linked-parent escapes, crash recovery, JSON error truthfulness, and checkout/update authority. No recursive deletion or automatic overwrite workaround."
     ]
+  },
+  "sequencing": "ordered-index",
+  "bookkeeping": {
+    "deferring_lanes": [
+      "00-inbox",
+      "10-backlog",
+      "50-blocked"
+    ],
+    "parked_on": [
+      "human-review"
+    ],
+    "blocked_by_forbidden_prefixes": [],
+    "link_roots": [
+      "AGENTS.md",
+      "README.md",
+      "CONTRIBUTING.md",
+      "docs/issues",
+      "docs/rfcs"
+    ],
+    "protected_globs": [],
+    "editable_globs": []
   }
 }

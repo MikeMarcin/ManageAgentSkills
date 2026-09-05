@@ -1,10 +1,11 @@
 ---
-id: MASK-0016
-title: Verify Windows launcher and agent CLI path
-status: Done
-rfc: RFC-MASK-0004
+schema: "implement-rfc.card.v1"
+id: "MASK-0016"
+title: "Verify Windows launcher and agent CLI path"
+status: "Done"
+rfcs: ["RFC-MASK-0004"]
 depends_on: ["MASK-0015"]
-platform: windows
+metadata: {"platform":"windows"}
 ---
 
 # MASK-0016: Verify Windows launcher and agent CLI path

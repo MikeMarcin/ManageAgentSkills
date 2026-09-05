@@ -1,9 +1,9 @@
 ---
-id: RFC-MASK-0004
-title: Bootstrap cutover, native dogfood and bounded v1 closeout
-status: Auto-Verified
-owner: MikeMarcin
-created: 2026-09-05
+id: "RFC-MASK-0004"
+title: "Bootstrap cutover, native dogfood and bounded v1 closeout"
+status: "Auto-Verified"
+owner: "MikeMarcin"
+created: "2026-09-05"
 ---
 
 # RFC-MASK-0004: Bootstrap cutover, native dogfood and bounded v1 closeout

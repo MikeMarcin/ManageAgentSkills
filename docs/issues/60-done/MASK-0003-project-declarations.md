@@ -1,8 +1,9 @@
 ---
-id: MASK-0003
-title: Implement project declarations and local registration
-status: Done
-rfc: RFC-MASK-0001
+schema: "implement-rfc.card.v1"
+id: "MASK-0003"
+title: "Implement project declarations and local registration"
+status: "Done"
+rfcs: ["RFC-MASK-0001"]
 depends_on: ["MASK-0002"]
 ---
 

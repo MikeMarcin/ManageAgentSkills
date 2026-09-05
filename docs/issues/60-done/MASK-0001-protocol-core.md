@@ -1,8 +1,9 @@
 ---
-id: MASK-0001
-title: Build the CLI protocol and capability registry
-status: Done
-rfc: RFC-MASK-0001
+schema: "implement-rfc.card.v1"
+id: "MASK-0001"
+title: "Build the CLI protocol and capability registry"
+status: "Done"
+rfcs: ["RFC-MASK-0001"]
 depends_on: []
 external_depends_on: ["AgentSkills:ASK-0004"]
 ---

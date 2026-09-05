@@ -1,8 +1,9 @@
 ---
-id: MASK-0007
-title: Add explicit recovery, exact link adoption and doctor
-status: Done
-rfc: RFC-MASK-0002
+schema: "implement-rfc.card.v1"
+id: "MASK-0007"
+title: "Add explicit recovery, exact link adoption and doctor"
+status: "Done"
+rfcs: ["RFC-MASK-0002"]
 depends_on: ["MASK-0006"]
 ---
 

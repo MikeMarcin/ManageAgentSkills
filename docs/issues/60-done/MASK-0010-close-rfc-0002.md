@@ -1,10 +1,12 @@
 ---
-id: MASK-0010
-title: Verify and close RFC-MASK-0002
-status: Done
-rfc: RFC-MASK-0002
-depends_on: ["MASK-0005", "MASK-0006", "MASK-0007", "MASK-0008", "MASK-0009"]
-closeout: true
+schema: "implement-rfc.card.v1"
+id: "MASK-0010"
+title: "Verify and close RFC-MASK-0002"
+status: "Done"
+rfcs: ["RFC-MASK-0002"]
+depends_on: ["MASK-0005","MASK-0006","MASK-0007","MASK-0008","MASK-0009"]
+closeout_for: ["RFC-MASK-0002"]
+metadata: {"closeout":true}
 ---
 
 # MASK-0010: Verify and close RFC-MASK-0002

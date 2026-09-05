@@ -1,8 +1,9 @@
 ---
-id: MASK-0005
-title: Implement ownership-aware pure reconciliation plans
-status: Done
-rfc: RFC-MASK-0002
+schema: "implement-rfc.card.v1"
+id: "MASK-0005"
+title: "Implement ownership-aware pure reconciliation plans"
+status: "Done"
+rfcs: ["RFC-MASK-0002"]
 depends_on: ["MASK-0004"]
 ---
 

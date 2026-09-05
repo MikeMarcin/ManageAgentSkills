@@ -1,8 +1,8 @@
 # ManageAgentSkills RFC tracker
 
-Live RFCs are top-level `RFC-MASK-NNNN-*.md` files. Retained packets under `assets/` are immutable provenance, never a second live RFC/card index. Status vocabulary: Proposed, Accepted, Implementing, Auto-Verified, Rejected, Superseded.
+Live RFCs are top-level `RFC-MASK-NNNN-*.md` files. Retained packets under `assets/` are immutable provenance, never a second live RFC/card index. Status vocabulary: Proposed, Accepted, Implementing, Implemented, Auto-Verified, Rejected, Superseded.
 
-Only the main integrator imports, renumbers, edits tracker rules and confirms terminal status after integration. Each RFC has exactly one linked closeout card with `closeout: true`. Store actual RFC_BASE_SHA before source implementation and record direct acceptance result/commit rows. Live board linkage selects work, not an arbitrary directory listing.
+Only the main integrator imports, renumbers, edits tracker rules and confirms terminal status after integration. Each RFC has exactly one linked closeout card whose `closeout_for` includes the RFC. Store actual RFC_BASE_SHA before source implementation and record direct acceptance result/commit rows. Live board linkage selects work, not an arbitrary directory listing.
 
 | RFC | Status | Title |
 |---|---|---|

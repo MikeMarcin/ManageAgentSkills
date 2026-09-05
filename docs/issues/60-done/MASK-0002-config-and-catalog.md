@@ -1,8 +1,9 @@
 ---
-id: MASK-0002
-title: Implement machine setup and passive skill inspection
-status: Done
-rfc: RFC-MASK-0001
+schema: "implement-rfc.card.v1"
+id: "MASK-0002"
+title: "Implement machine setup and passive skill inspection"
+status: "Done"
+rfcs: ["RFC-MASK-0001"]
 depends_on: ["MASK-0001"]
 ---
 

@@ -1,8 +1,9 @@
 ---
-id: MASK-0015
-title: Retire bootstrap copies and dogfood both repositories
-status: Done
-rfc: RFC-MASK-0004
+schema: "implement-rfc.card.v1"
+id: "MASK-0015"
+title: "Retire bootstrap copies and dogfood both repositories"
+status: "Done"
+rfcs: ["RFC-MASK-0004"]
 depends_on: ["MASK-0014"]
 external_depends_on: ["AgentSkills:ASK-0006"]
 ---

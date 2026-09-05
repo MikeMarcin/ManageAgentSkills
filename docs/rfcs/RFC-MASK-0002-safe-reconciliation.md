@@ -1,9 +1,9 @@
 ---
-id: RFC-MASK-0002
-title: Ownership-safe planning, symlink deployment and recovery
-status: Auto-Verified
-owner: MikeMarcin
-created: 2026-09-05
+id: "RFC-MASK-0002"
+title: "Ownership-safe planning, symlink deployment and recovery"
+status: "Auto-Verified"
+owner: "MikeMarcin"
+created: "2026-09-05"
 ---
 
 # RFC-MASK-0002: Ownership-safe planning, symlink deployment and recovery

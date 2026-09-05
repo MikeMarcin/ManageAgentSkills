@@ -1,10 +1,11 @@
 ---
-id: MASK-0009
-title: Verify native macOS symlink safety
-status: Done
-rfc: RFC-MASK-0002
+schema: "implement-rfc.card.v1"
+id: "MASK-0009"
+title: "Verify native macOS symlink safety"
+status: "Done"
+rfcs: ["RFC-MASK-0002"]
 depends_on: ["MASK-0007"]
-platform: macos
+metadata: {"platform":"macos"}
 ---
 
 # MASK-0009: Verify native macOS symlink safety

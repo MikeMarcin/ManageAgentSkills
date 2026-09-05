@@ -1,9 +1,9 @@
 ---
-id: RFC-MASK-0003
-title: Explicit source updates, portable launchers and program updates
-status: Auto-Verified
-owner: MikeMarcin
-created: 2026-09-05
+id: "RFC-MASK-0003"
+title: "Explicit source updates, portable launchers and program updates"
+status: "Auto-Verified"
+owner: "MikeMarcin"
+created: "2026-09-05"
 ---
 
 # RFC-MASK-0003: Explicit source updates, portable launchers and program updates

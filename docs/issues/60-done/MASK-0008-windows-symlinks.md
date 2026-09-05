@@ -1,10 +1,11 @@
 ---
-id: MASK-0008
-title: Verify native Windows symlink safety
-status: Done
-rfc: RFC-MASK-0002
+schema: "implement-rfc.card.v1"
+id: "MASK-0008"
+title: "Verify native Windows symlink safety"
+status: "Done"
+rfcs: ["RFC-MASK-0002"]
 depends_on: ["MASK-0007"]
-platform: windows
+metadata: {"platform":"windows"}
 ---
 
 # MASK-0008: Verify native Windows symlink safety

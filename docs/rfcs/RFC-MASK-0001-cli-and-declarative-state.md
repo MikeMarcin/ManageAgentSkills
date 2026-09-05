@@ -1,9 +1,9 @@
 ---
-id: RFC-MASK-0001
-title: Agent-friendly CLI and declarative project state
-status: Auto-Verified
-owner: MikeMarcin
-created: 2026-09-05
+id: "RFC-MASK-0001"
+title: "Agent-friendly CLI and declarative project state"
+status: "Auto-Verified"
+owner: "MikeMarcin"
+created: "2026-09-05"
 ---
 
 # RFC-MASK-0001: Agent-friendly CLI and declarative project state

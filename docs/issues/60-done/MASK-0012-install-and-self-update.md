@@ -1,8 +1,9 @@
 ---
-id: MASK-0012
-title: Implement portable launchers and separate self update
-status: Done
-rfc: RFC-MASK-0003
+schema: "implement-rfc.card.v1"
+id: "MASK-0012"
+title: "Implement portable launchers and separate self update"
+status: "Done"
+rfcs: ["RFC-MASK-0003"]
 depends_on: ["MASK-0011"]
 ---
 
