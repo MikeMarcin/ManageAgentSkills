@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import sys
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 PROTOCOL_VERSION = 1
 ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
 PROGRAM_ROOT = Path(__file__).resolve().parent
@@ -50,11 +50,11 @@ COMMANDS = {
     'project.register': (True, False, [('project', 'value'), ('path', 'optional'), ('apply', 'flag')]),
     'project.unregister': (True, False, [('project', 'value'), ('path', 'optional'), ('keep-links', 'flag')]),
     'project.list': (False, False, []),
-    'plan': (False, False, [('project', 'value'), ('all', 'flag')]),
-    'apply': (True, False, [('project', 'value'), ('all', 'flag')]),
-    'link.adopt': (True, False, [('project', 'required'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
+    'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
+    'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
+    'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
-    'doctor': (False, False, [('project', 'value'), ('all', 'flag'), ('check', 'flag')]),
+    'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
     'source.status': (False, False, []),
     'source.fetch': (True, True, []),
     'update': (True, True, []),
@@ -62,8 +62,15 @@ COMMANDS = {
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.update': (True, True, []),
 }
+for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'register', 'unregister'):
+    mutates, network, arguments = COMMANDS['project.' + action]
+    user_arguments = [(name, shape) for name, shape in arguments if name not in ('project', 'path')]
+    if action == 'register':
+        user_arguments.append(('user-home', 'value'))
+    COMMANDS['user.' + action] = (mutates, network, user_arguments)
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'self.status', 'self.install', 'self.update', 'source.status', 'source.fetch', 'update', 'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
+IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -124,7 +131,8 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=1, machine=1, state=1),
+    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=1, state=2, pending=2),
+                readable_versions=dict(state=[1, 2], pending=[1, 2]), scopes=['project', 'user'],
                 targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
@@ -139,6 +147,11 @@ CONFLICTS = {
     'apply': {'project': ['all'], 'all': ['project']},
     'doctor': {'project': ['all'], 'all': ['project']},
 }
+for action in ('set', 'set-targets'):
+    CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
+for command in ('plan', 'apply', 'doctor'):
+    CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
+CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 
 
 def validate_arguments(args):
@@ -147,6 +160,7 @@ def validate_arguments(args):
         if getattr(args, key, None) and any(getattr(args, other, None) for other in conflicts):
             raise MaskError('invocation.invalid', f'{key} conflicts with {", ".join(conflicts)}', 2)
     required_sets = {'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
+                     'user.set': ('skill', 'clear'), 'user.set-targets': ('targets', 'inherit'), 'link.adopt': ('project', 'user'),
                      'config.set': ('target', 'git_timeout'), 'skill.validate': ('id', 'all'),
                      'recover': ('inspect', 'complete', 'rollback')}
     if command in required_sets and not any(getattr(args, key, None) for key in required_sets[command]):
@@ -162,8 +176,12 @@ def machine_config(home):
 
 
 def selected_roots(args, state, *, all_default=False):
+    if getattr(args, 'user', False):
+        if not state.get('user'):
+            core.fail('user.not_registered', 'User scope is not registered.', 4)
+        return [Path(state['user']['root'])]
     if getattr(args, 'all', False) or all_default and not getattr(args, 'project', None):
-        return [Path(key) for key in sorted(state['projects'])]
+        return [Path(key) for key in sorted(core.consumer_records(state))]
     root = core.project_root(getattr(args, 'project', None))
     for known in state['projects']:
         if Path(known).is_dir() and os.path.samefile(root, known):
@@ -178,7 +196,7 @@ def diagnostics(args, output, home):
     config = machine_config(home)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
     roots = selected_roots(args, state, all_default=True)
-    planned = fs.plan(config, state, roots)
+    planned = fs.plan(config, state, roots, home=home)
     fs.public_plan(planned, output)
     issues = list(planned['blockers'])
     if core.kind(home / 'pending.json') != 'missing':
@@ -189,7 +207,7 @@ def diagnostics(args, output, home):
         issues.append(error.as_dict())
     drift = bool(planned['would_change'])
     for root in roots:
-        if not root.is_dir():
+        if not root.is_dir() or core.consumer_scope(state, root) == 'user':
             continue
         for relative in state['projects'][str(root)]['links']:
             tracked = core.git(root, 'ls-files', '--error-unmatch', '--', relative, optional=True) is not None
@@ -206,7 +224,7 @@ def reconciliation(args, output, home):
     config = machine_config(home)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
     roots = selected_roots(args, state)
-    planned = fs.plan(config, state, roots)
+    planned = fs.plan(config, state, roots, home=home)
     fs.public_plan(planned, output)
     if args.command == 'apply':
         fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
@@ -215,7 +233,8 @@ def reconciliation(args, output, home):
 
 
 def project_dispatch(args, output, home):
-    command = args.command
+    scope = 'user' if args.command.startswith('user.') else 'project'
+    command = args.command.replace('user.', 'project.')
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
     config_raw = core.read_json(home / 'config.json', default={})
     config = core.config(config_raw) if config_raw else None
@@ -223,21 +242,31 @@ def project_dispatch(args, output, home):
         output['data'] = dict(projects=[dict(record, available=Path(root).is_dir()) for root, record in sorted(state['projects'].items())])
         return
     selection = getattr(args, 'project', getattr(args, 'path', None))
-    if command == 'project.unregister' and getattr(args, 'keep_links', False) and selection is not None:
+    if scope == 'user':
+        record = state.get('user')
+        root = Path(record['root']) if record else Path.home().resolve()
+        if hasattr(args, 'user_home'):
+            selected = Path(args.user_home).expanduser().resolve()
+            if record and selected != root:
+                core.fail('user.already_registered', 'Unregister the existing user home before selecting another.', 4)
+            root = selected
+        if command == 'project.register' and not root.is_dir():
+            core.fail('user.not_found', 'User home must be an existing directory.', 4, root=str(root))
+    elif command == 'project.unregister' and getattr(args, 'keep_links', False) and selection is not None:
         root = Path(selection).expanduser().resolve()
     else:
         root = core.project_root(selection, initializing=command == 'project.init')
-    path = root / '.mask.json'
+    path = core.declaration_path(root, scope, home)
     key = str(root)
-    for known, existing_record in state['projects'].items():
+    for known, existing_record in (state['projects'].items() if scope == 'project' else []):
         if root.is_dir() and Path(known).is_dir() and core.identity(root) == existing_record['root_identity'] and os.path.samefile(root, known):
             root, key = Path(known), known
             path = root / '.mask.json'
             break
-    record = state['projects'].get(key)
+    record = state.get('user') if scope == 'user' else state['projects'].get(key)
     if command == 'project.init':
         if core.kind(path) != 'missing':
-            declaration = core.project_manifest(root)
+            declaration = core.consumer_manifest(root, scope, home)
             output['data'] = dict(root=key, manifest=declaration)
             return
         output['data'] = dict(root=key, manifest=dict(schema_version=1, skills=[]))
@@ -251,8 +280,8 @@ def project_dispatch(args, output, home):
             output['data'] = dict(root=key, registered=False)
             return
         keep = getattr(args, 'keep_links', False)
-        if record['links'] and not keep:
-            planned = fs.plan(config, state, [root], unregister=[key], operation=command)
+        if scope == 'user' or record['links'] and not keep:
+            planned = fs.plan(config, state, [root], unregister=[key], keep_links=keep, operation=args.command, home=home)
             fs.public_plan(planned, output)
             fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
             if not output['dry_run']:
@@ -274,17 +303,18 @@ def project_dispatch(args, output, home):
     declaration_text = core.read_text(path, 'manifest')
     declaration = core.manifest(core.parse_json(declaration_text, 'manifest'))
     if record:
-        core.registered_root(root, record)
-    output['data'] = dict(root=key, manifest=declaration, registered=record is not None,
+        core.registered_root(root, record, scope)
+    output['data'] = dict(root=key, scope=scope, manifest_path=str(path), manifest=declaration, registered=record is not None,
                           configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
     if command == 'project.show':
         output['data']['source'] = config['source'] if config else None
         output['data']['ownership'] = record['links'] if record else {}
         if config:
-            inspection = fs.plan(config, state, [root], register=[] if record else [key])
+            inspection = fs.plan(config, state, [root], register=[] if record else [key], home=home, user_root=root if scope == 'user' else None)
             output['data']['source'].update(inspection['source'])
-            output['data']['expected_links'] = inspection['intent']['after_state']['projects'].get(key, {}).get('links', {})
-            output['data']['actual_links'] = inspection['projects'][0]['leaves'] if inspection['projects'] else []
+            output['data']['expected_links'] = core.consumer_records(inspection['intent']['after_state']).get(key, {}).get('links', {})
+            observations = inspection['users'] if scope == 'user' else inspection['projects']
+            output['data']['actual_links'] = observations[0]['leaves'] if observations else []
             output['data']['blockers'] = inspection['blockers']
         output['data']['host_load'] = 'not_verified'
         return
@@ -293,19 +323,17 @@ def project_dispatch(args, output, home):
     source = Path(config['source']['root'])
     if getattr(args, 'apply', False):
         if record is None and command != 'project.register':
-            core.fail('project.not_registered', '--apply requires a registered project.', 4)
+            core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
 
     if command == 'project.register':
         if record and not getattr(args, 'apply', False):
             return
-        for adapter in ADAPTERS.values():
-            destination = root / adapter
-            if source.is_relative_to(destination) or home.is_relative_to(destination) or destination.is_relative_to(source / 'skills') or root == home:
-                core.fail('config.invalid', 'Managed source, state and destination locations overlap.')
+        core.registration_safe(root, source, home, state, scope)
         for identifier in declaration['skills']:
             core.package(source, identifier)
-        if getattr(args, 'apply', False):
-            planned = fs.plan(config, state, [root], register=[key], operation=command)
+        if scope == 'user' or getattr(args, 'apply', False):
+            planned = fs.plan(config, state, [root], register=[key], operation=args.command, home=home,
+                              user_root=root if scope == 'user' else None, register_only=not getattr(args, 'apply', False))
             fs.public_plan(planned, output)
             fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
             if not output['dry_run']:
@@ -339,14 +367,14 @@ def project_dispatch(args, output, home):
     for identifier in proposal['skills']:
         core.package(source, identifier)
     if getattr(args, 'apply', False):
-        planned = fs.plan(config, state, [root], proposals={key: proposal}, operation=command)
+        planned = fs.plan(config, state, [root], proposals={key: proposal}, operation=args.command, home=home)
         fs.public_plan(planned, output)
         fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
         if not output['dry_run']:
             fs.execute(planned, home, output)
         return
     output['data']['manifest'] = proposal
-    output['data']['plan_hash'] = core.digest(dict(command=command, root=key, before=declaration, after=proposal, generation=state['generation'], config=config))
+    output['data']['plan_hash'] = core.digest(dict(command=args.command, root=key, manifest_path=str(path), before=declaration, after=proposal, generation=state['generation'], config=config))
     output['would_change'] = proposal != declaration
     if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
         core.fail('plan.stale', 'The prospective manifest changed since preview.', 4)
@@ -394,10 +422,10 @@ def local_dispatch(args, output, leaves):
     if command == 'link.adopt':
         config = machine_config(home)
         state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
-        return fs.adopt(config, state, core.project_root(args.project), args.skill, args.target, args.expect_source, output, home, getattr(args, 'expect_plan_hash', None))
+        return fs.adopt(config, state, selected_roots(args, state)[0], args.skill, args.target, args.expect_source, output, home, getattr(args, 'expect_plan_hash', None))
     if command in ('plan', 'apply'):
         return reconciliation(args, output, home)
-    if command.startswith('project.'):
+    if command.startswith(('project.', 'user.')):
         return project_dispatch(args, output, home)
     config = machine_config(home)
     source = Path(config['source']['root'])
@@ -450,9 +478,9 @@ def dispatch(args, output, leaves):
             local_dispatch(args, output, leaves)
     else:
         observed = args.command not in ('capabilities',)
-        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json')] if observed else []
+        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json')] if observed else []
         local_dispatch(args, output, leaves)
-        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json')] if observed else []
+        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json')] if observed else []
         if before != after:
             core.fail('state.drift', 'Machine state changed during inspection; retry the observational command.', 4)
     if output['dry_run'] and output['would_change']:

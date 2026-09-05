@@ -157,13 +157,14 @@ def update(config, state, home, output, guard=None):
     root, remote, branch = Path(source['root']), source['remote'], source['branch']
     timeout = config['git_timeout_seconds']
     observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
-    roots = [Path(key) for key in sorted(state['projects'])]
+    records = c.consumer_records(state)
+    roots = [Path(key) for key in sorted(records)]
     # Refuse unavailable/invalid declarations before any network operation.
     identifiers = set()
     for project in roots:
-        c.registered_root(project, state['projects'][str(project)])
-        identifiers.update(c.project_manifest(project)['skills'])
-    local = fs.plan(config, state, roots, operation='update')
+        c.registered_root(project, records[str(project)], c.consumer_scope(state, project))
+        identifiers.update(c.consumer_manifest(project, c.consumer_scope(state, project), home)['skills'])
+    local = fs.plan(config, state, roots, operation='update', home=home)
     for blocker in local['blockers']:
         if blocker['code'] != 'skill.unknown':
             raise c.MaskError(blocker['code'], blocker['message'], 4, details=blocker['details'])
@@ -179,7 +180,7 @@ def update(config, state, home, output, guard=None):
     packages = candidate_packages(root, candidate, identifiers)
     transition = dict(scope='source', root=str(root), before=observed['revision'], candidate=candidate)
     view = dict(revision=candidate, packages=packages, transition=transition)
-    planned = fs.plan(config, state, roots, candidate=view, operation='update')
+    planned = fs.plan(config, state, roots, candidate=view, operation='update', home=home)
     advanced = candidate != observed['revision']
     if advanced:
         planned['would_change'] = True
@@ -192,7 +193,7 @@ def update(config, state, home, output, guard=None):
     if output['dry_run'] or not planned['would_change']:
         return
     rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
-    if rechecked['revision'] != observed['revision'] or fs.plan(config, state, roots, candidate=view, operation='update')['plan_hash'] != planned['plan_hash']:
+    if rechecked['revision'] != observed['revision'] or fs.plan(config, state, roots, candidate=view, operation='update', home=home)['plan_hash'] != planned['plan_hash']:
         c.fail('plan.stale', 'Source or consumer observations changed before checkout.', 4)
     pending = fs.make_pending(planned, home)
     pending['git'] = transition
@@ -227,7 +228,7 @@ def recover_git(pending, home, output, mode):
             c.fail('recovery.conflict', 'The source advanced; rollback never resets Git. Complete recovery against the new revision.', 8)
         return
     if entry['scope'] == 'source':
-        identifiers = {identifier for key in pending['selected'] for identifier in pending['after_state']['projects'].get(key, {}).get('last_manifest', {}).get('skills', [])}
+        identifiers = {identifier for key in pending['selected'] for identifier in c.consumer_records(pending['after_state']).get(key, {}).get('last_manifest', {}).get('skills', [])}
         candidate_packages(root, entry['candidate'], identifiers)
     else:
         from mask_install import validate_program

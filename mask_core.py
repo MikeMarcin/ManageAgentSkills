@@ -57,11 +57,11 @@ def parse_json(text, family='config'):
         fail(family + '.invalid', 'Invalid UTF-8 JSON.')
 
 
-def fields(value, required, optional=(), family='config'):
+def fields(value, required, optional=(), family='config', *, versions=(1,)):
     if not isinstance(value, dict) or not set(required) <= value.keys() or value.keys() - set(required) - set(optional):
         fail(family + '.invalid', 'Unexpected or missing fields.')
-    if 'schema_version' in required and (type(value['schema_version']) is not int or value['schema_version'] != 1):
-        fail(family + '.unsupported_version', 'Only schema version 1 is supported.')
+    if 'schema_version' in required and (type(value['schema_version']) is not int or value['schema_version'] not in versions):
+        fail(family + '.unsupported_version', 'Unsupported schema version.', supported=list(versions))
 
 
 def skill_id(value):
@@ -376,14 +376,21 @@ def empty_state():
 
 
 def state(value):
-    fields(value, ('schema_version', 'generation', 'projects', 'launchers'), family='state')
+    fields(value, ('schema_version', 'generation', 'projects', 'launchers'), ('user',), family='state', versions=(1, 2))
+    if (value['schema_version'] == 1 and 'user' in value) or (value['schema_version'] == 2 and 'user' not in value):
+        fail('state.invalid', 'User records require state version 2.')
+    user = value.get('user')
+    if user is not None and (not isinstance(user, dict) or not isinstance(user.get('root'), str)):
+        fail('state.invalid', 'Invalid user record.')
     if type(value['generation']) is not int or value['generation'] < 0 or not isinstance(value['projects'], dict) or not isinstance(value['launchers'], dict):
         fail('state.invalid', 'Invalid generation or registry maps.')
     for key, record in value['launchers'].items():
         fields(record, ('program_root', 'interpreter', 'content_digest'), family='state')
         if not isinstance(key, str) or not Path(key).is_absolute() or Path(key).name not in ('mask', 'mask.cmd') or any(not isinstance(record[item], str) or not Path(record[item]).is_absolute() for item in ('program_root', 'interpreter')) or not isinstance(record['content_digest'], str) or not re.fullmatch('sha256:[0-9a-f]{64}', record['content_digest']):
             fail('state.invalid', 'Invalid launcher ownership.')
-    for key, record in value['projects'].items():
+    if user and user['root'] in value['projects']:
+        fail('state.invalid', 'User and project roots overlap.')
+    for key, record in consumer_records(value).items():
         fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), family='state')
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
             fail('state.invalid', 'Noncanonical registry root.')
@@ -404,6 +411,57 @@ def state(value):
             if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
     return value
+
+
+def consumer_records(value):
+    """A root is unique across scopes; the user record remains explicit on disk."""
+    records = dict(value['projects'])
+    if value.get('user') is not None:
+        records[value['user']['root']] = value['user']
+    return records
+
+
+def consumer_scope(value, root):
+    user = value.get('user')
+    return 'user' if user and user['root'] == str(root) else 'project'
+
+
+def set_consumer(value, root, record, scope):
+    if scope == 'user':
+        value.update(schema_version=2, user=record)
+    elif record is None:
+        value['projects'].pop(str(root), None)
+    else:
+        value['projects'][str(root)] = record
+
+
+def declaration_path(root, scope='project', home=None):
+    if scope == 'user':
+        if home is None:
+            fail('internal.invariant', 'User declarations require the selected MASK home.', 10)
+        return Path(home) / 'user.json'
+    return Path(root) / '.mask.json'
+
+
+def consumer_manifest(root, scope='project', home=None):
+    return manifest(read_json(declaration_path(root, scope, home), 'manifest'))
+
+
+def registration_safe(root, source, home, value, scope):
+    if str(root) in consumer_records(value) and consumer_scope(value, root) != scope:
+        fail('target.overlap', 'The root is already registered in another scope.', 4, root=str(root))
+    for adapter in ADAPTERS.values():
+        destination = root / adapter
+        if source.is_relative_to(destination) or (home is not None and home.is_relative_to(destination)) or destination.is_relative_to(source / 'skills') or root == home:
+            fail('config.invalid', 'Managed source, state and destination locations overlap.')
+        parents_safe(root, destination / 'mask-registration-check')
+        for known in consumer_records(value):
+            if known == str(root):
+                continue
+            for other_adapter in ADAPTERS.values():
+                other = Path(known) / other_adapter
+                if destination.is_relative_to(other) or other.is_relative_to(destination):
+                    fail('target.overlap', 'Registered consumer destinations overlap.', 4, path=str(destination), other=str(other))
 
 
 def project_root(selection=None, *, initializing=False, cwd=None):
@@ -438,11 +496,11 @@ def registry_record(root, declaration, source):
                 last_manifest_digest=digest(declaration), last_source_revision=git(source, 'rev-parse', 'HEAD', optional=True), links={})
 
 
-def registered_root(root, record):
+def registered_root(root, record, scope='project'):
     if not root.is_dir():
-        fail('project.unavailable', 'Registered project is unavailable.', 4, root=str(root))
+        fail(scope + '.unavailable', 'Registered consumer is unavailable.', 4, root=str(root))
     if root.resolve() != root or identity(root) != record['root_identity']:
-        fail('project.identity_changed', 'Registered directory identity changed.', 4, root=str(root))
+        fail(scope + '.identity_changed', 'Registered directory identity changed.', 4, root=str(root))
 
 
 def save_state(home, before, after):

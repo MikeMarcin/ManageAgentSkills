@@ -1,0 +1,191 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "transaction_id",
+    "phase",
+    "operation",
+    "base_generation",
+    "selected",
+    "links",
+    "manifests",
+    "before_state",
+    "after_state",
+    "config",
+    "before_state_text",
+    "after_state_text",
+    "directories"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "prepared",
+        "git_started",
+        "git_advanced"
+      ]
+    },
+    "operation": {
+      "type": "string"
+    },
+    "base_generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "relative",
+          "skill",
+          "target",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "relative": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "target": {
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "manifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "before_state": {
+      "$ref": "state-v1.schema.json"
+    },
+    "after_state": {
+      "$ref": "state-v1.schema.json"
+    },
+    "config": {
+      "anyOf": [
+        {
+          "$ref": "machine.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "before_state_text": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "after_state_text": {
+      "type": "string"
+    },
+    "directories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "root",
+        "before",
+        "candidate"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "source",
+            "program"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "before": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "candidate": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        }
+      }
+    },
+    "launcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mask:pending:v1",
+  "$comment": "Internal recovery intent only. Runtime checks selection, source containment, before/after ownership and current disk states before effects. Git extension is implemented by the explicit update RFC."
+}

@@ -29,7 +29,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply'):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False):
     proposals = proposals or {}
     source = Path(config['source']['root'])
     after = copy.deepcopy(state)
@@ -38,20 +38,24 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     dirty = bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False
     for root in sorted(roots, key=str):
         key = str(root)
-        record = state['projects'].get(key)
+        record = c.consumer_records(state).get(key)
+        scope = 'user' if user_root == root else c.consumer_scope(state, root)
+        manifest_path = c.declaration_path(root, scope, home)
         try:
             if record is None and key not in register:
-                c.fail('project.not_registered', 'Project is not registered.', 4, root=key)
+                c.fail(scope + '.not_registered', 'Consumer is not registered.', 4, root=key)
+            if key in register:
+                c.registration_safe(root, source, home, state, scope)
             if key in unregister and keep_links:
-                after['projects'].pop(key, None)
+                c.set_consumer(after, root, None, scope)
                 actions.extend(dict(kind='link.abandon', status='planned', path=str(root / rel)) for rel in record['links'])
-                observations.append(dict(root=key, abandoned=record))
+                observations.append(dict(root=key, scope=scope, abandoned=record))
                 continue
             if record:
-                c.registered_root(root, record)
+                c.registered_root(root, record, scope)
             elif not root.is_dir():
                 c.fail('project.unavailable', 'Project is unavailable.', 4, root=key)
-            before_text = c.read_text(root / '.mask.json', 'manifest')
+            before_text = c.read_text(manifest_path, 'manifest')
             current = c.manifest(c.parse_json(before_text, 'manifest'))
             desired = c.manifest(proposals.get(key, current))
             old_links = record['links'] if record else {}
@@ -63,6 +67,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     for target in desired.get('targets', config['default_targets']):
                         relative = f'{c.ADAPTERS[target]}/{identifier}'
                         expected[relative] = dict(skill=identifier, target=target, link_text=creation_link_text(source / 'skills' / identifier))
+            if register_only:
+                expected = old_links
             next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
             next_record['links'] = {}
             leaves = []
@@ -92,15 +98,15 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     entry = dict(root=key, relative=relative, skill=(wanted or old)['skill'], target=(wanted or old)['target'], before=before, after=after_raw)
                     links.append(entry)
                     actions.append(dict(kind='link.create' if after_raw else 'link.remove', status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
-            observations.append(dict(root=key, identity=c.identity(root), manifest=desired, manifest_bytes=c.digest(before_text.encode()), leaves=leaves))
+            observations.append(dict(root=key, scope=scope, identity=c.identity(root), manifest=desired, manifest_path=str(manifest_path), manifest_bytes=c.digest(before_text.encode()), leaves=leaves))
             if key in unregister:
-                after['projects'].pop(key, None)
+                c.set_consumer(after, root, None, scope)
             else:
                 next_record.update(last_manifest=desired, last_manifest_digest=c.digest(desired), last_source_revision=revision)
-                after['projects'][key] = next_record
+                c.set_consumer(after, root, next_record, scope)
             if desired != current:
                 files.append(dict(root=key, before=before_text, after=c.text_json(desired)))
-                actions.append(dict(kind='manifest.write', status='planned', path=str(root / '.mask.json')))
+                actions.append(dict(kind='manifest.write', status='planned', path=str(manifest_path)))
         except c.MaskError as error:
             blockers.append(error.as_dict())
     if after != state:
@@ -110,11 +116,12 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                        fingerprint=c.digest({key: value['fingerprint'] for key, value in sorted(packages.items())}))
     payload = dict(protocol=1, adapters=c.ADAPTERS, operation=operation, config=config, generation=state['generation'],
                    state=state, observations=observations, source=source_data, links=links, manifests=files,
-                   register=sorted(register), unregister=sorted(unregister), keep_links=keep_links)
+                   register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only)
     if candidate:
         payload['transition'] = candidate.get('transition')
     return dict(applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
-                projects=observations, actions=actions, would_change=bool(actions),
+                projects=[entry for entry in observations if entry['scope'] == 'project'],
+                users=[entry for entry in observations if entry['scope'] == 'user'], actions=actions, would_change=bool(actions),
                 intent=dict(operation=operation, selected=[str(root) for root in roots], links=links, manifests=files,
                             before_state=state, after_state=after, config=config))
 
@@ -125,7 +132,7 @@ def public_plan(planned, output):
     output['would_change'] = planned['would_change']
     if planned['source']['dirty']:
         output['warnings'].append(dict(code='source.dirty', message='Local authoring changes are included in the source fingerprint.'))
-    if not planned['projects'] and not planned['blockers']:
+    if not planned['projects'] and not planned.get('users') and not planned['blockers']:
         output['warnings'].append(dict(code='project.empty_registry', message='No registered projects selected.'))
 
 
@@ -156,7 +163,8 @@ def required_directories(intent):
 def make_pending(planned, home):
     import uuid
     intent = copy.deepcopy(planned['intent'])
-    intent.update(schema_version=1, transaction_id=str(uuid.uuid4()), phase='prepared',
+    version = max(intent['before_state']['schema_version'], intent['after_state']['schema_version'])
+    intent.update(schema_version=version, transaction_id=str(uuid.uuid4()), phase='prepared',
                   base_generation=intent['before_state']['generation'],
                   before_state_text=c.read_text(home / 'state.json', 'state', missing=True),
                   after_state_text=c.text_json(intent['after_state']),
@@ -167,8 +175,8 @@ def make_pending(planned, home):
 def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher'), 'recovery')
-    if pending['operation'] not in {'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'update', 'self.update', 'self.install'}:
+             ('git', 'launcher'), 'recovery', versions=(1, 2))
+    if pending['operation'] not in {'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     for field in ('selected', 'links', 'manifests', 'directories'):
         if not isinstance(pending[field], list):
@@ -181,6 +189,11 @@ def validate_pending(pending, home):
         from mask_git import validate_git_intent
         validate_git_intent(pending['git'], pending['config'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
+    if pending['schema_version'] != max(before['schema_version'], after['schema_version']):
+        c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
+    if before['schema_version'] != after['schema_version'] and not (pending['operation'] == 'user.register' and before['schema_version'] == 1 and after['schema_version'] == 2):
+        c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
+    before_records, after_records = c.consumer_records(before), c.consumer_records(after)
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
         c.fail('recovery.conflict', 'Invalid pending generation.', 8)
     current_config = c.read_json(home / 'config.json', default={})
@@ -193,23 +206,26 @@ def validate_pending(pending, home):
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
-    if not selected <= before['projects'].keys() | after['projects'].keys():
+    if not selected <= before_records.keys() | after_records.keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
     if 'launcher' in pending:
         from mask_install import validate_launcher_intent
         validate_launcher_intent(pending)
     elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
-    for root in before['projects'].keys() | after['projects'].keys():
-        if root not in selected and before['projects'].get(root) != after['projects'].get(root):
+    for root in before_records.keys() | after_records.keys():
+        if root in before_records and root in after_records and c.consumer_scope(before, root) != c.consumer_scope(after, root):
+            c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
+        if root not in selected and before_records.get(root) != after_records.get(root):
             c.fail('recovery.conflict', 'Pending state changes an unselected project.', 8)
     allowed_directories = {str(Path(pending['launcher']['path']).parent)} if 'launcher' in pending else set()
     for key in selected:
-        record = before['projects'].get(key) or after['projects'][key]
+        record = before_records.get(key) or after_records[key]
         # Explicit keep-links may abandon an unavailable root without effects.
         touches = any(entry.get('root') == key for entry in pending['links'] + pending['manifests'])
-        if touches:
-            c.registered_root(Path(key), record)
+        if touches or pending['operation'] in ('project.register', 'user.register'):
+            selected_state = before if key in before_records else after
+            c.registered_root(Path(key), record, c.consumer_scope(selected_state, key))
         for adapter in c.ADAPTERS.values():
             allowed_directories.update((str(Path(key) / Path(adapter).parent), str(Path(key) / adapter)))
     if not isinstance(pending['directories'], list) or not set(pending['directories']) <= allowed_directories:
@@ -225,7 +241,7 @@ def validate_pending(pending, home):
             if raw is not None and (not isinstance(raw, str) or normalized_link(leaf, raw) != source / 'skills' / entry['skill']):
                 c.fail('recovery.conflict', 'Pending link points outside its configured package.', 8)
         for side, state in (('before', before), ('after', after)):
-            record = state['projects'].get(entry['root'], {}).get('links', {}).get(entry['relative'])
+            record = c.consumer_records(state).get(entry['root'], {}).get('links', {}).get(entry['relative'])
             raw = entry[side]
             if raw is not None and (not record or record['link_text'] != raw):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
@@ -246,6 +262,12 @@ def validate_pending(pending, home):
     return pending
 
 
+def pending_manifest_path(pending, entry, home):
+    root = entry['root']
+    selected_state = pending['before_state'] if root in c.consumer_records(pending['before_state']) else pending['after_state']
+    return c.declaration_path(root, c.consumer_scope(selected_state, root), home)
+
+
 def check_current(pending, home):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
@@ -259,7 +281,7 @@ def check_current(pending, home):
         if actual['type'] not in ('missing', 'symlink') or actual['link_text'] not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A pending link was replaced or edited.', 8, path=str(leaf))
     for entry in pending['manifests']:
-        path = Path(entry['root']) / '.mask.json'
+        path = pending_manifest_path(pending, entry, home)
         if c.read_text(path, 'manifest') not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A pending manifest was edited.', 8, path=str(path))
     actual = c.read_text(home / 'state.json', 'state', missing=True)
@@ -305,7 +327,7 @@ def restore(pending, home, side, *, inject=False):
         if inject:
             checkpoint('link')
     for entry in pending['manifests']:
-        path = Path(entry['root']) / '.mask.json'
+        path = pending_manifest_path(pending, entry, home)
         actual = c.read_text(path, 'manifest')
         if actual not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'Manifest changed immediately before replacement.', 8)
@@ -387,7 +409,7 @@ def recover(home, output, mode):
     if mode == 'complete':
         source = Path(pending['config']['source']['root']) if pending['config'] else None
         for key in pending['selected']:
-            record = pending['after_state']['projects'].get(key)
+            record = c.consumer_records(pending['after_state']).get(key)
             if record:
                 for identifier in record['last_manifest']['skills']:
                     c.package(source, identifier)
@@ -409,11 +431,12 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     c.skill_id(identifier)
     if target not in c.ADAPTERS:
         c.fail('config.invalid', 'Unknown agent target.')
-    record = state['projects'].get(str(root))
+    scope = c.consumer_scope(state, root)
+    record = c.consumer_records(state).get(str(root))
     if record is None:
         c.fail('project.not_registered', 'Adoption requires registration.', 4)
-    c.registered_root(root, record)
-    declaration = c.project_manifest(root)
+    c.registered_root(root, record, scope)
+    declaration = c.consumer_manifest(root, scope, home)
     if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
         c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)
     source = Path(config['source']['root'])
@@ -430,8 +453,8 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     owned = record['links'].get(relative)
     if owned and owned['link_text'] != current['link_text']:
         c.fail('target.drift', 'Adoption cannot repair mismatched ownership.', 4)
-    plan_hash = c.digest(dict(config=config, state=state, manifest=declaration, identity=c.identity(root), package=package, leaf=current))
-    output['data'] = dict(root=str(root), plan_hash=plan_hash, path=str(leaf), link_text=current['link_text'])
+    plan_hash = c.digest(dict(config=config, state=state, scope=scope, manifest_path=str(c.declaration_path(root, scope, home)), manifest=declaration, identity=c.identity(root), package=package, leaf=current))
+    output['data'] = dict(root=str(root), scope=scope, plan_hash=plan_hash, path=str(leaf), link_text=current['link_text'])
     if guard and guard != plan_hash:
         c.fail('plan.stale', 'Adoption inputs changed since preview.', 4)
     if owned:
@@ -443,6 +466,6 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
         if link_value(leaf) != current:
             c.fail('target.drift', 'Link changed before adoption.', 4)
         after = copy.deepcopy(state)
-        after['projects'][str(root)]['links'][relative] = dict(skill=identifier, target=target, link_text=current['link_text'])
+        c.consumer_records(after)[str(root)]['links'][relative] = dict(skill=identifier, target=target, link_text=current['link_text'])
         c.save_state(home, state, after)
         output.update(changed=True, transaction='committed')
