@@ -1,0 +1,230 @@
+"""Explicit fetch and frozen-candidate updates; no implicit Git reset or push."""
+from __future__ import annotations
+
+import copy
+from pathlib import Path
+import re
+
+import mask_core as c
+import mask_fs as fs
+
+
+def status(root, remote='origin', branch='main', timeout=30):
+    c.checkout(root)
+    head = c.git(root, 'rev-parse', 'HEAD', optional=True, timeout=timeout)
+    current_branch = c.git(root, 'symbolic-ref', '--short', 'HEAD', optional=True, timeout=timeout)
+    dirty = bool(c.git(root, 'status', '--porcelain', '--untracked-files=all', timeout=timeout))
+    candidate = c.git(root, 'rev-parse', '--verify', f'refs/remotes/{remote}/{branch}^{{commit}}', optional=True, timeout=timeout)
+    relation = 'unknown'
+    if head and candidate:
+        if head == candidate:
+            relation = 'equal'
+        elif c.git(root, 'merge-base', '--is-ancestor', head, candidate, optional=True, timeout=timeout) is not None:
+            relation = 'behind'
+        elif c.git(root, 'merge-base', '--is-ancestor', candidate, head, optional=True, timeout=timeout) is not None:
+            relation = 'ahead'
+        else:
+            relation = 'diverged'
+    return dict(root=str(root), revision=head, branch=current_branch, configured_branch=branch, remote=remote,
+                candidate=candidate, dirty=dirty, relation=relation, remote_freshness='last_fetched', unborn=head is None)
+
+
+def checkout_preconditions(root, remote, branch, expected_name, timeout=30, *, clean=True):
+    observed = status(root, remote, branch, timeout)
+    if observed['branch'] is None:
+        c.fail('source.detached', 'Checkout is detached.', 4)
+    if observed['branch'] != branch or observed['revision'] is None:
+        c.fail('source.identity_mismatch', 'Checkout is not on the configured branch with a commit.', 4)
+    origin = c.git(root, 'remote', 'get-url', remote, optional=True, timeout=timeout)
+    if origin is None:
+        c.fail('source.remote_unknown', 'Configured remote is missing.', 4)
+    name = origin.replace('\\', '/').rstrip('/').removesuffix('.git').rsplit('/', 1)[-1].rsplit(':', 1)[-1]
+    if name != expected_name:
+        c.fail('source.identity_mismatch', 'Configured remote does not name the expected repository.', 4, expected_repository=expected_name)
+    if clean and observed['dirty']:
+        c.fail('source.dirty', 'Commit or preserve authoring changes before updating.', 4)
+    for marker in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
+        location = c.git(root, 'rev-parse', '--git-path', marker, timeout=timeout)
+        path = Path(location)
+        if not path.is_absolute():
+            path = root / path
+        if path.exists():
+            c.fail('source.dirty', 'An in-progress Git operation blocks updating.', 4)
+    if c.git(root, 'config', '--bool', '--get', 'core.sparseCheckout', optional=True, timeout=timeout) == 'true':
+        c.fail('source.candidate_invalid', 'Sparse checkouts are unsupported.', 4)
+    entries = c.git(root, 'ls-files', '--stage', timeout=timeout)
+    if any(line.startswith('160000 ') for line in entries.splitlines()):
+        c.fail('source.candidate_invalid', 'Submodule checkouts are unsupported.', 4)
+    return observed
+
+
+def fetch(root, remote, branch, timeout, output):
+    before = c.git(root, 'rev-parse', '--verify', f'refs/remotes/{remote}/{branch}', optional=True, timeout=timeout)
+    output['data']['fetch_effects'] = dict(attempted=True, fetched=False, remote_refs_changed=False)
+    try:
+        c.git(root, 'fetch', '--no-tags', remote, f'+refs/heads/{branch}:refs/remotes/{remote}/{branch}', timeout=timeout, mutating=True)
+        output['data']['fetch_effects']['fetched'] = True
+    finally:
+        after = c.git(root, 'rev-parse', '--verify', f'refs/remotes/{remote}/{branch}', optional=True, timeout=timeout)
+        output['data']['fetch_effects'].update(remote_refs_changed=before != after, before=before, after=after)
+
+
+def tree(root, revision, path='', recursive=False):
+    args = ['ls-tree', '-z']
+    if recursive:
+        args.append('-r')
+    args.append(revision + (':' + path if path else ''))
+    raw = c.git(root, *args, binary=True)
+    rows = []
+    for item in raw.split(b'\0'):
+        if not item:
+            continue
+        try:
+            header, name = item.split(b'\t', 1)
+            mode, kind, oid = header.decode('ascii').split()
+            name = name.decode('utf-8')
+        except (ValueError, UnicodeError):
+            c.fail('source.candidate_invalid', 'Candidate has unsupported tree names.', 4)
+        rows.append((mode, kind, oid, name))
+    return rows
+
+
+def candidate_packages(root, revision, identifiers):
+    available = {}
+    folded = set()
+    try:
+        for mode, kind, oid, name in tree(root, revision, 'skills'):
+            c.skill_id(name)
+            if name.casefold() in folded or mode != '040000' or kind != 'tree':
+                c.fail('source.candidate_invalid', 'Candidate package roots must be distinct real trees.', 4)
+            folded.add(name.casefold())
+            available[name] = oid
+        packages = {}
+        for identifier in sorted(identifiers):
+            if identifier not in available:
+                c.fail('source.candidate_invalid', 'Candidate removes a requested skill.', 4, skill=identifier)
+            files, paths = {}, set()
+            for mode, kind, oid, name in tree(root, revision, 'skills/' + identifier, True):
+                if mode not in ('100644', '100755') or kind != 'blob' or name.casefold() in paths:
+                    c.fail('source.candidate_invalid', 'Candidate contains linked, special or case-colliding entries.', 4, skill=identifier)
+                paths.add(name.casefold())
+                if any(part in ('', '.', '..') for part in name.split('/')) or '\\' in name:
+                    c.fail('source.candidate_invalid', 'Unsafe candidate path.', 4)
+                files[name] = c.git(root, 'cat-file', 'blob', oid, binary=True)
+            if 'SKILL.md' not in files:
+                c.fail('source.candidate_invalid', 'Candidate package has no SKILL.md.', 4)
+            facts = c.metadata(files['SKILL.md'].decode('utf-8'), identifier)
+            packages[identifier] = dict(id=identifier, description=facts['description'], fingerprint=c.digest({name: c.digest(value) for name, value in files.items()}))
+        return packages
+    except (c.MaskError, UnicodeError) as error:
+        if isinstance(error, c.MaskError) and error.code == 'source.candidate_invalid':
+            raise
+        c.fail('source.candidate_invalid', 'Candidate skill tree or metadata is invalid.', 4)
+
+
+def validate_git_intent(entry, config, program_root):
+    c.fields(entry, ('scope', 'root', 'before', 'candidate'), family='recovery')
+    expected = Path(config['source']['root']) if entry['scope'] == 'source' else program_root if entry['scope'] == 'program' else None
+    if expected is None or entry['root'] != str(expected) or any(not isinstance(entry[key], str) or not re.fullmatch('[0-9a-f]{40,64}', entry[key]) for key in ('before', 'candidate')):
+        c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
+
+
+def advance(root, candidate, pending, home, output, timeout):
+    before = copy.deepcopy(pending)
+    pending['phase'] = 'git_started'
+    c.atomic_text(home / 'pending.json', c.text_json(pending), c.text_json(before))
+    try:
+        c.git(root, 'merge', '--ff-only', '--no-edit', candidate, timeout=timeout, mutating=True)
+        if c.git(root, 'rev-parse', 'HEAD', timeout=timeout) != candidate:
+            c.fail('git.failed', 'Checkout did not reach the frozen candidate.', 5)
+        before = copy.deepcopy(pending)
+        pending['phase'] = 'git_advanced'
+        c.atomic_text(home / 'pending.json', c.text_json(pending), c.text_json(before))
+        fs.checkpoint('git')
+    except (Exception, KeyboardInterrupt):
+        output.update(changed=True, transaction='partial')
+        c.fail('recovery.required', 'Checkout may have changed; pending intent retained without resetting Git.', 8)
+
+
+def update(config, state, home, output, guard=None):
+    source = config['source']
+    root, remote, branch = Path(source['root']), source['remote'], source['branch']
+    timeout = config['git_timeout_seconds']
+    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    roots = [Path(key) for key in sorted(state['projects'])]
+    # Refuse unavailable/invalid declarations before any network operation.
+    identifiers = set()
+    for project in roots:
+        c.registered_root(project, state['projects'][str(project)])
+        identifiers.update(c.project_manifest(project)['skills'])
+    local = fs.plan(config, state, roots, operation='update')
+    for blocker in local['blockers']:
+        if blocker['code'] != 'skill.unknown':
+            raise c.MaskError(blocker['code'], blocker['message'], 4, details=blocker['details'])
+    if not output['dry_run']:
+        fetch(root, remote, branch, timeout, output)
+    fetched = output['data'].get('fetch_effects')
+    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    if observed['candidate'] is None:
+        c.fail('source.remote_unknown', 'Fetch the configured source branch before previewing an update.', 4)
+    if observed['relation'] in ('ahead', 'diverged'):
+        c.fail('source.' + observed['relation'], 'Source cannot fast-forward; no automatic merge, reset or push is allowed.', 4)
+    candidate = observed['candidate']
+    packages = candidate_packages(root, candidate, identifiers)
+    transition = dict(scope='source', root=str(root), before=observed['revision'], candidate=candidate)
+    view = dict(revision=candidate, packages=packages, transition=transition)
+    planned = fs.plan(config, state, roots, candidate=view, operation='update')
+    advanced = candidate != observed['revision']
+    if advanced:
+        planned['would_change'] = True
+        planned['actions'].insert(0, dict(kind='source.advance', status='planned', before=observed['revision'], after=candidate))
+    fs.public_plan(planned, output)
+    output['data'].update(source_before=observed['revision'], source_after=observed['revision'], remote_freshness='last_fetched', requires_fetch=output['dry_run'])
+    if fetched is not None:
+        output['data']['fetch_effects'] = fetched
+    fs.ensure_applicable(planned, guard)
+    if output['dry_run'] or not planned['would_change']:
+        return
+    rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    if rechecked['revision'] != observed['revision'] or fs.plan(config, state, roots, candidate=view, operation='update')['plan_hash'] != planned['plan_hash']:
+        c.fail('plan.stale', 'Source or consumer observations changed before checkout.', 4)
+    pending = fs.make_pending(planned, home)
+    pending['git'] = transition
+    fs.validate_pending(pending, home)
+    c.atomic_text(home / 'pending.json', c.text_json(pending), None)
+    if advanced:
+        advance(root, candidate, pending, home, output, timeout)
+        output['data']['source_after'] = candidate
+    try:
+        for identifier in identifiers:
+            c.package(root, identifier)
+    except c.MaskError:
+        output.update(changed=advanced, transaction='partial')
+        c.fail('recovery.required', 'Checked-out skill contents failed validation; inspect pending update.', 8)
+    fs.execute(planned, home, output, pending=pending)
+    output['changed'] = output['changed'] or advanced
+
+
+def recover_git(pending, home, output, mode):
+    entry = pending['git']
+    root = Path(entry['root'])
+    config = pending['config']
+    remote = config['source']['remote'] if entry['scope'] == 'source' else 'origin'
+    branch = config['source']['branch'] if entry['scope'] == 'source' else 'main'
+    expected_name = 'AgentSkills' if entry['scope'] == 'source' else 'ManageAgentSkills'
+    observed = checkout_preconditions(root, remote, branch, expected_name, config['git_timeout_seconds'])
+    if observed['revision'] not in (entry['before'], entry['candidate']):
+        c.fail('recovery.conflict', 'Checkout changed outside the recorded transition.', 8)
+    if mode == 'rollback':
+        if observed['revision'] != entry['before']:
+            output.update(changed=True, transaction='partial')
+            c.fail('recovery.conflict', 'The source advanced; rollback never resets Git. Complete recovery against the new revision.', 8)
+        return
+    if entry['scope'] == 'source':
+        identifiers = {identifier for key in pending['selected'] for identifier in pending['after_state']['projects'].get(key, {}).get('last_manifest', {}).get('skills', [])}
+        candidate_packages(root, entry['candidate'], identifiers)
+    if observed['revision'] == entry['before'] and entry['candidate'] != entry['before']:
+        if c.git(root, 'merge-base', '--is-ancestor', entry['before'], entry['candidate'], optional=True) is None:
+            c.fail('recovery.conflict', 'Recorded candidate is no longer a fast-forward.', 8)
+        if not output['dry_run']:
+            advance(root, entry['candidate'], pending, home, output, config['git_timeout_seconds'])

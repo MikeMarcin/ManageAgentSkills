@@ -1,7 +1,7 @@
 ---
 id: MASK-0011
 title: Implement candidate-validated source fetch and update
-status: In Progress
+status: Done
 rfc: RFC-MASK-0003
 depends_on: ["MASK-0010"]
 ---
@@ -26,4 +26,4 @@ Dirty/ahead/diverged/wrong branch/missing skill/collision/unavailable project co
 
 ## Run record
 
-Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+Implemented noninteractive Git adapter, explicit fetch, cached-ref previews, frozen candidate tree/metadata validation and ff-only source update over every registered declaration. python3 -m unittest tests.test_git_update: 5 PASS using local bare remotes, including stale remote guard and post-advance crash/recovery without Git rollback. Fetch effects reported separately; no resets, pushes or skill execution. Commit: this Done move.

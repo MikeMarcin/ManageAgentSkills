@@ -17,6 +17,7 @@ PROGRAM_ROOT = Path(__file__).resolve().parent
 
 import mask_core as core
 import mask_fs as fs
+import mask_git as git_ops
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -61,7 +62,7 @@ COMMANDS = {
     'self.update': (True, True, []),
 }
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
-IMPLEMENTED = {'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
+IMPLEMENTED = {'source.status', 'source.fetch', 'update', 'recover', 'doctor', 'link.adopt', 'apply', 'plan', 'capabilities', 'init', 'config.show', 'config.set', 'skill.list', 'skill.show', 'skill.validate', *(name for name in COMMANDS if name.startswith('project.'))}
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
 
@@ -384,7 +385,19 @@ def local_dispatch(args, output, leaves):
         return project_dispatch(args, output, home)
     config = machine_config(home)
     source = Path(config['source']['root'])
-    if command == 'config.show':
+    if command == 'source.status':
+        output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])
+    elif command == 'source.fetch':
+        remote, branch = config['source']['remote'], config['source']['branch']
+        git_ops.checkout_preconditions(source, remote, branch, 'AgentSkills', config['git_timeout_seconds'], clean=False)
+        if not output['dry_run']:
+            git_ops.fetch(source, remote, branch, config['git_timeout_seconds'], output)
+        else:
+            output['data'] = dict(fetch_effects=dict(attempted=False, fetched=False), remote_freshness='last_fetched')
+    elif command == 'update':
+        state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+        return git_ops.update(config, state, home, output, getattr(args, 'expect_plan_hash', None))
+    elif command == 'config.show':
         output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home))
     elif command == 'config.set':
         proposal = dict(config)

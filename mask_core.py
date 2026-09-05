@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import signal
 import subprocess
 import tempfile
 
@@ -201,17 +202,44 @@ def writer_lock(home):
         handle.close()
 
 
-def git(root, *args, timeout=30, optional=False):
-    environment = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
-    environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never')
+def git(root, *args, timeout=30, optional=False, binary=False, mutating=False):
+    selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
+                 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
+                 'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
+    environment = {key: value for key, value in os.environ.items() if key not in selectors and not key.startswith(('GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_'))}
+    environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
+                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull)
+    if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
+        environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
+    options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    command = ['git', '-c', 'core.hooksPath=' + os.devnull, '-C', str(root), *args]
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
     try:
-        run = subprocess.run(['git', '-C', str(root), *args], stdin=subprocess.DEVNULL,
-                             capture_output=True, timeout=timeout, env=environment)
-    except subprocess.TimeoutExpired:
-        fail('git.timeout', 'Git exceeded its configured timeout.', 5)
-    if run.returncode and not optional:
-        fail('git.failed', 'Git operation failed.', 5, operation=args[0] if args else '')
-    return None if run.returncode else run.stdout.decode('utf-8', errors='replace').strip()
+        stdout, stderr = process.communicate(timeout=timeout)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+        confirmed = False
+        try:
+            if os.name == 'nt':
+                cleanup = subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
+                confirmed = cleanup.returncode == 0
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
+                confirmed = True
+            process.communicate(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            confirmed = False
+        if not confirmed:
+            fail('recovery.required', 'Git process-tree termination could not be confirmed; inspect before retrying.', 8, indeterminate=True)
+        if isinstance(error, KeyboardInterrupt):
+            raise
+        fail('git.timeout', 'Git exceeded its timeout; its process tree was terminated and reaped.', 5)
+    if process.returncode and not optional:
+        lower = stderr.lower()
+        auth = any(token in lower for token in (b'authentication failed', b'could not read username', b'permission denied (publickey)'))
+        fail('git.auth_required' if auth else 'git.failed', 'Noninteractive Git authentication failed.' if auth else 'Git operation failed.', 5, operation=args[0] if args else '')
+    if process.returncode:
+        return None
+    return stdout if binary else stdout.decode('utf-8', errors='replace').strip()
 
 
 def checkout(root):

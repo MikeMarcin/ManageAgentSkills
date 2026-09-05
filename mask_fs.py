@@ -177,6 +177,9 @@ def validate_pending(pending, home):
         c.fail('recovery.conflict', 'Invalid pending collection item.', 8)
     if not isinstance(pending['transaction_id'], str) or pending['phase'] not in ('prepared', 'git_started', 'git_advanced'):
         c.fail('recovery.conflict', 'Invalid pending transaction identity or phase.', 8)
+    if 'git' in pending:
+        from mask_git import validate_git_intent
+        validate_git_intent(pending['git'], pending['config'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
         c.fail('recovery.conflict', 'Invalid pending generation.', 8)
@@ -358,7 +361,8 @@ def recover(home, output, mode):
         return
     check_current(pending, home)
     if pending.get('git'):
-        c.fail('recovery.conflict', 'Git-update recovery requires explicit source validation.', 8)
+        from mask_git import recover_git
+        recover_git(pending, home, output, mode)
     if mode == 'complete':
         source = Path(pending['config']['source']['root'])
         for key in pending['selected']:
