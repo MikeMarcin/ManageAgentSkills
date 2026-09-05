@@ -31,11 +31,11 @@ Not started. Record actual commands, outcomes and commits here. Read the live bo
 
 ## Durable closeout anchor
 
-RFC_BASE_SHA: UNSET — integrator records a real pre-implementation commit at import/planning.
+RFC_BASE_SHA: f3ab52687284efa58de9451013a0faebc4850828
 
 Planned cards: MASK-0001, MASK-0002, MASK-0003.
 
-Cross-repository handoff commits: not recorded.
+Cross-repository handoff: AgentSkills ASK-0004 b66a562452eec00c6b97079e0376878f0b7d87f2.
 
 Next slice: first dependency-ready card, from live state.
 

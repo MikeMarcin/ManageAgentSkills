@@ -1,7 +1,7 @@
 ---
 id: MASK-0001
 title: Build the CLI protocol and capability registry
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0001
 depends_on: []
 external_depends_on: ["AgentSkills:ASK-0004"]
@@ -28,3 +28,5 @@ Implement/run `python -m unittest tests.test_cli_protocol`.
 ## Run record
 
 Not started. Record actual commands, outcomes and commits here. Read the live board before claiming. Never stage unrelated paths.
+
+External dependency AgentSkills:ASK-0004 / RFC-ASK-0001 integrated at b66a562452eec00c6b97079e0376878f0b7d87f2. Verified commit exists in authorized sibling checkout and closeout is Done. Boundary: shared consumer context and safe renderer.
