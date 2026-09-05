@@ -1,7 +1,7 @@
 ---
 id: MASK-0008
 title: Verify native Windows symlink safety
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0007"]
 platform: windows

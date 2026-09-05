@@ -1,7 +1,7 @@
 ---
 id: MASK-0009
 title: Verify native macOS symlink safety
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0007"]
 platform: macos
