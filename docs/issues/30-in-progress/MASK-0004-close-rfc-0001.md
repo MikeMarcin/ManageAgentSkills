@@ -1,7 +1,7 @@
 ---
 id: MASK-0004
 title: Verify and close RFC-MASK-0001
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0001
 depends_on: ["MASK-0001", "MASK-0002", "MASK-0003"]
 closeout: true
