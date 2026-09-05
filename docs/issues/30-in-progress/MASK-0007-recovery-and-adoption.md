@@ -1,7 +1,7 @@
 ---
 id: MASK-0007
 title: Add explicit recovery, exact link adoption and doctor
-status: Backlog
+status: In Progress
 rfc: RFC-MASK-0002
 depends_on: ["MASK-0006"]
 ---
