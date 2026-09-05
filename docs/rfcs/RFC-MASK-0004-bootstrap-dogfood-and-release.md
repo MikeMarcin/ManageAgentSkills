@@ -1,7 +1,7 @@
 ---
 id: RFC-MASK-0004
 title: Bootstrap cutover, native dogfood and bounded v1 closeout
-status: Proposed
+status: Implementing
 owner: MikeMarcin
 created: 2026-09-05
 ---
