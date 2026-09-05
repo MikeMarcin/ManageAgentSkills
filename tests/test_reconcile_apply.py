@@ -94,3 +94,13 @@ raise SystemExit(mask.main(['apply', '--project', sys.argv[2], '--home', sys.arg
             with self.assertRaises(mask_fs.c.MaskError) as caught:
                 mask_fs.set_link(entry, 'after')
         self.assertEqual(caught.exception.code, 'target.symlink_unsupported')
+
+    def test_all_projects_preflight_before_first_effect(self):
+        other = self.base / 'second-project'; other.mkdir()
+        (other / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        self.call('project', 'register', other)
+        collision = other / '.claude/skills/alpha'; collision.mkdir(parents=True)
+        before = self.snapshot()
+        self.call('apply', '--all', code=4)
+        self.assertEqual(before, self.snapshot())
+        self.assertFalse((self.project / '.agents').exists())

@@ -53,3 +53,7 @@ If an existing file/directory or mismatching symlink appears, recovery refuses a
 Test process exit after intent write; after first link creation; after one owned unlink; after manifest replacement but before state; after state replacement but before journal cleanup; after Git HEAD advance but before project effects; after parent/leaf replacement by a cooperative external writer. Check both recovery completion and rollback where supported. Do not claim operating-system power-loss durability from an exception-injection test.
 
 Once implementation chooses the precise journal layout, publish its strict internal JSON schema beside the state schema and test migrations/refusals. This does not add a second database or an externally editable command format.
+
+## Implemented serialization
+
+`schemas/state.schema.json` and `schemas/pending.schema.json` document the current closed object shapes. Pending intent holds selected roots, before/after state objects plus their exact UTF-8 text, bounded link/manifests lists and known potentially created directories. Runtime validation recomputes adapter-relative paths, checks configured source destinations and verifies every current object against a recorded before/after value before recovery effects. Native Windows creation intent records the extended path spelling returned by readlink; removal still requires exact raw equality.
