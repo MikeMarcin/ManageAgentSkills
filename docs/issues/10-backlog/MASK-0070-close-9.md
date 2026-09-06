@@ -53,3 +53,7 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0009-AC05 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Implementation progress
+
+MASK-0038 source c2fa4962f06349d33169fae478b69b7f758e7bb4 and Done 4291d5d supply local targeting/compatibility evidence, including corrected one-pass policy review and dangling-artifact reporting regressions. MASK-0039 now owns adapter data and contribution conflicts; MASK-0040 owns combined native engine/migration/targeting verification. Full AC rows remain open until this milestone.
