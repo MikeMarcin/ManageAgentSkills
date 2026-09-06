@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0008"
 title: "True version pinning, immutable deployment artifacts and recoverable migration"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
