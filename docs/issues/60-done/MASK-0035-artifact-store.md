@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0035"
 title: "Build isolated raw-byte artifacts and exact hydration"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0034", "MASK-0033"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "artifact-store", "stage": "B — reproducible content", "provisional_id": false}
+acceptance: [{"criterion":"MASK-0035 bounded immutable store and exact hydration","outcome":"pass","revision":"d17a607d60797b88efb312a349e8f823fcc90111","evidence":{"kind":"observation","detail":"17 focused methods plus four affected and two added checks pass; public source fetch --locked validates raw bytes and exact acquisition with preserved controls. Engine/native acceptance remains open."}}]
 ---
 
 # MASK-0035: Build isolated raw-byte artifacts and exact hydration
@@ -34,7 +35,11 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Implemented bounded artifact construction/hydration slice at `d17a607d60797b88efb312a349e8f823fcc90111`. Public `source fetch --locked --project/--user [--offline]` verifies retained artifacts first without Git, otherwise acquires only the full approved locked commit. Cache selector/ref advertisements and consumer control/link/state bytes remain unchanged. Store-v1 paths derive from validated digest/ID; raw-file validation, closed bounded manifest, complete no-follow inventory and bytes/modes checks protect creation and reuse. Same-volume staging uses no-replace publication; corrupt existing directories are preserved. No hardlinks, checkout filters, script execution or garbage collection. Retained directories and actual/possible acquisition effects are reported separately, including failures.
+
+Verification: `python3 -B -m unittest tests.test_artifacts tests.test_import_safety tests.test_launcher` passed 17 methods in 47.722s without skips. Four affected effects/subset/hydration methods passed in 10.350s after effect-report corrections. Two added fresh-machine/manifest-hardlink checks passed in 4.952s. Exact method names are retained in the focused test module; unchanged passing evidence reused. `git diff --check` passed. Task-created fixtures cleaned; user `.DS_Store` untouched.
+
+This is bounded support for AC01–03/07. Engine link activation, preparation outside the consumer writer lock, ensure fetch policy, state migration and native pinned-deployment acceptance remain MASK-0036/0037 and the coherent native milestone. No full RFC acceptance, actual pinned consumer deployment or POSIX permission result on Windows is asserted.
 
 ## Bounded implementation plan
 
