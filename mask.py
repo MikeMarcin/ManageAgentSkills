@@ -65,7 +65,7 @@ COMMANDS = {
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
     'integration.enable': (True, False, [('project', 'value'), ('git', 'flag'), ('agent', 'value')]),
     'integration.disable': (True, False, [('project', 'value'), ('git', 'flag'), ('agent', 'value')]),
-    'launch': (True, False, [('project', 'value'), ('agent', 'required'), ('host_args', 'remainder')]),
+    'launch': (True, True, [('project', 'value'), ('agent', 'required'), ('host_args', 'remainder')]),
     'workspace.forget': (True, False, [('path', 'pos'), ('expect-identity', 'required')]),
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),

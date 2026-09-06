@@ -46,11 +46,11 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0011-AC01 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0011-AC01 | Legacy inventory: 14 focused tests passed; unchanged integration coverage passed | Partial: pinned/layered/fleet boundary still open | 79c3d61 |
 | RFC-MASK-0011-AC02 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0011-AC03 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0011-AC04 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0011-AC05 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0011-AC04 | Legacy inventory: 14 focused tests passed; unchanged integration coverage passed | Partial: pinned/layered/fleet boundary still open | 79c3d61 |
+| RFC-MASK-0011-AC05 | Legacy inventory: 14 focused tests passed; unchanged integration coverage passed | Partial: pinned/layered/fleet boundary still open | 79c3d61 |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
 

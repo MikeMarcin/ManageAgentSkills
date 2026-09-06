@@ -181,7 +181,7 @@ manifest destinations are recomputed as `<project>/.mask.json` or the current
 `MASK_HOME/user.json`, never accepted as arbitrary serialized write paths.
 V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
 bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
-Capabilities report readable state/journal versions `[1, 2]` and latest version 2.
+Capabilities retain readable state versions `[1, 2]` and state version 2. The readiness extension below adds journal v3 while preserving the v1/v2 readers.
 The source/configuration and result schemas remain v1.
 
 ## Workspace readiness (unreleased RFC-MASK-0006 additions)
@@ -247,7 +247,7 @@ an existing local-environment setup script without replacing that script.
 
 `launch --agent claude|codex [--project PATH] -- HOST_ARGUMENTS...` ensures startup
 readiness first, releases the writer lock, then invokes the selected executable
-from PATH with an argv array. Dry-run never launches. Ordinary mode inherits host
+from PATH with an argv array. Capabilities mark launch as network-capable because the invoked host may use its own network services; ensure remains local-only. Dry-run never launches. Ordinary mode inherits host
 I/O; `--json` before `--` captures host stdout/stderr in the result. Arguments after
 `--` belong to the host. Missing executables and Windows batch-only launchers
 refuse; direct native Windows host launch still needs native acceptance. A failed

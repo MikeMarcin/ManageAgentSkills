@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0029"
 title: "Verify native Windows workspace and host readiness"
-status: "Backlog"
+status: "Blocked"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
 platforms: ["win"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "readiness-win", "stage": "A — first usable milestone", "provisional_id": false}
+blocked_by: "native-windows-station"
 ---
 
 # MASK-0029: Verify native Windows workspace and host readiness
@@ -34,3 +35,9 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Current blocker
+
+Native Windows acceptance has not run. This session is macOS; docs/development/remote-stations.md has no configured station and specifies local implementation. The owner was asked which Windows host/checkout should run the disposable tests; no answer has been recorded. Do not infer Windows acceptance from WSL, fixture protocol output, old RFCs or available app host names. No privilege, trust or enrollment changes were made.
+
+Next: identify an authorized native Windows checkout, run the focused public readiness/launcher/Git/host fixtures, record actual versions and limitations, and address only resulting defects. MASK-0067 and the source/pinning milestone remain open until this required boundary is satisfied.

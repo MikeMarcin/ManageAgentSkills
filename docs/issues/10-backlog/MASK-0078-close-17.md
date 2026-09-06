@@ -46,10 +46,14 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0017-AC01 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0017-AC01 | Committed reservation and import; historical IDs preserved; live mapping and baselines recorded | Pass | b185a15 |
 | RFC-MASK-0017-AC02 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0017-AC03 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0017-AC04 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0017-AC05 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Current implementation boundary
+
+Readiness, owned Git/host integrations, clone-boundary policy, native macOS prelaunch and independent legacy inventory are implemented. See MASK-0067 and MASK-0072 for actual evidence. One full integration suite ran (119 pass, 3 skip, 1 recovery failure); the failure and in-scope recovery issues were fixed and 33 affected checks passed. Native Windows acceptance is pending a selected station and blocks readiness closeout, which in turn blocks stages B–D. No AgentSkills handoff, real consumer migration, fleet enrollment or optional stage E completion is claimed. Next actionable input: native Windows host/checkout for MASK-0029.

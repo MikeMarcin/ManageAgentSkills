@@ -48,13 +48,13 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0006-AC01 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC02 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC03 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC04 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC05 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC06 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0006-AC07 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0006-AC01 | Git lifecycle and future-clone startup fixtures; 33 affected tests passed | Pass at macOS fallback boundary | c0d37e7 |
+| RFC-MASK-0006-AC02 | Ensure, clone policy, nested and personal preflight tests; no-op and bounded reads | Pass at exercised CLI boundary | c0d37e7 |
+| RFC-MASK-0006-AC03 | Collision, parent/identity, lock, pending and interruption refusal checks | Pass at exercised CLI boundary | c0d37e7 |
+| RFC-MASK-0006-AC04 | Inactive branch, stale control recovery, removed-package cleanup fixtures | Pass at exercised CLI boundary | c0d37e7 |
+| RFC-MASK-0006-AC05 | Owned Git/host entry and recovery checks; named-hook runtime unavailable | Pass on legacy Git/fixture boundary; named execution unverified | c0d37e7 |
+| RFC-MASK-0006-AC06 | Claude 2.1.260/Codex 0.153.2 native prelaunch; separate protocol outputs | Fallback verified; first-prompt discovery unverified | c0d37e7 |
+| RFC-MASK-0006-AC07 | Native macOS APFS launcher and lifecycle checks; Windows station unavailable | Pending Windows | c0d37e7 (macOS only) |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
 
@@ -99,3 +99,11 @@ Integration follow-up MASK-0082 records the full-suite failure and inactive clea
 Revision `c0d37e78d72802c90ae73f39a7d9e342612494f1`: Full integration at runtime revision 3a8182f ran 123 tests: 119 passes, three skips, one hook recovery failure. The reused path variable is fixed. The 33 affected Git/ensure/lifecycle/host tests all pass (47.140s), covering new-interpreter journal refusal, no unused-package dependency in inactive cleanup, and registered nested consumers without a filesystem crawl. Earlier 29 affected recovery/integration tests passed; unchanged full-suite results are reused.
 
 Final scoped source diff reviewed against immutable RFC_BASE_SHA `9dc90df`. No known critical failure remains on the exercised macOS/public-command boundary. Named-hook execution on newer Git, native Windows and actual first-prompt host loading remain explicitly limited. Native Windows is the required open platform criterion; later core stages retain their live dependencies.
+
+## Current stop boundary
+
+All currently eligible unattended slices are complete. MASK-0029 is blocked on selecting a native Windows test station; its required evidence is not waived. The dependency graph therefore keeps MASK-0067 and stages B–D open. Optional stage E and the two Inbox tracking items remain deferred. No independent review agent was used; the integrator reviewed the scoped diff and consumed one integration suite plus focused defect rechecks.
+
+Final capability reconciliation marks launch network-capable because the external host may use network services; ensure stays local, inventory remains observational, and pending readers advertise 1/2/3. Direct capability assertions passed. The change is metadata only; prior runtime checks remain relevant.
+
+Task-created scratch root `.mask/generated/implement-rfc/pack-work` held only finish decision files, whose records have been consumed into Done cards. It is removed after consumption. No task worktree or verification checkout was created; test-owned temporary roots were cleaned by fixture teardown. The original untracked `.DS_Store` is preserved. No push, publication, live adapter install, consumer migration, credentials or trust changes occurred.
