@@ -320,6 +320,22 @@ def references(home, config, state, name):
     return result
 
 
+def migrated_config(config, home, name='legacy'):
+    proposal = copy.deepcopy(config)
+    alias(name)
+    if config['schema_version'] == 1:
+        old = config['source']
+        root = Path(old['root'])
+        c.checkout(root)
+        transport = c.git(root, 'remote', 'get-url', old['remote'], optional=True) or str(root)
+        entry = binding(home, name, transport, old['branch'], authoring=str(root))
+        endpoint(root, transport, entry['repository'])
+        proposal.update(schema_version=2, legacy_source=name, sources={name: entry})
+    elif config['legacy_source'] != name:
+        c.fail('source.alias_conflict', 'Legacy source already migrated under another alias.', 4)
+    return c.config(proposal)
+
+
 def dispatch(args, output, home):
     original = c.read_text(home / 'config.json')
     config = c.config(c.parse_json(original))
@@ -328,17 +344,7 @@ def dispatch(args, output, home):
     output['data'] = dict(catalog_only=True)
     if args.command == 'source.migrate':
         name = getattr(args, 'alias', 'legacy')
-        alias(name)
-        if config['schema_version'] == 1:
-            old = config['source']
-            root = Path(old['root'])
-            c.checkout(root)
-            transport = c.git(root, 'remote', 'get-url', old['remote'], optional=True) or str(root)
-            entry = binding(home, name, transport, old['branch'], authoring=str(root))
-            endpoint(root, transport, entry['repository'])
-            proposal.update(schema_version=2, legacy_source=name, sources={name: entry})
-        elif config['legacy_source'] != name:
-            c.fail('source.alias_conflict', 'Legacy source already migrated under another alias.', 4)
+        proposal = migrated_config(config, home, name)
     elif args.command == 'source.list':
         output['data']['sources'] = config.get('sources', {})
         output['data']['migration_required'] = config['schema_version'] == 1
@@ -718,3 +724,124 @@ def acquire_exact(home, name, entry, commit, timeout, effects):
     effects['staging_ref'] = None
     effects['acquired'] = True
     return root
+
+
+def publication(args, output, home):
+    """Publish exact passive package paths from an isolated, unfiltered index."""
+    import tempfile
+    import mask_provenance as provenance
+    import mask_packages as packages
+    config = c.config(c.read_json(home / 'config.json'))
+    entry = selected(config, args.name)
+    paths = getattr(args, 'paths', [])
+    if not paths or len(paths) > 64 or len(set(paths)) != len(paths):
+        c.fail('invocation.invalid', 'Publishing requires 1–64 unique --paths package roots.', 2)
+    if getattr(args, 'push', False) and not getattr(args, 'commit', False):
+        c.fail('invocation.invalid', '--push requires separately explicit --commit.', 2)
+    if entry['authoring'] is None:
+        c.fail('source.authoring_required', 'Publishing requires an approved authoring checkout.', 4)
+    root = Path(entry['authoring'])
+    c.checkout(root)
+    head = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}')
+    committed_record = exact_entry(root, head, 'mask-source.json')
+    committed_index = source_index(root, {'mask-source.json': committed_record} if committed_record else {})
+    raw_index = provenance.regular_bytes(root / 'mask-source.json', 1024 * 1024) if c.kind(root / 'mask-source.json') != 'missing' else None
+    mapping = validate_index(c.parse_json(raw_index, 'source'))['packages'] if raw_index is not None else {}
+    if raw_index is None:
+        for path in paths:
+            if path.startswith(entry['packages'] + '/') and path.count('/') == entry['packages'].count('/') + 1:
+                mapping.setdefault(path.rsplit('/', 1)[-1], path)
+    selected_ids = []
+    for path in paths:
+        package_path(path)
+        matches = [identifier for identifier, chosen in mapping.items() if chosen == path]
+        if path == '.' or len(matches) != 1:
+            c.fail('source.publish_path', 'Publish an exact non-root package path in the approved layout/index.', 4, path=path)
+        if (raw_index is not None and committed_index is None or committed_index is not None and committed_index['packages'].get(matches[0]) != path):
+            c.fail('source.publish_index_required', 'Commit the selected source-index mapping explicitly before package publication; unrelated index edits are never swept into this commit.', 4, path=path)
+        selected_ids.append(matches[0])
+    if any(a.startswith(b + '/') or b.startswith(a + '/') for i, a in enumerate(paths) for b in paths[i + 1: ]):
+        c.fail('source.publish_path', 'Publication package roots overlap.', 4)
+    config_raw = c.read_text(home / 'config.json')
+    observations = []
+    payloads = []
+    for identifier, path in zip(selected_ids, paths):
+        actual, target, observation = provenance.destination(config, args.name, identifier)
+        if actual != root or observation['path'] != path or observation['head'] != head:
+            c.fail('source.changed', 'Publication source selection changed.', 4)
+        staged = c.git(root, '--literal-pathspecs', 'diff', '--cached', '--name-only', '-z', '--', path, binary=True)
+        if staged:
+            c.fail('source.publish_overlap', 'Selected package has staged changes; preserve/commit those explicitly first.', 4, path=path)
+        old_modes = {}
+        if exact_entry(root, head, path) is not None:
+            old_modes = {item.path: item.mode for item in packages.validate(root, head, path, identifier).files}
+        payload = provenance.working_payload(target, identifier, commit=head, path=path, modes=old_modes)
+        observations.append(observation)
+        payloads.append(payload)
+    snapshot = dict(config=config_raw, identity=c.identity(root), head=head, index=c.digest(c.git(root, 'ls-files', '--stage', '-z', binary=True)), source_index=c.digest(raw_index), observations=observations, payloads=[payload.summary() for payload in payloads])
+    message = getattr(args, 'message', 'Publish selected MASK packages')
+    if not isinstance(message, str) or not 1 <= len(message) <= 4096 or '\x00' in message:
+        c.fail('invocation.invalid', 'Commit message must be bounded nonempty text.', 2)
+    branch = entry['ref'] if entry['ref'].startswith('refs/heads/') else 'refs/heads/' + entry['ref']
+    from mask_resolve import ref
+    ref(branch, 'source')
+    plan_hash = c.digest(dict(snapshot=snapshot, paths=sorted(paths), message=message, commit=getattr(args, 'commit', False), push=getattr(args, 'push', False)))
+    output['data'] = dict(source=args.name, paths=paths, parent_commit=head, plan_hash=plan_hash, created_commit=None, created_ref=None, pushed=False, push_outcome='not_attempted', phase='planned', retained_objects_possible=False, authoring_head=head, authoring_index_changed=False, authoring_checkout_updated=False, network='none')
+    output['would_change'] = any(exact_entry(root, head, payload.path) is None or packages.validate(root, head, payload.path, payload.id).digest != payload.digest for payload in payloads)
+    if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
+        c.fail('plan.stale', 'Publication inputs changed; preview again.', 4)
+    if output['dry_run'] or not getattr(args, 'commit', False) or not output['would_change']:
+        return
+    def recheck():
+        if c.read_text(home / 'config.json') != snapshot['config'] or c.identity(root) != snapshot['identity'] or c.git(root, 'rev-parse', 'HEAD') != head or c.digest(c.git(root, 'ls-files', '--stage', '-z', binary=True)) != snapshot['index']:
+            c.fail('plan.stale', 'Publication source/config/index changed.', 4)
+        for payload, observation in zip(payloads, observations):
+            actual, target, now = provenance.destination(config, args.name, payload.id)
+            modes = {item.path: item.mode for item in payload.files}
+            if now != observation or provenance.working_payload(target, payload.id, commit=head, path=payload.path, modes=modes).digest != payload.digest:
+                c.fail('plan.stale', 'Publication package changed.', 4)
+    recheck()
+    with tempfile.TemporaryDirectory(prefix='mask-publish-') as temporary:
+        isolated = Path(temporary) / 'worktree'
+        added = False
+        try:
+            c.git(root, 'worktree', 'add', '--detach', '--no-checkout', str(isolated), head, mutating=True)
+            added = True
+            output['data'].update(phase='isolated_index', temporary_worktree_created=True, temporary_worktree_removed=False)
+            c.git(isolated, 'read-tree', head, mutating=True)
+            for payload in payloads:
+                tracked = c.git(isolated, '--literal-pathspecs', 'ls-files', '-z', '--', payload.path, binary=True)
+                for raw in tracked.split(b'\0'):
+                    if raw:
+                        c.git(isolated, 'update-index', '--force-remove', '--', raw.decode('utf-8'), mutating=True)
+                for item in payload.files:
+                    path = isolated / payload.path / item.path
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(item.data)
+                    output['data'].update(phase='objects', retained_objects_possible=True)
+                    output.update(changed=True, transaction='partial')
+                    oid = c.git(isolated, 'hash-object', '-w', '--no-filters', '--', str(path), mutating=True)
+                    c.git(isolated, 'update-index', '--add', '--cacheinfo', item.mode, oid, payload.path + '/' + item.path, mutating=True)
+            tree = c.git(isolated, 'write-tree', mutating=True)
+            recheck()
+            commit = c.git(isolated, '-c', 'commit.gpgsign=false', 'commit-tree', tree, '-p', head, '-m', message, mutating=True)
+            output['data'].update(created_commit=commit, phase='commit_created')
+            published = 'refs/mask/published/' + commit
+            c.git(root, 'update-ref', published, commit, '0' * len(commit), mutating=True)
+            output['data']['created_ref'] = published
+            if getattr(args, 'push', False):
+                recheck()
+                endpoint(root, entry['transport'], entry['repository'])
+                output['data']['network'] = 'query'
+                refs, _ = remote_refs(root, entry, config['git_timeout_seconds'], output)
+                if refs.get(branch) != head:
+                    c.fail('source.publish_rebound', 'Remote branch no longer equals the reviewed parent; retained publication commit was not pushed.', 4)
+                output['data'].update(network='push', push_attempted=True, pushed=None, push_outcome='unknown', phase='push_attempted')
+                c.git(root, *network_options(root, entry['transport']), '-c', 'push.gpgSign=false', '-c', 'push.followTags=false', 'push', '--no-verify', '--porcelain', entry['transport'], commit + ':' + branch, mutating=True, timeout=config['git_timeout_seconds'])
+                output['data'].update(pushed=True, push_outcome='confirmed')
+            output['data']['phase'] = 'complete'
+            output['transaction'] = 'committed'
+        finally:
+            if added:
+                c.git(root, 'worktree', 'remove', '--force', str(isolated), mutating=True)
+                output['data']['temporary_worktree_removed'] = True

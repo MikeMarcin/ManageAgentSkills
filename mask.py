@@ -79,11 +79,14 @@ COMMANDS = {
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
+    'source.publish': (True, True, [('name', 'pos'), ('paths', 'repeat'), ('commit', 'flag'), ('push', 'flag'), ('message', 'value')]),
+    'source.dev-link': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('authoring-root', 'value'), ('to-pinned', 'flag')]),
     'source.migrate': (True, False, [('alias', 'value')]),
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
-    'update': (True, True, []),
+    'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
+    'migrate': (True, False, [('to-pinned', 'flag'), ('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.update': (True, True, []),
@@ -99,7 +102,7 @@ GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if n
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
 GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
-GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock'})
+GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'migrate', 'source.dev-link', 'source.publish'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -181,9 +184,10 @@ CONFLICTS = {
 }
 for action in ('set', 'set-targets'):
     CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
-for command in ('plan', 'apply', 'doctor', 'inventory'):
+for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
+CONFLICTS['source.dev-link'] = {'project': ['user'], 'user': ['project'], 'authoring_root': ['to_pinned'], 'to_pinned': ['authoring_root']}
 CONFLICTS['lock'] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['source.fetch'] = {'name': ['locked'], 'locked': ['name'], 'project': ['user'], 'user': ['project']}
 
@@ -347,7 +351,7 @@ def project_dispatch(args, output, home):
                           configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
     if declaration['schema_version'] == 2:
         import mask_pinned
-        output['data'].update(mode='pinned', effective_targets=mask_pinned.simple_targets(declaration))
+        output['data'].update(mode=(record or {}).get('mode', 'pinned'), reproducible=(record or {}).get('mode') != 'dev-link', fleet_eligible=(record or {}).get('mode') != 'dev-link', effective_targets=mask_pinned.simple_targets(declaration))
     if command == 'project.show':
         output['data']['source'] = config['source'] if config else None
         output['data']['ownership'] = record['links'] if record else {}
@@ -448,6 +452,8 @@ def local_dispatch(args, output, leaves):
     if command in ('skill.import', 'skill.provenance', 'skill.record-adaptation'):
         import mask_provenance
         return mask_provenance.dispatch(args, output, home)
+    if command == 'source.publish':
+        return sources_ops.publication(args, output, home)
     if command == 'source.inspect':
         return sources_ops.inspect(args, output, home)
     if command in ('source.list', 'source.show', 'source.migrate', 'tap.add', 'tap.remove') or command == 'source.fetch' and getattr(args, 'name', None):
@@ -572,6 +578,10 @@ def dispatch_impl(args, output, leaves):
             core.fail('recovery.required', 'Recover pending consumer effects before exact preparation.', 8)
         return local_dispatch(args, output, leaves)
     import mask_pinned
+    if args.command in ('migrate', 'update') and mask_pinned.transition_dispatch(args, output, home):
+        return
+    if args.command == 'source.dev-link':
+        return mask_pinned.dev_dispatch(args, output, home)
     preparation = mask_pinned.prepare_dispatch(args, output, home) if mutates else None
     if mutates:
         with core.writer_lock(home):

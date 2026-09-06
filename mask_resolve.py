@@ -301,7 +301,7 @@ def machine_selector(root, entry):
     return {'ref': ref(candidates[0], 'lock')}
 
 
-def resolve_binding(home, declaration, binding, entry):
+def resolve_binding(home, declaration, binding, entry, payload_views=None):
     root = cached(home, binding['source'], entry)
     chosen = declared_selector(declaration, binding) or machine_selector(root, entry)
     commit = chosen.get('commit')
@@ -319,11 +319,14 @@ def resolve_binding(home, declaration, binding, entry):
         c.fail('skill.unknown', 'Selected package must have exactly one safe path at the chosen commit.', 4, skill=coordinate(binding))
     row = {key: found[0][key] for key in ('source', 'id', 'repository', 'path', 'commit')}
     row.update(selector=chosen, git_object_format=c.git(root, 'rev-parse', '--show-object-format'))
-    row.update(payload_digests(frozen_payload(root, row)))
+    payload = frozen_payload(root, row)
+    row.update(payload_digests(payload))
+    if payload_views is not None:
+        payload_views[row['payload_digest']] = payload
     return row
 
 
-def resolve_candidate(declaration, config, home, previous=None, *, refresh=False, skills=(), allow_ref_rebind=False):
+def resolve_candidate(declaration, config, home, previous=None, *, refresh=False, skills=(), allow_ref_rebind=False, payload_views=None):
     declaration = selection(declaration)
     entries = approved(declaration, config)
     old = lock(previous) if previous is not None else None
@@ -341,10 +344,12 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
             chosen = declared_selector(declaration, binding)
             if prior['repository'] != entry['repository'] or chosen is not None and chosen != prior['selector']:
                 c.fail('lock.stale', 'Changed binding requires an explicit selected --refresh.', 4, skill=key)
-            verify_resolution(home, binding['source'], entry, prior)
+            payload = verify_resolution(home, binding['source'], entry, prior)
+            if payload_views is not None:
+                payload_views[prior['payload_digest']] = payload
             rows.append(prior)
             continue
-        row = resolve_binding(home, declaration, binding, entry)
+        row = resolve_binding(home, declaration, binding, entry, payload_views)
         if prior is not None and prior['repository'] == row['repository'] and prior['selector'] == row['selector'] and prior['commit'] != row['commit']:
             chosen = row['selector']
             root = cached(home, binding['source'], entry)
@@ -412,7 +417,7 @@ def dispatch(args, output, home):
     changed = original is None or lock(original) != proposal
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     record = state.get('user') if scope == 'user' else state['projects'].get(str(root))
-    if changed and record is not None and record.get('mode') == 'pinned':
+    if changed and record is not None and record.get('mode') in ('pinned', 'dev-link'):
         c.fail('lock.active', 'Use the journaled pinned update flow to change an active consumer lock.', 4)
     plan_hash = c.digest(dict(command='lock', declaration=c.digest(declaration_raw), before=c.digest(before) if before is not None else None, after=proposal, config=c.digest(config_raw.encode('utf-8')), path=str(target), identities=identities))
     output['data'] = dict(scope=scope, lock_path=str(target), lock=proposal, plan_hash=plan_hash, network='none', portable=all(not entry['repository'].startswith('file:') for entry in declaration['sources'].values()), targeting='not_evaluated', deployment='not_requested')
@@ -434,7 +439,7 @@ def guard_command(args, home):
     """Central guard for public legacy consumer operations, before side effects."""
     command = args.command
     scoped = command.startswith(('project.', 'user.', 'integration.')) or command in {'ensure', 'plan', 'apply', 'doctor', 'inventory', 'skill.where-used', 'link.adopt', 'update'}
-    if not scoped or command in {'project.list', 'integration.revoke', 'integration.status'}:
+    if not scoped or command in {'project.list', 'integration.revoke', 'integration.status', 'update'}:
         return
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     roots = []

@@ -389,11 +389,42 @@ copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
 new v2 consumers can deploy isolated artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. Legacy-to-pinned migration, per-binding targeting, profiles, bundles, fleet
+remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting, profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not
-make those features available. MASK has no daemon or publishing command.
+make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.
 
 Both named repositories consume the shared skills. Verified bootstrap copies
 remain outside discovery roots in each
 `.mask/bootstrap-retired/implement-rfc-2026-09-05`. Filesystem deployment and bounded
 workflow invocation were verified; agent UI loading was not.
+
+## Moving legacy consumers to pins
+
+Install a reviewed compatible program revision first through its direct Python
+entrypoint, retaining that fallback for recovery. The normal self-update schema
+guard remains enabled. Preview selected persisted migration, then use its guard:
+
+```sh
+python3 /reviewed/ManageAgentSkills/mask.py migrate --to-pinned --project /project --dry-run --json
+python3 /reviewed/ManageAgentSkills/mask.py migrate --to-pinned --project /project --expect-plan-hash SHA256 --json
+```
+
+`--user` selects the registered personal consumer; `--all` selects registered
+scopes. Migration requires a clean committed authoring source and preserves
+unselected consumers. It creates exact raw-byte artifacts and records resolved
+legacy targets explicitly. Existing pending recovery must finish first.
+
+Fetch a source explicitly, then preview `mask update --project PATH --skill
+SOURCE/ID --dry-run --json` to update selected pins through one recoverable
+lock/link operation. Exact commit requirements stay fixed. Pinned updates use
+cached objects; preview never fetches.
+
+For scoped authoring, `mask source dev-link SOURCE/ID --project PATH
+--authoring-root PATH --json` makes an explicit dirty/unpinned exception. Return
+with `--to-pinned` in place of `--authoring-root`; ordinary apply/update/ensure
+refuse live overrides. `mask source publish SOURCE --paths PACKAGE_PATH --json`
+previews exact package publication. Add `--commit` and separately `--push` only
+when those effects are intended. Publication preserves the authoring HEAD/index
+and reports its separate commit/ref. See the
+[CLI contract](docs/architecture/cli-contract.md#explicit-migration-selected-updates-and-authoring-exceptions)
+for recovery, authority and platform limits.

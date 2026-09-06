@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Current CLI contract through RFC-MASK-0007, with the implemented lock, artifact store, and new pinned-consumer engine slices of RFC-MASK-0008 and the legacy inventory slice of RFC-MASK-0011. The result envelope remains v1; machine configuration and declarations read v1/v2, ownership state reads v1/v2/v3, and pending journals read v1/v2/v3. Source-catalog migration is explicit; existing consumer conversion remains pending. Historical and current native evidence is recorded in the corresponding RFC closeouts; pinned-engine native acceptance is pending.
+Current CLI contract through RFC-MASK-0007, with the implemented lock, artifact store, pinned-consumer engine, migration and authoring slices of RFC-MASK-0008 and the legacy inventory slice of RFC-MASK-0011. The result envelope remains v1; machine configuration and declarations read v1/v2, ownership state reads v1/v2/v3, and pending journals read v1/v2/v3. Source-catalog migration is explicit; selected consumer conversion is explicit. Historical and current native evidence is recorded in the corresponding RFC closeouts; pinned-engine native acceptance is pending.
 
 ## Common options
 
@@ -566,3 +566,66 @@ remains the explicit preparation command. No readiness operation resolves a newe
 ref or rewrites its selection/lock. Retained preparation effects survive failures,
 including stale post-preparation inputs and consumer noops; consumer partial or
 rollback status is preserved separately from those cache/store observations.
+
+### Explicit migration, selected updates and authoring exceptions
+
+`migrate --to-pinned [--project PATH | --user | --all]` converts registered legacy
+consumers and, when needed, machine configuration v1 through the same v3 journal.
+The source must have a clean committed HEAD on its configured branch; dirty,
+unborn, sparse, skip-worktree and assume-unchanged checkouts refuse without
+changing authoring content. Migration freezes raw Git bytes and explicitly copies
+the resolved legacy target list into `default_agents`. Unselected records remain
+exact. Preview is observational, including a cold artifact store. Empty migration
+selections refuse; already pinned selected records retain their resolutions.
+
+The typed `machine_config` role derives `MASK_HOME/config.json`; exact old/new
+config text and the clean authoring identity/HEAD/index baseline are retained in
+the migration extension. Recovery requires that baseline to remain unchanged and
+restores exact legacy config, declaration, lock absence and state bytes on
+rollback. Recover any existing journal before starting migration. Install a
+reviewed compatible program revision first using its direct Python entrypoint,
+for example `python3 /reviewed/ManageAgentSkills/mask.py self install --bin-dir
+PATH --json`, then preview/run persisted migration. Keep that direct entrypoint
+available for recovery. The self-update schema compatibility guard remains in
+force; migration never upgrades the executable or resets its checkout.
+
+`update [--project PATH | --user | --all] [--skill SOURCE/ID ...]
+[--allow-ref-rebind]` updates selected pinned locks and links in one journal.
+Pinned update uses cached source objects only; explicitly fetch or inspect the
+chosen source selector first. Dry-run never fetches or materializes artifacts.
+Exact commit requirements remain fixed; moved tags and non-fast-forward branch
+selectors require `--allow-ref-rebind`. Explicit update can repair a changed
+selection with an older disk lock; exact before bytes remain rollback inputs and
+the after declaration/lock must be coherent. Ensure/apply do not repair stale
+locks. Unqualified update still advances the legacy shared source for all legacy
+consumers, including source-only updates with an empty registry. A targeted
+legacy update refuses with `migration.required`; pinned consumers are unaffected
+by a legacy shared-checkout update.
+
+`source dev-link SOURCE/ID (--project PATH | --user) --authoring-root PATH`
+creates a scope-local live exception to an existing pinned selection. The source
+must be an approved physical authoring checkout and the package must pass bounded
+passive validation. State records `mode: dev-link`, exact root identity/path and
+per-link overrides; the retained selection/lock still identifies the pinned
+return destination. Dev-link is explicitly unpinned, not fleet eligible, and has
+no automatic writeback. Ordinary apply/update/ensure refuse an active override.
+Use the same command with `--to-pinned` to preview and perform a guarded return.
+Its typed development journal binds both old/new roots and the currently observed
+package bytes; source changes during recovery refuse without overwriting edits.
+
+`source publish SOURCE --paths PACKAGE_PATH ... [--commit] [--push]
+[--message TEXT]` accepts up to 64 exact non-root package paths from the approved
+layout/index. The selected index mapping must already be committed; uncommitted
+mapping changes require an explicit separate authoring commit. Default and dry-run only preview. `--commit` separately authorizes
+a new commit and retained `refs/mask/published/<commit>` ref; `--push` additionally
+authorizes pushing that child commit to the configured branch only when its
+remote parent still matches. Staged changes inside selected paths refuse;
+unrelated authoring/index changes are preserved. A no-checkout isolated worktree
+uses raw blob/index plumbing with filters, hooks, fsmonitor and signing helpers
+excluded from execution. Temporary worktrees are removed. Reports distinguish
+created commit/ref, attempted/completed push, and unchanged authoring HEAD/index;
+the authoring checkout does not advance to the published revision. Failures after
+object construction report potentially retained objects even without a commit.
+An attempted push with a lost/failed acknowledgement reports an unknown outcome
+and retains the created commit/ref for inspection. Source
+publication never updates consumer locks. File-URI fixtures remain machine-local.

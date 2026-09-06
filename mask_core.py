@@ -276,7 +276,7 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
     if not inspect_hooks:
         for event in HOOK_EVENTS:
             hook_options.extend(('-c', f'hook.{event}.enabled=false'))
-    command = ['git', *hook_options, '-C', str(root), *args]
+    command = ['git', *hook_options, '-c', 'core.fsmonitor=false', '-C', str(root), *args]
     job = None
     if os.name == 'nt':
         from mask_process import WindowsJob, CREATE_SUSPENDED
@@ -580,7 +580,7 @@ def state(value):
         if not isinstance(record['links'], dict):
             fail('state.invalid', 'Invalid ownership map.')
         for relative, link in record['links'].items():
-            fields(link, ('skill', 'target', 'link_text'), ('resolution',) if pinned else (), family='state')
+            fields(link, ('skill', 'target', 'link_text'), ('resolution', 'dev') if pinned else (), family='state')
             skill_id(link['skill'])
             if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
@@ -601,7 +601,7 @@ def consumer_scope(value, root):
 
 
 def set_consumer(value, root, record, scope):
-    if isinstance(record, dict) and record.get('mode') == 'pinned':
+    if isinstance(record, dict) and record.get('mode') in ('pinned', 'dev-link'):
         value.update(schema_version=3, user=value.get('user'))
     if scope == 'user':
         value.update(schema_version=max(value['schema_version'], 2), user=record)

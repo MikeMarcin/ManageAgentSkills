@@ -45,8 +45,8 @@ def dispatch(args, output, home):
         if getattr(args, 'scope', None) not in (None, scope):
             continue
         root, record = Path(key), records[key]
-        if record.get('mode') == 'pinned':
-            consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_pinned_selection', error=dict(code='inventory.pinned_unsupported', message='Pinned inventory detail awaits the reporting implementation.'), mode='pinned'))
+        if record.get('mode') in ('pinned', 'dev-link'):
+            consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_pinned_selection', error=dict(code='inventory.pinned_unsupported', message='Pinned inventory detail awaits the reporting implementation.'), mode=record['mode'], reproducible=record['mode']=='pinned', fleet_eligible=record['mode']=='pinned'))
             continue
         declaration = record['last_manifest']
         basis, consumer_error = 'live_declaration', None

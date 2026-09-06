@@ -31,9 +31,10 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None):
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
+    dev_proposals = dev_proposals or {}
     source = Path(config['source']['root'])
     after = copy.deepcopy(state)
     links, files, actions, blockers, observations, packages = [], [], [], [], [], {}
@@ -81,15 +82,28 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     lock_value, lock_raw = resolve.read_model(resolve.lock_path(root, scope, home), 'lock', missing=key in lock_proposals)
                     locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
                     lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
+                devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
+                if devs and operation in ('apply', 'update', 'ensure'):
+                    c.fail('dev_link.active', 'Explicit dev-link is unpinned; use source dev-link --to-pinned before ordinary reconciliation.', 4)
                 if key not in unregister and key not in inactive:
-                    expected = pinned.expected_links(home, desired, locked, config)
+                    expected = pinned.expected_links(home, desired, locked, config, payload_views)
+                    for link in expected.values():
+                        dev = devs.get(resolve.coordinate(link['resolution']))
+                        if dev is not None:
+                            pinned.observe_dev(dev, config)
+                            link['dev'] = dev
+                            link['link_text'] = creation_link_text(pinned.target(link, config, home))
                 next_record = dict(root=key, root_identity=c.identity(root), mode='pinned', last_manifest=desired,
                                    last_manifest_digest=resolve.selection_digest(desired), last_source_revision=None,
                                    last_lock=locked, links={})
+                if devs:
+                    next_record.update(mode='dev-link', dev_links=devs)
                 if key not in inactive:
                     for role, before_raw, after_raw in (('declaration', before_text, c.text_json(desired)), ('lock', lock_before, c.text_json(locked))):
                         changed = desired != current if role == 'declaration' else lock_value != locked
                         if changed:
+                            if len(after_raw.encode('utf-8')) > resolve.MODEL_BYTES:
+                                c.fail('lock.limit' if role == 'lock' else 'selection.limit', 'Serialized pinned control exceeds the 4 MiB model limit.', 4)
                             typed_files.append(dict(root=key, role=scope + '_' + role, before=before_raw, after=after_raw))
                             actions.append(dict(kind=role + '.write', status='planned', path=str(c.declaration_path(root, scope, home) if role == 'declaration' else resolve.lock_path(root, scope, home))))
             else:
@@ -156,6 +170,9 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                    register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only, inactive=sorted(inactive))
     if uses_pinned:
         payload.update(files=typed_files, pinned=pinned_controls)
+    development = pinned.development_observations(state, after, [str(root) for root in roots], config) if uses_pinned else []
+    if development:
+        payload['development'] = development
     if candidate:
         payload['transition'] = candidate.get('transition')
     result = dict(applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
@@ -165,6 +182,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                             before_state=state, after_state=after, config=config))
     if uses_pinned:
         result['intent'].update(files=typed_files, pinned=pinned_controls)
+    if development or operation == 'source.dev-link':
+        result['intent']['development'] = development
     return result
 
 
@@ -219,8 +238,8 @@ def make_pending(planned, home):
 def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned'), 'recovery', versions=(1, 2, 3))
-    if pending['operation'] not in {'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install'}:
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development'), 'recovery', versions=(1, 2, 3))
+    if pending['operation'] not in {'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -248,12 +267,14 @@ def validate_pending(pending, home):
     if pending['config'] is None:
         if pending['operation'] not in ('self.install', 'self.update') or current_config:
             c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
-    elif c.config(pending['config']) != c.config(current_config):
+    elif 'migration' not in pending and c.config(pending['config']) != c.config(current_config):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
     source = Path(pending['config']['source']['root']) if pending['config'] else None
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
+    if 'migration' in pending or pending['operation'] == 'migrate':
+        pinned.validate_migration(pending, home)
     if 'pinned' not in pending:
         for root in selected:
             old, new = before_records.get(root), after_records.get(root)
@@ -266,6 +287,9 @@ def validate_pending(pending, home):
                          and not any(name in pending for name in ('git', 'launcher', 'controls')))
             if not abandoned:
                 c.fail('recovery.conflict', 'Selected pinned ownership requires pinned journal observations.', 8)
+    needs_development = any(record.get('dev_links') for state in (before, after) for root, record in c.consumer_records(state).items() if root in selected) and 'pinned' in pending
+    if 'development' in pending or pending['operation'] == 'source.dev-link' or needs_development:
+        pinned.validate_development(pending, home)
     if 'controls' in pending:
         from mask_ensure import validate_controls
         validate_controls(pending, home)
@@ -283,7 +307,7 @@ def validate_pending(pending, home):
     elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
     for root in before_records.keys() | after_records.keys():
-        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]):
+        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]) and 'migration' not in pending:
             c.fail('recovery.conflict', 'Existing consumer mode conversion requires an explicit migration journal.', 8)
         if root in before_records and root in after_records and c.consumer_scope(before, root) != c.consumer_scope(after, root):
             c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
@@ -353,6 +377,10 @@ def pending_manifest_path(pending, entry, home):
 def check_current(pending, home):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
+    if 'migration' in pending:
+        pinned.check_migration(pending, home)
+    if 'development' in pending:
+        pinned.check_development(pending)
     if 'pinned' in pending:
         pinned.check_observations(pending, home)
         pinned.verify_transition(pending, home)
@@ -423,6 +451,8 @@ def restore(pending, home, side, *, inject=False):
             checkpoint('launcher')
     entries = pending['links'] if side == 'after' else reversed(pending['links'])
     for entry in entries:
+        if 'development' in pending:
+            pinned.check_development(pending)
         if 'pinned' in pending:
             pinned.check_observations(pending, home)
             pinned.verify_transition(pending, home, entry)
@@ -432,6 +462,8 @@ def restore(pending, home, side, *, inject=False):
         set_link(entry, side, inject=inject)
         if inject:
             checkpoint('link')
+    if 'migration' in pending:
+        pinned.check_migration(pending, home)
     for entry in pending['manifests']:
         path = pending_manifest_path(pending, entry, home)
         actual = c.read_text(path, 'manifest')
@@ -453,7 +485,7 @@ def restore(pending, home, side, *, inject=False):
         else:
             c.atomic_text(path, wanted, actual)
         if inject:
-            checkpoint('lock' if entry['role'].endswith('_lock') else 'manifest')
+            checkpoint('config' if entry['role'] == 'machine_config' else 'lock' if entry['role'].endswith('_lock') else 'manifest')
     if side == 'after' and 'pinned' in pending:
         for root, record in c.consumer_records(pending['after_state']).items():
             if root not in pending['selected'] or not pinned.is_pinned(record):
@@ -466,6 +498,8 @@ def restore(pending, home, side, *, inject=False):
     if 'controls' in pending:
         from mask_ensure import restore_controls
         restore_controls(pending, home, side)
+    if 'migration' in pending:
+        pinned.check_migration(pending, home)
     text = pending[side + '_state_text']
     path = home / 'state.json'
     if text is not None:
@@ -483,6 +517,8 @@ def restore(pending, home, side, *, inject=False):
 
 
 def clear_pending(home, pending):
+    if 'migration' in pending:
+        pinned.check_migration(pending, home)
     path = home / 'pending.json'
     if c.read_json(path, 'recovery') != pending:
         c.fail('recovery.conflict', 'Pending journal changed before cleanup.', 8)
@@ -569,6 +605,8 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     if record is None:
         c.fail('project.not_registered', 'Adoption requires registration.', 4)
     c.registered_root(root, record, scope)
+    if record.get('mode') == 'dev-link':
+        c.fail('dev_link.active', 'Return to pins explicitly before adopting additional links.', 4)
     if pinned.is_pinned(record):
         declaration, locked = resolve.read_exact_lock(root, scope, home, config, verify=False)
         if declaration != record['last_manifest'] or locked != record['last_lock']:

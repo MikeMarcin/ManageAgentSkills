@@ -325,6 +325,15 @@ def parse_record(raw):
     return value
 
 
+def working_payload(target, identifier, *, commit, path, modes=None):
+    manifest = working_manifest(target, modes or {}, exclude_record=False)
+    files = [p.PayloadFile(item['path'], item['mode'], regular_bytes(target / item['path'], p.FILE_BYTES)) for item in manifest]
+    payload = p.validate_files(files, identifier, commit=commit, path=path)
+    if payload.manifest() != manifest:
+        c.fail('source.changed', 'Authoring package changed during bounded observation.', 4)
+    return payload
+
+
 def working_manifest(target, modes, *, exclude_record=True):
     if c.kind(target) != 'directory':
         c.fail('provenance.unavailable', 'Selected package is not a real directory.', 4)

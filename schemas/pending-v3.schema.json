@@ -34,7 +34,17 @@
     "operation": {
       "enum": [
         "ensure",
-        "ensure.deactivate"
+        "ensure.deactivate",
+        "apply",
+        "update",
+        "migrate",
+        "source.dev-link",
+        "project.register",
+        "project.unregister",
+        "user.register",
+        "user.unregister",
+        "self.install",
+        "self.update"
       ]
     },
     "base_generation": {
@@ -262,7 +272,8 @@
               "project_declaration",
               "project_lock",
               "user_declaration",
-              "user_lock"
+              "user_lock",
+              "machine_config"
             ]
           },
           "before": {
@@ -372,9 +383,144 @@
           ]
         }
       }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_before",
+        "config_after",
+        "source"
+      ],
+      "properties": {
+        "config_before": {
+          "type": "string"
+        },
+        "config_after": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "identity",
+            "head",
+            "branch",
+            "index",
+            "repository",
+            "object_format"
+          ],
+          "properties": {
+            "root": {
+              "type": "string"
+            },
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "device",
+                "inode"
+              ],
+              "properties": {
+                "device": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "inode": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "head": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "index": {
+              "type": "string"
+            },
+            "repository": {
+              "type": "string"
+            },
+            "object_format": {
+              "enum": [
+                "sha1",
+                "sha256"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "development": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding",
+          "observation",
+          "payload_digest"
+        ],
+        "properties": {
+          "binding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "id",
+              "root",
+              "identity",
+              "path"
+            ],
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "root": {
+                "type": "string"
+              },
+              "identity": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "device",
+                  "inode"
+                ],
+                "properties": {
+                  "device": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inode": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "path": {
+                "type": "string"
+              }
+            }
+          },
+          "observation": {
+            "type": "object"
+          },
+          "payload_digest": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:pending:v3",
-  "$comment": "Readiness-only typed control observations; state remains v1/v2. Runtime checks selected roots, unchanged authority and live Git/control-file inputs before any effect."
+  "$comment": "Typed readiness, pinned deployment, explicit migration, and development observations. Runtime checks complete transitions and recomputed physical paths before effects."
 }

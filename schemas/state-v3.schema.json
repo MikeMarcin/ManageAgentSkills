@@ -163,15 +163,108 @@
                     },
                     "resolution": {
                       "$ref": "lock-v1.schema.json#/properties/packages/items"
+                    },
+                    "dev": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "source",
+                        "id",
+                        "root",
+                        "identity",
+                        "path"
+                      ],
+                      "properties": {
+                        "source": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "root": {
+                          "type": "string"
+                        },
+                        "identity": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "device",
+                            "inode"
+                          ],
+                          "properties": {
+                            "device": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "inode": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          }
+                        },
+                        "path": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
               },
               "mode": {
-                "const": "pinned"
+                "enum": [
+                  "pinned",
+                  "dev-link"
+                ]
               },
               "last_lock": {
                 "$ref": "lock-v1.schema.json"
+              },
+              "dev_links": {
+                "type": "object",
+                "maxProperties": 4096,
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source",
+                    "id",
+                    "root",
+                    "identity",
+                    "path"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "root": {
+                      "type": "string"
+                    },
+                    "identity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "device",
+                        "inode"
+                      ],
+                      "properties": {
+                        "device": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "inode": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }

@@ -172,7 +172,8 @@ def update(config, state, home, output, guard=None):
     timeout = config['git_timeout_seconds']
     observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     records = c.consumer_records(state)
-    roots = [Path(key) for key in sorted(records)]
+    from mask_pinned import is_pinned
+    roots = [Path(key) for key in sorted(records) if not is_pinned(records[key])]
     # Refuse unavailable/invalid declarations before any network operation.
     identifiers = set()
     for project in roots:

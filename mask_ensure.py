@@ -319,7 +319,7 @@ def inactive_branch(root, record, entry, observation):
     if c.git(root, 'cat-file', '-e', observation['head'] + ':./.mask.json', optional=True) is not None:
         return False
     text = c.git(root, 'show', tracked['head'] + ':./.mask.json', optional=True)
-    if record.get('mode') == 'pinned':
+    if record.get('mode') in ('pinned', 'dev-link'):
         if observation.get('lock') is not None or not tracked.get('lock_digest') or c.git(root, 'cat-file', '-e', observation['head'] + ':./.mask.lock.json', optional=True) is not None:
             return False
         old_lock = c.git(root, 'show', tracked['head'] + ':./.mask.lock.json', optional=True, binary=True)
