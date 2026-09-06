@@ -33,3 +33,32 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded implementation plan
+
+After RFC-0007 closes, implement the normalized closed selection-v2 and lock-v1
+models, explicit cached-only `mask lock --project/--user [--refresh] [--skill ...]`,
+and exact full-commit resolution through the approved source catalog and passive
+payload validator. Lock all bindings, including currently inapplicable ones.
+Canonical serialization rejects duplicate/unknown fields, floats, unsafe integers
+and invalid Unicode; normalize semantic sets and document default values.
+
+Bind selection digest, approved repository identity/layout, exact package path,
+object format/full commit, selector and raw payload/metadata/provenance digests.
+Retain an existing coherent resolution until explicit refresh; reject moved tags
+and non-fast-forward ref rewrites unless an explicit bounded rebind option is
+selected. No network on lock or preview; missing cached objects report resolution
+required. File-source fixtures remain explicitly machine-local, never portable
+repository claims.
+
+Extend ownership to the public CLI registrar/dispatcher, project/user schema
+version dispatch, runtime module inventory and current docs. Existing legacy
+consumer operations must fail closed on unsupported v2 deployment instead of
+iterating binding objects as v1 IDs. Missing/stale v2 locks receive precise
+errors. Artifact deployment, state migration and effective per-binding targeting
+remain on MASK-0035/0036/0037 and RFC-0009; do not advertise them early.
+
+Focused public checks cover canonical order and malformed inputs, exact SHA-1/
+SHA-256/path identity, raw CRLF/executable supporting bytes, source approval,
+missing/stale lock handling, selected refresh/ref-rebind refusal, unchanged refs
+and source movement leaving a lock unchanged, and observational previews.

@@ -47,14 +47,14 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0007-AC01 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0007-AC02 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0007-AC03 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0007-AC04 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0007-AC05 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0007-AC06 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0007-AC01 | Two independent local bare sources, root/nested/indexed discovery, qualified-name and ref/path ambiguity: source/discovery public subprocess tests; 31-test native source slice also passed. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
+| RFC-MASK-0007-AC02 | Machine-v2 approved URI/transport checks, rewrite/redirect/scp refusal and corrected independent-review findings passed; explicit v1 compatibility remains documented until source migration. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
+| RFC-MASK-0007-AC03 | Public copy/import/provenance integration preserves raw bytes, notice mappings, staged work and HEAD; collisions and late changed inputs refuse; explicit adaptation recording and cached assertions are covered. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
+| RFC-MASK-0007-AC04 | Raw-object and import adversarial tests cover links/submodules/LFS/activation metadata, path aliases, byte/count/depth limits, bounded subprocess capture and native process-tree containment. Polled fetch storage may transiently overshoot. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
+| RFC-MASK-0007-AC05 | Explicit source migration preserves exact old control/link bytes, repeated init and old recovery; live references prevent removal, and read/dry-run snapshots remain observational. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
+| RFC-MASK-0007-AC06 | Registered CLI commands/capabilities and current docs agree on catalog-only approval, resolution_required, import/fetch effects, offline preview, provenance levels, limits and no default publication. | Pass at stated source/import boundary | `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` (reuses unchanged earlier slice revisions) |
 
-Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+Closeout review runtime: `rfc-reviewer`, GPT-6 Astra/high, for the source-authority surface. URL-specific redirect policy and scp path-identity findings were corrected and directly regression-tested. The primary reviewed copy publication/provenance integration; no repeated independent review was needed. Native source/guard results are recorded below; final import native verification passed after the CRLF correction recorded below.
 
 ## Resumed dependency scope
 
@@ -85,3 +85,35 @@ The native checkout was clean after tests and removed, clearing read-only
 attributes only on its owned Git pack files during cleanup. No station was
 restarted; the retained station and the owner's manual clone were untouched.
 Local transfer/log files were consumed into this record and removed.
+
+## Integration evidence and boundary
+
+The MASK-0032 combined 21-test source/discovery/import/provenance/launcher pass
+(71.760s) is the integration-focused pass: a public import is committed only by
+the fixture, fetched as an independent tap and queried through frozen provenance.
+Reuse earlier unchanged catalog, authority, legacy-update and native containment
+checks; do not rerun the complete matrix merely for a new bookkeeping commit.
+
+All four implementation cards were checked against the original RFC_BASE_SHA.
+AgentSkills payload publication is outside this program implementation; no
+cross-repository source-data handoff is required or claimed. This closeout does
+not establish pinned consumers, fleet enrollment, host loading or a malware
+safety verdict. The following dependency is MASK-0034 (selection/lock model).
+
+## Final import and cleanup evidence
+
+Implementation `c45f771ca0cfcef280cc0f4c0726a9bc65f4266b` and CRLF discovery
+correction `815fb060e6d51ffe034141275a62fd3d1a898c96` complete the copy/provenance
+slice. Native Windows ran all 14 import/provenance methods (177.030s): 13 passed,
+and the remaining method exposed raw CRLF name inference. The corrected method
+and explicit CRLF public inspect/show/validate regression passed (11.710s),
+with unchanged passing methods reused and no skips. Native empty-directory and
+case-collision refusal, byte/index preservation and provenance checks passed.
+
+The shared `project_config.py` helper validated the native repository. Its clean
+checkout under `C:/Users/example/AppData/Local/Temp/mask-native-driver-6_3rql1g-03nmm45j`
+was removed. Consumed transfer/log files under
+`/tmp/mask-native-driver-6_3rql1g`
+were removed; only the task's native fixture driver is retained for the already
+planned remaining native prerequisite checks. No owner clone, station, consumer
+or credential settings were changed.
