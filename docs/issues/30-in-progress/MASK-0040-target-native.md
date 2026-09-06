@@ -16,7 +16,7 @@ Governing RFC: [RFC-MASK-0009](../../rfcs/RFC-MASK-0009-scope-agent-targeting-an
 
 Exercise one skill with different personal and project agent choices on both native supported platforms. Record physical links, per-agent names and compatibility outcomes. Reuse unchanged readiness loading evidence when relevant; do not invent a full host/OS matrix.
 
-Own only: `tests/test_targeting.py`, `tests/test_user_scope.py`, `docs/development/targeting-acceptance.md (new)`. Coordinate shared files with the integrator; no unrelated consumer or source publication is implied.
+Own only: `tests/test_targeting.py`, `tests/test_user_scope.py`, bounded UTF-8 fixture corrections in `tests/test_pinned_recovery.py`, `tests/test_pin_migration.py`, `tests/test_pinned_update.py` and `tests/test_compatibility.py`, `docs/development/targeting-acceptance.md (new)`. Coordinate shared files with the integrator; no unrelated consumer or source publication is implied.
 
 ## Acceptance and focused verification
 
@@ -41,3 +41,9 @@ Integration candidate: ececbf7e391211744b7e3c7b2c628da0136e8b77, source d33323e6
 The macOS unittest loader check passed 11 selected methods in 123.364s, no skips: seven combined pin/migration/update recovery methods, independent v2 user/project agents, legacy scope independence, collision preflight and linked-parent/overlap refusal. Exact names and fixture cleanup will be retained in the targeting acceptance note. All eleven tracked fixture roots were absent after execution.
 
 The Windows run uses existing example-win-host SSH, explicit noninteractive PowerShell and native Python314 in a detached disposable checkout of the candidate. It validates the shared implement-rfc project context before the unittest loader. Owned remote root: C:/Users/example/AppData/Local/Temp/mask-native-driver-6_3rql1g-vql84kve. The owner clone/station is not its output root. Run the new engine/migration/update/targeting/compatibility/adapter/conflict suites, changed lock guard, three native user-scope ownership methods, launcher suite and native Windows Job assignment-prerequisite test. Reuse unchanged earlier native source/import/artifact coverage. Exact remaining fixtures are reported by the temporary driver before cleanup.
+
+## Native harness and fixture findings
+
+The first full Windows attempt completed, but the local harness could not decode its CP1252 unittest stderr as UTF-8, so its test verdict was lost and no pass count is claimed. A subsequent read-only check found no remaining mask-fixture-* roots in the Windows temporary directory. The harness now saves raw SSH bytes plus UTF-8 per-test/final result files on the remote owned root. A too-long inline PowerShell launch was rejected before testing; staging the owned runner as a file keeps the launch command short. The same candidate is being rerun with durable results.
+
+The durable rerun identified two recovery-tampering fixture failures. A bounded two-test reproduction (29.515s; three failing assertions and one consequent error) confirmed that Path.write_text used Windows CP1252 for manually injected journals containing the Unicode project path. MASK correctly refused those invalid UTF-8 bytes before the intended semantic tampering check. The correction writes explicit UTF-8 journal bytes in the affected new recovery/migration/update/compatibility test fixtures. No production behavior is weakened. The two reproduction roots, C:/Users/example/AppData/Local/Temp/mask-fixture-e8qz3dgs and mask-fixture-3su_2w52 under the same parent, were confirmed removed. Native rerun results remain pending.

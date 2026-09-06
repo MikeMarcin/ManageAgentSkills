@@ -112,9 +112,9 @@ class CompatibilityTests(Fixture):
                 bad['files'] = []
             else:
                 bad['selection_change']['policy_before'] = c.text_json(selection.policy())
-            (self.home / 'pending.json').write_text(c.text_json(bad))
+            (self.home / 'pending.json').write_bytes(c.text_json(bad).encode('utf-8'))
             self.call('recover', '--rollback', code=8)
-        (self.home / 'pending.json').write_text(c.text_json(journal))
+        (self.home / 'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
         self.call('recover', '--rollback')
         self.assertFalse((self.home / 'selection-policy.json').exists())
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
@@ -148,12 +148,12 @@ class CompatibilityTests(Fixture):
         unauthorized = c.text_json(selection.policy())
         bad['selection_change']['policy_after'] = unauthorized
         next(row for row in bad['files'] if row['role'] == 'selection_policy')['after'] = unauthorized
-        (self.home / 'pending.json').write_text(c.text_json(bad))
+        (self.home / 'pending.json').write_bytes(c.text_json(bad).encode('utf-8'))
         before = self.snapshot()
         self.call('recover', '--complete', code=8)
         self.assertEqual(before, self.snapshot())
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
-        (self.home / 'pending.json').write_text(c.text_json(journal))
+        (self.home / 'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
         self.call('recover', '--complete')
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
 

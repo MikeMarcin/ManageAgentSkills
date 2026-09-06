@@ -207,9 +207,9 @@ class RecoveryUpdateTests(UpdateTests):
         journal = c.read_json(self.home / 'pending.json')
         bad = copy.deepcopy(journal)
         bad.pop('development')
-        (self.home / 'pending.json').write_text(c.text_json(bad))
+        (self.home / 'pending.json').write_bytes(c.text_json(bad).encode('utf-8'))
         self.call('recover', '--complete', code=8)
-        (self.home / 'pending.json').write_text(c.text_json(journal))
+        (self.home / 'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
         dirty = self.source / 'skills/alpha/recovery-edit'
         dirty.write_text('preserve')
         self.call('recover', '--rollback', code=8)

@@ -124,11 +124,11 @@ class MigrationTests(Fixture):
         altered = json.dumps(json.loads(tampered['migration']['config_before']), separators=(',', ':'))
         tampered['migration']['config_before'] = altered
         next(item for item in tampered['files'] if item['role'] == 'machine_config')['before'] = altered
-        (self.home / 'pending.json').write_text(c.text_json(tampered))
+        (self.home / 'pending.json').write_bytes(c.text_json(tampered).encode('utf-8'))
         before = self.snapshot()
         self.call('recover', '--rollback', code=8)
         self.assertEqual(before, self.snapshot())
-        (self.home / 'pending.json').write_text(c.text_json(journal))
+        (self.home / 'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
         config = (self.home / 'config.json').read_bytes()
         (self.home / 'config.json').write_bytes(config + b' ')
         self.call('recover', '--rollback', code=8)
