@@ -55,6 +55,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 c.registered_root(root, record, scope)
             elif not root.is_dir():
                 c.fail('project.unavailable', 'Project is unavailable.', 4, root=key)
+            import mask_resolve
+            mask_resolve.guard_legacy(root, scope, home)
             before_text = c.read_text(manifest_path, 'manifest', missing=key in inactive)
             if key in inactive:
                 if before_text is not None or record is None:

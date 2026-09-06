@@ -1,6 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:mask:user:v1",
-  "$ref": "project.schema.json",
-  "$comment": "Personal declaration at MASK_HOME/user.json. Deployment root is stored separately in the user registry record."
+  "$id": "urn:mask:user",
+  "oneOf": [
+    {
+      "$ref": "project.schema.json"
+    },
+    {
+      "$ref": "project-v2.schema.json"
+    }
+  ],
+  "$comment": "Personal declaration versions; v2 deployment is not yet implemented. Persisted state v1/v2 manifests remain v1-only."
 }

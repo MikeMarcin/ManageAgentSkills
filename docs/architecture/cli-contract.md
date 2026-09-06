@@ -429,3 +429,57 @@ source targets are drifted. `artifact` and upstream repository identity are null
 `recorded_source_revision` is historical ownership metadata, never a content pin.
 Compatibility is unspecified and host loading is unverified. Pin/profile/fleet
 fields and full update-impact reports remain unimplemented RFC work.
+
+### Cached selection locks
+
+`mask lock [--project PATH | --user] [--refresh] [--skill SOURCE/ID ...]
+[--allow-ref-rebind]` reads a v2 selection and writes `.mask.lock.json` or
+`MASK_HOME/user.lock.json`. It supports `--dry-run` and `--expect-plan-hash`.
+It never fetches, checks out files, builds artifacts or changes deployment links.
+Approve sources and explicitly fetch required refs/commits first.
+`source fetch NAME` acquires its configured selector; another annotated tag can
+be advertised without its tag object being cached. Use
+`source inspect NAME --ref refs/tags/TAG` to acquire that selected object before
+locking. Missing tag objects return `lock.resolution_required`. Every selected
+binding is resolved, including bindings with conditions false on this machine.
+File repository URIs are machine-local fixtures/inputs; output reports
+`portable: false` and makes no cross-machine portability claim for them.
+
+The explicit `project-v2.schema.json` and `lock-v1.schema.json` contracts are
+closed. `project.schema.json` remains the historical v1 contract, including its
+references from state v1/v2; the user declaration schema accepts either version.
+`core.manifest` retains strict v1 persisted-state semantics. The separate
+`selection_manifest` reader dispatches declaration versions. V2 consumer commands
+report `lock.missing` or `lock.stale`, then `deployment.unsupported_version` for a
+coherent lock; pinned deployment and per-binding targeting are not operational.
+
+Canonical bytes are sorted-key compact UTF-8 JSON without ASCII escaping or a
+trailing newline. Duplicate keys, floats, nonfinite numbers, unsafe/negative
+integers, invalid Unicode scalars and unknown closed fields are rejected. Source
+maps have at most 256 entries and declarations/locks at most 4096 bindings and
+4 MiB. Bindings sort by `source/id`; semantic string sets sort lexically.
+Missing `default_agents` becomes `all`; missing binding `agents` remains omitted to preserve inheritance intent; missing source `packages` becomes `skills`. An omitted ref uses the
+approved machine selector only at initial resolution/explicit refresh, normalized
+to a cached fully qualified branch/tag or full commit. Portable explicit refs
+must start with `refs/heads/` or `refs/tags/`. No target applicability is evaluated.
+
+Locks retain exact path, full SHA-1/SHA-256 commit, object format, selector and
+raw Git payload digest, including logical executable modes and every regular
+payload file. Metadata digest hashes normalized passive `mask-skill.json`; an
+absent file hashes the canonical bytes `null`. Present metadata uses sorted sets;
+requirements are bounded human-readable assertions and grant no execution or
+provider authority. The optional provenance digest hashes the exact bytes of
+`.mask-provenance.json`, including whitespace/newlines, without certifying its
+claims. Both files also participate in the complete payload digest.
+
+A coherent existing lock remains byte-for-byte unchanged until explicit refresh,
+even after cached refs or authoring files move. Selected refresh preserves other
+resolutions. An intent-only edit can update the selection digest while retaining
+resolutions. Changed identity/selector requires explicit refresh; an exact commit
+requirement never resolves to another commit. Moved tags and branches not proven
+fast-forward require `--allow-ref-rebind`. Missing original objects block exact
+verification instead of substituting current refs. The command verifies retained
+payloads at the frozen path and original index, not a later index. Publication
+bounds serialized lock bytes before preview/write and rechecks physical project/
+machine-home identities plus exact declaration/config/lock bytes under the machine writer lock; this
+is a same-user concurrency guard, not a hostile-same-user security boundary.

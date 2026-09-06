@@ -82,6 +82,7 @@ COMMANDS = {
     'source.migrate': (True, False, [('alias', 'value')]),
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
     'tap.remove': (True, False, [('name', 'pos')]),
+    'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     'update': (True, True, []),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
@@ -98,7 +99,7 @@ GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if n
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
 GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
-GUARDED.update({'skill.import', 'skill.record-adaptation'})
+GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -162,9 +163,9 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=2, state=2, pending=3),
-                readable_versions=dict(machine=[1, 2], state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
-                targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+    return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=2, pending=3),
+                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
+                pinned_deployment=False, per_binding_targeting=False, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
 CONFLICTS = {
@@ -183,6 +184,7 @@ for action in ('set', 'set-targets'):
 for command in ('plan', 'apply', 'doctor', 'inventory'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
+CONFLICTS['lock'] = {'project': ['user'], 'user': ['project']}
 
 
 def validate_arguments(args):
@@ -420,6 +422,10 @@ def local_dispatch(args, output, leaves):
     if command == 'capabilities':
         output['data'] = capabilities(leaves)
         return
+    import mask_resolve
+    if command == 'lock':
+        return mask_resolve.dispatch(args, output, home)
+    mask_resolve.guard_command(args, home)
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
     if command in ('skill.import', 'skill.provenance', 'skill.record-adaptation'):

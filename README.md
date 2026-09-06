@@ -364,6 +364,16 @@ of the working directory. `--include-generated` adds build/output directories
 while keeping links, caches, virtual environments, and local state excluded.
 The selected output file is always excluded from its own dump.
 
+`mask lock --project PATH --dry-run --json` previews an exact lock for a v2
+selection. Approve and fetch the source explicitly first, then run `mask lock`
+with the returned `--expect-plan-hash`. `--user` selects the personal declaration.
+Locking uses cached objects only and never changes deployed skills. Existing locks
+retain their resolution; `--refresh --skill SOURCE/ID` updates selected bindings.
+Ref rewrites require explicit `--allow-ref-rebind`. V2 deployment currently returns
+a typed unsupported error after checking for a missing or stale lock. See the
+[selection/lock contract](docs/architecture/cli-contract.md#cached-selection-locks)
+for canonical defaults, exact digests and the machine-local file-source limitation.
+
 - [CLI contract and exit codes](docs/architecture/cli-contract.md)
 - [JSON schemas](schemas/)
 - [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and [issue board](docs/issues/README.md)
@@ -374,8 +384,9 @@ The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
 catalog supports explicit migration, taps, fetch, package validation, curated
-copy imports and provenance; immutable content pins, profiles, bundles, fleet management and full
-update-impact reports remain RFC work. Importing their specifications does not
+copy imports and provenance. Cached v2 selection locks now record exact commits,
+paths and payload digests. Artifact deployment, profiles, bundles, fleet management
+and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
 
 Both named repositories consume the shared skills. Verified bootstrap copies

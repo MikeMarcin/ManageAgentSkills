@@ -610,7 +610,17 @@ def declaration_path(root, scope='project', home=None):
     return Path(root) / '.mask.json'
 
 
+def selection_manifest(value):
+    """Version-dispatched declaration reader; persisted legacy state uses manifest()."""
+    if isinstance(value, dict) and value.get('schema_version') == 2:
+        import mask_resolve
+        return mask_resolve.selection(value)
+    return manifest(value)
+
+
 def consumer_manifest(root, scope='project', home=None):
+    import mask_resolve
+    mask_resolve.guard_legacy(Path(root), scope, home)
     return manifest(read_json(declaration_path(root, scope, home), 'manifest'))
 
 
