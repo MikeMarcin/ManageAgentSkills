@@ -449,6 +449,10 @@ def source_index(root, entries):
     if entry[0] not in ('100644', '100755') or entry[1] != 'blob':
         c.fail('source.index_invalid', 'Source index must be a regular Git blob.', 4)
     value = c.parse_json(object_text(root, entry[2]), 'source')
+    return validate_index(value)
+
+
+def validate_index(value):
     c.fields(value, ('schema_version', 'packages'), ('bundles',), family='source')
     if not isinstance(value['packages'], dict) or len(value['packages']) > 10000:
         c.fail('source.index_invalid', 'Expected a bounded package map.', 4)

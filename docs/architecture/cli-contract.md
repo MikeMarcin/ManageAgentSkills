@@ -19,6 +19,9 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 | `skill list` | none | None | No |
 | `skill show` | `ID [--content]` | None | No |
 | `skill validate` | `ID` or `--all` | None | No |
+| `skill import` | `URL-or-SOURCE --mode copy --into SOURCE [--ref REF] [--path PATH] [--expect-plan-hash HASH]` | New curated directory and provenance; owned upstream cache | Yes |
+| `skill provenance` | `SOURCE/ID` | None | No |
+| `skill record-adaptation` | `SOURCE/ID --note TEXT [--expect-plan-hash HASH]` | Existing provenance record only | No |
 | `project init` | `[--project PATH]` | New empty `.mask.json` only | No |
 | `project show` | `[--project PATH]` | None | No |
 | `project set` | `--skill ID ...` or `--clear`, plus project/apply options | Manifest; registered links only with `--apply` | No |
@@ -123,7 +126,69 @@ uncontained fallback. Job termination includes helpers after their parent exits.
 POSIX uses a separate process group. Output-reader failures refuse incomplete
 observations through the same cleanup path.
 Legacy authoring-checkout updates retain their existing acquisition behavior.
-Provenance/imports and v2 consumer selection follow in later slices.
+V2 consumer selection follows in later slices.
+
+### Curated copy imports and provenance
+
+`skill import URL-or-SOURCE --mode copy --into SOURCE [--ref REF] [--path PATH]`
+uses the approved resolver and requires exactly one validated frozen package.
+It is network-capable; `--dry-run` neither fetches nor stages and reports
+`resolution_required` when cached resolution is unavailable. Preview/apply
+support `--expect-plan-hash`, binding config, selected objects, notice content,
+destination HEAD/root/parent identity, source index and Git index entries.
+
+The destination requires an approved authoring checkout on its configured
+branch, with no in-progress Git operation. Unrelated working/staged changes are
+preserved. A source index must already map the ID to a nonoverlapping path;
+without an index the destination is `<packages>/<id>`. Its parent must exist.
+Existing HEAD/index/worktree content refuses, including tracked deleted files.
+Staging lives beneath real Git metadata, outside skill discovery. After verifying
+staged bytes and final preconditions, native no-replace directory publication
+uses macOS `renamex_np(RENAME_EXCL)`, Linux `renameat2(RENAME_NOREPLACE)`, or Windows
+rename. Unsupported filesystems/cross-device staging refuse without a copy or
+overwrite fallback. A concurrent empty destination is preserved. Interrupted
+prepublication staging may leave a `mask-import-*` directory beneath Git metadata;
+normal success/refusal cleans its own temporary directory. This does not protect
+against a hostile same-user process racing every final precondition.
+
+Imports reserve `.mask-provenance.json` and `.mask-notices`; upstream collisions
+refuse instead of dropping data. Ancestor directories through the repository
+root are inspected for regular LICENSE, LICENCE, NOTICE and COPYING files, with
+an optional dot/hyphen suffix. At most 64 notices of 1 MiB each are incorporated
+under `.mask-notices/<ancestor-level>/<name>` with explicit original paths and
+byte hashes. Other notice conventions require separate review; absence does not
+establish licensing permission. The original upstream manifest/digest remains
+unchanged. Curated content comprises that original payload plus listed notices.
+
+The [provenance v1 schema](../../schemas/provenance.schema.json) records both
+manifests, exact upstream commit/coordinate, authoring HEAD at import, and bounded
+adaptations. Only the generated root `.mask-provenance.json` is excluded from
+the record's curated **content** digest to avoid self-reference. A full later
+artifact **payload** digest includes its actual bytes, as it does every other
+regular file. Import reports both digests and exact changed paths; no commit,
+push, index mutation or deployment is implicit.
+
+`skill provenance SOURCE/ID` is observational and never fetches. An available
+authoring checkout on its configured branch uses `observation=authoring`; taps,
+unavailable authoring roots and other checked-out branches use `frozen_cache`
+with an exact observed commit. Missing records return absent/unknown history.
+Authoring records are local assertions; cached embedded records are publisher
+assertions. `verified_git_objects` means the original full upstream manifest and
+all incorporated notices were independently rechecked in an approved cached
+repository. It does not authenticate the publisher or adaptation narrative.
+Missing upstream objects yield `recorded_only`; disagreeing objects yield
+`mismatch`. Current bytes are compared with the last recorded content manifest,
+reporting unrecorded adaptations. Windows authoring mode observations use
+recorded logical modes; cached Git mode observations are exact. Import does not
+set executable bits in the Windows Git index.
+
+`skill record-adaptation SOURCE/ID --note TEXT` requires authoring scope and an
+existing valid record. It supports preview/hash guards and appends the observed
+before/after content digests and complete manifest with the supplied local note.
+It changes only the provenance file, with no Git/index mutation. No content
+change is a no-op. Records are capped at 1 MiB, 100 adaptation entries and 4096
+characters per note; complex/unknown record shapes refuse. Recording is not
+approval to execute the skill and never fabricates unknown earlier history.
 
 ## JSON envelope
 

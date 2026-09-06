@@ -125,6 +125,49 @@ def parents_safe(root, path):
             fail('target.parent_link', 'A destination parent is linked or is not a real directory.', 4, path=str(current))
 
 
+def publish_directory(source, destination):
+    """Atomically publish a prepared directory without replacing any entry.
+
+    Caller validates scope/preconditions. Unsupported native/filesystem support
+    refuses; ordinary POSIX rename is never a fallback (it replaces empty dirs).
+    """
+    import ctypes
+    import errno
+    import sys
+    if kind(source) != 'directory':
+        fail('import.stage_invalid', 'Publication requires a real prepared directory.', 4)
+    try:
+        if os.name == 'nt':
+            os.rename(source, destination)  # Windows rename never replaces.
+            return
+        libc = ctypes.CDLL(None, use_errno=True)
+        if sys.platform == 'darwin':
+            rename = getattr(libc, 'renamex_np', None)
+            if rename is None:
+                fail('import.publish_unsupported', 'Native no-replace publication is unavailable.', 4)
+            rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+            rename.restype = ctypes.c_int
+            result = rename(os.fsencode(source), os.fsencode(destination), 0x00000004)  # RENAME_EXCL
+        elif sys.platform.startswith('linux'):
+            rename = getattr(libc, 'renameat2', None)
+            if rename is None:
+                fail('import.publish_unsupported', 'Native no-replace publication is unavailable.', 4)
+            rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+            rename.restype = ctypes.c_int
+            result = rename(-100, os.fsencode(source), -100, os.fsencode(destination), 1)  # NOREPLACE
+        else:
+            fail('import.publish_unsupported', 'Native no-replace publication is unavailable on this platform.', 4)
+        if result:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+    except OSError as error:
+        if error.errno in (errno.EEXIST, errno.ENOTEMPTY) or getattr(error, 'winerror', None) in (80, 183):
+            fail('import.collision', 'Destination appeared before publication; existing content was preserved.', 4)
+        if error.errno in (errno.EXDEV, errno.ENOSYS, errno.ENOTSUP, errno.EINVAL):
+            fail('import.publish_unsupported', 'This filesystem cannot publish the directory atomically without replacement.', 4)
+        raise
+
+
 def read_text(path, family='config', missing=False):
     parents_safe(Path(path.anchor), path)
     observed = kind(path)

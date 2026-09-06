@@ -49,6 +49,9 @@ COMMANDS = {
     'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int')]),
     'inventory': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('include-unmanaged', 'flag'), ('limit', 'int'), ('offset', 'int')]),
     'skill.validate': (False, False, [('id', 'optional'), ('all', 'flag')]),
+    'skill.import': (True, True, [('url', 'pos'), ('mode', 'required'), ('into', 'required'), ('ref', 'value'), ('path', 'value')]),
+    'skill.provenance': (False, False, [('id', 'pos')]),
+    'skill.record-adaptation': (True, False, [('id', 'pos'), ('note', 'required')]),
     'project.init': (True, False, [('project', 'value')]),
     'project.show': (False, False, [('project', 'value')]),
     'project.set': (True, False, [('project', 'value'), ('skill', 'repeat'), ('clear', 'flag'), ('apply', 'flag')]),
@@ -95,6 +98,7 @@ GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if n
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
 GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
+GUARDED.update({'skill.import', 'skill.record-adaptation'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -418,6 +422,9 @@ def local_dispatch(args, output, leaves):
         return
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
+    if command in ('skill.import', 'skill.provenance', 'skill.record-adaptation'):
+        import mask_provenance
+        return mask_provenance.dispatch(args, output, home)
     if command == 'source.inspect':
         return sources_ops.inspect(args, output, home)
     if command in ('source.list', 'source.show', 'source.migrate', 'tap.add', 'tap.remove') or command == 'source.fetch' and getattr(args, 'name', None):

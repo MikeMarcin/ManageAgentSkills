@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MASK copy import provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "upstream", "curated", "adaptations"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "mask-copy-import-v1"},
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "path", "id", "commit", "payload_digest", "files", "notices"],
+      "properties": {
+        "repository": {"type": "string"},
+        "path": {"type": "string", "maxLength": 1024},
+        "id": {"$ref": "#/$defs/id"},
+        "commit": {"$ref": "#/$defs/commit"},
+        "payload_digest": {"$ref": "#/$defs/digest"},
+        "files": {"$ref": "#/$defs/manifest"},
+        "notices": {
+          "type": "array", "maxItems": 64,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["upstream_path", "path", "mode", "size", "sha256"],
+            "properties": {
+              "upstream_path": {"type": "string", "maxLength": 1024},
+              "path": {"type": "string", "pattern": "^\\.mask-notices/"},
+              "mode": {"enum": ["100644", "100755"]},
+              "size": {"type": "integer", "minimum": 0, "maximum": 1048576},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    },
+    "curated": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "id", "path", "authoring_revision_at_import", "content_digest", "files"],
+      "properties": {
+        "source": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "id": {"$ref": "#/$defs/id"},
+        "path": {"type": "string", "maxLength": 1024},
+        "authoring_revision_at_import": {"$ref": "#/$defs/commit"},
+        "content_digest": {"$ref": "#/$defs/digest"},
+        "files": {"$ref": "#/$defs/manifest"}
+      }
+    },
+    "adaptations": {
+      "type": "array", "maxItems": 100,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["note", "from_content_digest", "to_content_digest", "files"],
+        "properties": {
+          "note": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "from_content_digest": {"$ref": "#/$defs/digest"},
+          "to_content_digest": {"$ref": "#/$defs/digest"},
+          "files": {"$ref": "#/$defs/manifest"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "commit": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "manifest": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "mode", "size", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "mode": {"enum": ["100644", "100755"]},
+          "size": {"type": "integer", "minimum": 0, "maximum": 67108864},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

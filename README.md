@@ -290,7 +290,31 @@ colliding paths, and known host activation metadata. Limits are 64 MiB per file,
 closed passive scalar subset; tool grants, hooks and dynamic shell preprocessing
 refuse (including executable examples). Arbitrary package scripts
 remain passive data; this is structural validation, not a malware safety claim.
-Imports and multi-source consumer selections are still being implemented.
+Copy imports can now vendor one selected package into a new directory in an
+approved authoring source. Fetch the upstream catalog first for an offline
+preview, then apply its exact proposal:
+
+```sh
+mask source fetch community --json
+mask skill import community --mode copy --into legacy --path skills/example --dry-run --json
+mask skill import community --mode copy --into legacy --path skills/example --expect-plan-hash RETURNED_HASH --json
+mask skill provenance legacy/example --json
+```
+
+An import preserves raw bytes and adjacent notices, writes a bounded provenance
+record, and returns exact changed paths. It never commits, pushes, or edits the
+Git index. Existing content—including an empty directory appearing concurrently—
+refuses publication. Destination parents must already exist; an existing source
+index must already map the selected ID. Package selection remains separate from
+deployment. Multi-source consumer selections are still being implemented.
+
+Provenance reports distinguish authoring observations, frozen tap objects,
+recorded assertions, missing history, and independently rechecked upstream Git
+facts. After editing imported content, preview `mask skill record-adaptation
+legacy/example --note "Describe the adaptation" --dry-run --json`, then apply
+with its returned plan hash. This records the observed changes without modifying
+payload files or inventing earlier history. Windows records logical execute
+modes; copying does not establish executable Git index bits for a later commit.
 
 Managed source fetches stage refs before advancing the catalog cursor. They
 enforce the configured timeout and bounded command output, and monitor object
@@ -349,8 +373,8 @@ The selected output file is always excluded from its own dump.
 The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
-catalog supports explicit migration, taps, fetch and package discovery; imports,
-immutable content pins, profiles, bundles, fleet management and full
+catalog supports explicit migration, taps, fetch, package validation, curated
+copy imports and provenance; immutable content pins, profiles, bundles, fleet management and full
 update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
 
