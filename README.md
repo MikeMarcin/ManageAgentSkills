@@ -252,6 +252,29 @@ mask update --expect-plan-hash RETURNED_HASH --json
 
 `source fetch` refreshes Git objects and remote-tracking refs without activating content. The dry run performs no fetch and reports last-fetched state. `update` validates a frozen candidate against live consumer declarations, fast-forwards the source, and reconciles its consumers. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
 
+Additional repositories can be registered in an approved source catalog. First
+preview `mask source migrate --dry-run --json`, then apply `mask source migrate
+--json` to assign the existing source the `legacy` alias. This changes machine
+configuration to v2 while preserving declarations, ownership and deployed links.
+The preview exposes the full repository identity being approved. Existing v1
+configuration remains supported; its historical basename check is replaced by
+full URI matching after migration.
+
+```sh
+mask tap add community https://github.com/OWNER/REPOSITORY.git --dry-run --json
+mask tap add community https://github.com/OWNER/REPOSITORY.git --json
+mask source list --json
+mask source show community --json
+mask source fetch community --json
+```
+
+Adding a tap only registers its repository, ref and package layout. An explicit
+fetch fills a separate owned bare cache; it does not deploy skills. HTTPS and SSH
+are distinct approved identities. Git credentials remain in the existing Git
+configuration; URLs containing credentials and redirects are refused. Tap removal
+retains the cache and refuses references, including the legacy binding. Package
+discovery, imports and multi-source consumer selections are still being implemented.
+
 `mask self update --json` updates only the running ManageAgentSkills checkout. It checks protocol/schema compatibility and returns `next_invocation_required`; the next command loads the new implementation. It does not update skills or reinstall the launcher. Local skill management remains available while the program checkout has authoring changes.
 
 ## Recover or stop managing a project
@@ -301,8 +324,9 @@ The selected output file is always excluded from its own dump.
 
 The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
-readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. Multi-source
-management, immutable content pins, profiles, bundles, fleet management and full
+readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
+catalog supports explicit migration, taps and fetch; package discovery/imports,
+immutable content pins, profiles, bundles, fleet management and full
 update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
 

@@ -42,7 +42,12 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 | `recover` | Exactly one of `--inspect`, `--complete`, `--rollback` | Only complete/rollback modes | No |
 | `doctor` | `[--project PATH | --user | --all] [--check]` | None | No |
 | `source status` | none | None | No |
-| `source fetch` | none | Source Git bookkeeping/remote refs only | Yes |
+| `source fetch` | `[SOURCE]` | Legacy checkout refs or named source bare cache only | Yes |
+| `source list` | none | None | No |
+| `source show` | `SOURCE` | None | No |
+| `source migrate` | `[--alias NAME] [--expect-plan-hash HASH]` | Explicit machine v1 → v2 migration; legacy alias defaults to `legacy` | No |
+| `tap add` | `SOURCE URL [--ref REF] [--packages PATH] [--checkout PATH] [--expect-plan-hash HASH]` | Approved catalog binding only | No |
+| `tap remove` | `SOURCE [--expect-plan-hash HASH]` | Unreferenced catalog binding only; retains cache | No |
 | `update` | `[--expect-plan-hash HASH]` | Source fast-forward + all registered links/state | Yes |
 | `self status` | none | None | No |
 | `self install` | `--bin-dir PATH` | Recognized launcher + ownership record | No |
@@ -51,6 +56,18 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 `plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks machine/source and all registered projects and the personal consumer. `update` always selects all; it cannot pretend to isolate shared content to one project. `source update` is deliberately not a separate bypass command; use `update` or fetch-only `source fetch`.
 
 A configuration default change does not relink anything until an explicit apply. There is no source-replacement command that silently relocates all ownership. v1 source relocation uses explicit unregister/setup/register as documented. `project init` and inspection can run before machine initialization where their operation does not need a source/registry. A missing source produces a typed refusal for operations that do need it.
+
+Source catalog commands use explicit machine schema v2 migration. Existing v1
+declarations, state and local source behavior remain supported. A named fetch
+never checks out or activates payloads; reads and previews never fetch. Missing
+cached resolution is reported as `resolution_required`. Approved identities
+normalize scheme/host/default port while preserving repository case and `.git`
+suffixes. HTTPS and SSH stay distinct; scp home-relative paths retain that
+distinction from absolute SSH paths. Passwords, tokens, unsupported protocols,
+transport rewrites to other identities and effective redirect policies refuse.
+Catalog mutation guards bind the before/after config. `tap remove` preserves all
+cache files and refuses the legacy binding or live selection/lock references.
+Discovery, provenance and v2 consumer selection commands follow in later slices.
 
 ## JSON envelope
 
@@ -76,7 +93,7 @@ Every normal machine-mode response includes:
 
 `data` contains command-specific results, including resolved project root/manifest, registration state, source root/revision/dirty/fingerprint, expected/actual links and plan hash as applicable. Actions have stable kinds and statuses. No fabricated revision is emitted for an unborn repository; use null plus an explicit condition.
 
-`changed` reports actual remaining changes to managed configuration, registry, manifest, links, launchers or source/program checkout. Fetch-only Git transfer bookkeeping is explicitly reported in `data.fetch_effects`; remote-ref changes can be identified separately without implying skill activation. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
+`changed` reports actual remaining changes to managed configuration, registry, manifest, links, launchers or source/program checkout. Fetch-only Git transfer bookkeeping is explicitly reported in `data.fetch_effects`; named-source cache creation is reported in `data.cache_effects`. These effects do not imply skill activation. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
 
 `transaction` values:
 

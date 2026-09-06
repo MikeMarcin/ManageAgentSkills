@@ -269,7 +269,10 @@ def checkout(root):
 
 
 def config(value):
-    fields(value, ('schema_version', 'source', 'default_targets', 'git_timeout_seconds'))
+    required = ('schema_version', 'source', 'default_targets', 'git_timeout_seconds')
+    if isinstance(value, dict) and value.get('schema_version') == 2:
+        required += ('sources', 'legacy_source')
+    fields(value, required, versions=(1, 2))
     source = value['source']
     fields(source, ('root', 'remote', 'branch'))
     if not isinstance(source['root'], str) or not Path(source['root']).is_absolute():
@@ -282,6 +285,9 @@ def config(value):
     timeout = value['git_timeout_seconds']
     if type(timeout) is not int or not 1 <= timeout <= 600:
         fail('config.invalid', 'Git timeout must be an integer from 1 through 600.')
+    if value['schema_version'] == 2:
+        from mask_sources import validate_config
+        validate_config(value)
     return dict(value, default_targets=targets)
 
 

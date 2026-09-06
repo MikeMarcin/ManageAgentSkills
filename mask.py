@@ -24,6 +24,7 @@ import mask_install as install_ops
 import mask_ensure as ensure_ops
 import mask_integration as integration_ops
 import mask_report as report_ops
+import mask_sources as sources_ops
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -71,7 +72,12 @@ COMMANDS = {
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
     'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
     'source.status': (False, False, []),
-    'source.fetch': (True, True, []),
+    'source.fetch': (True, True, [('name', 'optional')]),
+    'source.list': (False, False, []),
+    'source.show': (False, False, [('name', 'pos')]),
+    'source.migrate': (True, False, [('alias', 'value')]),
+    'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
+    'tap.remove': (True, False, [('name', 'pos')]),
     'update': (True, True, []),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
@@ -87,6 +93,7 @@ GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'p
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
+GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -150,8 +157,8 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=1, state=2, pending=3),
-                readable_versions=dict(state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
+    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=2, state=2, pending=3),
+                readable_versions=dict(machine=[1, 2], state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
                 targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
@@ -410,6 +417,8 @@ def local_dispatch(args, output, leaves):
         return
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
+    if command in ('source.list', 'source.show', 'source.migrate', 'tap.add', 'tap.remove') or command == 'source.fetch' and getattr(args, 'name', None):
+        return sources_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
         return integration_ops.dispatch(args, output, home)
     if command in ('ensure', 'workspace.forget') or command.startswith('integration.'):
@@ -425,6 +434,8 @@ def local_dispatch(args, output, leaves):
             core.fail('config.invalid', 'Invalid Git remote or branch name.')
         core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
         existing = core.read_json(home / 'config.json', default={})
+        if existing and core.config(existing)['schema_version'] == 2:
+            proposal.update(schema_version=2, legacy_source=existing['legacy_source'], sources=existing['sources'])
         if existing and core.config(existing) != proposal:
             core.fail('config.already_initialized', 'Machine already has a different configuration.', 4)
         output['data'] = dict(config=proposal, program_root=str(PROGRAM_ROOT))
@@ -461,7 +472,7 @@ def local_dispatch(args, output, leaves):
         output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])
     elif command == 'source.fetch':
         remote, branch = config['source']['remote'], config['source']['branch']
-        git_ops.checkout_preconditions(source, remote, branch, 'AgentSkills', config['git_timeout_seconds'], clean=False)
+        git_ops.checkout_preconditions(source, remote, branch, 'AgentSkills', config['git_timeout_seconds'], clean=False, approved_repository=sources_ops.approved_legacy(config))
         if not output['dry_run']:
             git_ops.fetch(source, remote, branch, config['git_timeout_seconds'], output)
         else:

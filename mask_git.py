@@ -7,6 +7,7 @@ import re
 
 import mask_core as c
 import mask_fs as fs
+import mask_sources as sources
 
 
 def status(root, remote='origin', branch='main', timeout=30):
@@ -29,7 +30,7 @@ def status(root, remote='origin', branch='main', timeout=30):
                 candidate=candidate, dirty=dirty, relation=relation, remote_freshness='last_fetched', unborn=head is None)
 
 
-def checkout_preconditions(root, remote, branch, expected_name, timeout=30, *, clean=True):
+def checkout_preconditions(root, remote, branch, expected_name, timeout=30, *, clean=True, approved_repository=None):
     observed = status(root, remote, branch, timeout)
     if observed['branch'] is None:
         c.fail('source.detached', 'Checkout is detached.', 4)
@@ -38,9 +39,15 @@ def checkout_preconditions(root, remote, branch, expected_name, timeout=30, *, c
     origin = c.git(root, 'remote', 'get-url', remote, optional=True, timeout=timeout)
     if origin is None:
         c.fail('source.remote_unknown', 'Configured remote is missing.', 4)
-    name = origin.replace('\\', '/').rstrip('/').removesuffix('.git').rsplit('/', 1)[-1].rsplit(':', 1)[-1]
-    if name != expected_name:
-        c.fail('source.identity_mismatch', 'Configured remote does not name the expected repository.', 4, expected_repository=expected_name)
+    if approved_repository is not None:
+        if sources.repository(origin) != approved_repository:
+            c.fail('source.identity_mismatch', 'Configured remote differs from its approved repository.', 4)
+        sources.endpoint(root, origin, approved_repository)
+    else:
+        # Legacy v1 configuration has no approved URI. Migration is explicit.
+        name = origin.replace('\\', '/').rstrip('/').removesuffix('.git').rsplit('/', 1)[-1].rsplit(':', 1)[-1]
+        if name != expected_name:
+            c.fail('source.identity_mismatch', 'Configured remote does not name the expected repository.', 4, expected_repository=expected_name)
     if clean and observed['dirty']:
         c.fail('source.dirty', 'Commit or preserve authoring changes before updating.', 4)
     for marker in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
@@ -59,10 +66,12 @@ def checkout_preconditions(root, remote, branch, expected_name, timeout=30, *, c
 
 
 def fetch(root, remote, branch, timeout, output):
+    transport = c.git(root, 'remote', 'get-url', remote, timeout=timeout)
+    options = sources.network_options(root, transport)
     before = c.git(root, 'rev-parse', '--verify', f'refs/remotes/{remote}/{branch}', optional=True, timeout=timeout)
     output['data']['fetch_effects'] = dict(attempted=True, fetched=False, remote_refs_changed=False)
     try:
-        c.git(root, 'fetch', '--no-tags', remote, f'+refs/heads/{branch}:refs/remotes/{remote}/{branch}', timeout=timeout, mutating=True)
+        c.git(root, *options, 'fetch', '--no-tags', '--no-recurse-submodules', remote, f'+refs/heads/{branch}:refs/remotes/{remote}/{branch}', timeout=timeout, mutating=True)
         output['data']['fetch_effects']['fetched'] = True
     finally:
         after = c.git(root, 'rev-parse', '--verify', f'refs/remotes/{remote}/{branch}', optional=True, timeout=timeout)
@@ -156,7 +165,7 @@ def update(config, state, home, output, guard=None):
     source = config['source']
     root, remote, branch = Path(source['root']), source['remote'], source['branch']
     timeout = config['git_timeout_seconds']
-    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     records = c.consumer_records(state)
     roots = [Path(key) for key in sorted(records)]
     # Refuse unavailable/invalid declarations before any network operation.
@@ -171,7 +180,7 @@ def update(config, state, home, output, guard=None):
     if not output['dry_run']:
         fetch(root, remote, branch, timeout, output)
     fetched = output['data'].get('fetch_effects')
-    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     if observed['candidate'] is None:
         c.fail('source.remote_unknown', 'Fetch the configured source branch before previewing an update.', 4)
     if observed['relation'] in ('ahead', 'diverged'):
@@ -192,7 +201,7 @@ def update(config, state, home, output, guard=None):
     fs.ensure_applicable(planned, guard)
     if output['dry_run'] or not planned['would_change']:
         return
-    rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout)
+    rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     if rechecked['revision'] != observed['revision'] or fs.plan(config, state, roots, candidate=view, operation='update', home=home)['plan_hash'] != planned['plan_hash']:
         c.fail('plan.stale', 'Source or consumer observations changed before checkout.', 4)
     pending = fs.make_pending(planned, home)
@@ -219,7 +228,7 @@ def recover_git(pending, home, output, mode):
     remote = config['source']['remote'] if entry['scope'] == 'source' else 'origin'
     branch = config['source']['branch'] if entry['scope'] == 'source' else 'main'
     expected_name = 'AgentSkills' if entry['scope'] == 'source' else 'ManageAgentSkills'
-    observed = checkout_preconditions(root, remote, branch, expected_name, (config or {}).get('git_timeout_seconds', 30))
+    observed = checkout_preconditions(root, remote, branch, expected_name, (config or {}).get('git_timeout_seconds', 30), approved_repository=sources.approved_legacy(config) if entry['scope'] == 'source' else None)
     if observed['revision'] not in (entry['before'], entry['candidate']):
         c.fail('recovery.conflict', 'Checkout changed outside the recorded transition.', 8)
     if mode == 'rollback':
