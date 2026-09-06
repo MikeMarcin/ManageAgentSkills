@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mask:pending:integration:v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "record",
+    "changes",
+    "ownership_before",
+    "ownership_after"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "operation": {
+      "enum": [
+        "integration.enable",
+        "integration.disable"
+      ]
+    },
+    "record": {
+      "type": "object"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "ownership_before": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ownership_after": {
+      "type": "string"
+    }
+  },
+  "$comment": "Runtime derives the allowlisted hook/config entries from the owned installation and validates each before/after value and physical repository identity. No arbitrary destination is accepted."
+}

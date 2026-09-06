@@ -66,11 +66,12 @@ def integration(args, output, home):
     approval = policy(home)
     root = c.project_root(getattr(args, 'project', None))
     if args.command == 'integration.inspect':
+        import mask_integration as integrations
         state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
         record = state['projects'].get(str(root))
         output['data'] = dict(root=str(root), approved=authorized(root, approval), host_load='not_verified',
                               registration_identity=c.digest(record['root_identity']) if record else None,
-                              coverage=dict(git=False, startup=False))
+                              coverage=integrations.coverage(integrations.registration(home)['installations'].get(str(root))))
         return
     proposal = copy.deepcopy(approval)
     if args.command == 'integration.approve':

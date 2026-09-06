@@ -203,17 +203,32 @@ def writer_lock(home):
         handle.close()
 
 
-def git(root, *args, timeout=30, optional=False, binary=False, mutating=False):
+HOOK_EVENTS = ('applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commit', 'pre-merge-commit',
+               'prepare-commit-msg', 'commit-msg', 'post-commit', 'pre-rebase', 'post-checkout', 'post-merge',
+               'pre-push', 'pre-receive', 'update', 'proc-receive', 'post-receive', 'post-update',
+               'reference-transaction', 'push-to-checkout', 'pre-auto-gc', 'post-rewrite', 'sendemail-validate',
+               'fsmonitor-watchman', 'p4-changelist', 'p4-prepare-changelist', 'p4-post-changelist',
+               'p4-pre-submit', 'post-index-change')
+
+
+def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False):
     selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
                  'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
                  'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
     environment = {key: value for key, value in os.environ.items() if key not in selectors and not key.startswith(('GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_'))}
     environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
-                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull)
+                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1')
     if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
         environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
     options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-    command = ['git', '-c', 'core.hooksPath=' + os.devnull, '-C', str(root), *args]
+    if inspect_hooks and (not args or args[0] not in ('config', 'rev-parse')):
+        fail('internal.invariant', 'Hook-path inspection is restricted to observational Git commands.', 10)
+    hook_options = [] if inspect_hooks else ['-c', 'core.hooksPath=' + os.devnull]
+    # Older Git ignores these settings; capable Git disables every known event.
+    # An environment token alone cannot suppress third-party configured hooks.
+    for event in HOOK_EVENTS:
+        hook_options.extend(('-c', f'hook.{event}.enabled=false'))
+    command = ['git', *hook_options, '-C', str(root), *args]
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
     try:
         stdout, stderr = process.communicate(timeout=timeout)
