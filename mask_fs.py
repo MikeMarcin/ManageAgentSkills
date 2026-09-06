@@ -29,13 +29,13 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True):
     proposals = proposals or {}
     source = Path(config['source']['root'])
     after = copy.deepcopy(state)
     links, files, actions, blockers, observations, packages = [], [], [], [], [], {}
     revision = candidate['revision'] if candidate else c.git(source, 'rev-parse', 'HEAD', optional=True)
-    dirty = bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False
+    dirty = (bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False) if source_status else None
     for root in sorted(roots, key=str):
         key = str(root)
         record = c.consumer_records(state).get(key)

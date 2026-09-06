@@ -19,6 +19,7 @@ import mask_core as core
 import mask_fs as fs
 import mask_git as git_ops
 import mask_install as install_ops
+import mask_ensure as ensure_ops
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -52,6 +53,10 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
+    'ensure': (True, False, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag')]),
+    'integration.approve': (True, False, [('project', 'required'), ('linked-worktrees', 'flag')]),
+    'integration.revoke': (True, False, [('project', 'required')]),
+    'integration.inspect': (False, False, [('project', 'value')]),
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
     'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
@@ -70,6 +75,7 @@ for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 're
     COMMANDS['user.' + action] = (mutates, network, user_arguments)
 GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
+GUARDED.update({'integration.approve', 'integration.revoke'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -389,6 +395,8 @@ def local_dispatch(args, output, leaves):
     if command == 'capabilities':
         output['data'] = capabilities(leaves)
         return
+    if command == 'ensure' or command.startswith('integration.'):
+        return ensure_ops.dispatch(args, output, home)
     if command == 'init':
         source = Path(args.source).expanduser().resolve()
         core.checkout(source)
@@ -469,7 +477,7 @@ def local_dispatch(args, output, leaves):
 def dispatch(args, output, leaves):
     if args.command not in IMPLEMENTED:
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
-    mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False))
+    mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))
     home = machine_home(args)
     if mutates:
         with core.writer_lock(home):
@@ -478,9 +486,9 @@ def dispatch(args, output, leaves):
             local_dispatch(args, output, leaves)
     else:
         observed = args.command not in ('capabilities',)
-        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json')] if observed else []
+        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json')] if observed else []
         local_dispatch(args, output, leaves)
-        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json')] if observed else []
+        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json')] if observed else []
         if before != after:
             core.fail('state.drift', 'Machine state changed during inspection; retry the observational command.', 4)
     if output['dry_run'] and output['would_change']:
