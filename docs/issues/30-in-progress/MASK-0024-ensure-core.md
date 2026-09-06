@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0024"
 title: "Add one authorized ensure path over the existing reconciler"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0023"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "ensure-core", "stage": "A — first usable milestone", "provisional_id": false}
