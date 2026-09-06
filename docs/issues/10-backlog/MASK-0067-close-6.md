@@ -61,3 +61,9 @@ Closeout review runtime: not run. A skipped required native/host/device check le
 ## Ensure core slice
 
 Revision `029adabec841e59515ec45b6f2d9a51b5e6517b5`: 17 focused tests passed (one existing Windows-only skip), covering approved project registration/reconciliation, no-op bytes, check-only drift, selected-package scan, collisions, parent substitution, pending and busy refusal. AC02/AC03 core evidence; full lifecycle/integration/native rows remain open. Next: MASK-0025. Temporary test roots were automatically cleaned by unittest fixtures.
+
+## Lifecycle slice
+
+Revision `b6ce556029fdf45e650681fc06235034f827a53b`: 22 focused tests passed across lifecycle, ensure, recovery and launcher; after adding unrelated-commit and conflicted-index cases, all 6 lifecycle tests passed. Direct subprocess/Git fixtures cover inactive branch removal/restoration, local deletion, sparse checkout, conflicted index, changed branch/declaration/authority recovery, and verified worktree retirement. Existing v1/v2 recovery remains exercised. Busy lock fails immediately without takeover. Native Windows/host acceptance remains on separate cards.
+
+Owned-path extension: CLI registration/capability metadata, pending schema union and launcher module inventory changed with the new runtime/journal boundary. Inactivity requires an explicit root approval with `--inactive-branches` and tracked declaration evidence; inherited linked-worktree approval alone does not opt a new worktree into deactivation. No live consumer was migrated. Next: MASK-0026 and MASK-0027.

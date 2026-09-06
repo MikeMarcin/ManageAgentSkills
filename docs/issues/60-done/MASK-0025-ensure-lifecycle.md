@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0025"
 title: "Implement branch inactivity and bounded readiness recovery"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0024"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "ensure-lifecycle", "stage": "A — first usable milestone", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0006-AC03","outcome":"pass","revision":"b6ce556029fdf45e650681fc06235034f827a53b","evidence":{"kind":"command","detail":"22 focused tests passed across lifecycle, ensure, recovery and launcher; after adding unrelated-commit and conflicted-index cases, all 6 lifecycle tests passed. Direct subprocess/Git fixtures cover inactive branch removal/restoration, local deletion, sparse checkout, conflicted index, changed branch/declaration/authority recovery, and verified worktree retirement. Existing v1/v2 recovery remains exercised. Busy lock fails immediately without takeover. Native Windows/host acceptance remains on separate cards."}},{"criterion":"RFC-MASK-0006-AC04","outcome":"pass","revision":"b6ce556029fdf45e650681fc06235034f827a53b","evidence":{"kind":"command","detail":"22 focused tests passed across lifecycle, ensure, recovery and launcher; after adding unrelated-commit and conflicted-index cases, all 6 lifecycle tests passed. Direct subprocess/Git fixtures cover inactive branch removal/restoration, local deletion, sparse checkout, conflicted index, changed branch/declaration/authority recovery, and verified worktree retirement. Existing v1/v2 recovery remains exercised. Busy lock fails immediately without takeover. Native Windows/host acceptance remains on separate cards."}},{"criterion":"RFC-MASK-0006-AC07","outcome":"pass","revision":"b6ce556029fdf45e650681fc06235034f827a53b","evidence":{"kind":"command","detail":"22 focused tests passed across lifecycle, ensure, recovery and launcher; after adding unrelated-commit and conflicted-index cases, all 6 lifecycle tests passed. Direct subprocess/Git fixtures cover inactive branch removal/restoration, local deletion, sparse checkout, conflicted index, changed branch/declaration/authority recovery, and verified worktree retirement. Existing v1/v2 recovery remains exercised. Busy lock fails immediately without takeover. Native Windows/host acceptance remains on separate cards."}}]
 ---
 
 # MASK-0025: Implement branch inactivity and bounded readiness recovery
