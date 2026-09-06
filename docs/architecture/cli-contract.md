@@ -320,7 +320,7 @@ manifest destinations are recomputed as `<project>/.mask.json` or the current
 V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
 bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
 Capabilities retain readable state versions `[1, 2]` and state version 2. The readiness extension below adds journal v3 while preserving the v1/v2 readers.
-The source/configuration and result schemas remain v1.
+User declarations remain v1 and the result envelope remains v1. The later source-catalog extension reads machine v1/v2 and migrates explicitly to v2.
 
 ## Workspace readiness (unreleased RFC-MASK-0006 additions)
 
