@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0038"
 title: "Implement per-binding agent choices and compatibility metadata"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0036"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "target-model", "stage": "B — selection semantics", "provisional_id": false}
