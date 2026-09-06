@@ -53,3 +53,9 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0011-AC05 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Legacy inventory slice
+
+Revision `79c3d611709cf719bb30169adafdd73fdd5646d3`: python3 -B -m unittest tests.test_inventory tests.test_manifest_registry tests.test_launcher: 14 tests passed. Direct CLI fixtures cover desired/owned/drifted rows, scope/agent filtering, pagination, unavailable cached selections, shallow unmanaged inspection, linked-parent refusal, and absent source targets. A narrow query inspected one leaf and one declaration with zero payload reads or Git scans. Full multi-source/pinned/profile/fleet fields remain explicitly unavailable until predecessor features ship.
+
+This is the independently authorized legacy inventory boundary. Full RFC acceptance remains open for exact locks, layered selections and impact reporting. Temporary fixtures cleaned automatically.

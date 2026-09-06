@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0044"
 title: "Expose skill-centric where-used and actual deployment inventory"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0024"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "inventory", "stage": "C — explainability", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0011-AC01","outcome":"pass","revision":"79c3d611709cf719bb30169adafdd73fdd5646d3","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_inventory tests.test_manifest_registry tests.test_launcher: 14 tests passed. Direct CLI fixtures cover desired/owned/drifted rows, scope/agent filtering, pagination, unavailable cached selections, shallow unmanaged inspection, linked-parent refusal, and absent source targets. A narrow query inspected one leaf and one declaration with zero payload reads or Git scans. Full multi-source/pinned/profile/fleet fields remain explicitly unavailable until predecessor features ship."}},{"criterion":"RFC-MASK-0011-AC04","outcome":"pass","revision":"79c3d611709cf719bb30169adafdd73fdd5646d3","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_inventory tests.test_manifest_registry tests.test_launcher: 14 tests passed. Direct CLI fixtures cover desired/owned/drifted rows, scope/agent filtering, pagination, unavailable cached selections, shallow unmanaged inspection, linked-parent refusal, and absent source targets. A narrow query inspected one leaf and one declaration with zero payload reads or Git scans. Full multi-source/pinned/profile/fleet fields remain explicitly unavailable until predecessor features ship."}},{"criterion":"RFC-MASK-0011-AC05","outcome":"pass","revision":"79c3d611709cf719bb30169adafdd73fdd5646d3","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_inventory tests.test_manifest_registry tests.test_launcher: 14 tests passed. Direct CLI fixtures cover desired/owned/drifted rows, scope/agent filtering, pagination, unavailable cached selections, shallow unmanaged inspection, linked-parent refusal, and absent source targets. A narrow query inspected one leaf and one declaration with zero payload reads or Git scans. Full multi-source/pinned/profile/fleet fields remain explicitly unavailable until predecessor features ship."}}]
 ---
 
 # MASK-0044: Expose skill-centric where-used and actual deployment inventory

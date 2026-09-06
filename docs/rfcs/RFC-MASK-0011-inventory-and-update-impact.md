@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0011"
 title: "Where-used inventory, update diffs and deployment impact reports"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---

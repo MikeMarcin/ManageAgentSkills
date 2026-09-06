@@ -26,7 +26,7 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC-MASK-0008 | Accepted | True version pinning, immutable deployment artifacts and recoverable migration |
 | RFC-MASK-0009 | Accepted | Per-skill scope-specific agent targeting and advertised compatibility |
 | RFC-MASK-0010 | Accepted | Portable personal selections, reusable bundles and profile composition |
-| RFC-MASK-0011 | Accepted | Where-used inventory, update diffs and deployment impact reports |
+| RFC-MASK-0011 | Implementing | Where-used inventory, update diffs and deployment impact reports |
 | RFC-MASK-0012 | Accepted | Explicit fleet enrollment, device identity and bounded remote transport |
 | RFC-MASK-0013 | Accepted | Declarative fleet rollouts, optional continuous convergence and completion reports |
 | RFC-MASK-0014 | Proposed | Optional MCP facade over the MASK management API |
