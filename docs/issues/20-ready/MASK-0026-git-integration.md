@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0026"
 title: "Install owned Git integrations and suppress internal hooks"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0025"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "git-integration", "stage": "A — first usable milestone", "provisional_id": false}
