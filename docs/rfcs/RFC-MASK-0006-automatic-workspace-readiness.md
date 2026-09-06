@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0006"
 title: "Automatic workspace readiness for clone, worktree, branch and agent startup"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -108,3 +108,11 @@ Integration enable/disable must itself be recoverable: allowlisted destination r
 ## Live authorization
 
 Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+
+## Verified implementation boundary
+
+The [readiness closeout](../issues/60-done/MASK-0067-close-6.md) records
+passing local-source readiness acceptance, including native macOS and Windows
+paths. Native Windows fixes are `c03f85c`. Host prelaunch fallback is verified;
+first-prompt discovery and native host trust/gate enforcement remain explicitly
+unverified. Later pinning/fleet behavior belongs to its own RFCs.

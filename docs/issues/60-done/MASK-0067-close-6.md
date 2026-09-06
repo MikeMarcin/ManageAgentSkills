@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0067"
 title: "Verify and close RFC-MASK-0006"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029", "MASK-0081", "MASK-0082"]
 closeout_for: ["RFC-MASK-0006"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-6", "stage": "A — first usable milestone", "provisional_id": false, "closeout": true}
+acceptance: [{"criterion":"RFC-MASK-0006-AC01","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Native macOS fallback and Windows named Git lifecycle; clone/startup fixtures. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC02","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Approved ensure, nested/personal preflight, bounded reads and no-op byte/generation checks. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC03","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Ownership, collisions, pending/busy refusal, unavailable worktree preservation. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC04","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Inactive-branch cleanup and exact control/authority recovery checks. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC05","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Owned entries and recovery; native directory and named Git hook suppression. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC06","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Native macOS/Windows mask launch with installed Claude/Codex --version; separate adapter protocols. Pass at explicit prelaunch fallback; first-prompt loading unverified. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}},{"criterion":"RFC-MASK-0006-AC07","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Native macOS APFS and Windows NTFS launcher/link/lifecycle checks; WinError1314 mapping. Pass. Native evidence: docs/development/readiness-acceptance.md; completed prerequisite cards and recorded original revisions remain authoritative."}}]
 ---
 
 # MASK-0067: Verify and close RFC-MASK-0006
@@ -48,13 +49,13 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0006-AC01 | Git lifecycle and future-clone startup fixtures; 33 affected tests passed | Pass at macOS fallback boundary | c0d37e7 |
-| RFC-MASK-0006-AC02 | Ensure, clone policy, nested and personal preflight tests; no-op and bounded reads | Pass at exercised CLI boundary | c0d37e7 |
-| RFC-MASK-0006-AC03 | Collision, parent/identity, lock, pending and interruption refusal checks | Pass at exercised CLI boundary | c0d37e7 |
-| RFC-MASK-0006-AC04 | Inactive branch, stale control recovery, removed-package cleanup fixtures | Pass at exercised CLI boundary | c0d37e7 |
-| RFC-MASK-0006-AC05 | Owned Git/host entry and recovery checks; named-hook runtime unavailable | Pass on legacy Git/fixture boundary; named execution unverified | c0d37e7 |
-| RFC-MASK-0006-AC06 | Claude 2.1.260/Codex 0.153.2 native prelaunch; separate protocol outputs | Fallback verified; first-prompt discovery unverified | c0d37e7 |
-| RFC-MASK-0006-AC07 | Native macOS APFS launcher and lifecycle checks; Windows station unavailable | Pending Windows | c0d37e7 (macOS only) |
+| RFC-MASK-0006-AC01 | Native macOS fallback and Windows named Git lifecycle; clone/startup fixtures | Pass | c03f85c |
+| RFC-MASK-0006-AC02 | Approved ensure, nested/personal preflight, bounded reads and no-op byte/generation checks | Pass | c0d37e7; unchanged at c03f85c |
+| RFC-MASK-0006-AC03 | Ownership, collisions, pending/busy refusal, unavailable worktree preservation | Pass | c03f85c |
+| RFC-MASK-0006-AC04 | Inactive-branch cleanup and exact control/authority recovery checks | Pass | c03f85c |
+| RFC-MASK-0006-AC05 | Owned entries and recovery; native directory and named Git hook suppression | Pass | c03f85c |
+| RFC-MASK-0006-AC06 | Native macOS/Windows mask launch with installed Claude/Codex --version; separate adapter protocols | Pass at explicit prelaunch fallback; first-prompt loading unverified | 3456e3 (Windows); c0d37e7 (macOS); unchanged host path at c03f85c |
+| RFC-MASK-0006-AC07 | Native macOS APFS and Windows NTFS launcher/link/lifecycle checks; WinError1314 mapping | Pass | c03f85c |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
 
@@ -100,10 +101,34 @@ Revision `c0d37e78d72802c90ae73f39a7d9e342612494f1`: Full integration at runtime
 
 Final scoped source diff reviewed against immutable RFC_BASE_SHA `9dc90df`. No known critical failure remains on the exercised macOS/public-command boundary. Named-hook execution on newer Git, native Windows and actual first-prompt host loading remain explicitly limited. Native Windows is the required open platform criterion; later core stages retain their live dependencies.
 
-## Current stop boundary
+## Earlier stop boundary (resolved by Windows acceptance)
 
 All currently eligible unattended slices are complete. MASK-0029 is blocked on selecting a native Windows test station; its required evidence is not waived. The dependency graph therefore keeps MASK-0067 and stages B–D open. Optional stage E and the two Inbox tracking items remain deferred. No independent review agent was used; the integrator reviewed the scoped diff and consumed one integration suite plus focused defect rechecks.
 
 Final capability reconciliation marks launch network-capable because the external host may use network services; ensure stays local, inventory remains observational, and pending readers advertise 1/2/3. Direct capability assertions passed. The change is metadata only; prior runtime checks remain relevant.
 
 Task-created scratch root `.mask/generated/implement-rfc/pack-work` held only finish decision files, whose records have been consumed into Done cards. It is removed after consumption. No task worktree or verification checkout was created; test-owned temporary roots were cleaned by fixture teardown. The original untracked `.DS_Store` is preserved. No push, publication, live adapter install, consumer migration, credentials or trust changes occurred.
+
+## Final readiness closeout
+
+MASK-0029 is Done at `a51dab1`. Native Windows fixes are `c03f85c`; the precise
+initial failures, affected rechecks, native hosts and cleanup are recorded in
+[readiness acceptance](../../development/readiness-acceptance.md). The original
+Windows-station blocker is resolved. Planned followups MASK-0081 and MASK-0082
+are integrated and Done alongside MASK-0024–0029.
+
+The final scoped implementation was reviewed against immutable RFC_BASE_SHA
+`9dc90df45febf2a6e048ace60a4ac959807aaaf6`, reusing the prior integration review and
+unchanged passing evidence. The Windows delta corrects separator handling,
+named-hook argument forwarding and CRLF schema comparison, with focused checks
+covering each. No known critical failure remains at the accepted readiness
+boundary. First-prompt skill loading and native host trust/gate behavior are
+explicit limitations; AC06 permits the documented prelaunch fallback.
+
+RFC-MASK-0006 is Auto-Verified at this bounded local-source readiness boundary.
+Later source/pin/profile/fleet RFCs remain separate work and are not completed
+by this closeout. No live consumer or host configuration was migrated.
+The persistent station/source checkouts are retained at the owner's request;
+the invisible SSH runner stopped and released its lease. The separate direct
+verification clone and transfer archives were deleted after their results were
+consumed. The owner's manual clone and original untracked `.DS_Store` are untouched.
