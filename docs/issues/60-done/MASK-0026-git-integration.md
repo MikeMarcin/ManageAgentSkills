@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0026"
 title: "Install owned Git integrations and suppress internal hooks"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0025"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "git-integration", "stage": "A — first usable milestone", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0006-AC01","outcome":"pass","revision":"2c3fd278787df3136125f82784f0f020f0ab963d","evidence":{"kind":"command","detail":"9 Git-integration/subprocess tests passed. After bounding hook child process-tree termination, the affected manual-merge/warning test and launcher tests passed (3 tests). Actual Apple Git 2.50.1 fixtures exercised switch, linked worktree creation, fast-forward merge, manual conflict-resolution commit, clone coverage limitation, collision preservation, existing hook manager refusal, crash recovery and internal directory-hook suppression. Named-hook capability was probed unavailable on installed Git (also fallback Git 2.53.0); its configured execution branch remains unverified, not a native pass."}},{"criterion":"RFC-MASK-0006-AC05","outcome":"pass","revision":"2c3fd278787df3136125f82784f0f020f0ab963d","evidence":{"kind":"command","detail":"9 Git-integration/subprocess tests passed. After bounding hook child process-tree termination, the affected manual-merge/warning test and launcher tests passed (3 tests). Actual Apple Git 2.50.1 fixtures exercised switch, linked worktree creation, fast-forward merge, manual conflict-resolution commit, clone coverage limitation, collision preservation, existing hook manager refusal, crash recovery and internal directory-hook suppression. Named-hook capability was probed unavailable on installed Git (also fallback Git 2.53.0); its configured execution branch remains unverified, not a native pass."}}]
 ---
 
 # MASK-0026: Install owned Git integrations and suppress internal hooks
