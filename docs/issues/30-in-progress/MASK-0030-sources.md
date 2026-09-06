@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0030"
 title: "Implement approved source identities and multi-source catalog"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0067"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "sources", "stage": "B — source foundation", "provisional_id": false}
