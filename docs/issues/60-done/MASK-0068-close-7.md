@@ -118,3 +118,8 @@ was removed. Consumed transfer/log files under
 were removed; only the task's native fixture driver is retained for the already
 planned remaining native prerequisite checks. No owner clone, station, consumer
 or credential settings were changed.
+
+Final structure gate: `python3 -B scripts/verify_documentation.py --root .`
+reported **17 RFCs, 82 cards; 0 structural violations** after the closeout card
+was Done and RFC/index status was reconciled. No required RFC-0007 acceptance
+remains open. RFC-0008 is the next prerequisite; RFCs 0012/0013 remain pending.

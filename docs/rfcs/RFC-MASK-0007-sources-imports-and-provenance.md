@@ -1,14 +1,14 @@
 ---
 id: "RFC-MASK-0007"
 title: "Multiple sources, taps, curated imports and upstream provenance"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
 
 # RFC-MASK-0007: Multiple sources, taps, curated imports and upstream provenance
 
-**Delivery stage:** B — source foundation. **Packet status:** proposed implementation contract; no implementation or acceptance is claimed.
+**Delivery stage:** B — source foundation. Implemented and auto-verified through MASK-0030–0033 and [MASK-0068](../issues/60-done/MASK-0068-close-7.md). Source, import and provenance fixtures passed on macOS and native Windows; the closeout records exact revisions, corrections and limits.
 
 **Predecessors:** RFC-MASK-0006.
 

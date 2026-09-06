@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Normative for RFC-MASK-0001 through RFC-MASK-0005. The JSON result protocol remains v1; local program v0.2.0 adds user scope and state/journal v2. Historical native verification is recorded in docs/releases/v0.1.0.md; the RFC-MASK-0005 closeout records the new acceptance evidence.
+Current CLI contract through RFC-MASK-0007, with the implemented legacy inventory slice of RFC-MASK-0011. The result envelope remains v1; machine configuration reads v1/v2, ownership state reads v1/v2, and pending journals read v1/v2/v3. Source-catalog migration is explicit. Historical and current native evidence is recorded in the corresponding RFC closeouts.
 
 ## Common options
 
