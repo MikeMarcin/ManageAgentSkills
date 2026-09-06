@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0035"
 title: "Build isolated raw-byte artifacts and exact hydration"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0034", "MASK-0033"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "artifact-store", "stage": "B — reproducible content", "provisional_id": false}
@@ -35,3 +35,11 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded implementation plan
+
+Build a runtime-derived store-v1 path from validated SHA-256 payload identity and skill ID. Revalidate incoming raw files and logical modes before staging; use the same passive package constraints for Git and future forwarded payloads. Write unique same-volume staging directories, validate bytes/manifest, flush, and publish without replacing an existing digest directory. Validate reused artifacts completely (missing/extra entries, links, special files, byte digests and logical modes); never rely on timestamps. Preserve existing corruption for explicit repair. No hardlinks, checkout filters, execution or garbage collection.
+
+Extend ownership narrowly to shared payload validation, exact-source acquisition, resolver/CLI dispatch and capabilities, launcher runtime inventory, an explicit artifact-manifest schema and current documentation as necessary. Public `source fetch --locked --project/--user` may acquire only the exact approved locked commits and materialize verified artifacts; cached/offline preparation never resolves selectors or changes lock/control/link/state bytes. Keep possible network and retained cache effects explicit on failures as well as success. Engine activation/ensure policy remain MASK-0036.
+
+Focused checks cover independent roots with identical raw CRLF/executable content, immutable reuse across authoring/ref movement, full corruption/collision refusal, stage-publication failure cleanup, exact missing commit without substitution, source approval, and observational offline previews. Native mode evidence waits for the coherent pinned-deployment milestone. Retain all published artifacts conservatively.
