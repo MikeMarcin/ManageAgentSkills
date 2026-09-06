@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0033"
 title: "Harden passive package acquisition and plain-skill boundaries"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0031"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "package-guards", "stage": "B — source foundation", "provisional_id": false}
+acceptance: [{"criterion":"MASK-0033/passive-payload","outcome":"pass","revision":"afd245d81489d436977e0f34cc115fa885c78b18","evidence":{"kind":"observation","detail":"Raw regular Git bytes, portable paths, passive frontmatter and known activation boundaries validated with synthetic adversarial public-path fixtures."}},{"criterion":"MASK-0033/resource-bounds","outcome":"pass","revision":"afd245d81489d436977e0f34cc115fa885c78b18","evidence":{"kind":"observation","detail":"Focused fixtures pass for pre-allocation size/count/depth and bounded process output/time; polled storage refusal preserves selected cursor and reports staging effects."}},{"criterion":"MASK-0033/native-containment","outcome":"pass","revision":"afd245d81489d436977e0f34cc115fa885c78b18","evidence":{"kind":"observation","detail":"Native Windows Job Object assignment and process-tree cleanup methods passed; corrected raw-Git-byte resource fixture passed at this revision."}},{"criterion":"MASK-0033/public-contract","outcome":"pass","revision":"afd245d81489d436977e0f34cc115fa885c78b18","evidence":{"kind":"observation","detail":"Public skill validation and capabilities expose payload validation and documented acquisition limits; existing source authority checks remain covered."}}]
 ---
 
 # MASK-0033: Harden passive package acquisition and plain-skill boundaries
@@ -31,7 +32,14 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Implemented at `96b18ee3298b160e956ec2ce2a34c9439efc879d`; native fixture correction at `afd245d81489d436977e0f34cc115fa885c78b18`.
+
+- macOS package/catalog/subprocess/source/discovery/launcher checks: 33 passed in 47.408s before final native/frontmatter additions. Final affected guard/subprocess/launcher set: 16 successful with one Windows-only skip in 29.913s; final frontmatter/subprocess checks: seven successful with one Windows-only skip in 15.016s. Final fetch-storage refusal check: one passed in 1.310s. `git diff --check` passed.
+- Native Windows Python 3.14.6 / Git 2.55.0.windows.3 on ExampleWinHost: `tests.test_import_safety tests.test_subprocess_policy tests.test_launcher` ran 16 tests in 105.805s, with 15 methods passing and two failed assertions in one resource-limit fixture. The fixture incorrectly counted CRLF checkout bytes rather than raw Git object bytes; production's raw-byte count was correct. After correcting that measurement, the affected method passed on macOS (2.766s) and Windows (9.972s). Unchanged passing native methods include Job Object assignment refusal and real process-tree cleanup. No native skips.
+- Acquisition has bounded time/output/object sizes and a polled cache-storage limit; storage may transiently overshoot between polls. The selected cursor advances only after post-fetch checks. No hard network-byte quota is asserted.
+- Exact task roots were `C:/Users/example/AppData/Local/Temp/mask-guards-win-60ff62w0` and `/tmp/mask-guards-win-60ff62w0`. Native checkout was clean and removed; local transfer/log files were consumed into this record and removed. Tests used temporary fixtures; no station restart or modification to the owner's manual clone occurred.
+
+These checks establish the passive payload/acquisition slice. Copy imports remain on MASK-0032; no fleet or host-load acceptance is asserted.
 
 ## Bounded implementation plan
 
