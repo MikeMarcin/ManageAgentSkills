@@ -106,7 +106,10 @@ class ArtifactTests(Fixture):
         selected = c.git(self.cache, 'rev-parse', 'refs/mask/selected')
         refs = (self.cache / 'mask-refs.json').read_bytes()
         # Task-owned cache fixture: remove objects, preserving selector evidence.
-        shutil.rmtree(self.cache / 'objects')
+        def remove_readonly(action, path, error):
+            os.chmod(path, 0o600)
+            action(path)
+        shutil.rmtree(self.cache / 'objects', onerror=remove_readonly)
         (self.cache / 'objects').mkdir()
         (self.cache / 'objects/info').mkdir()
         (self.cache / 'objects/pack').mkdir()
