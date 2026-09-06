@@ -4,7 +4,7 @@ id: "MASK-0067"
 title: "Verify and close RFC-MASK-0006"
 status: "Backlog"
 rfcs: ["RFC-MASK-0006"]
-depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029", "MASK-0081"]
+depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029", "MASK-0081", "MASK-0082"]
 closeout_for: ["RFC-MASK-0006"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-6", "stage": "A — first usable milestone", "provisional_id": false, "closeout": true}
 ---
@@ -91,3 +91,5 @@ Integration discovery: required MASK-0081 completes repository-boundary approval
 Revision `8ddb5d30c2fc876a458c11c9414d7e70fb822b1b`: python3 -B -m unittest tests.test_ensure tests.test_host_integration tests.test_workspace_lifecycle: 24 tests passed. A generated user-level adapter command readies a future approved local clone and registered personal scope. Wrong-origin/outside/replaced-boundary requests and credential-bearing identities refuse; direct revoke refuses inherited authority. Project-local and user-level settings remain independently owned, with no actual host-loading claim.
 
 The earlier explicit-root-only limitation is resolved at the fixture/public-command boundary. Native host first-prompt loading still uses the recorded fallback limitation. No live approval or user-level configuration was installed.
+
+Integration follow-up MASK-0082 records the full-suite failure and inactive cleanup recovery edge discovered during the final scoped diff review. Terminal status remains open.
