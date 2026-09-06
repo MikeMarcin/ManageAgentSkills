@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0036"
 title: "Retarget owned links and recover lock/artifact transitions"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0035"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "artifact-reconcile", "stage": "B — reproducible content", "provisional_id": false}
