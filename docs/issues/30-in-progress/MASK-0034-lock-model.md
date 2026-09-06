@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0034"
 title: "Implement portable v2 selections and exact resolution locks"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0068"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "lock-model", "stage": "B — reproducible content", "provisional_id": false}
