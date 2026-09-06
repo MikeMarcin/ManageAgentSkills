@@ -13,7 +13,7 @@ pack includes all six named consumers. Preserve unrelated product work, commit
 explicit paths and use temporary tooling fixtures/local bare remotes. No push,
 publication, credentials or access changes are implied.
 
-No daemon, fleet synchronization, marketplace or remote agent orchestration is part of MASK v1. Existing optional workflow helpers are retained without enabling them. The station registry is deliberately empty; unavailable optional models are limitations, not blockers.
+No daemon, fleet synchronization, marketplace or remote agent orchestration is part of MASK v1. Existing optional workflow helpers are retained without enabling them. Native Windows verification through the existing ExampleWinHost SSH connection is authorized; see the remote-station registry for its disposable-checkout scope. No persistent remote agent station is provisioned. Unavailable optional models are limitations, not blockers.
 
 ## Direct surfaces and acceptance
 
