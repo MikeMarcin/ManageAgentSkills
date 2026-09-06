@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0027"
 title: "Add Claude and Codex startup adapters and prelaunch fallback"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0025"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "host-integration", "stage": "A — first usable milestone", "provisional_id": false}
