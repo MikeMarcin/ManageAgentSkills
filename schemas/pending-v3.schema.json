@@ -44,7 +44,15 @@
         "user.register",
         "user.unregister",
         "self.install",
-        "self.update"
+        "self.update",
+        "project.set-agents",
+        "user.set-agents",
+        "project.set-targets",
+        "user.set-targets",
+        "selection-policy.set",
+        "selection-policy.clear",
+        "compatibility.override",
+        "compatibility.clear"
       ]
     },
     "base_generation": {
@@ -273,7 +281,8 @@
               "project_lock",
               "user_declaration",
               "user_lock",
-              "machine_config"
+              "machine_config",
+              "selection_policy"
             ]
           },
           "before": {
@@ -381,6 +390,31 @@
             "string",
             "null"
           ]
+        },
+        "selection_policy_text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1048576
+        },
+        "home_identity": {
+          "type": "object",
+          "required": [
+            "device",
+            "inode"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "device": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "inode": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     },
@@ -516,6 +550,38 @@
           "payload_digest": {
             "type": "string"
           }
+        }
+      }
+    },
+    "selection_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_before",
+        "policy_after",
+        "apply"
+      ],
+      "properties": {
+        "policy_before": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1048576
+        },
+        "policy_after": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1048576
+        },
+        "apply": {
+          "type": "boolean"
+        },
+        "coordinate": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
         }
       }
     }

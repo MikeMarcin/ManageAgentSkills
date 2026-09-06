@@ -107,7 +107,10 @@ mask.main(sys.argv[3:])
         altered=copy.deepcopy(self.declaration);altered['skills'][0]['when']={'platforms':['windows']}
         (self.project/'.mask.json').write_text(json.dumps(altered))
         (self.project/'.mask.lock.json').write_text(c.text_json(dict(self.lock,selection_digest=r.selection_digest(altered))))
-        self.assertEqual(self.call('ensure',code=4)['error']['code'],'targeting.unsupported')
+        result = self.call('ensure')
+        import mask_selection as selection
+        expected = 'deployed' if selection.device()['platform'] == 'windows' else 'not_applicable'
+        self.assertEqual(result['data']['outcomes'][0]['status'], expected)
 
     def test_preparation_outside_writer_and_generation_cas(self):
         self.register()

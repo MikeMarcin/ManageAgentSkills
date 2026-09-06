@@ -307,7 +307,7 @@ record, and returns exact changed paths. It never commits, pushes, or edits the
 Git index. Existing content—including an empty directory appearing concurrently—
 refuses publication. Destination parents must already exist; an existing source
 index must already map the selected ID. Package selection remains separate from
-deployment. Multi-source consumer selections are still being implemented.
+deployment. V2 consumer selections pin approved sources independently.
 
 Provenance reports distinguish authoring observations, frozen tap objects,
 recorded assertions, missing history, and independently rechecked upstream Git
@@ -389,7 +389,7 @@ copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
 new v2 consumers can deploy isolated artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting, profiles, bundles, fleet
+remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Contribution conflicts, profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.
 
@@ -428,3 +428,50 @@ when those effects are intended. Publication preserves the authoring HEAD/index
 and reports its separate commit/ref. See the
 [CLI contract](docs/architecture/cli-contract.md#explicit-migration-selected-updates-and-authoring-exceptions)
 for recovery, authority and platform limits.
+
+
+### Per-skill agents and local compatibility
+
+Registered v2 consumers can choose agents independently:
+
+```sh
+mask project set-agents vendor/alpha codex --apply --json
+mask user set-agents vendor/alpha claude --apply --json
+mask project set-agents vendor/alpha --inherit --apply --json
+mask project set-targets --inherit --apply --json
+```
+
+`--all` on `set-agents` selects supported, locally enabled agents. `--inherit`
+removes the binding choice; `set-targets --inherit` restores the v2 `all` default.
+Run `project register` or `user register` first; registration without `--apply`
+is supported. Without `--apply`, setters update declaration, coherent lock and
+cached desired selection while retaining current owned links. Preview with
+`--dry-run` and apply its `--expect-plan-hash` to guard the exact intent.
+
+Bindings whose `when.platforms` or `when.architectures` do not match are reported
+`not_applicable`, retain their lock rows, and need no artifact preparation.
+Missing compatibility metadata means unspecified. Generic and specific metadata
+are publisher assertions, never evidence that a skill was tested. Explicit
+incompatible requests block; implicit `all` can exclude incompatible agents.
+Requirements are informational and never execute or install tools.
+
+Local policy defaults to both Claude and Codex without detecting executables:
+
+```sh
+mask selection-policy set --agent codex --dry-run --json
+mask selection-policy clear --json
+mask compatibility override vendor/alpha --project /path/to/project \
+  --agent claude --reason "Reviewed for this project" --dry-run --json
+mask compatibility clear vendor/alpha --project /path/to/project --json
+```
+
+Global enabled-agent changes reconcile every registered consumer; explicit
+requests for disabled agents block the change, including legacy resolved targets.
+Overrides affect one physical project or registered `--user` scope and one
+coordinate. `--platform` and `--architecture` name the current device dimension.
+Every override needs a reason and produces a warning; it cannot enable an
+unsupported/disabled adapter or grant source trust. Local policy is bounded to
+1 MiB and is never imported from a package. Policy, declaration and lock effects
+use the existing recoverable journal. Dev-link evaluation reads validated live
+metadata and remains unpinned. Profile/contribution conflict semantics remain
+separate work; duplicate invocation destinations currently refuse safely.

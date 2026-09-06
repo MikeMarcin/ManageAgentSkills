@@ -55,51 +55,100 @@ def target(link, config, home):
 
 
 def simple_targets(declaration):
+    """Display the requested supported agent union; compatibility is evaluated separately."""
     declaration = r.selection(declaration)
-    if any('when' in binding or 'agents' in binding for binding in declaration['skills']):
-        c.fail('targeting.unsupported', 'Per-binding agents/conditions require the targeting implementation.', 4)
-    names = [binding['id'] for binding in declaration['skills']]
-    if len(set(names)) != len(names):
-        c.fail('target.collision', 'Selected sources have the same host invocation name.', 4)
-    return sorted(c.ADAPTERS) if declaration['default_agents'] == 'all' else declaration['default_agents']
+    requested = set()
+    for binding in declaration['skills']:
+        agents = binding.get('agents', declaration['default_agents'])
+        requested.update(c.ADAPTERS if agents == 'all' else agents)
+    return sorted(requested)
 
 
-def metadata_supported(home, row, payload=None):
+def metadata_supported(home, row, payload=None, *, config=None, verified=None):
+    """Read verified passive metadata; absence and publisher assertions remain distinct."""
     import mask_store as store
     from mask_provenance import regular_bytes
-    if row['metadata_digest'] == c.digest(b'null'):
-        return
+    if verified is not None:
+        verified[r.coordinate(row)] = False
     if payload is not None:
         store.checked_payload(payload, row)
-        raw = next(item.data for item in payload.files if item.path == 'mask-skill.json')
+        if c.kind(store.location(home, row['payload_digest'], row['id'])[0]) != 'missing':
+            store.verify(home, row)
+            if verified is not None:
+                verified[r.coordinate(row)] = True
+        raw = next((item.data for item in payload.files if item.path == 'mask-skill.json'), None)
     else:
-        path = store.verify(home, row)
-        raw = regular_bytes(path / 'mask-skill.json', r.METADATA_BYTES)
+        artifact, target = store.location(home, row['payload_digest'], row['id'])
+        if c.kind(artifact) != 'missing':
+            store.verify(home, row)
+            if verified is not None:
+                verified[r.coordinate(row)] = True
+            raw = regular_bytes(target / 'mask-skill.json', r.METADATA_BYTES) if c.kind(target / 'mask-skill.json') != 'missing' else None
+        elif row['metadata_digest'] == c.digest(b'null'):
+            raw = None
+        elif config is not None:
+            import mask_sources as sources
+            entry = sources.selected(config, row['source'])
+            payload = r.verify_resolution(home, row['source'], entry, row)
+            raw = next((item.data for item in payload.files if item.path == 'mask-skill.json'), None)
+        else:
+            c.fail('metadata.unavailable', 'Applicable metadata requires a verified artifact or exact cached payload.', 4)
     value = r.metadata(raw)
-    if any(value.get(field) not in (None, 'generic') for field in ('agents', 'platforms', 'architectures')) or value.get('requirements'):
-        c.fail('targeting.unsupported', 'Restrictive package compatibility requires the targeting implementation.', 4)
+    if c.digest(r.canonical(value, 'metadata')) != row['metadata_digest']:
+        c.fail('lock.digest_mismatch', 'Verified metadata differs from its locked digest.', 4)
+    return value
 
 
-def expected_links(home, declaration, resolved, config, payload_views=None):
+def effective_selection(home, declaration, resolved, config, *, root, scope, payload_views=None, policy_value=None, devs=None):
+    import mask_selection as selection
+    policy_value = selection.read_policy(home)[0] if policy_value is None else selection.policy(policy_value)
+    facts = selection.device()
+    applicable = set(selection.applicable_coordinates(declaration, facts))
+    metadata, verified = {}, {}
+    for row in resolved['packages']:
+        key = r.coordinate(row)
+        if key not in applicable:
+            continue
+        if (devs or {}).get(key) is not None:
+            observation, payload = observe_dev(devs[key], config, with_payload=True)
+            raw = next((item.data for item in payload.files if item.path == 'mask-skill.json'), None)
+            metadata[key] = r.metadata(raw)
+            verified[key] = True
+        else:
+            metadata[key] = metadata_supported(home, row, (payload_views or {}).get(row['payload_digest']), config=config, verified=verified)
+    evaluated = selection.evaluate([dict(origin='local', declaration=declaration, lock=resolved)], metadata,
+                              facts=facts, enabled_agents=policy_value['enabled_agents'], scope=scope,
+                              root=str(root), identity=c.identity(root), overrides=policy_value['overrides'])
+    for outcome in evaluated['outcomes']:
+        outcome['target_verified'] = verified.get(outcome['coordinate'], False)
+    return evaluated
+
+
+def expected_links(home, declaration, resolved, config, payload_views=None, *, root=None, scope='project', policy_value=None, devs=None, outcomes=None):
     import mask_store as store
     import mask_fs as fs
-    agents = simple_targets(declaration)
     r.approved(declaration, config)
+    evaluated = effective_selection(home, declaration, resolved, config, root=root or home, scope=scope,
+                                    payload_views=payload_views, policy_value=policy_value, devs=devs)
+    if outcomes is not None:
+        outcomes.extend(evaluated['outcomes'])
+    if evaluated['blocked']:
+        c.fail('compatibility.unsupported', 'Explicit agent or device compatibility is unsupported; use conditional intent or a reasoned local override.', 4, outcomes=evaluated['outcomes'])
     expected = {}
-    for row in resolved['packages']:
-        root, _ = store.location(home, row['payload_digest'], row['id'])
-        if c.kind(root) != 'missing':
-            store.verify(home, row)
-        metadata_supported(home, row, (payload_views or {}).get(row['payload_digest']))
-        for agent in agents:
-            relative = c.ADAPTERS[agent] + '/' + row['id']
-            expected[relative] = dict(skill=row['id'], target=agent, resolution=row,
-                                     link_text=fs.creation_link_text(store.location(home, row['payload_digest'], row['id'])[1]))
+    for deployment in evaluated['deployable']:
+        row, agent = deployment['resolution'], deployment['agent']
+        relative = c.ADAPTERS[agent] + '/' + row['id']
+        if relative in expected and expected[relative]['resolution'] != row:
+            c.fail('target.collision', 'Different coordinates share one agent invocation path.', 4, path=relative)
+        expected[relative] = dict(skill=row['id'], target=agent, resolution=row,
+                                 link_text=fs.creation_link_text(store.location(home, row['payload_digest'], row['id'])[1]))
     return expected
 
 
 def file_path(entry, home):
     role, root = entry['role'], Path(entry['root'])
+    if role == 'selection_policy' and root == home:
+        return home / 'selection-policy.json'
     if role == 'machine_config' and root == home:
         return home / 'config.json'
     if role == 'project_declaration':
@@ -134,6 +183,11 @@ def validate_files(pending, home):
     seen = set()
     for entry in pending.get('files', []):
         c.fields(entry, ('root', 'role', 'before', 'after'), family='recovery')
+        if entry['role'] == 'selection_policy':
+            change = pending.get('selection_change', {})
+            if entry != dict(root=str(home), role='selection_policy', before=change.get('policy_before'), after=change.get('policy_after')):
+                c.fail('recovery.conflict', 'Selection policy role differs from its explicit transition.', 8)
+            continue
         if entry['role'] == 'machine_config':
             migration = pending.get('migration', {})
             if entry != dict(root=str(home), role='machine_config', before=migration.get('config_before'), after=migration.get('config_after')):
@@ -201,6 +255,16 @@ def observe(roots, state, home, *, user_root=None):
 def check_observations(pending, home):
     import mask_ensure as readiness
     observations = pending['pinned']['workspaces']
+    if 'home_identity' in pending['pinned'] and c.identity(home) != pending['pinned']['home_identity']:
+        c.fail('recovery.conflict', 'Pinned machine home identity changed.', 8)
+    policy_before = pending['pinned'].get('selection_policy_text')
+    import mask_selection as selection
+    try:
+        current_policy = selection.read_policy(home)[1]
+    except c.MaskError as error:
+        c.fail('recovery.conflict', 'Local selection policy is no longer readable.', 8, cause=error.as_dict())
+    if current_policy not in (policy_before, pending.get('selection_change', {}).get('policy_after', policy_before)):
+        c.fail('recovery.conflict', 'Local selection policy changed.', 8)
     if c.read_text(home / 'config.json', missing=True) not in (pending['pinned']['config_text'], pending.get('migration', {}).get('config_after', pending['pinned']['config_text'])) or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
         c.fail('recovery.conflict', 'Pinned configuration or authority changed.', 8)
     for expected in observations:
@@ -209,7 +273,7 @@ def check_observations(pending, home):
             c.fail('recovery.conflict', 'Pinned consumer root changed.', 8)
         actual = readiness.workspace_observation(root, scope=expected.get('scope', 'project'), home=home)
         for entry in pending.get('files', []):
-            if entry['root'] == str(root) and entry['role'] != 'machine_config':
+            if entry['root'] == str(root) and entry['role'] not in ('machine_config', 'selection_policy'):
                 field = 'lock' if entry['role'].endswith('_lock') else 'manifest'
                 if actual.get(field) not in (entry['before'], entry['after']):
                     c.fail('recovery.conflict', 'Typed consumer control changed.', 8)
@@ -224,12 +288,15 @@ def check_observations(pending, home):
 def validate_observations(pending, home):
     import mask_ensure as readiness
     value = pending['pinned']
-    c.fields(value, ('workspaces', 'config_text', 'policy_text'), family='recovery')
+    c.fields(value, ('workspaces', 'config_text', 'policy_text'), ('selection_policy_text', 'home_identity'), family='recovery')
     if not isinstance(value['workspaces'], list) or sorted(item.get('root', '') for item in value['workspaces'] if isinstance(item, dict)) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Pinned observations must cover selected consumers exactly.', 8)
     expected_config = pending.get('migration', {}).get('config_before', c.text_json(pending['config']))
     if not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text'])) != c.config(c.parse_json(expected_config)):
         c.fail('recovery.conflict', 'Pinned config observation differs from intent.', 8)
+    if value.get('selection_policy_text') is not None:
+        import mask_selection as selection
+        selection.policy(c.parse_json(value['selection_policy_text'], 'selection_policy'))
     if value['policy_text'] is not None:
         readiness.validate_policy(c.parse_json(value['policy_text'], 'integration'))
     for item in value['workspaces']:
@@ -283,7 +350,10 @@ def selected_consumers(args, state, home):
 
 def snapshot(home, consumers):
     import mask_ensure as readiness
-    return dict(home_identity=c.identity(home), controls={name:c.read_text(home / name, missing=True) for name in ('config.json','state.json','pending.json','integration.json')},
+    import mask_selection as selection
+    controls = {name: c.read_text(home / name, missing=True) for name in ('config.json', 'state.json', 'pending.json', 'integration.json')}
+    controls['selection-policy.json'] = selection.read_policy(home)[1]
+    return dict(home_identity=c.identity(home), controls=controls,
                 workspaces=[readiness.workspace_observation(root, scope=scope, home=home) for root, scope in consumers])
 
 
@@ -324,12 +394,17 @@ def prepare_dispatch(args, output, home):
         declaration, resolved = r.read_exact_lock(root, scope, home, config, verify=False)
         simple_targets(declaration)
         allowed = policy['approvals'].get(str(root), {}).get('allow_locked_fetch', []) if command == 'ensure' and scope == 'project' and not getattr(args, 'offline', False) else []
+        import mask_selection as selection
+        applicable = set(selection.applicable_coordinates(declaration))
         for row in resolved['packages']:
+            if r.coordinate(row) not in applicable:
+                continue
             item = dict(root=str(root), scope=scope, skill=r.coordinate(row), effects={})
             effects.append(item)
             store.ensure(home, declaration, resolved, config, offline=row['source'] not in allowed, coordinates=[r.coordinate(row)], effects=item['effects'])
-        for row in resolved['packages']:
-            metadata_supported(home, row)
+        evaluated = effective_selection(home, declaration, resolved, config, root=root, scope=scope)
+        if evaluated['blocked']:
+            c.fail('compatibility.unsupported', 'Applicable compatibility blocks activation.', 4, outcomes=evaluated['outcomes'])
     return dict(before=before, consumers=consumers, effects=effects)
 
 
@@ -562,7 +637,9 @@ def transition_dispatch(args, output, home):
         for root, scope in consumers:
             observation = dict(root=str(root), effects={})
             effects.append(observation)
-            store.ensure(home, c.selection_manifest(c.read_json(c.declaration_path(root, scope, home))), locks[str(root)], config, offline=True, effects=observation['effects'])
+            import mask_selection as selection
+            declaration = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home)))
+            store.ensure(home, declaration, locks[str(root)], config, offline=True, coordinates=selection.applicable_coordinates(declaration), effects=observation['effects'])
     with c.writer_lock(home):
         if snapshot(home, observed_consumers) != before or migration and authoring_snapshot(config) != source:
             c.fail('plan.stale', 'Source, consumer controls, generation or identity changed during preparation.', 4)
@@ -599,7 +676,7 @@ def validate_dev(value, config=None):
     return value
 
 
-def observe_dev(value, config):
+def observe_dev(value, config, *, with_payload=False):
     import mask_provenance as provenance
     import mask_packages as packages
     validate_dev(value, config)
@@ -609,7 +686,8 @@ def observe_dev(value, config):
     # Preserve tracked logical executable modes on Windows; new files default regular.
     modes = {item.path: item.mode for item in packages.validate(root, observed['head'], value['path'], value['id']).files}
     payload = provenance.working_payload(target, value['id'], commit=observed['head'], path=value['path'], modes=modes)
-    return dict(binding=value, observation=observed, payload_digest=payload.digest)
+    result = dict(binding=value, observation=observed, payload_digest=payload.digest)
+    return (result, payload) if with_payload else result
 
 
 def development_observations(before, after, selected, config):

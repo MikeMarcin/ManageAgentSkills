@@ -57,6 +57,11 @@ COMMANDS = {
     'project.set': (True, False, [('project', 'value'), ('skill', 'repeat'), ('clear', 'flag'), ('apply', 'flag')]),
     'project.require': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
     'project.unrequire': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
+    'project.set-agents': (True, False, [('project', 'value'), ('id', 'pos'), ('agents', 'some'), ('all', 'flag'), ('inherit', 'flag'), ('apply', 'flag')]),
+    'selection-policy.set': (True, False, [('agent', 'repeat')]),
+    'selection-policy.clear': (True, False, []),
+    'compatibility.override': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('reason', 'required'), ('agent', 'repeat'), ('platform', 'flag'), ('architecture', 'flag')]),
+    'compatibility.clear': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag')]),
     'project.set-targets': (True, False, [('project', 'value'), ('targets', 'some'), ('inherit', 'flag'), ('apply', 'flag')]),
     'project.register': (True, False, [('project', 'value'), ('path', 'optional'), ('apply', 'flag')]),
     'project.unregister': (True, False, [('project', 'value'), ('path', 'optional'), ('keep-links', 'flag')]),
@@ -91,7 +96,7 @@ COMMANDS = {
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.update': (True, True, []),
 }
-for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'register', 'unregister'):
+for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'set-agents', 'register', 'unregister'):
     mutates, network, arguments = COMMANDS['project.' + action]
     user_arguments = [(name, shape) for name, shape in arguments if name not in ('project', 'path')]
     if action == 'register':
@@ -103,6 +108,7 @@ GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
 GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
 GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'migrate', 'source.dev-link', 'source.publish'})
+GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -168,7 +174,7 @@ def capabilities(leaves):
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                pinned_deployment=True, per_binding_targeting=False, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+                pinned_deployment=True, per_binding_targeting=True, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
 CONFLICTS = {
@@ -188,6 +194,10 @@ for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['source.dev-link'] = {'project': ['user'], 'user': ['project'], 'authoring_root': ['to_pinned'], 'to_pinned': ['authoring_root']}
+CONFLICTS['project.set-agents'] = {key: [other for other in ('agents', 'all', 'inherit') if other != key] for key in ('agents', 'all', 'inherit')}
+CONFLICTS['user.set-agents'] = CONFLICTS['project.set-agents']
+for command in ('compatibility.override', 'compatibility.clear'):
+    CONFLICTS[command] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['lock'] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['source.fetch'] = {'name': ['locked'], 'locked': ['name'], 'project': ['user'], 'user': ['project']}
 
@@ -197,10 +207,14 @@ def validate_arguments(args):
     for key, conflicts in CONFLICTS.get(command, {}).items():
         if getattr(args, key, None) and any(getattr(args, other, None) for other in conflicts):
             raise MaskError('invocation.invalid', f'{key} conflicts with {", ".join(conflicts)}', 2)
-    required_sets = {'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
+    required_sets = {'project.set-agents': ('agents', 'all', 'inherit'), 'user.set-agents': ('agents', 'all', 'inherit'),
+                     'selection-policy.set': ('agent',), 'compatibility.override': ('project', 'user'), 'compatibility.clear': ('project', 'user'),
+                     'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
                      'user.set': ('skill', 'clear'), 'user.set-targets': ('targets', 'inherit'), 'link.adopt': ('project', 'user'),
                      'config.set': ('target', 'git_timeout'), 'skill.validate': ('id', 'all'),
                      'recover': ('inspect', 'complete', 'rollback')}
+    if command == 'compatibility.override' and not any(getattr(args, key, None) for key in ('agent', 'platform', 'architecture')):
+        raise MaskError('invocation.invalid', 'An explicit compatibility dimension is required.', 2)
     if command in required_sets and not any(getattr(args, key, None) for key in required_sets[command]):
         raise MaskError('invocation.invalid', 'An explicit operand or mode is required.', 2)
 
@@ -351,7 +365,7 @@ def project_dispatch(args, output, home):
                           configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
     if declaration['schema_version'] == 2:
         import mask_pinned
-        output['data'].update(mode=(record or {}).get('mode', 'pinned'), reproducible=(record or {}).get('mode') != 'dev-link', fleet_eligible=(record or {}).get('mode') != 'dev-link', effective_targets=mask_pinned.simple_targets(declaration))
+        output['data'].update(mode=(record or {}).get('mode', 'pinned'), reproducible=(record or {}).get('mode') != 'dev-link', fleet_eligible=(record or {}).get('mode') != 'dev-link', requested_targets=mask_pinned.simple_targets(declaration), effective_targets=None)
     if command == 'project.show':
         output['data']['source'] = config['source'] if config else None
         output['data']['ownership'] = record['links'] if record else {}
@@ -362,6 +376,9 @@ def project_dispatch(args, output, home):
             observations = inspection['users'] if scope == 'user' else inspection['projects']
             output['data']['actual_links'] = observations[0]['leaves'] if observations else []
             output['data']['blockers'] = inspection['blockers']
+            output['data']['outcomes'] = inspection['outcomes']
+            if declaration['schema_version'] == 2:
+                output['data']['effective_targets'] = sorted({row['agent'] for row in inspection['outcomes'] if row['status'] in ('selected', 'deployed', 'overridden')})
         output['data']['host_load'] = 'not_verified'
         return
     if config is None:
@@ -578,6 +595,9 @@ def dispatch_impl(args, output, leaves):
             core.fail('recovery.required', 'Recover pending consumer effects before exact preparation.', 8)
         return local_dispatch(args, output, leaves)
     import mask_pinned
+    import mask_selection
+    if mask_selection.dispatch(args, output, home):
+        return
     if args.command in ('migrate', 'update') and mask_pinned.transition_dispatch(args, output, home):
         return
     if args.command == 'source.dev-link':
@@ -596,9 +616,9 @@ def dispatch_impl(args, output, leaves):
                     output['data']['network'] = 'locked_fetch' if any(item['effects'].get('network_attempted') for item in preparation['effects']) else 'none'
     else:
         observed = args.command not in ('capabilities',)
-        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json')] if observed else []
+        before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json', 'selection-policy.json')] if observed else []
         local_dispatch(args, output, leaves)
-        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json')] if observed else []
+        after = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json', 'selection-policy.json')] if observed else []
         if before != after:
             core.fail('state.drift', 'Machine state changed during inspection; retry the observational command.', 4)
     if output['dry_run'] and output['would_change']:

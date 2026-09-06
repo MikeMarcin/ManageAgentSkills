@@ -450,9 +450,8 @@ closed. `project.schema.json` remains the historical v1 contract, including its
 references from state v1/v2; the user declaration schema accepts either version.
 `core.manifest` retains strict v1 persisted-state semantics. The separate
 `selection_manifest` reader dispatches declaration versions. V2 consumer commands report `lock.missing` or `lock.stale` when required. New
-v2 project/user consumers support pinned registration/apply/ensure. Per-binding
-targeting and explicit conversion of existing legacy consumers remain separate
-implementation steps.
+v2 project/user consumers support pinned registration/apply/ensure, explicit legacy
+conversion, per-binding targets and local compatibility policy.
 
 Canonical bytes are sorted-key compact UTF-8 JSON without ASCII escaping or a
 trailing newline. Duplicate keys, floats, nonfinite numbers, unsafe/negative
@@ -462,7 +461,7 @@ maps have at most 256 entries and declarations/locks at most 4096 bindings and
 Missing `default_agents` becomes `all`; missing binding `agents` remains omitted to preserve inheritance intent; missing source `packages` becomes `skills`. An omitted ref uses the
 approved machine selector only at initial resolution/explicit refresh, normalized
 to a cached fully qualified branch/tag or full commit. Portable explicit refs
-must start with `refs/heads/` or `refs/tags/`. No target applicability is evaluated.
+must start with `refs/heads/` or `refs/tags/`. Lock resolution itself does not evaluate target applicability.
 
 Locks retain exact path, full SHA-1/SHA-256 commit, object format, selector and
 raw Git payload digest, including logical executable modes and every regular
@@ -523,9 +522,10 @@ effects are preparation observations, not part of the consumer's exact intent.
 
 New v2 consumers use `project register [--apply]` or `user register [--apply]`,
 then ordinary `plan`, `apply`, `ensure`, `doctor`, adoption and unregister.
-Whole-selection `default_agents: "all"` or a supported agent list is operational.
-Explicit per-binding `agents`, `when`, duplicate invocation names and restrictive
-package metadata fail with a typed error until per-binding targeting ships.
+Whole-selection `default_agents`, per-binding `agents` and `when` are operational.
+The evaluator reports implicit metadata exclusions and blocks explicit incompatible
+intent. Duplicate invocation destinations currently fail closed; contribution
+union/conflict semantics remain a separate slice.
 An already registered legacy consumer requires explicit migration. Ordinary
 `mask lock` refuses a changed active pinned lock with `lock.active`; lock changes
 must go through the journaled update seam, not a separate file write.
@@ -629,3 +629,47 @@ object construction report potentially retained objects even without a commit.
 An attempted push with a lost/failed acknowledgement reports an unknown outcome
 and retains the created commit/ref for inspection. Source
 publication never updates consumer locks. File-URI fixtures remain machine-local.
+
+
+### Targeting and machine-local compatibility policy
+
+`project set-agents SOURCE/ID AGENT ...|--all|--inherit [--apply]` and its
+`user` counterpart require an explicitly registered v2 consumer. Existing v1
+`set-targets` behavior remains; on v2, `set-targets AGENT ...|--inherit` changes
+`default_agents`. Without apply, exact package rows and actual owned links remain
+while selection/lock digests and cached desired controls change together. With
+apply, prospective links and controls share one collision-preflighted journal.
+All setters support dry-run and expected plan hashes.
+
+`selection-policy set --agent AGENT ...` changes enabled supported adapters for
+all registered scopes. `selection-policy clear` restores the supported default
+while preserving overrides. `compatibility override SOURCE/ID --project PATH|--user
+--reason TEXT [--agent AGENT ...] [--platform] [--architecture]` records one
+reasoned local override; at least one dimension is required. `compatibility clear`
+removes only that scope/coordinate row. These policy commands reconcile affected
+scopes, use exact typed `selection_policy` before/after bytes and machine/root
+identities, and expose every affected scope in the preview. Other override rows
+remain exact. Overrides never grant adapter/source authority.
+
+`MASK_HOME/selection-policy.json` is a closed, non-portable v1 object bounded to
+1 MiB, with `enabled_agents` and up to 4096 `overrides`. Absent policy means both
+supported adapters enabled. Each override binds canonical root, device/inode,
+coordinate, reason and explicit compatibility dimensions. It cannot come from
+remote metadata. Explicit disabled-agent intent blocks; implicit all ignores
+disabled adapters. Legacy explicit/resolved targets retain their meaning.
+
+Planner `data.outcomes` rows carry scope, coordinate, agent, origin, status,
+compatibility assertion and `tested: false`. Status is selected, deployed,
+not_applicable, excluded_by_metadata, blocked or overridden. Only observed owned
+links with verified usable targets become deployed; missing artifacts remain
+selected in observational plans, and corrupt retained artifacts block; an override retains its warning/status and may additionally
+report `deployed: true`. Metadata requirements are plain informational strings.
+False when conditions skip metadata and artifact acquisition while keeping all
+locked bindings. Absent metadata is unspecified; generic/specific assertions
+remain distinct. Applicable device incompatibility and explicit incompatible
+agent requests block unless covered by local reasoned authority.
+
+`mask_selection.evaluate` is a pure attributed-contribution input seam, currently
+fed only the local declaration. Filesystem effects remain in the ordinary
+planner. Full contribution union/conflict/shadowing is MASK-0039; public profiles
+are RFC10. No native targeting acceptance is claimed by this implementation.

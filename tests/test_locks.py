@@ -181,9 +181,10 @@ class LockTests(Fixture):
         self.write_selection()
         self.assertEqual(self.call('ensure', code=4)['error']['code'], 'lock.stale')
         self.locked()
-        for args in [('ensure',), ('project', 'show')]:
-            self.assertEqual(self.call(*args, code=4)['error']['code'], 'targeting.unsupported')
-        self.assertEqual(self.call('apply', code=4)['error']['code'], 'project.not_registered')
+        shown = self.call('project', 'show')
+        self.assertTrue(shown['data']['outcomes'])
+        self.call('ensure', '--offline')
+        self.assertFalse(self.call('apply')['changed'])
         self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'selection.command_unsupported')
         self.declare(['alpha'])
         self.call('project', 'require', 'beta')
