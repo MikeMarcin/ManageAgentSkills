@@ -4,7 +4,7 @@ id: "MASK-0067"
 title: "Verify and close RFC-MASK-0006"
 status: "Backlog"
 rfcs: ["RFC-MASK-0006"]
-depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029"]
+depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029", "MASK-0081"]
 closeout_for: ["RFC-MASK-0006"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-6", "stage": "A — first usable milestone", "provisional_id": false, "closeout": true}
 ---
@@ -83,3 +83,5 @@ Native versions observed: Claude Code 2.1.260; codex-cli 0.153.2. No host trust 
 ## Native macOS boundary
 
 Revision `98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a`: installed launcher, native links and both host prelaunch version invocations passed; full boundary and limitations are in [readiness acceptance](../../development/readiness-acceptance.md). Required native Windows acceptance remains open. No terminal RFC claim.
+
+Integration discovery: required MASK-0081 completes repository-boundary approval and user-level startup for future clones. These were missing from the first explicit-root slices; their bounded tests do not prove this broader workflow.
