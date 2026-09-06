@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0030"
 title: "Implement approved source identities and multi-source catalog"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0067"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "sources", "stage": "B — source foundation", "provisional_id": false}
@@ -34,3 +34,17 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded implementation plan
+
+Owner request prioritizes RFCs 0012/0013 with their dependency closure. This
+source-catalog slice preserves the v1 local engine and adds explicit guarded
+machine-v2 migration, credential-free repository identities, catalog-only tap
+registration/removal and noninteractive managed bare-cache fetch. Package
+discovery/import follows on MASK-0031/0032/0033; no deployment is implied by a tap.
+
+Owned-path extension for the public path: `mask.py` registrar/dispatch,
+`mask_install.py` runtime inventory, machine schema union and corresponding
+launcher fixtures/current CLI contract documentation. Existing state and
+declaration bytes remain unchanged during config migration. Use temporary
+local bare repositories for direct CLI acceptance.

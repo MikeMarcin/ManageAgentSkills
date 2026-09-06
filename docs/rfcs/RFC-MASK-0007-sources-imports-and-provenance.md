@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0007"
 title: "Multiple sources, taps, curated imports and upstream provenance"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---

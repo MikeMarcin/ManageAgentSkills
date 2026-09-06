@@ -55,3 +55,11 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0007-AC06 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Resumed dependency scope
+
+On September 5, 2026, the owner requested RFCs 0012/0013 next and their required
+prerequisites. RFC-0006 is complete. The dependency path begins at MASK-0030,
+then source discovery/import/guards, pinning and targeting before enrollment;
+profiles and impact reporting are required before rollout composition. The
+original RFC_BASE_SHA and planned card IDs above remain unchanged.

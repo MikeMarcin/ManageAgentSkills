@@ -22,7 +22,7 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC | Status | Title |
 |---|---|---|
 | RFC-MASK-0006 | Auto-Verified | Automatic workspace readiness for clone, worktree, branch and agent startup |
-| RFC-MASK-0007 | Accepted | Multiple sources, taps, curated imports and upstream provenance |
+| RFC-MASK-0007 | Implementing | Multiple sources, taps, curated imports and upstream provenance |
 | RFC-MASK-0008 | Accepted | True version pinning, immutable deployment artifacts and recoverable migration |
 | RFC-MASK-0009 | Accepted | Per-skill scope-specific agent targeting and advertised compatibility |
 | RFC-MASK-0010 | Accepted | Portable personal selections, reusable bundles and profile composition |
