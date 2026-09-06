@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0034"
 title: "Implement portable v2 selections and exact resolution locks"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0068"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "lock-model", "stage": "B — reproducible content", "provisional_id": false}
+acceptance: [{"criterion":"MASK-0034 bounded closed selection and exact cached lock model","outcome":"pass","revision":"c5a359fa6cf6794d3c56b001f208d99bd12a729f","evidence":{"kind":"observation","detail":"Public CLI/model/launcher run and focused corrections recorded in Run record; exact identity, offline refresh and publication preconditions verified. Artifact deployment and native milestone remain open."}}]
 ---
 
 # MASK-0034: Implement portable v2 selections and exact resolution locks
@@ -32,7 +33,11 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Implemented lock-model slice at `c5a359fa6cf6794d3c56b001f208d99bd12a729f`. Closed normalized v2 declarations and exact lock-v1 resolution now have a public cache-only `mask lock` command with preview/hash guard. Retained resolutions verify frozen source/index/path/full object format/raw payload and metadata/provenance identities. Semantic inheritance is preserved; moved tags and unproven branch rewrites require explicit rebind. Missing/stale locks and unsupported deployment are typed. Physical root/home and exact control-byte publication checks preserve concurrent replacements.
+
+Verification: `python3 -B -m unittest tests.test_locks tests.test_cli_protocol tests.test_launcher` ran 16 methods in 33.329s: 13 passed, three failures subsequently corrected (two fixture assumptions, one validation ordering issue). The four affected methods `test_canonical_sets_defaults_and_complete_intent`, `test_moved_annotated_tag_and_branch_rewrite_require_rebind`, `test_public_offline_preview_raw_modes_digests_and_user_scope`, and `test_tampered_identity_path_format_digests_and_metadata_refuse` passed in 15.960s. Added output-size/root-replacement test passed; the accompanying unavailable-object test exposed a diagnostic ordering error. After correction, `test_frozen_index_missing_object_and_legacy_state_isolation` and `test_tampered_identity_path_format_digests_and_metadata_refuse` passed in 6.605s. No skips. `git diff --check` passed. Reused unchanged passing checks; no synthetic all-suite result is asserted.
+
+Native Windows lock coverage remains for the coherent pinned-deployment milestone. This card supplies bounded model/resolution evidence toward AC01–03; simultaneous deployment, artifact restore/hydration, and recovery remain MASK-0035–0037. No full RFC acceptance or operational targeting is asserted. Worker temporary fixtures were cleaned; user `.DS_Store` preserved.
 
 ## Bounded implementation plan
 
