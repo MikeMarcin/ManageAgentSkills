@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0067"
 title: "Verify and close RFC-MASK-0006"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0024", "MASK-0025", "MASK-0026", "MASK-0027", "MASK-0028", "MASK-0029", "MASK-0081", "MASK-0082"]
 closeout_for: ["RFC-MASK-0006"]
