@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0030"
 title: "Implement approved source identities and multi-source catalog"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0067"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "sources", "stage": "B — source foundation", "provisional_id": false}
+acceptance: [{"criterion":"MASK-0030/catalog","outcome":"pass","revision":"e4bd35cd10551b1afba40a13dca3c6d19c5d4f7d","evidence":{"kind":"observation","detail":"Two independent bare sources, guarded catalog-only add/remove, alias conflicts and fetch effects passed via tests.test_sources; package discovery is explicitly deferred to MASK-0031."}},{"criterion":"MASK-0030/authority","outcome":"pass","revision":"e4bd35cd10551b1afba40a13dca3c6d19c5d4f7d","evidence":{"kind":"observation","detail":"URI-bound fetch/update, cache-local rewrite refusal, local HTTPS redirect refusal, and scp versus absolute SSH refusal passed; corrected reviewer findings exercised."}},{"criterion":"MASK-0030/migration","outcome":"pass","revision":"e4bd35cd10551b1afba40a13dca3c6d19c5d4f7d","evidence":{"kind":"observation","detail":"Exact declaration/state/link preservation, noncanonical config CAS, repeated init, explicit pending recovery and migration guards passed."}},{"criterion":"MASK-0030/public-contract","outcome":"pass","revision":"e4bd35cd10551b1afba40a13dca3c6d19c5d4f7d","evidence":{"kind":"observation","detail":"Source CLI and capabilities, readable machine versions, dry-run snapshots, errors, runtime module inventory and updater compatibility passed. Current docs updated to bounded shipped behavior."}}]
 ---
 
 # MASK-0030: Implement approved source identities and multi-source catalog
@@ -33,7 +34,24 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Implemented at `e4bd35cd10551b1afba40a13dca3c6d19c5d4f7d`.
+
+This card closes only its catalog/migration slice. Exact package lookup,
+root/nested discovery and ref/path ambiguity remain on MASK-0031; imports and
+resource/package guards remain on MASK-0032/0033. The RFC acceptance rows stay
+open until those slices are integrated.
+
+- `python3 -B -m unittest tests.test_sources tests.test_git_update tests.test_launcher`: 20 passed on macOS in 28.535s, including local HTTPS redirect and SSH transport fixtures, noncanonical config migration, recovery, independent bare caches and legacy updater/launcher regression checks.
+- `python3 -B -m unittest tests.test_cli_protocol`: four unchanged tests passed within the earlier combined run. Its one then-failing source-cache rewrite check was corrected and covered by the passing focused run above.
+- Final scp tilde/option-path refusal: `python3 -B -m unittest tests.test_sources.SourcesTests.test_repository_normalization_keeps_authority_boundaries`: one passed in 0.265s.
+- `git diff --check`: passed. Native Windows acceptance is not asserted for this new slice.
+
+Closeout review runtime: independent `rfc-reviewer`, gpt-6-astra/high. Two
+reproduced authority defects were corrected: URL-scoped redirect overrides and
+scp relative versus SSH absolute repository paths. The passing tests above
+exercise both corrections; no second review was run. All tests and reviewer
+reproductions used disposable roots and cleaned them after consumption. The
+pre-existing untracked `.DS_Store` remains untouched.
 
 ## Bounded implementation plan
 
