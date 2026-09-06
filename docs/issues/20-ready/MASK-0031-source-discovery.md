@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0031"
 title: "Resolve skill URLs and bounded indexed/nested packages"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0030"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "source-discovery", "stage": "B — source foundation", "provisional_id": false}
@@ -34,3 +34,14 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded implementation plan
+
+Continue the owner-authorized dependency path to RFCs 0012/0013. Resolve approved
+source URLs and frozen cached Git objects, add root/flat/indexed nested package
+coordinates and typed name/ref/path ambiguity. Network inspection is explicit;
+read-only commands and dry-run never fetch. Extend ownership to `mask.py`
+registrar/dispatch, shipped source-index schema and current public docs.
+Package extraction/import and the full adversarial resource policy remain on
+MASK-0032/0033. Preserve old v1 CLI behavior; multi-source queries use explicit
+approved config v2 and report missing cached resolution.
