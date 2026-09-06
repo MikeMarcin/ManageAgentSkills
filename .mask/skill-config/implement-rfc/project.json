@@ -39,6 +39,10 @@
   "workstreams": {
     "main": {
       "branch": "main"
+    },
+    "win": {
+      "branch": "codex/mask-win-example-win-host",
+      "platform": "win"
     }
   },
   "role_addenda": {

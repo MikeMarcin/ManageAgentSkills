@@ -14,3 +14,4 @@ __pycache__/
 /.mask/sessions/
 /.claude/agents/rfc-*.md
 /.codex/agents/rfc-*.toml
+/.remote-station.json
