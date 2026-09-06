@@ -29,11 +29,12 @@ its approved linked worktrees. Future clones require direct or repository-bounda
 startup/prelaunch readiness. The user-level startup adapter and physical clone-boundary policy are exercised by the MASK-0081 fixtures. Configured named-hook execution remains unverified
 on a capable Git version; no Git upgrade was performed.
 
-Windows acceptance is open. The repository's remote-station registry contains
-no station and specifies local implementation. A Windows host/checkout was
-requested from the owner; no access, privileges, host trust or enrollment was
-changed. The source/pinning milestone depends on the readiness closeout and
-cannot be promoted while its required native acceptance remains open.
+Windows acceptance is open and resumed on ExampleWinHost after the owner identified the
+existing SSH connection and requested the implement-rfc station scripts. The
+native Windows station and current provisioning limits are recorded in the
+[station registry](remote-stations.md). No access, privileges or host trust were
+changed. The source/pinning milestone still depends on completed readiness
+acceptance; station provisioning alone does not satisfy it.
 
 No live project/personal skill deployment, host configuration or Git hook was
 changed. Test-created roots were cleaned by their TemporaryDirectory fixtures.

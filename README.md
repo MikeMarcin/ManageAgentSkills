@@ -300,8 +300,8 @@ The selected output file is always excluded from its own dump.
 - [Local v0.1.0 readiness and implementation provenance](docs/releases/v0.1.0.md)
 
 The September 2026 RFC pack is imported, with workspace readiness, integration,
-recovery and legacy inventory slices implemented. Required native Windows
-readiness acceptance remains blocked on an available test station. Multi-source
+recovery and legacy inventory slices implemented. Native Windows
+readiness acceptance is in progress on the ExampleWinHost verification station. Multi-source
 management, immutable content pins, profiles, bundles, fleet management and full
 update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.

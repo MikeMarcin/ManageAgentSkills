@@ -33,7 +33,16 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Native Windows testing started at `3456e3954b51fa3fefa5a5c7072d4ab7067409f3`.
+The direct SSH pass ran 36 tests: 28 passed, three skipped, three failures and two
+errors. Station results and public launcher observations are being reconciled.
+No Windows acceptance is claimed yet.
+
+Contained native failures extend this card's local integrator ownership to
+`mask_ensure.py`, `mask_install.py`, `tests/test_git_integration.py` and any directly
+necessary test fixture changes. Fixes must preserve missing-root ownership,
+exact recovery observations and schema migration refusal. The Windows station
+remains read-only; it diagnoses and verifies without source or tracker edits.
 
 ## Windows access resolved
 
