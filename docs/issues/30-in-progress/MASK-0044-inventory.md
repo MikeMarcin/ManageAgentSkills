@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0044"
 title: "Expose skill-centric where-used and actual deployment inventory"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0024"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "inventory", "stage": "C — explainability", "provisional_id": false}
