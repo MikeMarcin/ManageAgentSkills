@@ -250,7 +250,7 @@ readiness first, releases the writer lock, then invokes the selected executable
 from PATH with an argv array. Capabilities mark launch as network-capable because the invoked host may use its own network services; ensure remains local-only. Dry-run never launches. Ordinary mode inherits host
 I/O; `--json` before `--` captures host stdout/stderr in the result. Arguments after
 `--` belong to the host. Missing executables and Windows batch-only launchers
-refuse; direct native Windows host launch still needs native acceptance. A failed
+refuse; direct native Windows host prelaunch was verified with installed executables and `--version`; first-prompt loading remains unverified. A failed
 host exits MASK with 5 and records the host exit code without undoing readiness.
 
 `workspace forget PATH --expect-identity ID` retires a registration only after

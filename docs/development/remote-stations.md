@@ -7,7 +7,7 @@ were verified without changing credentials, privileges or trust.
 
 | Workstream | Station | Branch | Checkout | Environment | Authority | Provisioning |
 |---|---|---|---|---|---|---|
-| win | mask-win-example-win-host | codex/mask-win-example-win-host | `C:\code\git\ManageAgentSkills-win-example-win-host` | windows-native | read-only-proof | Codex task provisioned; Claude awaiting workspace trust |
+| win | mask-win-example-win-host | codex/mask-win-example-win-host | `C:\code\git\ManageAgentSkills-win-example-win-host` | windows-native | read-only-proof | Provisioned; runner stopped and lease released after verification |
 
 The local main integrator retains source edits, board updates and commit
 acceptance. Windows station work is bounded verification of MASK-0029 with
@@ -38,3 +38,22 @@ Use explicit PowerShell for native commands; no default-shell setting was
 changed. The cause of the SSH-session GitHub authentication failure remains
 unresolved. Claude's trust prompt has not been approved, and host loading is
 not inferred from Codex task provisioning.
+
+The SSH runner used `example` in Windows session 0, so its terminal was invisible
+to the desktop in session 1. It was stopped without approving Claude's workspace
+trust prompt; `station_lease.py status` then reported free. The Codex task's
+tools used `CodexSandboxOffline`: normal inherited Git identity checks worked,
+but the workflow helper's stripped Git environment exposed a dubious-ownership
+refusal. The station verified the live lease through a read-only native lock
+probe; no safe-directory configuration was added.
+
+To run the retained station visibly, execute this in desktop PowerShell:
+
+```powershell
+py -3 'C:\code\git\AgentSkills-mask-station\skills\implement-rfc\scripts\launch_remote_station.py' win --repo-root 'C:\code\git\ManageAgentSkills-win-example-win-host' --machine example-win-host --read-only --permission-mode default
+```
+
+The operator handles any host workspace/hook trust prompt in that visible
+terminal. The recorded station base remains `3456e3`; fixed revision `c03f85c`
+was tested in a separate disposable clone. Refresh the station through its
+ordinary controlled checkout-update workflow before testing newer revisions.

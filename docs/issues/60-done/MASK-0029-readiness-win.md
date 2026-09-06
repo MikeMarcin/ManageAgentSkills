@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0029"
 title: "Verify native Windows workspace and host readiness"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
 platforms: ["win"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "readiness-win", "stage": "A — first usable milestone", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0006-AC01","outcome":"pass","revision":"c03f85c","evidence":{"kind":"command","detail":"Native Windows Git 2.55.0.windows.3 named hooks: checkout/worktree/merge/manual merge, future-clone coverage and internal suppression. Affected lifecycle/Git/launcher run: 17 tests in 88.489s, 16 pass and one legacy-hook fixture skip; exit 0."}},{"criterion":"RFC-MASK-0006-AC06","outcome":"pass","revision":"3456e3954b51fa3fefa5a5c7072d4ab7067409f3","evidence":{"kind":"observation","detail":"Disposable native mask.cmd prelaunch invoked Claude 2.1.259 and Codex 0.153.4 with --version successfully. Host protocol evidence retained; first-prompt loading and native trust/gate enforcement explicitly unverified. This satisfies the recorded fallback limitation, not a loading claim."}},{"criterion":"RFC-MASK-0006-AC07","outcome":"pass","revision":"c03f85c","evidence":{"kind":"observation","detail":"Windows 11 Home 10.0.26200 AMD64/NTFS/Python3.14.6 real directory symlinks, spaced/Unicode launcher, readiness, unavailable worktree refusal and retirement passed. Native WinError1314 injected mapping passed without privilege changes. Existing native macOS evidence retained. See docs/development/readiness-acceptance.md."}}]
 ---
 
 # MASK-0029: Verify native Windows workspace and host readiness
@@ -35,8 +36,11 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 Native Windows testing started at `3456e3954b51fa3fefa5a5c7072d4ab7067409f3`.
 The direct SSH pass ran 36 tests: 28 passed, three skipped, three failures and two
-errors. Station results and public launcher observations are being reconciled.
-No Windows acceptance is claimed yet.
+errors. The station also ran 35 tests with four failures, two errors and three skips.
+Revision c03f85c resolves the contained failures; the affected native recheck
+passed 16 of 17 tests, with the legacy-directory hook case skipped on named-hook
+Git. Full results and explicit host-loading limitations are recorded in
+[readiness acceptance](../../development/readiness-acceptance.md).
 
 Contained native failures extend this card's local integrator ownership to
 `mask_ensure.py`, `mask_integration.py`, `mask_install.py`, `tests/test_git_integration.py` and any directly
@@ -52,5 +56,9 @@ Windows 11 Home 10.0.26200. Testing will use a disposable checkout, existing
 Python/Git/host executables and existing symlink privileges. No access, privilege
 or host-trust changes are authorized or needed for initial verification.
 
-Next: run the focused public readiness/launcher/Git/host fixtures, record actual
-versions and limitations, and address only resulting defects.
+Completed: native Windows public launcher/symlink/host prelaunch, named Git
+lifecycle events, exact recovery refusal, unavailable worktree preservation and
+missing-privilege error mapping. No actual first-prompt discovery claim. The
+invisible SSH station runner was stopped, and its lease verified free. The
+station and workflow-source checkouts are retained; the separate temporary
+clone and transfer archives were removed. The owner's manual clone is untouched.

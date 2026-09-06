@@ -13,7 +13,7 @@ This repository contains the Python CLI. The companion [AgentSkills repository](
 - Directory symlink support. Windows needs existing symlink privileges; MASK does not elevate or substitute junctions or copies.
 
 > [!NOTE]
-> The new workspace readiness and inventory commands are unreleased additions; the program version remains `0.2.0`. Readiness has native macOS evidence, but its Windows acceptance, named Git hook execution, and actual first-prompt host loading remain open. See the [current acceptance report](docs/development/readiness-acceptance.md). The [v0.1.0 report](docs/releases/v0.1.0.md) records earlier macOS and Windows checks, not acceptance of these additions. Linux remains best-effort.
+> The new workspace readiness and inventory commands are unreleased additions; the program version remains `0.2.0`. Readiness has native macOS and Windows evidence, including named Git hooks on Windows. Actual first-prompt host loading remains unverified. See the [current acceptance report](docs/development/readiness-acceptance.md). The [v0.1.0 report](docs/releases/v0.1.0.md) records earlier macOS and Windows checks, not acceptance of these additions. Linux remains best-effort.
 
 ## Install and select a source
 
@@ -301,7 +301,7 @@ The selected output file is always excluded from its own dump.
 
 The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
-readiness acceptance is in progress on the ExampleWinHost verification station. Multi-source
+readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. Multi-source
 management, immutable content pins, profiles, bundles, fleet management and full
 update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
