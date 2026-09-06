@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0038"
 title: "Implement per-binding agent choices and compatibility metadata"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0036"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "target-model", "stage": "B — selection semantics", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0009-AC01","outcome":"pass","revision":"c2fa4962f06349d33169fae478b69b7f758e7bb4","evidence":{"kind":"observation","detail":"Local public independent project/user choices, all/inherit, enabled policy, no executable probes and physical CAS passed; native milestone remains0040."}},{"criterion":"RFC-MASK-0009-AC02","outcome":"pass","revision":"c2fa4962f06349d33169fae478b69b7f758e7bb4","evidence":{"kind":"observation","detail":"Guarded setters preserve exact package rows and no-apply links, collision/preview/no-op checks pass; reuse0037 migration preservation."}},{"criterion":"RFC-MASK-0009-AC03","outcome":"pass","revision":"c2fa4962f06349d33169fae478b69b7f758e7bb4","evidence":{"kind":"observation","detail":"Generic/specific/absent metadata, conditional cold skip, scope-local overrides and corrected policy recovery/artifact status regressions passed."}}]
 ---
 
 # MASK-0038: Implement per-binding agent choices and compatibility metadata
@@ -32,7 +33,7 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Dependency MASK-0036 is Done; MASK-0037 migration/update source is 7bbe2db and Done at a5b887c. RFC_BASE_SHA remains 9dc90df45febf2a6e048ace60a4ac959807aaaf6 on MASK-0070. No implementation or acceptance for this slice is asserted yet.
+Dependency MASK-0036 is Done; MASK-0037 migration/update source is 7bbe2db and Done at a5b887c. RFC_BASE_SHA remains 9dc90df45febf2a6e048ace60a4ac959807aaaf6 on MASK-0070. Implementation and local acceptance are recorded below; native milestone acceptance remains MASK-0040.
 
 ## Bounded implementation decisions
 
@@ -43,3 +44,19 @@ Dependency MASK-0036 is Done; MASK-0037 migration/update source is 7bbe2db and D
 - Read pinned metadata from validated artifact or validated raw candidate payload views. A dev-link uses its validated live authoring input and remains reported unpinned. Conditional preparation passes only applicable coordinates to store.ensure; no lock/ref mutation from ensure.
 - The contribution evaluator accepts attributed internal contribution rows, with the local declaration as the current public producer. RFC-0039 establishes union/conflict/shadowing semantics; RFC-0010 later connects public profile storage. Do not invent a dependency cycle or advertise profile commands here.
 - Focused public targeting/compatibility checks cover independent personal/project choices, implicit/all versus explicit restrictions, when/architecture conditions, no executable side effects, local override/policy authority, collision rollback, stale/no-op guards and cold skipped-package preparation. Reuse unchanged migration target-preservation evidence. Native affected engine/migration/targeting checks remain MASK-0040 after the adapter slice.
+
+## Integrated result
+
+Source revision: `c2fa4962f06349d33169fae478b69b7f758e7bb4`.
+
+The pure evaluator, public registered-v2 setters, machine-local enabled-agent policy and reasoned physical-scope overrides now feed the ordinary planner/recovery engine. Runtime module inventory includes mask_selection.py. Declaration-only setters preserve owned links; apply setters use one prospective declaration/lock/link plan. False when bindings keep their locks and skip acquisition. Dev-link metadata is validated live. Actual deployment reporting requires verified target content; a dangling owned leaf is not deployed.
+
+Local direct verification (macOS):
+
+- `python3 -B -m unittest tests.test_targeting tests.test_compatibility tests.test_locks.LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations tests.test_pinned_recovery.PinnedTests.test_readiness_exact_authority_and_no_inferred_network tests.test_launcher.LauncherTests.test_program_update_separate_and_incompatible_refused`: 12/12 passed in 76.223s, no skips, before the bounded review corrections.
+- After those corrections: `python3 -B -m unittest tests.test_compatibility.CompatibilityTests.test_recovery_rederives_links_from_effective_after_policy tests.test_compatibility.CompatibilityTests.test_final_policy_edits_retain_partial_recovery tests.test_targeting.TargetingTests.test_dangling_and_corrupt_artifacts_are_never_reported_deployed tests.test_targeting.LegacyPolicyTests tests.test_compatibility.PolicyModelTests tests.test_targeting.TargetingTests.test_independent_agents_inheritance_noop_and_declaration_only`: 6/6 passed in 28.516s, no skips. An initial mechanical indentation error prevented that command from loading tests; corrected before the successful run.
+- Earlier focused iterations corrected a cold-cache fixture setup and required recovery exit-code mapping. The combined successful run above covers those fixes. JSON schema syntax and Python syntax checks passed; jsonschema was unavailable, so no JSON Schema validator execution is claimed. Final git diff --check passed.
+
+Closeout review runtime: one independent rfc-reviewer, gpt-6-astra/high, bounded to new policy and typed-transition authority. Two confirmed failures were fixed: saved recovery now recomputes owned links from effective after-policy, and exact final controls are rechecked after typed effects, before state and before journal deletion. Reviewer fixtures mask-fixture-ofjif4rt and mask-fixture-bf_ij2f3 were removed. Primary public plan reproduction found dangling artifact links incorrectly reported deployed; mask-fixture-hu6k_xn5 was removed and the focused regression covers missing and corrupt artifacts. No repeat review was run.
+
+Worker temporary fixtures used TemporaryDirectory cleanup; individual names were not logged. The worker confirmed no mask-fixture-* roots remained in Python's temporary directory and its /tmp/mask-target-capabilities.json was absent. User .DS_Store was preserved. Reuse unchanged MASK-0037 migration target-preservation evidence. Native engine/migration/targeting and full adapter/contribution acceptance remain MASK-0039/0040; this Done card does not claim RFC-0009 terminal status.
