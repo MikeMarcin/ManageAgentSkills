@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0029"
 title: "Verify native Windows workspace and host readiness"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
 platforms: ["win"]
