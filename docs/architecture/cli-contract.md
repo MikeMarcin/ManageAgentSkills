@@ -222,7 +222,7 @@ Recovery checks exact declaration bytes or expected absence, Git/index identity,
 physical roots, and approval bytes. Changed inputs block both stale completion
 and rollback. Integration-entry journals are another typed v3 variant; recover
 only the recorded owned hook/config entries. A new integration is recovered using its originally selected interpreter; an already owned installation retains its recorded interpreter. Inactive cleanup validates only packages whose links remain active, rather than unused cached requirements. V1/v2 journals retain their readers.
-Program self-update still refuses schema changes: update the program checkout
+Program self-update still refuses schema changes (LF/CRLF checkout conversion alone is compatible): update the program checkout
 explicitly before using this persistence boundary.
 
 `integration enable|disable [--project PATH] (--git | --agent claude|codex)`

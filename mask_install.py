@@ -78,11 +78,11 @@ def validate_program(root, candidate):
         assignments = {node.targets[0].id: ast.literal_eval(node.value) for node in ast.parse(source).body if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'PROTOCOL_VERSION'}
         if assignments.get('PROTOCOL_VERSION') != 1:
             raise ValueError('protocol')
-        # V1 supports no implicit schema migration. Require byte-identical contracts.
+        # Preserve exact contracts apart from Git's LF/CRLF checkout conversion.
         candidate_schemas = {name: (mode, oid) for mode, kind, oid, name in g.tree(root, candidate, 'schemas')}
         for path in sorted((root / 'schemas').glob('*.schema.json')):
             mode, oid = candidate_schemas.get(path.name, ('', ''))
-            if mode not in ('100644', '100755') or c.git(root, 'cat-file', 'blob', oid, binary=True) != path.read_bytes():
+            if mode not in ('100644', '100755') or c.git(root, 'cat-file', 'blob', oid, binary=True).replace(b'\r\n', b'\n') != path.read_bytes().replace(b'\r\n', b'\n'):
                 raise ValueError('schema')
     except (ValueError, SyntaxError, UnicodeError, c.MaskError):
         c.fail('source.candidate_invalid', 'Program protocol or schema migration requires explicit review.', 4)

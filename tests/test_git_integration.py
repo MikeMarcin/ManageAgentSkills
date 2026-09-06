@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import subprocess
 import sys
 
@@ -150,10 +151,11 @@ mask.main(['integration','enable','--git','--project',sys.argv[3],'--home',sys.a
     def test_internal_git_suppresses_directory_and_configured_hooks(self):
         marker = self.base / 'marker'
         hook = self.project / '.git/hooks/post-commit'
-        hook.write_text('#!/bin/sh\ntouch ' + repr(str(marker)) + '\n')
+        command = shlex.join(['touch', marker.as_posix()])
+        hook.write_text('#!/bin/sh\n' + command + '\n', newline='\n')
         hook.chmod(0o755)
         self.git(self.project, 'config', 'hook.marker.event', 'post-commit')
-        self.git(self.project, 'config', 'hook.marker.command', 'touch ' + repr(str(marker)))
+        self.git(self.project, 'config', 'hook.marker.command', command)
         c.git(self.project, 'commit', '--allow-empty', '-m', 'internal', mutating=True)
         self.assertFalse(marker.exists())
         self.git(self.project, 'commit', '--allow-empty', '-m', 'external')
@@ -163,6 +165,6 @@ mask.main(['integration','enable','--git','--project',sys.argv[3],'--home',sys.a
         if integration.named_hooks(self.project):
             self.git(self.project, 'commit', '--allow-empty', '-m', 'configured')
             self.assertTrue(marker.exists())
-        run = subprocess.run([sys.executable, str(ENTRY.parent / 'mask_integration.py'), 'git-hook', str(self.home), 'post-commit'], env=dict(os.environ, MASK_INTERNAL_GIT='1'), capture_output=True)
+        run = subprocess.run([sys.executable, str(ENTRY.parent / 'mask_integration.py'), 'git-hook', str(self.home), 'post-checkout', 'old-revision', 'new-revision', '1'], env=dict(os.environ, MASK_INTERNAL_GIT='1'), capture_output=True)
         self.assertEqual(run.returncode, 0)
         self.assertEqual(run.stdout, b'')

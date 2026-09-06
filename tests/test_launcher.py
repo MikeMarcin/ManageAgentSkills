@@ -37,7 +37,11 @@ class LauncherTests(Fixture):
             shutil.copyfile(ENTRY.parent / name, program / name)
         shutil.copytree(ENTRY.parent / 'schemas', program / 'schemas')
         self.git(program, 'config', 'user.name', 'Fixture'); self.git(program, 'config', 'user.email', 'fixture@example.invalid')
+        (program / '.gitattributes').write_text('schemas/*.schema.json text eol=crlf\n')
         self.git(program, 'add', '.'); self.git(program, 'commit', '-m', 'program'); self.git(program, 'push', '-u', 'origin', 'main')
+        for schema in (program / 'schemas').glob('*.schema.json'):
+            schema.write_bytes(schema.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        self.git(program, 'add', 'schemas')  # Refresh stat data after checkout-equivalent conversion.
         author = self.base / 'program author'
         self.git(self.base, 'clone', '--branch', 'main', str(remote), str(author))
         self.git(author, 'config', 'user.name', 'Fixture'); self.git(author, 'config', 'user.email', 'fixture@example.invalid')
@@ -55,6 +59,14 @@ class LauncherTests(Fixture):
         self.assertEqual(before, self.snapshot(self.project))
         self.assertEqual(state_before, (self.home / 'state.json').read_bytes())
         self.assertFalse(invoke()['changed'])
+        schema = author / 'schemas/machine.schema.json'
+        original_schema = schema.read_bytes()
+        changed_schema = json.loads(original_schema)
+        changed_schema['title'] = 'Changed contract fixture'
+        schema.write_text(json.dumps(changed_schema))
+        self.git(author, 'add', 'schemas/machine.schema.json'); self.git(author, 'commit', '-m', 'changed schema'); self.git(author, 'push', 'origin', 'main')
+        self.assertEqual(invoke(4)['error']['code'], 'source.candidate_invalid')
+        schema.write_bytes(original_schema)
         path = author / 'mask.py'; path.write_text(path.read_text().replace('PROTOCOL_VERSION = 1', 'PROTOCOL_VERSION = 2'))
-        self.git(author, 'add', 'mask.py'); self.git(author, 'commit', '-m', 'incompatible'); self.git(author, 'push', 'origin', 'main')
+        self.git(author, 'add', 'mask.py', 'schemas/machine.schema.json'); self.git(author, 'commit', '-m', 'incompatible'); self.git(author, 'push', 'origin', 'main')
         self.assertEqual(invoke(4)['error']['code'], 'source.candidate_invalid')

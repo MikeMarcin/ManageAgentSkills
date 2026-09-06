@@ -404,7 +404,8 @@ def host_hook(home, agent):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 4 and sys.argv[1] == 'git-hook':
+    # Named Git hooks append event arguments; authority comes from our fixed prefix.
+    if len(sys.argv) >= 4 and sys.argv[1] == 'git-hook':
         raise SystemExit(git_hook(sys.argv[2], sys.argv[3]))
     if len(sys.argv) == 4 and sys.argv[1] == 'host-hook':
         raise SystemExit(host_hook(sys.argv[2], sys.argv[3]))

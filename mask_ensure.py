@@ -354,8 +354,9 @@ def forget(args, output, home):
         common = Path(entry.get('common_dir', ''))
         if not common.is_absolute() or not common.is_dir() or c.identity(common) != entry.get('common_identity'):
             c.fail('project.unavailable', 'Cannot verify removal from the original Git repository.', 4)
-        worktrees = c.git(common, 'worktree', 'list', '--porcelain')
-        if any(line == 'worktree ' + str(root) for line in worktrees.splitlines()):
+        worktrees = c.git(common, 'worktree', 'list', '--porcelain', '-z')
+        if any(Path(field.removeprefix('worktree ')) == root
+               for field in worktrees.split('\0') if field.startswith('worktree ')):
             c.fail('project.unavailable', 'Git still records this worktree; missing storage is not removal.', 4)
     planned = fs.plan(config, state, [root], unregister=[str(root)], keep_links=missing,
                       operation='project.unregister', home=home, source_status=False)

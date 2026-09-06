@@ -39,7 +39,7 @@ errors. Station results and public launcher observations are being reconciled.
 No Windows acceptance is claimed yet.
 
 Contained native failures extend this card's local integrator ownership to
-`mask_ensure.py`, `mask_install.py`, `tests/test_git_integration.py` and any directly
+`mask_ensure.py`, `mask_integration.py`, `mask_install.py`, `tests/test_git_integration.py` and any directly
 necessary test fixture changes. Fixes must preserve missing-root ownership,
 exact recovery observations and schema migration refusal. The Windows station
 remains read-only; it diagnoses and verifies without source or tracker edits.

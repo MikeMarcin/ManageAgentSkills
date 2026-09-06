@@ -94,10 +94,10 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         self.crash('intent')
         # Simulate an external control edit while the journal is pending.
         path = self.home / 'integration.json'
-        original = path.read_text()
+        original = path.read_bytes()
         path.write_text(json.dumps(dict(schema_version=1, approvals={})))
         self.call('recover', '--complete', code=8)
-        path.write_text(original)
+        path.write_bytes(original)
         self.call('recover', '--complete')
 
     def test_unrelated_commit_is_noop_and_conflicted_declaration_blocks(self):
@@ -119,7 +119,7 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         self.assertEqual(before, self.snapshot())
 
     def test_unavailable_worktree_is_not_automatically_forgotten(self):
-        linked = self.base / 'linked'
+        linked = self.base / 'linked ü'
         self.git(self.project, 'worktree', 'add', '-b', 'linked', str(linked))
         self.call('integration', 'approve', '--project', linked)
         self.call('ensure', '--project', linked)
