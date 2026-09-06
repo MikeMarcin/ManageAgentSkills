@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0025"
 title: "Implement branch inactivity and bounded readiness recovery"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0024"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "ensure-lifecycle", "stage": "A — first usable milestone", "provisional_id": false}
