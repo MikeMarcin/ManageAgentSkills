@@ -57,3 +57,7 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0008-AC07 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Implementation progress
+
+MASK-0034 model/resolver source: `c5a359f` (Done card records focused checks and corrections). MASK-0035 store/exact-hydration source: `d17a607` (Done card records 17 passing focused methods plus affected/new checks). These supply bounded lock/raw-artifact evidence, not full RFC acceptance. MASK-0036 now owns activation/recovery and unlocked readiness preparation; MASK-0037 owns selected migration/update/dev-link/publishing. Native pinned-engine/targeting checks remain planned at the coherent milestone; do not repeat unchanged RFC-0007 source/import native results.
