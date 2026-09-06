@@ -385,7 +385,8 @@ recovery and legacy inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
 catalog supports explicit migration, taps, fetch, package validation, curated
 copy imports and provenance. Cached v2 selection locks now record exact commits,
-paths and payload digests. Artifact deployment, profiles, bundles, fleet management
+paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
+deployment of those artifacts, profiles, bundles, fleet management
 and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
 

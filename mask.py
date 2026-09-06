@@ -75,7 +75,7 @@ COMMANDS = {
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
     'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
     'source.status': (False, False, []),
-    'source.fetch': (True, True, [('name', 'optional')]),
+    'source.fetch': (True, True, [('name', 'optional'), ('locked', 'flag'), ('project', 'value'), ('user', 'flag'), ('offline', 'flag')]),
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
@@ -185,6 +185,7 @@ for command in ('plan', 'apply', 'doctor', 'inventory'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['lock'] = {'project': ['user'], 'user': ['project']}
+CONFLICTS['source.fetch'] = {'name': ['locked'], 'locked': ['name'], 'project': ['user'], 'user': ['project']}
 
 
 def validate_arguments(args):
@@ -425,6 +426,11 @@ def local_dispatch(args, output, leaves):
     import mask_resolve
     if command == 'lock':
         return mask_resolve.dispatch(args, output, home)
+    if command == 'source.fetch' and getattr(args, 'locked', False):
+        import mask_store
+        return mask_store.dispatch(args, output, home)
+    if command == 'source.fetch' and any(getattr(args, flag, False) for flag in ('project', 'user', 'offline')):
+        core.fail('invocation.invalid', 'Scope/offline options require source fetch --locked.', 2)
     mask_resolve.guard_command(args, home)
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)

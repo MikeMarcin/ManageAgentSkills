@@ -655,3 +655,66 @@ def validate_row(home, config, row):
     entry = selected(config, row['source'])
     payload = validate(cached(home, row['source'], entry), row['commit'], row['path'], row['id'])
     row.update(payload.summary())
+
+
+def acquire_exact(home, name, entry, commit, timeout, effects):
+    """Acquire only a full commit; never advertise/resolve refs or move selected."""
+    if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', commit):
+        c.fail('source.ref_invalid', 'Exact acquisition requires a full commit.', 4)
+    root = cached(home, name, entry)
+    if root and c.git(root, 'rev-parse', '--verify', commit + '^{commit}', optional=True) == commit:
+        return root
+    root = root or cache_root(home, name, entry)
+    endpoint(home, entry['transport'], entry['repository'])
+    options = network_options(root if root.exists() else home, entry['transport'])
+    protocol = urlsplit(entry['repository']).scheme
+    options += ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
+    effects.update(path=str(root), commit=commit, network_attempted=False, retained_objects_possible=False)
+    if c.kind(root) == 'missing':
+        c.parents_safe(home, root)
+        root.parent.mkdir(parents=True, exist_ok=True)
+        root.mkdir()
+        effects['cache_created'] = True
+        c.git(root, '-c', 'init.templateDir=', 'init', '--bare', '--object-format=' + ('sha256' if len(commit) == 64 else 'sha1'), mutating=True)
+        c.atomic_text(root / 'mask-source.json', c.text_json(dict(schema_version=1, repository=entry['repository'], identity=c.identity(root))), None)
+    cached(home, name, entry)
+    if c.git(root, 'rev-parse', '--show-object-format') != ('sha256' if len(commit) == 64 else 'sha1'):
+        c.fail('source.object_format', 'Locked commit and approved cache object format differ.', 4)
+    identity = c.identity(root)
+    baseline, last = cache_bytes(root), 0
+    def monitor(force=False):
+        nonlocal last
+        now = time.monotonic()
+        if not force and now - last < 0.05:
+            return
+        last = now
+        size = cache_bytes(root)
+        if size > CACHE_BYTES or size - baseline > FETCH_BYTES:
+            c.fail('source.fetch_limit', 'Exact acquisition exceeds storage policy; acquired objects are retained.', 4)
+    staged = 'refs/mask/acquiring/' + uuid.uuid4().hex
+    effects.update(staging_ref=staged, resource_policy=dict(fetch_growth_bytes=FETCH_BYTES, cache_bytes=CACHE_BYTES, storage_poll_seconds=0.05, hard_wire_byte_limit=False))
+    monitor(True)
+    endpoint(root, entry['transport'], entry['repository'])
+    effects.update(network_attempted=True, retained_objects_possible=True)
+    try:
+        c.git(root, *options, '-c', 'fetch.unpackLimit=0', '-c', 'gc.auto=0', 'fetch',
+              '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--no-auto-maintenance',
+              entry['transport'], '+' + commit + ':' + staged, timeout=timeout, mutating=True, monitor=monitor)
+    except c.MaskError as error:
+        if error.code == 'git.failed':
+            c.fail('artifact.unavailable', 'Approved remote did not provide the exact locked commit; no substitute was selected.', 4, commit=commit)
+        raise
+    monitor(True)
+    if c.identity(root) != identity or c.git(root, 'rev-parse', '--verify', staged + '^{commit}', optional=True) != commit:
+        c.fail('source.cache_invalid', 'Exact acquisition identity changed.', 4)
+    # Retain the exact object under its own immutable name, never a moving selector.
+    frozen = 'refs/mask/frozen/' + commit
+    previous = c.git(root, 'rev-parse', '--verify', frozen, optional=True)
+    if previous not in (None, commit):
+        c.fail('source.cache_invalid', 'An exact cache ref has an unexpected value.', 4)
+    if previous is None:
+        c.git(root, 'update-ref', frozen, commit, '0' * len(commit), mutating=True)
+    c.git(root, 'update-ref', '-d', staged, commit, mutating=True)
+    effects['staging_ref'] = None
+    effects['acquired'] = True
+    return root

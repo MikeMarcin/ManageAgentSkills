@@ -66,7 +66,11 @@ def passive_frontmatter(text):
 
 
 def portable_path(path):
-    if not isinstance(path, str) or not path or len(path.encode('utf-8')) > 1024:
+    try:
+        size = len(path.encode('utf-8')) if isinstance(path, str) else 0
+    except UnicodeError:
+        c.fail('skill.path_invalid', 'Package paths require valid Unicode scalars.', 4)
+    if not isinstance(path, str) or not path or size > 1024:
         c.fail('skill.path_invalid', 'Package paths require bounded UTF-8 relative names.', 4)
     parts = path.split('/')
     if len(parts) > DEPTH:
@@ -169,21 +173,43 @@ def validate(root, commit, path, identifier):
         data = c.git(root, 'cat-file', 'blob', oid, binary=True, max_output=size)
         if len(data) != size:
             c.fail('skill.object_invalid', 'Frozen blob size changed during validation.', 4)
-        if data.startswith(b'version https://git-lfs.github.com/spec/v1'):
-            c.fail('skill.lfs_unsupported', 'Git LFS assets require a separate supported acquisition policy.', 4)
-        if name.rsplit('/', 1)[-1] == 'SKILL.md':
+        files.append(PayloadFile(name, mode, data))
+    return validate_files(files, identifier, commit=commit, path=path)
+
+
+def validate_files(files, identifier, *, commit, path):
+    """Revalidate raw supplied regular entries; a frozen dataclass grants no trust."""
+    c.skill_id(identifier)
+    if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', commit):
+        c.fail('skill.revision_invalid', 'Payload requires a full frozen commit.', 4)
+    if path != '.':
+        portable_path(path)
+    if not isinstance(files, (tuple, list)) or len(files) > FILE_COUNT:
+        c.fail('skill.limit', 'Payload requires a bounded collection of regular files.', 4)
+    paths, directories, total = [], set(), 0
+    for item in files:
+        if not isinstance(item, PayloadFile) or type(item.data) is not bytes or item.mode not in ('100644', '100755'):
+            c.fail('skill.entry_unsupported', 'Payload entries require raw bytes and regular logical Git modes.', 4)
+        parts = portable_path(item.path)
+        paths.append(item.path)
+        directories.update('/'.join(parts[:i]) for i in range(1, len(parts)))
+        total += len(item.data)
+        if len(item.data) > FILE_BYTES or total > PACKAGE_BYTES or len(files) + len(directories) > FILE_COUNT:
+            c.fail('skill.limit', 'Payload exceeds file/package bytes or entry count.', 4)
+        if item.data.startswith(b'version https://git-lfs.github.com/spec/v1'):
+            c.fail('skill.lfs_unsupported', 'Git LFS assets need a separate supported acquisition policy.', 4)
+        if parts[-1] == 'SKILL.md':
             try:
-                passive_frontmatter(data.decode('utf-8'))
+                passive_frontmatter(item.data.decode('utf-8'))
             except UnicodeError:
                 c.fail('skill.invalid', 'SKILL.md requires UTF-8 text.', 4)
-        files.append(PayloadFile(name, mode, data))
+    if len(set(paths)) != len(paths):
+        c.fail('skill.path_ambiguous', 'Duplicate payload file path.', 4)
+    check_paths(paths)
     skill = next((item for item in files if item.path == 'SKILL.md'), None)
     if skill is None:
-        c.fail('skill.invalid', 'Package requires SKILL.md.', 4)
-    try:
-        facts = c.metadata(skill.data.decode('utf-8'), identifier)
-    except UnicodeError:
-        c.fail('skill.invalid', 'SKILL.md requires UTF-8 text.', 4)
-    files.sort(key=lambda item: item.path)
-    digest = c.digest([item.manifest_entry() for item in files])
-    return Payload(commit, path, identifier, facts['description'], tuple(files), digest, total)
+        c.fail('skill.invalid', 'Payload requires SKILL.md.', 4)
+    facts = c.metadata(skill.data.decode('utf-8'), identifier)
+    ordered = tuple(sorted(files, key=lambda item: item.path))
+    return Payload(commit, path, identifier, facts['description'], ordered,
+                   c.digest([item.manifest_entry() for item in ordered]), total)

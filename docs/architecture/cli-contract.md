@@ -483,3 +483,36 @@ payloads at the frozen path and original index, not a later index. Publication
 bounds serialized lock bytes before preview/write and rechecks physical project/
 machine-home identities plus exact declaration/config/lock bytes under the machine writer lock; this
 is a same-user concurrency guard, not a hostile-same-user security boundary.
+
+### Exact artifact preparation
+
+`mask source fetch --locked [--project PATH | --user] [--offline]` prepares
+artifacts for an already coherent v2 lock. It changes no declaration, lock,
+consumer state or deployment link. `--dry-run` is always observational and
+network-free; unavailable exact objects are reported as resolution required.
+`--offline` materializes only cached content. Online invocation may acquire only
+the approved full locked commit, never resolve a newer selector. Exact acquisition
+leaves `refs/mask/selected`, cached advertisements and FETCH_HEAD unchanged.
+Network attempts and retained cache/store effects are reported separately.
+
+Store paths are derived as `MASK_HOME/store/v1/<sha256-hex>/payload/<id>`.
+The sibling `manifest.json` records every raw file, logical Git mode, size and
+content hash plus metadata/provenance digests. Its 16 MiB limit accommodates the
+bounded 10,000-entry payload policy. Source identity and revision remain in the
+lock; identical validated content can share an artifact across revisions/sources.
+
+Preparation revalidates supplied bytes, stages on the same volume, flushes files,
+verifies the complete tree and publishes without replacing any existing directory.
+It copies bytes without hardlinking authoring files. Reuse checks all files and
+directories, including unexpected empty directories, links and special entries.
+Corrupt existing artifacts are preserved and refused. No garbage collection or
+automatic repair runs. Files are read-only as an accidental-edit guard; directories
+are not a hostile-same-user boundary. POSIX executable bits are compared to logical
+modes; Windows retains logical modes in the manifest without claiming POSIX mode
+observations. Unchanged retained artifacts can be verified without Git or a cache.
+
+The internal `mask_store.ensure` defaults to offline preparation. Its optional
+`coordinates` subset must contain unique bindings from the fully validated lock;
+default preparation includes all bindings. It does not activate links or evaluate
+target policies. Artifact availability and acquisition
+effects are preparation observations, not part of the consumer's exact intent.
