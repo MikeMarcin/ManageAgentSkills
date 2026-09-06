@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0040"
 title: "Verify native scope-specific pinned targeting"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0039", "MASK-0037"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "target-native", "stage": "B — selection semantics", "provisional_id": false}
