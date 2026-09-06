@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0035"
 title: "Build isolated raw-byte artifacts and exact hydration"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0034", "MASK-0033"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "artifact-store", "stage": "B — reproducible content", "provisional_id": false}
