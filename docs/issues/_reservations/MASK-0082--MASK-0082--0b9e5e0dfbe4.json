@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0082"
+  ],
+  "reserve_for": "readiness-integration-recovery",
+  "purpose": "",
+  "created": "2026-09-06T02:26:28.078101+00:00",
+  "base": "3a8182f2bbfcf055825d27398e10011345005333"
+}
