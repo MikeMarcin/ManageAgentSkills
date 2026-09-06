@@ -170,26 +170,89 @@ def cached(home, name, entry):
     return root
 
 
-def fetch(home, name, entry, timeout, output):
+def remote_refs(root, entry, timeout, output):
+    endpoint(root, entry['transport'], entry['repository'])
+    options = network_options(root, entry['transport'])
+    protocol = urlsplit(entry['repository']).scheme
+    options += ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
+    output['data']['resolution_effects'] = dict(network_attempted=True)
+    raw = c.git(root, *options, 'ls-remote', entry['transport'], timeout=timeout)
+    refs = {}
+    if len(raw.encode('utf-8')) > 1024 * 1024:
+        c.fail('source.limit', 'Repository advertises too many refs.', 4)
+    for line in raw.splitlines():
+        parts = line.split('\t')
+        if len(parts) != 2:
+            c.fail('source.refs_invalid', 'Malformed remote ref advertisement.', 4)
+        oid, ref = parts
+        if ref.endswith('^{}'):
+            continue
+        if ref != 'HEAD' and not ref.startswith(('refs/heads/', 'refs/tags/')):
+            continue
+        if not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', oid) or ref in refs:
+            c.fail('source.refs_invalid', 'Invalid or duplicate remote ref.', 4)
+        refs[selector(ref)] = oid
+    if len(refs) > 4096:
+        c.fail('source.limit', 'Repository advertises too many refs.', 4)
+    return refs, options
+
+
+def resolve_ref(refs, ref):
+    selector(ref)
+    if re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', ref):
+        return ref
+    candidates = [name for name in refs if name == ref or name in ('refs/heads/' + ref, 'refs/tags/' + ref)]
+    if len(candidates) > 1:
+        c.fail('source.ref_ambiguous', 'Ref names both a branch and a tag; select the full ref.', 4, choices=sorted(candidates))
+    if not candidates:
+        c.fail('source.ref_unknown', 'Exact ref is unavailable; no fallback to the default branch.', 4, ref=ref)
+    return refs[candidates[0]]
+
+
+def cached_refs(root, entry):
+    path = root / 'mask-refs.json'
+    value = c.read_json(path, 'source', default={})
+    if not value:
+        return None
+    c.fields(value, ('schema_version', 'repository', 'refs'), family='source')
+    if value['repository'] != entry['repository'] or not isinstance(value['refs'], dict) or len(value['refs']) > 4096:
+        c.fail('source.cache_invalid', 'Invalid cached ref advertisement.', 4)
+    for ref, oid in value['refs'].items():
+        selector(ref)
+        if not isinstance(oid, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', oid):
+            c.fail('source.cache_invalid', 'Invalid cached ref identity.', 4)
+    return value['refs']
+
+
+def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
     root = cache_root(home, name, entry)
     endpoint(home, entry['transport'], entry['repository'])
-    if cached(home, name, entry) is None:
+    existing = cached(home, name, entry)
+    context = existing or home
+    refs, options = advertised or remote_refs(context, entry, timeout, output)
+    requested = entry['ref'] if ref is None else ref
+    oid = resolve_ref(refs, requested)
+    if existing is None:
         root.parent.mkdir(parents=True, exist_ok=True)
-        root.mkdir()  # An existing unrelated object is never adopted.
+        root.mkdir()
         output['data']['cache_effects'] = dict(path=str(root), created=True)
-        c.git(root, '-c', 'init.templateDir=', 'init', '--bare', mutating=True)
+        c.git(root, '-c', 'init.templateDir=', 'init', '--bare', '--object-format=' + ('sha256' if len(oid) == 64 else 'sha1'), mutating=True)
         c.atomic_text(root / 'mask-source.json', c.text_json(dict(schema_version=1, repository=entry['repository'], identity=c.identity(root))), None)
     endpoint(root, entry['transport'], entry['repository'])
-    before = c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True)
-    protocol = urlsplit(entry['repository']).scheme
-    options = network_options(root, entry['transport']) + ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
+    if c.git(root, 'rev-parse', '--show-object-format') != ('sha256' if len(oid) == 64 else 'sha1'):
+        c.fail('source.object_format', 'Source object format differs from its existing cache.', 4)
+    destination = 'refs/mask/selected' if ref is None else 'refs/mask/frozen/' + oid
+    before = c.git(root, 'rev-parse', '--verify', destination + '^{commit}', optional=True)
     output['data']['fetch_effects'] = dict(attempted=True, before=before, after=before)
     try:
         c.git(root, *options, 'fetch', '--no-tags', '--no-recurse-submodules', entry['transport'],
-              '+' + entry['ref'] + ':refs/mask/selected', timeout=timeout, mutating=True)
+              '+' + oid + ':' + destination, timeout=timeout, mutating=True)
+        path = root / 'mask-refs.json'
+        c.atomic_text(path, c.text_json(dict(schema_version=1, repository=entry['repository'], refs=refs)), c.read_text(path, missing=True))
     finally:
-        after = c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True)
+        after = c.git(root, 'rev-parse', '--verify', destination + '^{commit}', optional=True)
         output['data']['fetch_effects'].update(after=after, remote_refs_changed=before != after)
+    return root, after
 
 
 def references(home, config, state, name):
@@ -281,3 +344,226 @@ def dispatch(args, output, home):
         if not output['dry_run']:
             c.atomic_text(home / 'config.json', c.text_json(proposal), original)
             output.update(changed=True, transaction='committed')
+
+
+def object_blob(root, oid, limit=1024 * 1024):
+    size = c.git(root, 'cat-file', '-s', oid)
+    if not size.isdecimal() or int(size) > limit:
+        c.fail('source.limit', 'Selected metadata exceeds its byte limit.', 4)
+    return c.git(root, 'cat-file', 'blob', oid, binary=True)
+
+
+def object_text(root, oid):
+    try:
+        return object_blob(root, oid).decode('utf-8')
+    except UnicodeError:
+        c.fail('source.metadata_invalid', 'Selected metadata requires UTF-8 text.', 4)
+
+
+def tree_entries(root, commit):
+    from mask_git import tree
+    rows = tree(root, commit, recursive=True)
+    if len(rows) > 10000:
+        c.fail('source.limit', 'Discovery exceeds 10,000 tree entries; use a smaller source layout.', 4)
+    result, folded = {}, set()
+    import unicodedata
+    for mode, kind, oid, path in rows:
+        package_path(path)
+        if len(path.split('/')) > 32:
+            c.fail('source.limit', 'Discovery exceeds depth 32.', 4)
+        key = unicodedata.normalize('NFC', path).casefold()
+        if path != unicodedata.normalize('NFC', path) or key in folded:
+            c.fail('source.path_ambiguous', 'Source tree contains aliased case or Unicode paths.', 4)
+        result[path] = (mode, kind, oid)
+        folded.add(key)
+    return result
+
+
+def package_metadata(root, record, identifier=None):
+    if record[0] not in ('100644', '100755') or record[1] != 'blob':
+        c.fail('skill.path_escape', 'SKILL.md must be a regular Git blob.', 4)
+    text = object_text(root, record[2])
+    if identifier is None:
+        # Infer root/nested IDs using the same deliberately small scalar subset.
+        match = re.search(r'^name:\s*([^\r\n]*)$', text.split('---', 2)[1] if text.startswith('---') and text.count('---') >= 2 else '', re.M)
+        if match is None:
+            c.fail('skill.invalid', 'SKILL.md needs a name in frontmatter.')
+        identifier = match[1].strip()
+        if identifier.startswith('"'):
+            identifier = c.parse_json(identifier, 'skill')
+        elif identifier.startswith("'") and identifier.endswith("'"):
+            identifier = identifier[1:-1].replace("''", "'")
+        c.skill_id(identifier)
+    return c.metadata(text, identifier), text
+
+
+def source_index(root, entries):
+    entry = entries.get('mask-source.json')
+    if entry is None:
+        return None
+    if entry[0] not in ('100644', '100755') or entry[1] != 'blob':
+        c.fail('source.index_invalid', 'Source index must be a regular Git blob.', 4)
+    value = c.parse_json(object_text(root, entry[2]), 'source')
+    c.fields(value, ('schema_version', 'packages'), ('bundles',), family='source')
+    if not isinstance(value['packages'], dict) or len(value['packages']) > 10000:
+        c.fail('source.index_invalid', 'Expected a bounded package map.', 4)
+    for identifier, path in value['packages'].items():
+        c.skill_id(identifier)
+        package_path(path)
+    bundles = value.get('bundles', {})
+    if not isinstance(bundles, dict) or len(bundles) > 1000:
+        c.fail('source.index_invalid', 'Expected a bounded bundle map.', 4)
+    for name, bundle in bundles.items():
+        c.skill_id(name)
+        c.fields(bundle, ('skills',), ('description',), family='source')
+        if not isinstance(bundle['skills'], list) or len(bundle['skills']) > 1000:
+            c.fail('source.index_invalid', 'Bundle entries must be a bounded binding array.', 4)
+        if 'description' in bundle and (not isinstance(bundle['description'], str) or len(bundle['description']) > 4096):
+            c.fail('source.index_invalid', 'Bundle descriptions must be bounded text.', 4)
+        for binding in bundle['skills']:
+            c.fields(binding, ('source', 'id'), ('agents', 'version', 'when', 'introduced_by'), family='source')
+            alias(binding['source'])
+            c.skill_id(binding['id'])
+    return value
+
+
+def discover(root, name, entry, commit, *, path=None, content=False):
+    entries = tree_entries(root, commit)
+    index = source_index(root, entries)
+    selected_path = package_path(path) if path is not None else None
+    candidates = []
+    if index is not None:
+        paths = list(index['packages'].items())
+    else:
+        prefix = '' if entry['packages'] == '.' else entry['packages'] + '/'
+        paths = [(None, key.removesuffix('/SKILL.md') if key != 'SKILL.md' else '.')
+                 for key in entries if (key == 'SKILL.md' or key.endswith('/SKILL.md'))
+                 and (key == 'SKILL.md' or key.startswith(prefix))]
+    for identifier, package in paths:
+        if selected_path is not None and selected_path != '.' and package != selected_path and not package.startswith(selected_path + '/'):
+            continue
+        key = 'SKILL.md' if package == '.' else package + '/SKILL.md'
+        if key not in entries:
+            c.fail('source.index_invalid', 'Indexed package has no SKILL.md at its exact path.', 4, path=package)
+        metadata, text = package_metadata(root, entries[key], identifier)
+        identifier = metadata['name']
+        row = dict(source=name, id=identifier, coordinate=name + '/' + identifier,
+                   repository=entry['repository'], path=package, commit=commit,
+                   description=metadata['description'], validation='metadata_only')
+        if content:
+            row['content'] = text
+        candidates.append(row)
+    paths = sorted(item['path'] for item in candidates)
+    if any(a == '.' or b.startswith(a + '/') for i, a in enumerate(paths) for b in paths[i+1:]):
+        c.fail('source.path_ambiguous', 'Overlapping package roots need an index selecting one interpretation.', 4, choices=paths)
+    ids = [item['id'] for item in candidates]
+    if len(set(ids)) != len(ids):
+        c.fail('source.name_ambiguous', 'Duplicate package names need an exact source index.', 4, choices=[dict(id=item['id'], path=item['path']) for item in candidates])
+    if selected_path is not None and not candidates:
+        c.fail('skill.unknown', 'No package matches the selected repository path.', 4, path=selected_path)
+    return sorted(candidates, key=lambda item: (item['id'], item['path']))
+
+
+def locate_url(config, url):
+    if url in config.get('sources', {}):
+        return url, config['sources'][url], None, None
+    normalized = repository(url)
+    candidates = [(name, entry, None, None) for name, entry in config.get('sources', {}).items() if entry['repository'] == normalized]
+    parsed = urlsplit(url)
+    parts = unquote(parsed.path).strip('/').split('/')
+    if parsed.scheme.lower() == 'https' and parsed.hostname == 'github.com' and len(parts) >= 2:
+        base = 'https://github.com/' + '/'.join(parts[:2]).removesuffix('.git')
+        tail = '/'.join(parts[3:]) if len(parts) >= 4 and parts[2] in ('tree', 'blob') else None
+        if len(parts) == 2 or tail:
+            candidates = [(name, entry, tail, parts[2] if tail else None) for name, entry in config.get('sources', {}).items()
+                          if entry['repository'] in (base, base + '.git')]
+    if not candidates:
+        c.fail('source.unapproved', 'Approve this repository with tap add before inspecting it.', 4)
+    if len(candidates) > 1:
+        c.fail('source.alias_ambiguous', 'Repository has multiple catalog bindings; use an unambiguous binding.', 4, choices=[item[0] for item in candidates])
+    return candidates[0]
+
+
+def url_selection(tail, kind, refs, requested_ref, requested_path, default_ref):
+    if tail is None:
+        return requested_ref or default_ref, requested_path
+    choices = []
+    for i in range(1, len(tail.split('/')) + 1):
+        parts = tail.split('/')
+        ref, path = '/'.join(parts[:i]), '/'.join(parts[i:]) or '.'
+        if requested_ref and ref != requested_ref:
+            continue
+        if requested_ref or any(key in refs for key in (ref, 'refs/heads/' + ref, 'refs/tags/' + ref)):
+            if kind == 'blob':
+                if path == 'SKILL.md':
+                    path = '.'
+                elif path.endswith('/SKILL.md'):
+                    path = path.removesuffix('/SKILL.md')
+                else:
+                    continue
+            choices.append(dict(ref=ref, path=path))
+    if len(choices) != 1:
+        c.fail('source.ref_path_ambiguous' if choices else 'source.ref_unknown',
+               'URL ref/path could not be selected uniquely; supply an exact --ref and --path.', 4, choices=choices)
+    return choices[0]['ref'], requested_path if requested_path is not None else choices[0]['path']
+
+
+def inspect(args, output, home):
+    config = c.config(c.read_json(home / 'config.json'))
+    if config['schema_version'] != 2:
+        c.fail('source.migration_required', 'Migrate the source catalog before URL inspection.', 4)
+    name, entry, tail, kind = locate_url(config, args.url)
+    root = cached(home, name, entry)
+    output['data'] = dict(source=name, repository=entry['repository'], resolution_required=True, catalog_only=True)
+    advertised = None
+    if output['dry_run']:
+        refs = cached_refs(root, entry) if root else None
+        if refs is None:
+            return
+    else:
+        advertised = remote_refs(root or home, entry, config['git_timeout_seconds'], output)
+        refs = advertised[0]
+    ref, path = url_selection(tail, kind, refs, getattr(args, 'ref', None), getattr(args, 'path', None), entry['ref'])
+    oid = resolve_ref(refs, ref)
+    commit = c.git(root, 'rev-parse', '--verify', oid + '^{commit}', optional=True) if root else None
+    output['data'].update(ref=ref, path=path, object=oid, commit=commit)
+    if not output['dry_run']:
+        root, commit = fetch(home, name, entry, config['git_timeout_seconds'], output, ref=ref, advertised=advertised)
+    if commit is None:
+        return
+    output['data'].update(commit=commit, resolution_required=False, skills=discover(root, name, entry, commit, path=path))
+
+
+def query(args, output, home):
+    config = c.config(c.read_json(home / 'config.json'))
+    requested = getattr(args, 'id', None)
+    names = sorted(config['sources'])
+    identifier = None
+    if requested and '/' in requested:
+        name, identifier = requested.split('/', 1)
+        selected(config, name)
+        names = [name]
+    elif requested:
+        identifier = requested
+    if identifier is not None:
+        c.skill_id(identifier)
+    rows, unresolved = [], []
+    for name in names:
+        entry = selected(config, name)
+        root = cached(home, name, entry)
+        commit = c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True) if root else None
+        if commit is None:
+            unresolved.append(name)
+        else:
+            rows.extend(discover(root, name, entry, commit, content=getattr(args, 'content', False)))
+    output['data'] = dict(skills=rows, resolution_required=bool(unresolved), unresolved_sources=unresolved, validation='metadata_only')
+    if identifier is None:
+        return
+    if unresolved:
+        c.fail('source.resolution_required', 'Fetch the named sources before establishing a unique package match.', 4, sources=unresolved)
+    matches = [item for item in rows if item['id'] == identifier]
+    if len(matches) > 1:
+        c.fail('source.name_ambiguous', 'Use a source-qualified skill ID.', 4, choices=[item['coordinate'] for item in matches])
+    if not matches:
+        c.fail('skill.unknown', 'Skill is unavailable in the selected sources.', 4, skill=identifier)
+    output['data'] = matches[0]

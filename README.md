@@ -272,8 +272,18 @@ Adding a tap only registers its repository, ref and package layout. An explicit
 fetch fills a separate owned bare cache; it does not deploy skills. HTTPS and SSH
 are distinct approved identities. Git credentials remain in the existing Git
 configuration; URLs containing credentials and redirects are refused. Tap removal
-retains the cache and refuses references, including the legacy binding. Package
-discovery, imports and multi-source consumer selections are still being implemented.
+retains the cache and refuses references, including the legacy binding.
+
+With a v2 catalog, `skill list` reports the fetched catalogs and `skill show
+SOURCE/ID` selects an exact source. Duplicate bare names require qualification;
+an unfetched source is reported explicitly. These queries read frozen Git objects.
+`source inspect URL [--ref REF] [--path PATH]` inspects an already approved
+repository and reports package coordinates, without deploying them. Its dry run
+uses cached refs/objects and reports `resolution_required` when they are missing.
+Root, flat and indexed nested layouts are supported. GitHub tree/blob URLs with
+ambiguous branch/path splits return choices. Package metadata inspection is not
+full payload validation; imports and multi-source consumer selections are still
+being implemented.
 
 `mask self update --json` updates only the running ManageAgentSkills checkout. It checks protocol/schema compatibility and returns `next_invocation_required`; the next command loads the new implementation. It does not update skills or reinstall the launcher. Local skill management remains available while the program checkout has authoring changes.
 
@@ -325,7 +335,7 @@ The selected output file is always excluded from its own dump.
 The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
-catalog supports explicit migration, taps and fetch; package discovery/imports,
+catalog supports explicit migration, taps, fetch and package discovery; imports,
 immutable content pins, profiles, bundles, fleet management and full
 update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.

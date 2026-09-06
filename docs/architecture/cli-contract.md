@@ -45,6 +45,7 @@ All mutators accept `--dry-run`; project manifest mutators may accept `--apply`;
 | `source fetch` | `[SOURCE]` | Legacy checkout refs or named source bare cache only | Yes |
 | `source list` | none | None | No |
 | `source show` | `SOURCE` | None | No |
+| `source inspect` | `URL-or-SOURCE [--ref REF] [--path PATH]` | Owned bare cache for already approved source; never deployment | Yes |
 | `source migrate` | `[--alias NAME] [--expect-plan-hash HASH]` | Explicit machine v1 → v2 migration; legacy alias defaults to `legacy` | No |
 | `tap add` | `SOURCE URL [--ref REF] [--packages PATH] [--checkout PATH] [--expect-plan-hash HASH]` | Approved catalog binding only | No |
 | `tap remove` | `SOURCE [--expect-plan-hash HASH]` | Unreferenced catalog binding only; retains cache | No |
@@ -67,7 +68,18 @@ distinction from absolute SSH paths. Passwords, tokens, unsupported protocols,
 transport rewrites to other identities and effective redirect policies refuse.
 Catalog mutation guards bind the before/after config. `tap remove` preserves all
 cache files and refuses the legacy binding or live selection/lock references.
-Discovery, provenance and v2 consumer selection commands follow in later slices.
+In machine v2, `skill list/show` use frozen fetched source catalogs. Qualified
+`SOURCE/ID` selects one catalog; bare-name duplicates return choices, and missing
+cached sources cannot establish a unique bare-name match. Inspection supports
+flat, root and exact indexed nested packages with bounded metadata reads.
+GitHub tree/blob inputs are split against advertised refs, preserving slash
+ambiguity. HTTP(S) GitHub browser spellings with and without `.git` may locate an
+already approved HTTPS binding, but never grant SSH or a different host approval.
+Remote inspection is explicit and fetches an exact advertised object. Inspecting
+another ref does not advance the configured catalog cursor. Read/dry-run results
+report missing cached resolution. `validation=metadata_only` makes the current
+boundary explicit; provenance, payload guards and v2 consumer selection follow
+in later slices.
 
 ## JSON envelope
 

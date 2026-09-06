@@ -75,6 +75,7 @@ COMMANDS = {
     'source.fetch': (True, True, [('name', 'optional')]),
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
+    'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
     'source.migrate': (True, False, [('alias', 'value')]),
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
     'tap.remove': (True, False, [('name', 'pos')]),
@@ -417,6 +418,8 @@ def local_dispatch(args, output, leaves):
         return
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
+    if command == 'source.inspect':
+        return sources_ops.inspect(args, output, home)
     if command in ('source.list', 'source.show', 'source.migrate', 'tap.add', 'tap.remove') or command == 'source.fetch' and getattr(args, 'name', None):
         return sources_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
@@ -468,6 +471,8 @@ def local_dispatch(args, output, leaves):
         return project_dispatch(args, output, home)
     config = machine_config(home)
     source = Path(config['source']['root'])
+    if config['schema_version'] == 2 and command in ('skill.list', 'skill.show'):
+        return sources_ops.query(args, output, home)
     if command == 'source.status':
         output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])
     elif command == 'source.fetch':
