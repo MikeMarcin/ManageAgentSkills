@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0023"
 title: "Reconcile live sources and import the staged RFC pack"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0017"]
 depends_on: []
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "import", "stage": "A–D — integration and owner workflow", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0017-AC01","outcome":"pass","revision":"499a1f5a20cc9fae8134586d36e2fa33f5fdb114","evidence":{"kind":"observation","detail":"Reservation committed at 9dc90df before import b185a15; IDs map identically, original pack retained, 12 closeouts have immutable baseline, historical RFC/card bytes preserved. Structure gate: 17 RFCs, 80 cards; 0 violations."}}]
 ---
 
 # MASK-0023: Reconcile live sources and import the staged RFC pack
