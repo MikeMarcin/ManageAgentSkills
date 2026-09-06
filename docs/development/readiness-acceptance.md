@@ -40,3 +40,9 @@ changed. Test-created roots were cleaned by their TemporaryDirectory fixtures.
 The failed initial filesystem query against a directory was replaced by the
 successful query against that directory's mounted device; it was not a failed
 product acceptance check.
+
+## Integration verification
+
+At runtime revision `3a8182f`, `python3 -B -m unittest discover -s tests` ran 123 tests in 149.665 seconds: 119 passed, three skipped, and one hook-installation recovery test failed. MASK-0082 fixes the reused path variable responsible for that failure, removes unused-package requirements from inactive cleanup recovery, validates new-installation interpreter authority, and covers registered nested projects during Git events.
+
+After those changes, `python3 -B -m unittest tests.test_git_integration tests.test_ensure tests.test_workspace_lifecycle tests.test_host_integration` ran 33 tests in 47.140 seconds; all passed. The previous affected recovery/integration pass also ran 29 tests successfully. Unchanged passing full-suite evidence is retained; the full suite was not repeated.

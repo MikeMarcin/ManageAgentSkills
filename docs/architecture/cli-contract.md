@@ -204,7 +204,7 @@ No-op runs preserve managed file bytes and registry generations. Filesystem
 readiness is `ready_legacy_unpinned`, separately from `host_load: not_verified`.
 
 Events are `manual`, `startup`, `post-checkout`, `post-merge`, `post-rewrite`, and
-`post-commit`. Startup also preflights the already registered personal consumer
+`post-commit`. A Git event includes already registered nested consumers in the same worktree, without crawling unregistered directories or entering separate nested repositories. Each selected project still requires its own applicable readiness authority. Startup also preflights the already registered personal consumer
 before any selected scope changes. A session outside Git can reconcile that
 personal consumer alone. It never creates a personal declaration or registration.
 
@@ -221,7 +221,7 @@ Readiness journals use v3 control observations, while state remains v1/v2.
 Recovery checks exact declaration bytes or expected absence, Git/index identity,
 physical roots, and approval bytes. Changed inputs block both stale completion
 and rollback. Integration-entry journals are another typed v3 variant; recover
-only the recorded owned hook/config entries. V1/v2 journals retain their readers.
+only the recorded owned hook/config entries. A new integration is recovered using its originally selected interpreter; an already owned installation retains its recorded interpreter. Inactive cleanup validates only packages whose links remain active, rather than unused cached requirements. V1/v2 journals retain their readers.
 Program self-update still refuses schema changes: update the program checkout
 explicitly before using this persistence boundary.
 

@@ -434,7 +434,8 @@ def recover(home, output, mode):
         for key in pending['selected']:
             record = c.consumer_records(pending['after_state']).get(key)
             if record:
-                for identifier in record['last_manifest']['skills']:
+                identifiers = {link['skill'] for link in record['links'].values()} if pending['operation'] == 'ensure.deactivate' else record['last_manifest']['skills']
+                for identifier in identifiers:
                     c.package(source, identifier)
     output['would_change'] = True
     if output['dry_run']:

@@ -80,6 +80,15 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         self.declare(['beta'])
         self.call('recover', '--complete')
 
+    def test_inactive_cleanup_recovery_does_not_require_removed_packages(self):
+        self.git(self.project, 'switch', 'inactive')
+        self.crash('link')
+        (self.source / 'skills/alpha').rename(self.source / 'skills/removed-alpha')
+        self.call('recover', '--complete')
+        self.assertFalse((self.project / '.agents/skills/alpha').is_symlink())
+        self.assertFalse((self.project / '.claude/skills/alpha').is_symlink())
+        self.assertEqual(self.call('ensure')['data']['readiness'], 'inactive_on_branch')
+
     def test_recovery_checks_authority_and_root_identity(self):
         self.git(self.project, 'switch', 'inactive')
         self.crash('intent')

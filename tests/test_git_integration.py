@@ -50,6 +50,32 @@ class GitIntegrationTests(Fixture):
         self.git(self.project, 'worktree', 'add', '-b', 'linked', str(linked))
         self.assertTrue((linked / '.agents/skills/beta').is_symlink())
 
+    def test_git_event_reconciles_registered_nested_consumers_without_crawling(self):
+        nested = self.project / 'nested'
+        nested.mkdir()
+        declaration = nested / '.mask.json'
+        declaration.write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        (self.project / '.mask.json').unlink()
+        self.git(self.project, 'add', '-A')
+        self.git(self.project, 'commit', '-m', 'nested declaration')
+        self.call('project', 'register', nested)
+        self.call('integration', 'approve', '--project', nested)
+        unrelated = self.project / 'not-registered'
+        unrelated.mkdir()
+        (unrelated / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        inner = self.project / 'inner-repository'
+        inner.mkdir()
+        self.git(inner, 'init', '-b', 'main')
+        (inner / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        self.call('project', 'register', inner)
+        self.call('integration', 'approve', '--project', inner)
+        self.enable()
+        declaration.write_text(json.dumps(dict(schema_version=1, skills=['beta'])))
+        self.git(self.project, 'commit', '-am', 'change nested selection')
+        self.assertTrue((nested / '.agents/skills/beta').is_symlink())
+        self.assertFalse((unrelated / '.agents').exists())
+        self.assertFalse((inner / '.agents/skills/alpha').is_symlink())
+
     def test_manual_merge_completion_and_postoperation_warning(self):
         self.enable()
         self.git(self.project, 'switch', '-c', 'other')
@@ -109,6 +135,15 @@ mask.main(['integration','enable','--git','--project',sys.argv[3],'--home',sys.a
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True)
         self.assertEqual(run.returncode, 99, run.stdout)
         self.call('recover', '--inspect')
+        path = self.home / 'pending.json'
+        original = path.read_text()
+        pending = json.loads(original)
+        pending['record']['interpreter'] = str(self.base / 'unapproved-interpreter')
+        path.write_text(json.dumps(pending))
+        before = self.snapshot()
+        self.call('recover', '--complete', code=8)
+        self.assertEqual(before, self.snapshot())
+        path.write_text(original)
         self.call('recover', '--complete')
         self.assertFalse(self.enable()['changed'])
 

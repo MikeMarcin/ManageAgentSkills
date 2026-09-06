@@ -188,33 +188,47 @@ def ensure(args, output, home):
             root = c.project_root(initializing=True)
         else:
             raise
+    projects = [root] if root is not None else []
+    if selection is None and event.startswith('post-'):
+        boundary = c.project_root(initializing=True)
+        common = common_directory(boundary)
+        for key, record in state['projects'].items():
+            known = Path(key)
+            if known != root and known.is_relative_to(boundary):
+                c.registered_root(known, record)
+                if common_directory(known) == common:
+                    projects.append(known)
+        if len(projects) > 1 and str(root) not in state['projects'] and c.kind(root / '.mask.json') == 'missing':
+            projects.remove(root)
     approval = policy(home)
-    if root is not None and not authorized(root, approval):
-        output['data']['readiness'] = 'approval_required'
-        c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(root))
-    observation = workspace_observation(root) if root is not None else None
-    if observation and observation['index'] and any(line.split('\t', 1)[0].split()[-1] != '0' for line in observation['index'].splitlines()):
-        c.fail('readiness.blocked', 'The declaration has unresolved index conflicts.', 4)
     inactive = []
+    observations = []
     proposed_approval = copy.deepcopy(approval)
-    entry = proposed_approval['approvals'].get(str(root))
-    if observation and observation['manifest'] is None:
-        if not inactive_branch(root, state['projects'].get(str(root)), entry, observation):
-            c.fail('manifest.missing', 'Missing declaration is not a proven opted-in inactive branch.', 4)
-        inactive = [str(root)]
-    elif observation and entry is not None and observation['head'] is not None:
-        tracked = c.git(root, 'show', observation['head'] + ':./.mask.json', optional=True)
-        if tracked is not None and tracked == observation['manifest'].strip() and not observation['unsafe']:
-            manifest_digest = c.digest(c.manifest(c.parse_json(observation['manifest'], 'manifest')))
-            if entry.get('tracked', {}).get('manifest_digest') != manifest_digest:
-                entry['tracked'] = dict(head=observation['head'], manifest_digest=manifest_digest)
-    roots = [root] if root is not None else []
-    observations = [observation] if observation else []
+    for project in projects:
+        if not authorized(project, approval):
+            output['data']['readiness'] = 'approval_required'
+            c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(project))
+        observation = workspace_observation(project)
+        observations.append(observation)
+        if observation['index'] and any(line.split('\t', 1)[0].split()[-1] != '0' for line in observation['index'].splitlines()):
+            c.fail('readiness.blocked', 'The declaration has unresolved index conflicts.', 4)
+        entry = proposed_approval['approvals'].get(str(project))
+        if observation['manifest'] is None:
+            if not inactive_branch(project, state['projects'].get(str(project)), entry, observation):
+                c.fail('manifest.missing', 'Missing declaration is not a proven opted-in inactive branch.', 4)
+            inactive.append(str(project))
+        elif entry is not None and observation['head'] is not None:
+            tracked = c.git(project, 'show', observation['head'] + ':./.mask.json', optional=True)
+            if tracked is not None and tracked == observation['manifest'].strip() and not observation['unsafe']:
+                manifest_digest = c.digest(c.manifest(c.parse_json(observation['manifest'], 'manifest')))
+                if entry.get('tracked', {}).get('manifest_digest') != manifest_digest:
+                    entry['tracked'] = dict(head=observation['head'], manifest_digest=manifest_digest)
+    roots = list(projects)
     user_root = Path(state['user']['root']) if event == 'startup' and state.get('user') else None
     if user_root is not None:
         roots.append(user_root)
         observations.append(workspace_observation(user_root, scope='user', home=home))
-    register = [str(root)] if root is not None and str(root) not in state['projects'] else []
+    register = [str(project) for project in projects if str(project) not in state['projects']]
     planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root,
                       operation='ensure.deactivate' if inactive else 'ensure', source_status=False, inactive=inactive)
     policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
@@ -233,10 +247,11 @@ def ensure(args, output, home):
             c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7)
     elif not output['dry_run']:
         # Recheck mutable inputs under the same writer lock, with no second payload scan.
-        if policy(home) != approval or root is not None and not authorized(root, approval):
+        if policy(home) != approval or any(not authorized(project, approval) for project in projects):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
-    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if inactive else 'ready_legacy_unpinned'
+    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_legacy_unpinned') for selected in roots]
+    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_legacy_unpinned'
 
 
 def dispatch(args, output, home):

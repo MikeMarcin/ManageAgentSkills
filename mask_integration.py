@@ -26,6 +26,10 @@ def named_hooks(root):
 
 def registration(home):
     value = c.read_json(home / 'integrations.json', 'integration', default=dict(schema_version=1, installations={}))
+    return validate_registration(value)
+
+
+def validate_registration(value):
     c.fields(value, ('schema_version', 'installations'), family='integration')
     if not isinstance(value['installations'], dict):
         c.fail('integration.invalid', 'Invalid integration ownership.')
@@ -263,12 +267,16 @@ def validate_pending(pending, home):
     if pending['operation'] not in ('integration.enable', 'integration.disable'):
         c.fail('recovery.conflict', 'Unknown integration operation.', 8)
     record = pending['record']
+    if not isinstance(record, dict) or not isinstance(record.get('root'), str) or not isinstance(record.get('mode'), str):
+        c.fail('recovery.conflict', 'Invalid integration record.', 8)
     validate_record(binding(record), record)
     if record['home'] != str(home) or record['program'] != str(Path(__file__).resolve().parent):
         c.fail('recovery.conflict', 'Integration belongs to another machine/program.', 8)
     check_record(record)
-    before = c.parse_json(pending['ownership_before'], 'integration') if pending['ownership_before'] is not None else dict(schema_version=1, installations={})
-    after = c.parse_json(pending['ownership_after'], 'integration')
+    before = validate_registration(c.parse_json(pending['ownership_before'], 'integration')) if pending['ownership_before'] is not None else dict(schema_version=1, installations={})
+    after = validate_registration(c.parse_json(pending['ownership_after'], 'integration'))
+    if binding(record) not in before['installations'] and record['interpreter'] != str(Path(sys.executable).resolve()):
+        c.fail('recovery.conflict', 'Recover a new integration using its original selected interpreter.', 8)
     expected = copy.deepcopy(before)
     if pending['operation'] == 'integration.enable':
         expected['installations'][binding(record)] = record
@@ -279,9 +287,14 @@ def validate_pending(pending, home):
     if expected != after:
         c.fail('recovery.conflict', 'Integration changes unrelated ownership.', 8)
     allowed = {entry['name']: entry for entry in entries(record)}
-    if not isinstance(pending['changes'], list) or len({entry['name'] for entry in pending['changes']}) != len(pending['changes']):
+    if not isinstance(pending['changes'], list):
         c.fail('recovery.conflict', 'Invalid integration entry selection.', 8)
+    seen = set()
     for entry in pending['changes']:
+        c.fields(entry, ('name', 'role', 'value', 'before', 'after'), family='recovery')
+        if not isinstance(entry['name'], str) or entry['name'] in seen:
+            c.fail('recovery.conflict', 'Invalid integration entry identity.', 8)
+        seen.add(entry['name'])
         canonical = allowed.get(entry['name'])
         if not canonical or {key: entry.get(key) for key in ('name', 'role', 'value')} != canonical or set(entry) != {'name', 'role', 'value', 'before', 'after'}:
             c.fail('recovery.conflict', 'Unsafe integration entry.', 8)
@@ -307,8 +320,8 @@ def restore(pending, home, side):
         if current != entry[side]:
             write_entry(pending['record'], entry, entry[side])
         elif entry['role'] == 'git-hook' and entry[side] is not None and os.name != 'nt':
-            path = Path(pending['record']['common']) / 'hooks' / entry['name']
-            path.chmod(path.stat().st_mode | 0o111)
+            hook_path = Path(pending['record']['common']) / 'hooks' / entry['name']
+            hook_path.chmod(hook_path.stat().st_mode | 0o111)
         fs.checkpoint('integration-entry')
     wanted = pending['ownership_' + side]
     if wanted is not None:
