@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0009"
 title: "Per-skill scope-specific agent targeting and advertised compatibility"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
