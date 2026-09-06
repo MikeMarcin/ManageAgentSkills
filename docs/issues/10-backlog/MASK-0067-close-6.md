@@ -85,3 +85,9 @@ Native versions observed: Claude Code 2.1.260; codex-cli 0.153.2. No host trust 
 Revision `98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a`: installed launcher, native links and both host prelaunch version invocations passed; full boundary and limitations are in [readiness acceptance](../../development/readiness-acceptance.md). Required native Windows acceptance remains open. No terminal RFC claim.
 
 Integration discovery: required MASK-0081 completes repository-boundary approval and user-level startup for future clones. These were missing from the first explicit-root slices; their bounded tests do not prove this broader workflow.
+
+## Clone/startup integration follow-up
+
+Revision `8ddb5d30c2fc876a458c11c9414d7e70fb822b1b`: python3 -B -m unittest tests.test_ensure tests.test_host_integration tests.test_workspace_lifecycle: 24 tests passed. A generated user-level adapter command readies a future approved local clone and registered personal scope. Wrong-origin/outside/replaced-boundary requests and credential-bearing identities refuse; direct revoke refuses inherited authority. Project-local and user-level settings remain independently owned, with no actual host-loading claim.
+
+The earlier explicit-root-only limitation is resolved at the fixture/public-command boundary. Native host first-prompt loading still uses the recorded fallback limitation. No live approval or user-level configuration was installed.
