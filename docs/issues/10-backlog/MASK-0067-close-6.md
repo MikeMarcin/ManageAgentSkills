@@ -93,3 +93,9 @@ Revision `8ddb5d30c2fc876a458c11c9414d7e70fb822b1b`: python3 -B -m unittest test
 The earlier explicit-root-only limitation is resolved at the fixture/public-command boundary. Native host first-prompt loading still uses the recorded fallback limitation. No live approval or user-level configuration was installed.
 
 Integration follow-up MASK-0082 records the full-suite failure and inactive cleanup recovery edge discovered during the final scoped diff review. Terminal status remains open.
+
+## Integration recovery fixes
+
+Revision `c0d37e78d72802c90ae73f39a7d9e342612494f1`: Full integration at runtime revision 3a8182f ran 123 tests: 119 passes, three skips, one hook recovery failure. The reused path variable is fixed. The 33 affected Git/ensure/lifecycle/host tests all pass (47.140s), covering new-interpreter journal refusal, no unused-package dependency in inactive cleanup, and registered nested consumers without a filesystem crawl. Earlier 29 affected recovery/integration tests passed; unchanged full-suite results are reused.
+
+Final scoped source diff reviewed against immutable RFC_BASE_SHA `9dc90df`. No known critical failure remains on the exercised macOS/public-command boundary. Named-hook execution on newer Git, native Windows and actual first-prompt host loading remain explicitly limited. Native Windows is the required open platform criterion; later core stages retain their live dependencies.
