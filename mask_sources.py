@@ -430,7 +430,7 @@ def package_metadata(root, record, identifier=None):
     text = object_text(root, record[2])
     if identifier is None:
         # Infer root/nested IDs using the same deliberately small scalar subset.
-        match = re.search(r'^name:\s*([^\r\n]*)$', text.split('---', 2)[1] if text.startswith('---') and text.count('---') >= 2 else '', re.M)
+        match = re.search(r'^name:[ \t]*([^\r\n]*)\r?$', text.split('---', 2)[1] if text.startswith('---') and text.count('---') >= 2 else '', re.M)
         if match is None:
             c.fail('skill.invalid', 'SKILL.md needs a name in frontmatter.')
         identifier = match[1].strip()

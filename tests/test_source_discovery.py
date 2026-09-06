@@ -55,6 +55,21 @@ class DiscoveryTests(Fixture):
         self.assertEqual(before, self.snapshot())
         self.assertFalse((self.project / '.agents').exists())
 
+    def test_raw_crlf_frontmatter_is_discovered_without_rewriting_bytes(self):
+        author, remote = self.tap('crlf', {'skills/item/SKILL.md': skill('item')}, 'skills')
+        self.git(author, 'config', 'core.autocrlf', 'false')
+        raw = (skill('item') + 'Exact CRLF bytes.\n').replace('\n', '\r\n').encode('utf-8')
+        (author / 'skills/item/SKILL.md').write_bytes(raw)
+        self.git(author, 'add', '.')
+        self.git(author, 'commit', '-m', 'raw CRLF package')
+        self.git(author, 'push', 'origin', 'main')
+        inspected = self.call('source', 'inspect', remote)['data']
+        self.assertEqual(inspected['skills'][0]['id'], 'item')
+        self.call('source', 'fetch', 'crlf')
+        shown = self.call('skill', 'show', 'crlf/item', '--content')['data']
+        self.assertEqual(shown['content'].encode('utf-8'), raw)
+        self.assertTrue(self.call('skill', 'validate', 'crlf/item')['data']['valid'])
+
     def test_inspect_frozen_commit_and_offline_dry_run(self):
         author, remote = self.tap('history', {'skills/old/SKILL.md': skill('old')}, 'skills')
         old = self.git(author, 'rev-parse', 'HEAD')
