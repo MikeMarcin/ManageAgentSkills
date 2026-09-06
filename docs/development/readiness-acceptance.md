@@ -100,3 +100,17 @@ record the consumed results. The station checkout and workflow-source checkout
 are retained for the owner's requested station. The separate direct-test clone
 and transfer archives are removed after consumption. The owner-created manual
 clone is untouched.
+
+Final bookkeeping verification after the closeout move: 17 RFCs, 82 cards,
+zero structural violations; the RFC-MASK-0006 queue has nine selected cards,
+all Done. The pre-finish structure check correctly rejected terminal RFC status
+while its closeout card was still In Progress; the completed move resolved it.
+
+Consumed temporary roots:
+
+- `C:\Users\example\AppData\Local\Temp\mask-windows-acceptance-tddvb6ly`:
+  direct test clone, transferred bundles/archive and captured logs; removed after
+  confirming no Python process referenced it.
+- `/tmp/mask-windows-acceptance-tddvb6ly`:
+  SSH command helpers, transfer files, copied logs and consumed finish decisions;
+  removed after recording their results here and in the Done cards.
