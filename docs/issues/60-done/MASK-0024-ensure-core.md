@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0024"
 title: "Add one authorized ensure path over the existing reconciler"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0023"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "ensure-core", "stage": "A — first usable milestone", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0006-AC02","outcome":"pass","revision":"029adabec841e59515ec45b6f2d9a51b5e6517b5","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_ensure tests.test_reconcile_plan tests.test_cli_protocol: 17 tests, OK, one existing Windows-only skip. Direct subprocess ensure covers approvals, linked worktrees, no-op/check, collision and parent protection, busy/pending refusal; selected package scan asserted. Scope is ensure core; hook and lifecycle criteria remain assigned to later cards."}},{"criterion":"RFC-MASK-0006-AC03","outcome":"pass","revision":"029adabec841e59515ec45b6f2d9a51b5e6517b5","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_ensure tests.test_reconcile_plan tests.test_cli_protocol: 17 tests, OK, one existing Windows-only skip. Direct subprocess ensure covers approvals, linked worktrees, no-op/check, collision and parent protection, busy/pending refusal; selected package scan asserted. Scope is ensure core; hook and lifecycle criteria remain assigned to later cards."}}]
 ---
 
 # MASK-0024: Add one authorized ensure path over the existing reconciler

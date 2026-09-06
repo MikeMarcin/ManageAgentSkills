@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0017"
 title: "Staged migration, agent workflow handoff and personal-use acceptance"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---

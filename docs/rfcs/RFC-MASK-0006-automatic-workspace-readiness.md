@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0006"
 title: "Automatic workspace readiness for clone, worktree, branch and agent startup"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---

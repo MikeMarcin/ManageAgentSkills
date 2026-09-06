@@ -57,3 +57,7 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0006-AC07 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Ensure core slice
+
+Revision `029adabec841e59515ec45b6f2d9a51b5e6517b5`: 17 focused tests passed (one existing Windows-only skip), covering approved project registration/reconciliation, no-op bytes, check-only drift, selected-package scan, collisions, parent substitution, pending and busy refusal. AC02/AC03 core evidence; full lifecycle/integration/native rows remain open. Next: MASK-0025. Temporary test roots were automatically cleaned by unittest fixtures.
