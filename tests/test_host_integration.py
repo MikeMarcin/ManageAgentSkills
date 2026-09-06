@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import shutil
+import shlex
 import sys
 
 from tests.support import Fixture, ENTRY
@@ -129,3 +130,29 @@ class HostIntegrationTests(Fixture):
                 result = json.loads(run.stdout)
                 self.assertEqual(result['data']['host']['exit_code'], 0)
                 self.assertTrue(result['data']['host']['stdout'].strip())
+
+    def test_user_adapter_readies_a_future_approved_clone(self):
+        personal = self.base / 'personal'
+        personal.mkdir()
+        self.call('user', 'init')
+        self.call('user', 'register', '--user-home', personal)
+        self.call('integration', 'enable', '--agent', 'claude')
+        settings = personal / '.claude/settings.json'
+        command = json.loads(settings.read_text())['hooks']['SessionStart'][0]['hooks'][0]['command']
+        self.assertFalse((personal / '.claude/settings.local.json').exists())
+        boundary = self.base / 'clones'
+        boundary.mkdir()
+        self.git(self.project, 'config', 'user.name', 'Fixture')
+        self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(self.project, 'add', '.mask.json')
+        self.git(self.project, 'commit', '-m', 'declaration')
+        self.call('integration', 'approve', '--repository', str(self.project), '--under', boundary)
+        clone = boundary / 'new-clone'
+        self.git(self.base, 'clone', str(self.project), str(clone))
+        run = subprocess.run(shlex.split(command), cwd=clone, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertTrue(json.loads(run.stdout)['hookSpecificOutput']['reloadSkills'])
+        self.assertTrue((clone / '.agents/skills/alpha').is_symlink())
+        self.assertTrue(self.call('integration', 'inspect', '--agent', 'claude')['data']['coverage']['startup'])
+        self.call('integration', 'disable', '--agent', 'claude')
+        self.assertEqual(json.loads(settings.read_text())['hooks']['SessionStart'], [])

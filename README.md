@@ -86,7 +86,7 @@ mask ensure --project /absolute/path/to/project --check --json
 It reads local source content and preserves ownership/recovery refusals. Opt-in
 Git and host startup adapters are described in the
 [readiness contract](docs/architecture/cli-contract.md#workspace-readiness-unreleased-rfc-mask-0006-additions).
-Native Windows acceptance and actual first-prompt host loading remain open.
+A user-level startup adapter can cover future clones under an explicitly approved repository/clone-directory boundary. Native Windows acceptance and actual first-prompt host loading remain open.
 
 | Intent | Command |
 |---|---|

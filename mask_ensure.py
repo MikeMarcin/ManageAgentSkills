@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import copy
+import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import mask_core as c
 import mask_fs as fs
@@ -12,7 +14,22 @@ EVENTS = {'manual', 'startup', 'post-checkout', 'post-merge', 'post-rewrite', 'p
 
 
 def validate_policy(value):
-    c.fields(value, ('schema_version', 'approvals'), family='integration')
+    c.fields(value, ('schema_version', 'approvals'), ('repositories',), family='integration')
+    if not isinstance(value.get('repositories', []), list):
+        c.fail('integration.invalid', 'Repository approvals must be a list.')
+    seen = set()
+    for entry in value.get('repositories', []):
+        c.fields(entry, ('repository', 'under', 'identity'), family='integration')
+        repository_identity(entry['repository'])
+        if not isinstance(entry['under'], str) or not Path(entry['under']).is_absolute():
+            c.fail('integration.invalid', 'Clone boundaries must be absolute.')
+        c.fields(entry['identity'], ('device', 'inode'), family='integration')
+        if any(type(number) is not int for number in entry['identity'].values()):
+            c.fail('integration.invalid', 'Invalid clone-boundary identity.')
+        key = (entry['repository'], entry['under'])
+        if key in seen:
+            c.fail('integration.invalid', 'Duplicate repository approval.')
+        seen.add(key)
     if not isinstance(value['approvals'], dict):
         c.fail('integration.invalid', 'Approvals must be a map.')
     for root, entry in value['approvals'].items():
@@ -34,6 +51,22 @@ def validate_policy(value):
                     c.fail('integration.invalid', 'Invalid approval identity.')
         if ('common_dir' in entry) != ('common_identity' in entry) or ('common_dir' in entry and (not isinstance(entry['common_dir'], str) or not Path(entry['common_dir']).is_absolute())):
             c.fail('integration.invalid', 'Invalid linked-worktree approval.')
+    return value
+
+
+def repository_identity(value):
+    if not isinstance(value, str) or not value or value.startswith('-') or any(ord(ch) < 32 for ch in value):
+        c.fail('integration.invalid', 'Invalid repository identity.')
+    if Path(value).is_absolute():
+        return value
+    if re.fullmatch(r'[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._/-]+', value):
+        return value
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        c.fail('integration.invalid', 'Invalid repository identity.')
+    if parsed.scheme not in ('https', 'ssh') or not parsed.hostname or parsed.password is not None or parsed.query or parsed.fragment or (parsed.scheme == 'https' and parsed.username is not None):
+        c.fail('integration.invalid', 'Use an absolute local repository or credential-free HTTPS/SSH identity.')
     return value
 
 
@@ -59,22 +92,48 @@ def authorized(root, approval):
         original = Path(key)
         if entry.get('linked_worktrees') and entry.get('common_dir') == str(common) and original.is_dir() and c.identity(original) == entry['identity'] and common.is_dir() and c.identity(common) == entry['common_identity'] and common_directory(original) == common:
             return True
+    for entry in approval.get('repositories', []):
+        boundary = Path(entry['under'])
+        if root.is_relative_to(boundary) and boundary.is_dir() and boundary.resolve() == boundary and c.identity(boundary) == entry['identity']:
+            remote = c.git(root, 'remote', 'get-url', 'origin', optional=True)
+            if remote is not None and repository_identity(remote) == entry['repository']:
+                return True
     return False
 
 
 def integration(args, output, home):
     approval = policy(home)
-    root = c.project_root(getattr(args, 'project', None))
     if args.command == 'integration.inspect':
         import mask_integration as integrations
         state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+        if getattr(args, 'agent', None) not in (None, 'claude', 'codex'):
+            c.fail('invocation.invalid', 'Choose a supported agent.', 2)
+        root = integrations.host_root(home) if getattr(args, 'agent', None) and not getattr(args, 'project', None) else c.project_root(getattr(args, 'project', None))
         record = state['projects'].get(str(root))
         output['data'] = dict(root=str(root), approved=authorized(root, approval), host_load='not_verified',
                               registration_identity=c.digest(record['root_identity']) if record else None,
                               coverage=integrations.inspect_coverage(home, root))
         return
+    repository, under, project = getattr(args, 'repository', None), getattr(args, 'under', None), getattr(args, 'project', None)
+    if bool(repository) == bool(project) or bool(repository) != bool(under) or repository and (getattr(args, 'linked_worktrees', False) or getattr(args, 'inactive_branches', False)):
+        c.fail('invocation.invalid', 'Choose --project PATH or --repository ID --under ROOT; branch flags require --project.', 2)
     proposal = copy.deepcopy(approval)
-    if args.command == 'integration.approve':
+    root = None
+    selected_approval = None
+    if repository:
+        repository_identity(repository)
+        boundary = Path(under).expanduser().resolve()
+        if args.command == 'integration.approve' and not boundary.is_dir():
+            c.fail('integration.invalid', 'The approved clone boundary must exist.', 4)
+        values = [item for item in proposal.get('repositories', []) if (item['repository'], item['under']) != (repository, str(boundary))]
+        if args.command == 'integration.approve':
+            entry = dict(repository=repository, under=str(boundary), identity=c.identity(boundary))
+            values.append(entry)
+            selected_approval = entry
+        proposal['repositories'] = sorted(values, key=lambda item: (item['repository'], item['under']))
+    else:
+        root = c.project_root(project) if args.command == 'integration.approve' else Path(project).expanduser().resolve()
+    if root is not None and args.command == 'integration.approve':
         entry = dict(identity=c.identity(root), linked_worktrees=getattr(args, 'linked_worktrees', False),
                      inactive_branches=getattr(args, 'inactive_branches', False))
         common = common_directory(root)
@@ -90,12 +149,15 @@ def integration(args, output, home):
         if previous.get('identity') == entry['identity'] and 'tracked' in previous:
             entry['tracked'] = previous['tracked']
         proposal['approvals'][str(root)] = entry
-    else:
+        selected_approval = entry
+    elif root is not None:
         proposal['approvals'].pop(str(root), None)
+        if root.is_dir() and authorized(root, proposal):
+            c.fail('integration.inherited_authority', 'Revoke the linked-worktree or repository-boundary approval that grants this root authority.', 4)
     plan_hash = c.digest(dict(before=approval, after=proposal))
     if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
         c.fail('plan.stale', 'Integration approval changed; inspect a new preview.', 4)
-    output['data'] = dict(root=str(root), plan_hash=plan_hash, approval=proposal['approvals'].get(str(root)))
+    output['data'] = dict(root=str(root) if root is not None else None, plan_hash=plan_hash, approval=selected_approval)
     output['would_change'] = proposal != approval
     if proposal != approval:
         output['actions'] = [dict(kind=args.command, status='planned', path=str(home / 'integration.json'))]

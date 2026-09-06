@@ -125,3 +125,39 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         self.approve()
         self.assertEqual(self.call('integration', 'approve', '--project', self.project, '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'], 'plan.stale')
         self.call('ensure', '--event', 'unknown', code=2)
+
+    def test_repository_clone_boundary_identity_and_revocation(self):
+        self.git(self.project, 'config', 'user.name', 'Fixture')
+        self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(self.project, 'add', '.mask.json')
+        self.git(self.project, 'commit', '-m', 'declaration')
+        boundary = self.base / 'clones'
+        boundary.mkdir()
+        self.call('integration', 'approve', '--repository', str(self.project), '--under', boundary)
+        clone = boundary / 'approved'
+        self.git(self.base, 'clone', str(self.project), str(clone))
+        self.call('ensure', '--project', clone)
+        self.assertTrue((clone / '.agents/skills/alpha').is_symlink())
+        self.call('integration', 'revoke', '--project', clone, code=4)
+        outside = self.base / 'outside'
+        self.git(self.base, 'clone', str(self.project), str(outside))
+        self.call('ensure', '--project', outside, code=4)
+        self.git(clone, 'remote', 'set-url', 'origin', str(self.source))
+        self.call('ensure', '--project', clone, code=4)
+        self.git(clone, 'remote', 'set-url', 'origin', str(self.project))
+        self.call('integration', 'revoke', '--repository', str(self.project), '--under', boundary)
+        self.call('ensure', '--project', clone, code=4)
+
+    def test_replaced_clone_boundary_and_credential_identity_refuse(self):
+        boundary = self.base / 'clones'
+        boundary.mkdir()
+        self.call('integration', 'approve', '--repository', str(self.source), '--under', boundary)
+        boundary.rename(self.base / 'old-boundary')
+        boundary.mkdir()
+        clone = boundary / 'new'
+        self.git(self.base, 'clone', str(self.source), str(clone))
+        (clone / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        self.call('ensure', '--project', clone, code=4)
+        result = self.call('integration', 'approve', '--repository', 'https://user:secret@example.invalid/org/repo', '--under', boundary, code=3)
+        self.assertNotIn('secret', json.dumps(result))
+        self.call('integration', 'approve', '--repository', str(self.source), '--project', self.project, '--under', boundary, code=2)

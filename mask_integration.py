@@ -35,7 +35,9 @@ def registration(home):
 
 
 def validate_record(root, record):
-    c.fields(record, ('root', 'identity', 'common', 'common_identity', 'mode', 'interpreter', 'program', 'home'), family='integration')
+    c.fields(record, ('root', 'identity', 'common', 'common_identity', 'mode', 'interpreter', 'program', 'home'), ('scope',), family='integration')
+    if record.get('scope', 'project') not in ('project', 'user') or record.get('scope') == 'user' and record['mode'] not in ('claude', 'codex'):
+        c.fail('integration.invalid', 'Invalid integration scope.')
     if binding(record) != root or record['mode'] not in ('named', 'directory', 'claude', 'codex'):
         c.fail('integration.invalid', 'Invalid integration binding.')
     for key in ('root', 'common', 'interpreter', 'program', 'home'):
@@ -78,7 +80,19 @@ def binding(record):
 
 
 def host_file(record):
-    return Path(record['root']) / ('.claude/settings.local.json' if record['mode'] == 'claude' else '.codex/hooks.json')
+    relative = '.codex/hooks.json'
+    if record['mode'] == 'claude':
+        relative = '.claude/settings.json' if record.get('scope') == 'user' else '.claude/settings.local.json'
+    return Path(record['root']) / relative
+
+
+def host_root(home):
+    state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+    if state.get('user'):
+        root = Path(state['user']['root'])
+        c.registered_root(root, state['user'], 'user')
+        return root
+    return Path.home().resolve()
 
 
 def host_settings(record):
@@ -178,7 +192,10 @@ def dispatch(args, output, home):
     agent = getattr(args, 'agent', None)
     if bool(getattr(args, 'git', False)) == bool(agent) or agent is not None and agent not in ('claude', 'codex'):
         c.fail('invocation.invalid', 'Select exactly one of --git or --agent claude|codex.', 2)
-    root = c.project_root(args.project)
+    project = getattr(args, 'project', None)
+    if agent is None and project is None:
+        c.fail('invocation.invalid', 'Per-repository Git installation requires --project.', 2)
+    root = c.project_root(project) if project else host_root(home)
     common = str(root) if agent else c.git(root, 'rev-parse', '--git-common-dir', optional=True)
     if common is None:
         c.fail('integration.invalid', 'Git integration requires a repository.', 4)
@@ -190,6 +207,8 @@ def dispatch(args, output, home):
     record = previous or dict(root=str(root), identity=c.identity(root), common=str(common), common_identity=c.identity(common),
                               mode=agent or ('named' if named_hooks(root) else 'directory'), interpreter=str(Path(sys.executable).resolve()),
                               program=str(Path(__file__).resolve().parent), home=str(home))
+    if project is None:
+        record = dict(record, scope='user')
     check_record(record)
     after = copy.deepcopy(before)
     if enable:

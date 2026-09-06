@@ -25,8 +25,8 @@ host starts. Existing Codex local-environment scripts are preserved; the adapter
 returns a pinned command for composition rather than taking over setup.
 
 Apple Git lacks named hooks. The fallback covers an installed repository and
-its approved linked worktrees. Future clones require explicit root approval and
-startup/prelaunch readiness. Configured named-hook execution remains unverified
+its approved linked worktrees. Future clones require direct or repository-boundary approval and
+startup/prelaunch readiness. The user-level startup adapter and physical clone-boundary policy are exercised by the MASK-0081 fixtures. Configured named-hook execution remains unverified
 on a capable Git version; no Git upgrade was performed.
 
 Windows acceptance is open. The repository's remote-station registry contains

@@ -189,11 +189,10 @@ The source/configuration and result schemas remain v1.
 `integration approve --project PATH [--linked-worktrees] [--inactive-branches]`
 records physical-root authority in `MASK_HOME/integration.json`. Approval is
 separate from installing an integration and from ordinary explicit registration.
-`integration revoke --project PATH` removes that authority while preserving links.
+`integration revoke --project PATH` removes direct authority while preserving links. It refuses when a broader linked-worktree or repository approval would still authorize the root.
 Both commands support dry-run and a plan guard. `integration inspect --project PATH`
 reports approval, the registration identity used for retirement, owned adapter
-configuration, and unverified host loading. Approval by repository URL/clone-root
-boundary is not implemented; approve each clone's physical root explicitly.
+configuration, and unverified host loading. `integration approve --repository ID --under ROOT` authorizes future repository roots beneath an existing physical clone directory. The directory identity and exact credential-free origin identity must match; outside or replaced boundaries refuse. Use the matching `integration revoke --repository ID --under ROOT` to remove that policy.
 
 `ensure [--project PATH] [--event EVENT] [--check] [--offline] [--dry-run]`
 registers and reconciles an approved project under the ordinary writer lock.
@@ -226,7 +225,7 @@ only the recorded owned hook/config entries. V1/v2 journals retain their readers
 Program self-update still refuses schema changes: update the program checkout
 explicitly before using this persistence boundary.
 
-`integration enable|disable --project PATH (--git | --agent claude|codex)`
+`integration enable|disable [--project PATH] (--git | --agent claude|codex)`
 supports dry-run and guards. Git capability is probed: named hooks are preferred
 when supported; otherwise only unoccupied per-repository hook files are used.
 An existing hook manager is preserved. Installed events cover checkout, merge,
@@ -236,8 +235,8 @@ Failures warn that the Git operation already completed. Internal Git commands
 suppress directory and configured event hooks. Hook children have a 30-second
 deadline and process-tree cleanup; interrupted effects require explicit recovery.
 
-Claude configuration adds an owned SessionStart group to
-`.claude/settings.local.json`; Codex uses `.codex/hooks.json`. Other settings and
+With `--project`, Claude configuration adds an owned SessionStart group to
+`.claude/settings.local.json`; Codex uses `.codex/hooks.json`. Without `--project`, an agent adapter is installed at the registered personal home, or the OS home if personal scope is unregistered: Claude uses `.claude/settings.json`, and Codex uses `.codex/hooks.json`. This installs an adapter without creating a personal skill selection or registration. Git installation always requires `--project`. Other settings and
 groups are preserved. Removal refuses an edited owned group and may retain empty
 JSON containers. These edits do not approve a repository or change host trust.
 Claude requests `reloadSkills` after readiness and is a warning-only startup
