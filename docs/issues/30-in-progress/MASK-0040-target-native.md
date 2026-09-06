@@ -34,4 +34,10 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Integration candidate: ececbf7e391211744b7e3c7b2c628da0136e8b77, source d33323e6a9f7054ae7ffc073bd6d082c0110b7c7 plus targeting c2fa4962f06349d33169fae478b69b7f758e7bb4. Native Windows execution is in progress; no Windows result is asserted yet.
+
+## Current verification
+
+The macOS unittest loader check passed 11 selected methods in 123.364s, no skips: seven combined pin/migration/update recovery methods, independent v2 user/project agents, legacy scope independence, collision preflight and linked-parent/overlap refusal. Exact names and fixture cleanup will be retained in the targeting acceptance note. All eleven tracked fixture roots were absent after execution.
+
+The Windows run uses existing example-win-host SSH, explicit noninteractive PowerShell and native Python314 in a detached disposable checkout of the candidate. It validates the shared implement-rfc project context before the unittest loader. Owned remote root: C:/Users/example/AppData/Local/Temp/mask-native-driver-6_3rql1g-vql84kve. The owner clone/station is not its output root. Run the new engine/migration/update/targeting/compatibility/adapter/conflict suites, changed lock guard, three native user-scope ownership methods, launcher suite and native Windows Job assignment-prerequisite test. Reuse unchanged earlier native source/import/artifact coverage. Exact remaining fixtures are reported by the temporary driver before cleanup.
