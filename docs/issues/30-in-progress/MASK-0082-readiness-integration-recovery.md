@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0082"
 title: "Resolve readiness integration and recovery regressions"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0025", "MASK-0026", "MASK-0081"]
 ---
