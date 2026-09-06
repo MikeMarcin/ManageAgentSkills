@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0068"
 title: "Verify and close RFC-MASK-0007"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0030", "MASK-0031", "MASK-0032", "MASK-0033"]
 closeout_for: ["RFC-MASK-0007"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-7", "stage": "B — source foundation", "provisional_id": false, "closeout": true}
+acceptance: [{"criterion":"RFC-MASK-0007-AC01","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Two independent local bare sources, root/nested/indexed discovery, qualified-name and ref/path ambiguity: source/discovery public subprocess tests; 31-test native source slice also passed."}},{"criterion":"RFC-MASK-0007-AC02","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Machine-v2 approved URI/transport checks, rewrite/redirect/scp refusal and corrected independent-review findings passed; explicit v1 compatibility remains documented until source migration."}},{"criterion":"RFC-MASK-0007-AC03","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Public copy/import/provenance integration preserves raw bytes, notice mappings, staged work and HEAD; collisions and late changed inputs refuse; explicit adaptation recording and cached assertions are covered."}},{"criterion":"RFC-MASK-0007-AC04","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Raw-object and import adversarial tests cover links/submodules/LFS/activation metadata, path aliases, byte/count/depth limits, bounded subprocess capture and native process-tree containment. Polled fetch storage may transiently overshoot."}},{"criterion":"RFC-MASK-0007-AC05","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Explicit source migration preserves exact old control/link bytes, repeated init and old recovery; live references prevent removal, and read/dry-run snapshots remain observational."}},{"criterion":"RFC-MASK-0007-AC06","outcome":"pass","revision":"815fb060e6d51ffe034141275a62fd3d1a898c96","evidence":{"kind":"observation","detail":"Registered CLI commands/capabilities and current docs agree on catalog-only approval, resolution_required, import/fetch effects, offline preview, provenance levels, limits and no default publication."}}]
 ---
 
 # MASK-0068: Verify and close RFC-MASK-0007
