@@ -94,3 +94,5 @@ AgentSkills card is not yet allocated. Upstream completion revision and local ha
 Existing RFCs 0001–0005, cards 0001–0022 and tracker instructions are preserved. NEXT_ID advanced only through the allocator. No collisions required renumbering. The packet snapshot matches the current CLI version; the actual baseline includes later historical closeout records. Packet roadmap/index remain immutable provenance rather than a second live tracker. Editor files, bytecode and caches are excluded. Synthetic fixture hashes and reports are examples, never live acceptance. No hook installation, device enrollment, publication, credential changes or consumer migration occurred during import.
 
 Temporary roots: none. Packet validation passed before import; this establishes packet consistency only.
+
+Import correction: live scheduling platform tokens normalized from packet `macos`/`windows` to canonical `mac`/`win`; original packet remains unchanged.

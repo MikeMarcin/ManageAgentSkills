@@ -5,7 +5,7 @@ title: "Verify native macOS workspace and host readiness"
 status: "Backlog"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
-platforms: ["macos"]
+platforms: ["mac"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "readiness-mac", "stage": "A — first usable milestone", "provisional_id": false}
 ---
 
