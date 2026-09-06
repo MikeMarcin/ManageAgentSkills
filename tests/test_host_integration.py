@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 
 from tests.support import Fixture, ENTRY
@@ -106,3 +107,25 @@ class HostIntegrationTests(Fixture):
         before = self.snapshot()
         self.call('integration', 'disable', '--agent', 'codex', '--project', self.project, code=4)
         self.assertEqual(before, self.snapshot())
+
+    def test_native_macos_launcher_and_installed_host_prelaunch(self):
+        if sys.platform != 'darwin':
+            self.skipTest('Native macOS acceptance')
+        self.call('integration', 'approve', '--project', self.project)
+        binary = self.base / 'launchers'
+        binary.mkdir()
+        self.call('self', 'install', '--bin-dir', binary)
+        launcher = binary / 'mask'
+        environment = dict(os.environ, MASK_HOME=str(self.home))
+        run = subprocess.run([str(launcher), 'ensure', '--project', str(self.project), '--json'], env=environment, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
+        for agent in ('claude', 'codex'):
+            with self.subTest(agent=agent):
+                if shutil.which(agent) is None:
+                    continue  # Loading is never inferred from an absent host.
+                run = subprocess.run([str(launcher), 'launch', '--agent', agent, '--project', str(self.project), '--json', '--', '--version'], env=environment, capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+                result = json.loads(run.stdout)
+                self.assertEqual(result['data']['host']['exit_code'], 0)
+                self.assertTrue(result['data']['host']['stdout'].strip())
