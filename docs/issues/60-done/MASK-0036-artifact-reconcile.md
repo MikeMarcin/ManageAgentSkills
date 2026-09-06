@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0036"
 title: "Retarget owned links and recover lock/artifact transitions"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0035"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "artifact-reconcile", "stage": "B — reproducible content", "provisional_id": false}
+acceptance: [{"criterion":"MASK-0036 bounded pinned artifact activation and typed recovery","outcome":"pass","revision":"53522576740ecbd3cd237742a3d777592e056cb3","evidence":{"kind":"observation","detail":"Public worktree/user/readiness and crash recovery checks recorded in Run record; independently reproduced omission/intermediate-absence defects corrected and affected21method run passed20 withone nativeWindows-only Macskip. Migration and native engine remain open."}}]
 ---
 
 # MASK-0036: Retarget owned links and recover lock/artifact transitions
@@ -31,7 +32,15 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Implemented bounded pinned-engine slice at `53522576740ecbd3cd237742a3d777592e056cb3`. New project/personal v2 consumers use the ordinary planner/executor with state3 ownership, independent old/new artifact identities, typed exact declaration/lock transitions, unlocked preparation and explicit source/scope hydration authority. Existing legacy records and state versions remain readable; selected legacy conversion/config migration remain MASK-0037. Preview/check stay observational, readiness never changes a lock/ref, and preparation effects survive later failures. Basic whole-selection agents work; RFC-0009 per-binding semantics remain typed unsupported.
+
+Verification: `python3 -B -m unittest tests.test_pinned_recovery tests.test_reconcile_apply tests.test_recovery tests.test_ensure tests.test_launcher` ran 36 methods in 80.827s: 35 passed, one expected macOS skip for native Windows symlink error mapping. Focused follow-ups passed 6 methods/23.880s (adoption, exact-fetch authority, actual HEAD movement, linear verification, corruption, typed retarget); 3/12.824s (preparation CAS, late effects/cache-only restoration, inactive branch); 3/13.104s (journal source/control binding and affected transitions); 2/8.487s (metadata/provenance dedup and malformed resolution IDs); and 1/2.674s (implicit mode-conversion refusal).
+
+Independent saved-journal review: rfc-reviewer, GPT-6 Astra/high. It reproduced incomplete typed-lock effect coverage and unrecoverable absence between unlink/replacement. Primary additionally reproduced incomplete link-effect coverage and identified extension stripping. Corrected journals require complete controls/changed links, selected pinned observations and final owned-leaf verification. Expected intermediate absence remains recoverable while real entries and changed raw targets remain protected. The affected command covered `test_saved_journal_cannot_strip_pinned_extension`, `test_typed_lock_transition_retarget_and_tamper`, `test_retarget_unlink_crash_and_transient_create_failure_recover`, `test_recovery_dedup_keeps_metadata_claims_and_bad_resolution_typed`, `test_inactive_pinned_branch_requires_recorded_lock_evidence`, plus `tests.test_recovery tests.test_reconcile_apply`: 21 methods/44.124s, 20 passed and the same expected Windows-only skip on macOS. No second full review or unrelated suite rerun.
+
+Integrator updated the obsolete lock guard expectation to the shipped stage and ran `python3 -B -m unittest tests.test_locks.LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations tests.test_cli_protocol`: 5 passed/5.949s. `git diff --check` passed. Worker/reviewer/primary fixture roots were cleaned; user `.DS_Store` preserved.
+
+This closes the artifact-engine portion of AC04/05 and supplies worktree isolation/readiness evidence for AC01/03. Full legacy/config migration and targeted update acceptance remain MASK-0037; native pinned-engine/targeting acceptance remains open. No full RFC8 completion or host-load claim.
 
 ## Bounded implementation plan
 

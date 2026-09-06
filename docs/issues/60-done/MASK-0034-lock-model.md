@@ -67,3 +67,9 @@ Focused public checks cover canonical order and malformed inputs, exact SHA-1/
 SHA-256/path identity, raw CRLF/executable supporting bytes, source approval,
 missing/stale lock handling, selected refresh/ref-rebind refusal, unchanged refs
 and source movement leaving a lock unchanged, and observational previews.
+
+## Native Windows follow-through
+
+ExampleWinHost native Python3.14.6/Windows11, committed candidate `8cb1ab00c1fae6c38a576466efb834398fb5e622`: `python -B -m unittest tests.test_locks tests.test_artifacts` ran 22 methods/219.598s, 21 passed and one fixture error before the hydration path (readonly loose Git object during task-owned cleanup). Fixture-only correction `6d36d6f` reran `tests.test_artifacts.ArtifactTests.test_public_exact_hydration_keeps_selectors_and_controls_unchanged`: passed/10.870s. No production correction or unittest skip. Logical modes were checked without claiming POSIX permission evidence on Windows. The later MASK-0036 stage changes one lock guard expectation; that changed method remains for the engine native milestone.
+
+Both disposable native checkouts (`mask-native-driver-6_3rql1g-2zcsbrrm` and `mask-native-driver-6_3rql1g-dzj59o9r` beneath example's Temp) were removed after clean Git status. Shared implement-rfc `project_config.py --repo-root` validated each checkout. Owner clone and retained station were untouched. Logs consumed here; only the reusable local native driver remains for later native checks.
