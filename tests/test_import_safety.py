@@ -114,7 +114,7 @@ class ImportSafetyTests(Fixture):
     def test_public_resource_policy_checks_zero_and_multiple_files_before_reads(self):
         self.frozen({'a': b'12345678', 'b': b'abcdefgh', 'empty': b''})
         self.prepare_public()
-        size = (self.source / 'skills/alpha/SKILL.md').stat().st_size
+        size = int(self.git(self.source, 'cat-file', '-s', 'HEAD:skills/alpha/SKILL.md'))
         self.assertEqual(self.limited_cli({'FILE_BYTES': size, 'PACKAGE_BYTES': size + 16}, 0)['data']['file_count'], 4)
         for policy in ({'FILE_BYTES': 0}, {'PACKAGE_BYTES': size + 15}, {'FILE_COUNT': 3}, {'TREE_BYTES': 1}):
             with self.subTest(policy=policy):
