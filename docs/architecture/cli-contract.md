@@ -267,3 +267,28 @@ Adapter contracts: [Git hooks](https://git-scm.com/docs/git-hook),
 Additional error families are `user.not_registered`, `user.not_found`,
 `user.already_registered`, `user.unavailable`, `user.identity_changed`, and
 `target.overlap`. Ownership, stale-plan, and recovery errors retain existing codes.
+
+## Legacy inventory (unreleased RFC-MASK-0011 slice)
+
+`inventory [--project PATH | --user | --all] [--include-unmanaged]` reports the
+selected registered consumers. Without a selector it uses the current project.
+`skill where-used legacy/ID [--agent claude|codex] [--scope user|project]` searches
+registered local declarations and ownership for that skill. The `legacy` alias
+identifies the currently configured single source; other aliases refuse until
+multi-source support ships.
+
+Both commands accept `--limit 1..1000` (default 100) and `--offset N`, with
+`total_rows` and `next_offset` in the result. Pagination limits output; the
+reported work counters describe the full selected query. No network operation,
+writer lock, package-content scan or registry update occurs. Narrow inverse
+queries read relevant consumer declarations and only the selected skill/agent
+leaves. `--include-unmanaged` enumerates supported discovery directories one
+level deep and never follows neighboring links or adopts content.
+
+Rows distinguish declared-but-missing deployment, converged or drifted ownership,
+unmanaged entries, blocked input and unavailable consumers. Unavailable cached
+selections are labeled diagnostic, with no claim that they are current. Broken
+source targets are drifted. `artifact` and upstream repository identity are null;
+`recorded_source_revision` is historical ownership metadata, never a content pin.
+Compatibility is unspecified and host loading is unverified. Pin/profile/fleet
+fields and full update-impact reports remain unimplemented RFC work.

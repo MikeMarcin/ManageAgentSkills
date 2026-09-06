@@ -23,6 +23,7 @@ import mask_git as git_ops
 import mask_install as install_ops
 import mask_ensure as ensure_ops
 import mask_integration as integration_ops
+import mask_report as report_ops
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -44,6 +45,8 @@ COMMANDS = {
     'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
     'skill.list': (False, False, []),
     'skill.show': (False, False, [('id', 'pos'), ('content', 'flag')]),
+    'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int')]),
+    'inventory': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('include-unmanaged', 'flag'), ('limit', 'int'), ('offset', 'int')]),
     'skill.validate': (False, False, [('id', 'optional'), ('all', 'flag')]),
     'project.init': (True, False, [('project', 'value')]),
     'project.show': (False, False, [('project', 'value')]),
@@ -165,7 +168,7 @@ CONFLICTS = {
 }
 for action in ('set', 'set-targets'):
     CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
-for command in ('plan', 'apply', 'doctor'):
+for command in ('plan', 'apply', 'doctor', 'inventory'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 
@@ -405,6 +408,8 @@ def local_dispatch(args, output, leaves):
     if command == 'capabilities':
         output['data'] = capabilities(leaves)
         return
+    if command in ('inventory', 'skill.where-used'):
+        return report_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
         return integration_ops.dispatch(args, output, home)
     if command in ('ensure', 'workspace.forget') or command.startswith('integration.'):
