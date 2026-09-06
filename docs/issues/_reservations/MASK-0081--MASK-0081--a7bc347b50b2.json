@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0081"
+  ],
+  "reserve_for": "readiness-clone-boundary",
+  "purpose": "",
+  "created": "2026-09-06T02:18:31.811742+00:00",
+  "base": "203fed4e0718c8932759bed8d0ae68e15583a102"
+}
