@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0028"
 title: "Verify native macOS workspace and host readiness"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
 platforms: ["mac"]
