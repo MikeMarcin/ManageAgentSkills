@@ -226,8 +226,9 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
     hook_options = [] if inspect_hooks else ['-c', 'core.hooksPath=' + os.devnull]
     # Older Git ignores these settings; capable Git disables every known event.
     # An environment token alone cannot suppress third-party configured hooks.
-    for event in HOOK_EVENTS:
-        hook_options.extend(('-c', f'hook.{event}.enabled=false'))
+    if not inspect_hooks:
+        for event in HOOK_EVENTS:
+            hook_options.extend(('-c', f'hook.{event}.enabled=false'))
     command = ['git', *hook_options, '-C', str(root), *args]
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
     try:

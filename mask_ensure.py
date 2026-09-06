@@ -71,7 +71,7 @@ def integration(args, output, home):
         record = state['projects'].get(str(root))
         output['data'] = dict(root=str(root), approved=authorized(root, approval), host_load='not_verified',
                               registration_identity=c.digest(record['root_identity']) if record else None,
-                              coverage=integrations.coverage(integrations.registration(home)['installations'].get(str(root))))
+                              coverage=integrations.inspect_coverage(home, root))
         return
     proposal = copy.deepcopy(approval)
     if args.command == 'integration.approve':
@@ -114,42 +114,50 @@ def ensure(args, output, home):
     output['data'] = dict(readiness='blocked', host_load='not_verified', event=event)
     if c.kind(home / 'pending.json') != 'missing':
         c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
+    config = c.config(c.read_json(home / 'config.json'))
+    state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     selection = getattr(args, 'project', None)
     try:
         root = c.project_root(selection)
     except c.MaskError as error:
-        if selection is not None or error.code != 'manifest.missing':
+        if selection is None and error.code == 'project.not_found' and event == 'startup' and state.get('user'):
+            root = None
+        elif selection is None and error.code == 'manifest.missing':
+            root = c.project_root(initializing=True)
+        else:
             raise
-        # Missing declarations may be a verified inactive branch at the boundary.
-        root = c.project_root(initializing=True)
     approval = policy(home)
-    if not authorized(root, approval):
+    if root is not None and not authorized(root, approval):
         output['data']['readiness'] = 'approval_required'
         c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(root))
-    config = c.config(c.read_json(home / 'config.json'))
-    state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
-    observation = workspace_observation(root)
-    if observation['index'] and any(line.split('\t', 1)[0].split()[-1] != '0' for line in observation['index'].splitlines()):
+    observation = workspace_observation(root) if root is not None else None
+    if observation and observation['index'] and any(line.split('\t', 1)[0].split()[-1] != '0' for line in observation['index'].splitlines()):
         c.fail('readiness.blocked', 'The declaration has unresolved index conflicts.', 4)
     inactive = []
     proposed_approval = copy.deepcopy(approval)
     entry = proposed_approval['approvals'].get(str(root))
-    if observation['manifest'] is None:
+    if observation and observation['manifest'] is None:
         if not inactive_branch(root, state['projects'].get(str(root)), entry, observation):
             c.fail('manifest.missing', 'Missing declaration is not a proven opted-in inactive branch.', 4)
         inactive = [str(root)]
-    elif entry is not None and observation['head'] is not None:
+    elif observation and entry is not None and observation['head'] is not None:
         tracked = c.git(root, 'show', observation['head'] + ':./.mask.json', optional=True)
         if tracked is not None and tracked == observation['manifest'].strip() and not observation['unsafe']:
             manifest_digest = c.digest(c.manifest(c.parse_json(observation['manifest'], 'manifest')))
             if entry.get('tracked', {}).get('manifest_digest') != manifest_digest:
                 entry['tracked'] = dict(head=observation['head'], manifest_digest=manifest_digest)
-    register = [str(root)] if str(root) not in state['projects'] else []
-    planned = fs.plan(config, state, [root], register=register, home=home,
+    roots = [root] if root is not None else []
+    observations = [observation] if observation else []
+    user_root = Path(state['user']['root']) if event == 'startup' and state.get('user') else None
+    if user_root is not None:
+        roots.append(user_root)
+        observations.append(workspace_observation(user_root, scope='user', home=home))
+    register = [str(root)] if root is not None and str(root) not in state['projects'] else []
+    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root,
                       operation='ensure.deactivate' if inactive else 'ensure', source_status=False, inactive=inactive)
-    policy_before = c.read_text(home / 'integration.json', 'integration')
+    policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
     policy_after = c.text_json(proposed_approval) if proposed_approval != approval else policy_before
-    planned['intent']['controls'] = dict(workspaces=[observation], policy_before=policy_before, policy_after=policy_after)
+    planned['intent']['controls'] = dict(workspaces=observations, policy_before=policy_before, policy_after=policy_after)
     planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], controls=planned['intent']['controls']))
     if policy_after != policy_before:
         planned['actions'].append(dict(kind='integration.record', status='planned', path=str(home / 'integration.json')))
@@ -163,7 +171,7 @@ def ensure(args, output, home):
             c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7)
     elif not output['dry_run']:
         # Recheck mutable inputs under the same writer lock, with no second payload scan.
-        if policy(home) != approval or not authorized(root, approval):
+        if policy(home) != approval or root is not None and not authorized(root, approval):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
     output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if inactive else 'ready_legacy_unpinned'
@@ -177,9 +185,9 @@ def dispatch(args, output, home):
     return integration(args, output, home)
 
 
-def workspace_observation(root):
-    head = c.git(root, 'rev-parse', '--verify', 'HEAD', optional=True)
-    git_dir = c.git(root, 'rev-parse', '--absolute-git-dir', optional=True)
+def workspace_observation(root, *, scope='project', home=None):
+    head = c.git(root, 'rev-parse', '--verify', 'HEAD', optional=True) if scope == 'project' else None
+    git_dir = c.git(root, 'rev-parse', '--absolute-git-dir', optional=True) if scope == 'project' else None
     unsafe = False
     index = None
     if git_dir:
@@ -188,9 +196,12 @@ def workspace_observation(root):
                   or bool(c.git(root, 'ls-files', '--unmerged'))
                   or any(c.kind(directory / name) != 'missing' for name in ('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD')))
         index = c.git(root, 'ls-files', '--stage', '--', '.mask.json')
-    return dict(root=str(root), identity=c.identity(root), head=head, git_dir=git_dir,
+    result = dict(root=str(root), identity=c.identity(root), head=head, git_dir=git_dir,
                 git_identity=c.identity(Path(git_dir)) if git_dir else None,
-                index=index, unsafe=unsafe, manifest=c.read_text(root / '.mask.json', 'manifest', missing=True))
+                index=index, unsafe=unsafe, manifest=c.read_text(c.declaration_path(root, scope, home), 'manifest', missing=True))
+    if scope == 'user':
+        result['scope'] = 'user'
+    return result
 
 
 def inactive_branch(root, record, entry, observation):
@@ -215,15 +226,18 @@ def validate_controls(pending, home):
         c.fail('recovery.conflict', 'Invalid readiness observations.', 8)
     roots = []
     for observation in controls['workspaces']:
-        c.fields(observation, ('root', 'identity', 'head', 'git_dir', 'git_identity', 'index', 'unsafe', 'manifest'), family='recovery')
+        c.fields(observation, ('root', 'identity', 'head', 'git_dir', 'git_identity', 'index', 'unsafe', 'manifest'), ('scope',), family='recovery')
         roots.append(observation['root'])
         if observation['root'] not in pending['selected']:
             c.fail('recovery.conflict', 'Unselected readiness root.', 8)
+        selected_state = pending['before_state'] if observation['root'] in c.consumer_records(pending['before_state']) else pending['after_state']
+        if observation.get('scope', 'project') != c.consumer_scope(selected_state, observation['root']):
+            c.fail('recovery.conflict', 'Readiness scope differs from ownership.', 8)
         if observation['manifest'] is not None:
             c.manifest(c.parse_json(observation['manifest'], 'manifest'))
     if sorted(roots) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Readiness control coverage differs from selection.', 8)
-    before, after = [validate_policy(c.parse_json(controls['policy_' + side], 'integration')) for side in ('before', 'after')]
+    before, after = [validate_policy(c.parse_json(controls['policy_' + side], 'integration')) if controls['policy_' + side] is not None else dict(schema_version=1, approvals={}) for side in ('before', 'after')]
     # Readiness may record tracked evidence, but cannot grant or revoke authority.
     for value in (before, after):
         for root in roots:
@@ -235,11 +249,11 @@ def validate_controls(pending, home):
 
 def check_controls(pending, home):
     controls = pending['controls']
-    if c.read_text(home / 'integration.json', 'integration') not in (controls['policy_before'], controls['policy_after']):
+    if c.read_text(home / 'integration.json', 'integration', missing=True) not in (controls['policy_before'], controls['policy_after']):
         c.fail('recovery.conflict', 'Readiness authority changed after preparation.', 8)
     for expected in controls['workspaces']:
         root = Path(expected['root'])
-        if not root.is_dir() or root.resolve() != root or workspace_observation(root) != expected:
+        if not root.is_dir() or root.resolve() != root or workspace_observation(root, scope=expected.get('scope', 'project'), home=home) != expected:
             c.fail('recovery.conflict', 'Readiness worktree or declaration changed after preparation.', 8, root=str(root))
 
 

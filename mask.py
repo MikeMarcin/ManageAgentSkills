@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import sys
+import shutil
+import subprocess
 
 VERSION = '0.2.0'
 PROTOCOL_VERSION = 1
@@ -58,8 +60,9 @@ COMMANDS = {
     'integration.approve': (True, False, [('project', 'required'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag')]),
     'integration.revoke': (True, False, [('project', 'required')]),
     'integration.inspect': (False, False, [('project', 'value')]),
-    'integration.enable': (True, False, [('project', 'required'), ('git', 'flag')]),
-    'integration.disable': (True, False, [('project', 'required'), ('git', 'flag')]),
+    'integration.enable': (True, False, [('project', 'required'), ('git', 'flag'), ('agent', 'value')]),
+    'integration.disable': (True, False, [('project', 'required'), ('git', 'flag'), ('agent', 'value')]),
+    'launch': (True, False, [('project', 'value'), ('agent', 'required'), ('host_args', 'remainder')]),
     'workspace.forget': (True, False, [('path', 'pos'), ('expect-identity', 'required')]),
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
@@ -87,7 +90,9 @@ COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'fl
 
 def argument(parser, name, shape):
     kwargs = {'default': argparse.SUPPRESS}
-    positional = shape in {'pos', 'optional', 'many', 'some'}
+    positional = shape in {'pos', 'optional', 'many', 'some', 'remainder'}
+    if shape == 'remainder':
+        kwargs['nargs'] = argparse.REMAINDER
     if shape == 'flag':
         kwargs['action'] = 'store_true'
     elif shape == 'repeat':
@@ -485,6 +490,28 @@ def local_dispatch(args, output, leaves):
 
 
 def dispatch(args, output, leaves):
+    if args.command == 'launch':
+        if args.agent not in ADAPTERS:
+            core.fail('invocation.invalid', 'Choose a supported agent.', 2)
+        executable = shutil.which(args.agent)
+        if executable is None or os.name == 'nt' and Path(executable).suffix.lower() in ('.cmd', '.bat'):
+            core.fail('host.unavailable', 'Configure a directly executable host on PATH before launch.', 4)
+        ensure_args = argparse.Namespace(**vars(args))
+        ensure_args.command, ensure_args.event = 'ensure', 'startup'
+        dispatch(ensure_args, output, leaves)
+        if output['dry_run']:
+            return
+        operands = getattr(args, 'host_args', [])
+        if operands and operands[0] == '--':
+            operands = operands[1:]
+        run = subprocess.run([executable, *operands], cwd=getattr(args, 'project', None),
+                             capture_output=getattr(args, 'json', False), text=True)
+        output['data']['host'] = dict(agent=args.agent, exit_code=run.returncode, executable=executable)
+        if getattr(args, 'json', False):
+            output['data']['host'].update(stdout=run.stdout, stderr=run.stderr)
+        if run.returncode:
+            core.fail('host.failed', 'The host exited unsuccessfully after readiness.', 5, exit_code=run.returncode)
+        return
     if args.command not in IMPLEMENTED:
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
     mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))

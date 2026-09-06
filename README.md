@@ -73,6 +73,21 @@ mask doctor --project /absolute/path/to/project --check --json
 
 Deploying `implement-rfc` also requires [consumer workflow context](https://github.com/MikeMarcin/AgentSkills#configure-implement-rfc).
 
+For repeated workspace readiness, the unreleased RFC-MASK-0006 implementation
+adds explicit approval and `ensure`:
+
+```sh
+mask integration approve --project /absolute/path/to/project --json
+mask ensure --project /absolute/path/to/project --json
+mask ensure --project /absolute/path/to/project --check --json
+```
+
+`ensure` registers and reconciles under one lock without a caller-supplied hash.
+It reads local source content and preserves ownership/recovery refusals. Opt-in
+Git and host startup adapters are described in the
+[readiness contract](docs/architecture/cli-contract.md#workspace-readiness-unreleased-rfc-mask-0006-additions).
+Native Windows acceptance and actual first-prompt host loading remain open.
+
 | Intent | Command |
 |---|---|
 | Add requirements without removing others | `project require ID ...` |

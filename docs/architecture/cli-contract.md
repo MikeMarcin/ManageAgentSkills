@@ -184,6 +184,86 @@ bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
 Capabilities report readable state/journal versions `[1, 2]` and latest version 2.
 The source/configuration and result schemas remain v1.
 
+## Workspace readiness (unreleased RFC-MASK-0006 additions)
+
+`integration approve --project PATH [--linked-worktrees] [--inactive-branches]`
+records physical-root authority in `MASK_HOME/integration.json`. Approval is
+separate from installing an integration and from ordinary explicit registration.
+`integration revoke --project PATH` removes that authority while preserving links.
+Both commands support dry-run and a plan guard. `integration inspect --project PATH`
+reports approval, the registration identity used for retirement, owned adapter
+configuration, and unverified host loading. Approval by repository URL/clone-root
+boundary is not implemented; approve each clone's physical root explicitly.
+
+`ensure [--project PATH] [--event EVENT] [--check] [--offline] [--dry-run]`
+registers and reconciles an approved project under the ordinary writer lock.
+It reads the selected legacy source locally, validates selected packages, and
+performs no fetch or whole-source status scan (`source.dirty` is null). It does
+not require a caller-supplied plan hash. `--check` performs no writes and exits 7
+for drift. Busy writers fail immediately with exit 6; pending recovery exits 8.
+No-op runs preserve managed file bytes and registry generations. Filesystem
+readiness is `ready_legacy_unpinned`, separately from `host_load: not_verified`.
+
+Events are `manual`, `startup`, `post-checkout`, `post-merge`, `post-rewrite`, and
+`post-commit`. Startup also preflights the already registered personal consumer
+before any selected scope changes. A session outside Git can reconcile that
+personal consumer alone. It never creates a personal declaration or registration.
+
+Inactive-branch cleanup requires an explicit root approval with
+`--inactive-branches`, a previously observed tracked declaration matching the
+cached selection, and unchanged worktree identity. HEAD/index must omit the
+declaration without sparse checkout, conflicts, or an in-progress merge/rebase.
+Cleanup removes only unchanged owned links, retains registration and the cached
+selection, and creates no manifest. A linked worktree must receive its own
+inactivity opt-in. Missing or ambiguous inputs block without treating them as
+empty selections.
+
+Readiness journals use v3 control observations, while state remains v1/v2.
+Recovery checks exact declaration bytes or expected absence, Git/index identity,
+physical roots, and approval bytes. Changed inputs block both stale completion
+and rollback. Integration-entry journals are another typed v3 variant; recover
+only the recorded owned hook/config entries. V1/v2 journals retain their readers.
+Program self-update still refuses schema changes: update the program checkout
+explicitly before using this persistence boundary.
+
+`integration enable|disable --project PATH (--git | --agent claude|codex)`
+supports dry-run and guards. Git capability is probed: named hooks are preferred
+when supported; otherwise only unoccupied per-repository hook files are used.
+An existing hook manager is preserved. Installed events cover checkout, merge,
+rewrite and post-commit, including manual merge completion. Per-repository
+installation does not cover future clones; startup/prelaunch is the fallback.
+Failures warn that the Git operation already completed. Internal Git commands
+suppress directory and configured event hooks. Hook children have a 30-second
+deadline and process-tree cleanup; interrupted effects require explicit recovery.
+
+Claude configuration adds an owned SessionStart group to
+`.claude/settings.local.json`; Codex uses `.codex/hooks.json`. Other settings and
+groups are preserved. Removal refuses an edited owned group and may retain empty
+JSON containers. These edits do not approve a repository or change host trust.
+Claude requests `reloadSkills` after readiness and is a warning-only startup
+adapter. Codex uses its own context/stop fields and does not receive Claude's
+reload field. Actual first-prompt loading and gate behavior remain unverified.
+For Codex worktree setup, enable returns a pinned ensure command to compose into
+an existing local-environment setup script without replacing that script.
+
+`launch --agent claude|codex [--project PATH] -- HOST_ARGUMENTS...` ensures startup
+readiness first, releases the writer lock, then invokes the selected executable
+from PATH with an argv array. Dry-run never launches. Ordinary mode inherits host
+I/O; `--json` before `--` captures host stdout/stderr in the result. Arguments after
+`--` belong to the host. Missing executables and Windows batch-only launchers
+refuse; direct native Windows host launch still needs native acceptance. A failed
+host exits MASK with 5 and records the host exit code without undoing readiness.
+
+`workspace forget PATH --expect-identity ID` retires a registration only after
+matching its recorded identity. Existing paths use normal owned unregister rules.
+A missing path must be absent from the original, identity-checked Git common
+repository's worktree list; unavailable storage that Git still records refuses.
+The operation never infers removal by scanning/pruning unavailable consumers.
+
+Adapter contracts: [Git hooks](https://git-scm.com/docs/git-hook),
+[Claude hooks](https://code.claude.com/docs/en/hooks), and
+[Codex hooks](https://learn.chatgpt.com/docs/hooks), checked September 5, 2026.
+
 Additional error families are `user.not_registered`, `user.not_found`,
 `user.already_registered`, `user.unavailable`, `user.identity_changed`, and
 `target.overlap`. Ownership, stale-plan, and recovery errors retain existing codes.
