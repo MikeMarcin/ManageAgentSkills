@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0031"
 title: "Resolve skill URLs and bounded indexed/nested packages"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0030"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "source-discovery", "stage": "B — source foundation", "provisional_id": false}
