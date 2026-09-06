@@ -1,0 +1,20 @@
+{
+  "allow_compatibility_skips": false,
+  "apply_before": "2026-09-12T23:00:00Z",
+  "created_at": "2026-09-05T23:00:00Z",
+  "devices": [
+    "mac-example",
+    "windows-example",
+    "offline-example"
+  ],
+  "epoch": "example-only-epoch",
+  "lock_digest": "sha256:8bb0d1a6dfb4f6c1f73928a82302f3a4e025f97b243c71b9788f74d767da16cf",
+  "mode": "tap",
+  "operation_id": "example-only-0001",
+  "parent_intent_digest": null,
+  "schema": "mask.intent.v1",
+  "scope": "user",
+  "selection_digest": "sha256:b3728bcc46ebc7c128efe067572015c3f62764d926c65aa37f2893aac7d607a4",
+  "sequence": 1,
+  "source": "fixture"
+}

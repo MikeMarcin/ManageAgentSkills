@@ -1,0 +1,1768 @@
+{
+  "basis": "supplied v0.2.0 snapshot; not a live checkout",
+  "cards": [
+    {
+      "ac": [
+        1
+      ],
+      "depends": [],
+      "depends_on": [],
+      "id": "MASK-0023",
+      "key": "import",
+      "path": "docs/issues/10-backlog/MASK-0023-import.md",
+      "paths": [
+        "docs/rfcs/README.md",
+        "docs/issues/NEXT_ID",
+        "docs/issues/_reservations/*",
+        "docs/design/*",
+        "live imported RFCs/cards"
+      ],
+      "platforms": [],
+      "rn": 17,
+      "title": "Reconcile live sources and import the staged RFC pack"
+    },
+    {
+      "ac": [
+        2,
+        3
+      ],
+      "depends": [
+        "import"
+      ],
+      "depends_on": [
+        "MASK-0023"
+      ],
+      "id": "MASK-0024",
+      "key": "ensure-core",
+      "path": "docs/issues/10-backlog/MASK-0024-ensure-core.md",
+      "paths": [
+        "mask.py",
+        "mask_ensure.py (new)",
+        "mask_core.py",
+        "mask_fs.py",
+        "tests/test_ensure.py (new)"
+      ],
+      "platforms": [],
+      "rn": 6,
+      "title": "Add one authorized ensure path over the existing reconciler"
+    },
+    {
+      "ac": [
+        3,
+        4,
+        7
+      ],
+      "depends": [
+        "ensure-core"
+      ],
+      "depends_on": [
+        "MASK-0024"
+      ],
+      "id": "MASK-0025",
+      "key": "ensure-lifecycle",
+      "path": "docs/issues/10-backlog/MASK-0025-ensure-lifecycle.md",
+      "paths": [
+        "mask_ensure.py",
+        "mask_fs.py",
+        "schemas/pending-v3.schema.json (new)",
+        "tests/test_workspace_lifecycle.py (new)"
+      ],
+      "platforms": [],
+      "rn": 6,
+      "title": "Implement branch inactivity and bounded readiness recovery"
+    },
+    {
+      "ac": [
+        1,
+        5
+      ],
+      "depends": [
+        "ensure-lifecycle"
+      ],
+      "depends_on": [
+        "MASK-0025"
+      ],
+      "id": "MASK-0026",
+      "key": "git-integration",
+      "path": "docs/issues/10-backlog/MASK-0026-git-integration.md",
+      "paths": [
+        "mask_integration.py (new)",
+        "mask_core.py:git",
+        "mask_install.py",
+        "tests/test_git_integration.py (new)"
+      ],
+      "platforms": [],
+      "rn": 6,
+      "title": "Install owned Git integrations and suppress internal hooks"
+    },
+    {
+      "ac": [
+        2,
+        5,
+        6
+      ],
+      "depends": [
+        "ensure-lifecycle"
+      ],
+      "depends_on": [
+        "MASK-0025"
+      ],
+      "id": "MASK-0027",
+      "key": "host-integration",
+      "path": "docs/issues/10-backlog/MASK-0027-host-integration.md",
+      "paths": [
+        "mask_integration.py",
+        "mask.py",
+        "tests/test_host_integration.py (new)",
+        "docs/architecture/cli-contract.md"
+      ],
+      "platforms": [],
+      "rn": 6,
+      "title": "Add Claude and Codex startup adapters and prelaunch fallback"
+    },
+    {
+      "ac": [
+        1,
+        6,
+        7
+      ],
+      "depends": [
+        "git-integration",
+        "host-integration"
+      ],
+      "depends_on": [
+        "MASK-0026",
+        "MASK-0027"
+      ],
+      "id": "MASK-0028",
+      "key": "readiness-mac",
+      "path": "docs/issues/10-backlog/MASK-0028-readiness-mac.md",
+      "paths": [
+        "tests/test_workspace_lifecycle.py",
+        "tests/test_host_integration.py",
+        "docs/development/readiness-acceptance.md (new)"
+      ],
+      "platforms": [
+        "macos"
+      ],
+      "rn": 6,
+      "title": "Verify native macOS workspace and host readiness"
+    },
+    {
+      "ac": [
+        1,
+        6,
+        7
+      ],
+      "depends": [
+        "git-integration",
+        "host-integration"
+      ],
+      "depends_on": [
+        "MASK-0026",
+        "MASK-0027"
+      ],
+      "id": "MASK-0029",
+      "key": "readiness-win",
+      "path": "docs/issues/10-backlog/MASK-0029-readiness-win.md",
+      "paths": [
+        "tests/test_workspace_lifecycle.py",
+        "tests/test_host_integration.py",
+        "tests/test_launcher.py",
+        "docs/development/readiness-acceptance.md"
+      ],
+      "platforms": [
+        "windows"
+      ],
+      "rn": 6,
+      "title": "Verify native Windows workspace and host readiness"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        5,
+        6
+      ],
+      "depends": [
+        "close-6"
+      ],
+      "depends_on": [
+        "MASK-0067"
+      ],
+      "id": "MASK-0030",
+      "key": "sources",
+      "path": "docs/issues/10-backlog/MASK-0030-sources.md",
+      "paths": [
+        "mask_sources.py (new)",
+        "mask_core.py",
+        "mask_git.py",
+        "schemas/machine-v2.schema.json (new)",
+        "tests/test_sources.py (new)"
+      ],
+      "platforms": [],
+      "rn": 7,
+      "title": "Implement approved source identities and multi-source catalog"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        6
+      ],
+      "depends": [
+        "sources"
+      ],
+      "depends_on": [
+        "MASK-0030"
+      ],
+      "id": "MASK-0031",
+      "key": "source-discovery",
+      "path": "docs/issues/10-backlog/MASK-0031-source-discovery.md",
+      "paths": [
+        "mask_sources.py",
+        "mask_git.py",
+        "tests/test_source_discovery.py (new)",
+        "contracts/source-index schema implementation"
+      ],
+      "platforms": [],
+      "rn": 7,
+      "title": "Resolve skill URLs and bounded indexed/nested packages"
+    },
+    {
+      "ac": [
+        3,
+        6
+      ],
+      "depends": [
+        "source-discovery"
+      ],
+      "depends_on": [
+        "MASK-0031"
+      ],
+      "id": "MASK-0032",
+      "key": "imports",
+      "path": "docs/issues/10-backlog/MASK-0032-imports.md",
+      "paths": [
+        "mask_sources.py",
+        "mask_provenance.py (new)",
+        "tests/test_imports.py (new)",
+        "tests/test_provenance.py (new)"
+      ],
+      "platforms": [],
+      "rn": 7,
+      "title": "Add curated copy imports with verifiable provenance"
+    },
+    {
+      "ac": [
+        2,
+        4
+      ],
+      "depends": [
+        "source-discovery"
+      ],
+      "depends_on": [
+        "MASK-0031"
+      ],
+      "id": "MASK-0033",
+      "key": "package-guards",
+      "path": "docs/issues/10-backlog/MASK-0033-package-guards.md",
+      "paths": [
+        "mask_sources.py",
+        "mask_core.py:package",
+        "mask_git.py",
+        "tests/test_import_safety.py (new)"
+      ],
+      "platforms": [],
+      "rn": 7,
+      "title": "Harden passive package acquisition and plain-skill boundaries"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3
+      ],
+      "depends": [
+        "close-7"
+      ],
+      "depends_on": [
+        "MASK-0068"
+      ],
+      "id": "MASK-0034",
+      "key": "lock-model",
+      "path": "docs/issues/10-backlog/MASK-0034-lock-model.md",
+      "paths": [
+        "mask_resolve.py (new)",
+        "mask_core.py",
+        "schemas/project-v2.schema.json (new)",
+        "schemas/lock-v1.schema.json (new)",
+        "tests/test_locks.py (new)"
+      ],
+      "platforms": [],
+      "rn": 8,
+      "title": "Implement portable v2 selections and exact resolution locks"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        7
+      ],
+      "depends": [
+        "lock-model",
+        "package-guards"
+      ],
+      "depends_on": [
+        "MASK-0034",
+        "MASK-0033"
+      ],
+      "id": "MASK-0035",
+      "key": "artifact-store",
+      "path": "docs/issues/10-backlog/MASK-0035-artifact-store.md",
+      "paths": [
+        "mask_store.py (new)",
+        "mask_git.py",
+        "tests/test_artifacts.py (new)"
+      ],
+      "platforms": [],
+      "rn": 8,
+      "title": "Build isolated raw-byte artifacts and exact hydration"
+    },
+    {
+      "ac": [
+        4,
+        5
+      ],
+      "depends": [
+        "artifact-store"
+      ],
+      "depends_on": [
+        "MASK-0035"
+      ],
+      "id": "MASK-0036",
+      "key": "artifact-reconcile",
+      "path": "docs/issues/10-backlog/MASK-0036-artifact-reconcile.md",
+      "paths": [
+        "mask_fs.py",
+        "mask_core.py:state",
+        "schemas/state-v3.schema.json (new)",
+        "schemas/pending-v3.schema.json",
+        "tests/test_pinned_recovery.py (new)"
+      ],
+      "platforms": [],
+      "rn": 8,
+      "title": "Retarget owned links and recover lock/artifact transitions"
+    },
+    {
+      "ac": [
+        5,
+        6,
+        7
+      ],
+      "depends": [
+        "artifact-reconcile"
+      ],
+      "depends_on": [
+        "MASK-0036"
+      ],
+      "id": "MASK-0037",
+      "key": "pin-migration",
+      "path": "docs/issues/10-backlog/MASK-0037-pin-migration.md",
+      "paths": [
+        "mask.py",
+        "mask_resolve.py",
+        "mask_install.py",
+        "mask_git.py",
+        "tests/test_pin_migration.py (new)",
+        "tests/test_pinned_update.py (new)"
+      ],
+      "platforms": [],
+      "rn": 8,
+      "title": "Add explicit legacy migration and pinned update operations"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3
+      ],
+      "depends": [
+        "artifact-reconcile"
+      ],
+      "depends_on": [
+        "MASK-0036"
+      ],
+      "id": "MASK-0038",
+      "key": "target-model",
+      "path": "docs/issues/10-backlog/MASK-0038-target-model.md",
+      "paths": [
+        "mask_selection.py (new)",
+        "mask_core.py",
+        "mask.py",
+        "tests/test_targeting.py (new)",
+        "tests/test_compatibility.py (new)"
+      ],
+      "platforms": [],
+      "rn": 9,
+      "title": "Implement per-binding agent choices and compatibility metadata"
+    },
+    {
+      "ac": [
+        4,
+        5
+      ],
+      "depends": [
+        "target-model"
+      ],
+      "depends_on": [
+        "MASK-0038"
+      ],
+      "id": "MASK-0039",
+      "key": "adapter-contract",
+      "path": "docs/issues/10-backlog/MASK-0039-adapter-contract.md",
+      "paths": [
+        "mask_adapters.py (new)",
+        "mask.py",
+        "mask_core.py",
+        "mask_fs.py",
+        "tests/test_adapters.py (new)",
+        "tests/test_selection_conflicts.py (new)"
+      ],
+      "platforms": [],
+      "rn": 9,
+      "title": "Consolidate adapter metadata and reject deployment-name conflicts"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "depends": [
+        "adapter-contract",
+        "pin-migration"
+      ],
+      "depends_on": [
+        "MASK-0039",
+        "MASK-0037"
+      ],
+      "id": "MASK-0040",
+      "key": "target-native",
+      "path": "docs/issues/10-backlog/MASK-0040-target-native.md",
+      "paths": [
+        "tests/test_targeting.py",
+        "tests/test_user_scope.py",
+        "docs/development/targeting-acceptance.md (new)"
+      ],
+      "platforms": [],
+      "rn": 9,
+      "title": "Verify native scope-specific pinned targeting"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        5
+      ],
+      "depends": [
+        "close-8",
+        "close-9"
+      ],
+      "depends_on": [
+        "MASK-0069",
+        "MASK-0070"
+      ],
+      "id": "MASK-0041",
+      "key": "portable",
+      "path": "docs/issues/10-backlog/MASK-0041-portable.md",
+      "paths": [
+        "mask_profiles.py (new)",
+        "mask.py",
+        "tests/test_profiles.py (new)"
+      ],
+      "platforms": [],
+      "rn": 10,
+      "title": "Implement portable personal profile export and import"
+    },
+    {
+      "ac": [
+        2,
+        3
+      ],
+      "depends": [
+        "portable"
+      ],
+      "depends_on": [
+        "MASK-0041"
+      ],
+      "id": "MASK-0042",
+      "key": "bundles",
+      "path": "docs/issues/10-backlog/MASK-0042-bundles.md",
+      "paths": [
+        "mask_profiles.py",
+        "mask_sources.py",
+        "tests/test_bundles.py (new)"
+      ],
+      "platforms": [],
+      "rn": 10,
+      "title": "Implement flat named bundle expansion and guarded refresh"
+    },
+    {
+      "ac": [
+        1,
+        4,
+        5
+      ],
+      "depends": [
+        "bundles"
+      ],
+      "depends_on": [
+        "MASK-0042"
+      ],
+      "id": "MASK-0043",
+      "key": "subscriptions",
+      "path": "docs/issues/10-backlog/MASK-0043-subscriptions.md",
+      "paths": [
+        "mask_profiles.py",
+        "mask_selection.py",
+        "mask_fs.py",
+        "tests/test_profile_contributions.py (new)"
+      ],
+      "platforms": [],
+      "rn": 10,
+      "title": "Compose subscribed profile and local selection contributions"
+    },
+    {
+      "ac": [
+        1,
+        4,
+        5
+      ],
+      "depends": [
+        "ensure-core"
+      ],
+      "depends_on": [
+        "MASK-0024"
+      ],
+      "id": "MASK-0044",
+      "key": "inventory",
+      "path": "docs/issues/10-backlog/MASK-0044-inventory.md",
+      "paths": [
+        "mask_report.py (new)",
+        "mask.py",
+        "tests/test_inventory.py (new)"
+      ],
+      "platforms": [],
+      "rn": 11,
+      "title": "Expose skill-centric where-used and actual deployment inventory"
+    },
+    {
+      "ac": [
+        2,
+        3
+      ],
+      "depends": [
+        "inventory",
+        "close-8",
+        "close-9",
+        "close-10"
+      ],
+      "depends_on": [
+        "MASK-0044",
+        "MASK-0069",
+        "MASK-0070",
+        "MASK-0071"
+      ],
+      "id": "MASK-0045",
+      "key": "impact",
+      "path": "docs/issues/10-backlog/MASK-0045-impact.md",
+      "paths": [
+        "mask_report.py",
+        "mask_resolve.py",
+        "tests/test_update_impact.py (new)"
+      ],
+      "platforms": [],
+      "rn": 11,
+      "title": "Explain exact content diffs and selected consumer impact"
+    },
+    {
+      "ac": [
+        4,
+        5
+      ],
+      "depends": [
+        "impact"
+      ],
+      "depends_on": [
+        "MASK-0045"
+      ],
+      "id": "MASK-0046",
+      "key": "report-render",
+      "path": "docs/issues/10-backlog/MASK-0046-report-render.md",
+      "paths": [
+        "mask_report.py",
+        "tests/test_report_rendering.py (new)",
+        "docs/architecture/cli-contract.md"
+      ],
+      "platforms": [],
+      "rn": 11,
+      "title": "Add compact text JSON and offline HTML report renderers"
+    },
+    {
+      "ac": [
+        1,
+        6
+      ],
+      "depends": [
+        "close-8",
+        "close-9"
+      ],
+      "depends_on": [
+        "MASK-0069",
+        "MASK-0070"
+      ],
+      "id": "MASK-0047",
+      "key": "fleet-identity",
+      "path": "docs/issues/10-backlog/MASK-0047-fleet-identity.md",
+      "paths": [
+        "mask_fleet.py (new)",
+        "mask_identity.py (new)",
+        "tests/test_fleet_identity.py (new)"
+      ],
+      "platforms": [],
+      "rn": 12,
+      "title": "Implement local device enrollment and authorization records"
+    },
+    {
+      "ac": [
+        2,
+        3,
+        6
+      ],
+      "depends": [
+        "fleet-identity"
+      ],
+      "depends_on": [
+        "MASK-0047"
+      ],
+      "id": "MASK-0048",
+      "key": "fleet-rpc",
+      "path": "docs/issues/10-backlog/MASK-0048-fleet-rpc.md",
+      "paths": [
+        "mask_rpc.py (new)",
+        "mask_fleet.py",
+        "mask_fs.py",
+        "tests/test_fleet_rpc.py (new)"
+      ],
+      "platforms": [],
+      "rn": 12,
+      "title": "Implement bounded remote protocol and idempotent local dispatch"
+    },
+    {
+      "ac": [
+        2,
+        3,
+        4
+      ],
+      "depends": [
+        "fleet-rpc"
+      ],
+      "depends_on": [
+        "MASK-0048"
+      ],
+      "id": "MASK-0049",
+      "key": "fleet-ssh",
+      "path": "docs/issues/10-backlog/MASK-0049-fleet-ssh.md",
+      "paths": [
+        "mask_transport.py (new)",
+        "mask_rpc.py",
+        "tests/test_fleet_transport.py (new)"
+      ],
+      "platforms": [],
+      "rn": 12,
+      "title": "Add fixed-entrypoint SSH and exact artifact transfer"
+    },
+    {
+      "ac": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "depends": [
+        "fleet-ssh"
+      ],
+      "depends_on": [
+        "MASK-0049"
+      ],
+      "id": "MASK-0050",
+      "key": "fleet-native",
+      "path": "docs/issues/10-backlog/MASK-0050-fleet-native.md",
+      "paths": [
+        "tests/test_fleet_transport.py",
+        "docs/development/fleet-native-acceptance.md (new)"
+      ],
+      "platforms": [],
+      "rn": 12,
+      "title": "Verify native remote invocation and enrollment boundaries"
+    },
+    {
+      "ac": [
+        2,
+        3
+      ],
+      "depends": [
+        "close-10",
+        "close-12"
+      ],
+      "depends_on": [
+        "MASK-0071",
+        "MASK-0073"
+      ],
+      "id": "MASK-0051",
+      "key": "fleet-control",
+      "path": "docs/issues/10-backlog/MASK-0051-fleet-control.md",
+      "paths": [
+        "mask_control.py (new)",
+        "mask_fleet.py",
+        "tests/test_fleet_control.py (new)"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Implement signed desired state and conflict-safe control publication"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        7
+      ],
+      "depends": [
+        "fleet-control",
+        "close-7",
+        "close-11"
+      ],
+      "depends_on": [
+        "MASK-0051",
+        "MASK-0068",
+        "MASK-0072"
+      ],
+      "id": "MASK-0052",
+      "key": "fleet-install",
+      "path": "docs/issues/10-backlog/MASK-0052-fleet-install.md",
+      "paths": [
+        "mask_fleet.py",
+        "mask_sources.py",
+        "mask_control.py",
+        "tests/test_fleet_install.py (new)"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Compose one-request copy or tap installation and fan-out"
+    },
+    {
+      "ac": [
+        3,
+        4,
+        7
+      ],
+      "depends": [
+        "fleet-install"
+      ],
+      "depends_on": [
+        "MASK-0052"
+      ],
+      "id": "MASK-0053",
+      "key": "fleet-receipts",
+      "path": "docs/issues/10-backlog/MASK-0053-fleet-receipts.md",
+      "paths": [
+        "mask_fleet.py",
+        "mask_report.py",
+        "tests/test_fleet_receipts.py (new)"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Track per-device completion failure and supersession"
+    },
+    {
+      "ac": [
+        3,
+        4,
+        5
+      ],
+      "depends": [
+        "fleet-receipts"
+      ],
+      "depends_on": [
+        "MASK-0053"
+      ],
+      "id": "MASK-0054",
+      "key": "fleet-runner",
+      "path": "docs/issues/10-backlog/MASK-0054-fleet-runner.md",
+      "paths": [
+        "mask_runner.py (new)",
+        "mask_integration.py",
+        "tests/test_fleet_runner.py (new)"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Add opt-in native scheduled convergence and offline catch-up"
+    },
+    {
+      "ac": [
+        1,
+        4,
+        6,
+        7
+      ],
+      "depends": [
+        "fleet-runner",
+        "fleet-native"
+      ],
+      "depends_on": [
+        "MASK-0054",
+        "MASK-0050"
+      ],
+      "id": "MASK-0055",
+      "key": "fleet-dogfood",
+      "path": "docs/issues/10-backlog/MASK-0055-fleet-dogfood.md",
+      "paths": [
+        "docs/development/fleet-native-acceptance.md",
+        "tests/test_fleet_install.py",
+        "docs/architecture/cli-contract.md"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Demonstrate real two-machine install and offline convergence"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3
+      ],
+      "depends": [
+        "close-13"
+      ],
+      "depends_on": [
+        "MASK-0074"
+      ],
+      "id": "MASK-0056",
+      "key": "mcp-service",
+      "path": "docs/issues/10-backlog/MASK-0056-mcp-service.md",
+      "paths": [
+        "optional/mcp/* (new)",
+        "tests/test_mcp_facade.py (new)",
+        "optional dependency manifest"
+      ],
+      "platforms": [],
+      "rn": 14,
+      "title": "Add optional SDK-based MCP management facade"
+    },
+    {
+      "ac": [
+        3,
+        4
+      ],
+      "depends": [
+        "mcp-service"
+      ],
+      "depends_on": [
+        "MASK-0056"
+      ],
+      "id": "MASK-0057",
+      "key": "mcp-hosts",
+      "path": "docs/issues/10-backlog/MASK-0057-mcp-hosts.md",
+      "paths": [
+        "optional/mcp/*",
+        "tests/test_mcp_facade.py",
+        "docs/development/mcp-acceptance.md (new)"
+      ],
+      "platforms": [],
+      "rn": 14,
+      "title": "Verify optional client integration and cancellation semantics"
+    },
+    {
+      "ac": [
+        1,
+        4
+      ],
+      "depends": [
+        "close-12"
+      ],
+      "depends_on": [
+        "MASK-0073"
+      ],
+      "id": "MASK-0058",
+      "key": "credential-seam",
+      "path": "docs/issues/10-backlog/MASK-0058-credential-seam.md",
+      "paths": [
+        "optional/credentials/* (new)",
+        "tests/test_credential_providers.py (new)"
+      ],
+      "platforms": [],
+      "rn": 15,
+      "title": "Implement credential handle providers without exporting values"
+    },
+    {
+      "ac": [
+        2,
+        4
+      ],
+      "depends": [
+        "credential-seam",
+        "close-13"
+      ],
+      "depends_on": [
+        "MASK-0058",
+        "MASK-0074"
+      ],
+      "id": "MASK-0059",
+      "key": "sealed-vault",
+      "path": "docs/issues/10-backlog/MASK-0059-sealed-vault.md",
+      "paths": [
+        "optional/credentials/*",
+        "tests/test_sealed_vault.py (new)",
+        "optional dependency manifest"
+      ],
+      "platforms": [],
+      "rn": 15,
+      "title": "Add opt-in established-provider encrypted vault delivery"
+    },
+    {
+      "ac": [
+        3,
+        4
+      ],
+      "depends": [
+        "sealed-vault"
+      ],
+      "depends_on": [
+        "MASK-0059"
+      ],
+      "id": "MASK-0060",
+      "key": "vault-recovery",
+      "path": "docs/issues/10-backlog/MASK-0060-vault-recovery.md",
+      "paths": [
+        "optional/credentials/*",
+        "tests/test_vault_rotation.py (new)",
+        "docs/development/vault-acceptance.md (new)"
+      ],
+      "platforms": [],
+      "rn": 15,
+      "title": "Verify vault rotation revocation and recovery limitations"
+    },
+    {
+      "ac": [
+        1,
+        2
+      ],
+      "depends": [
+        "close-7",
+        "close-8",
+        "close-13"
+      ],
+      "depends_on": [
+        "MASK-0068",
+        "MASK-0069",
+        "MASK-0074"
+      ],
+      "id": "MASK-0061",
+      "key": "trust-docs",
+      "path": "docs/issues/10-backlog/MASK-0061-trust-docs.md",
+      "paths": [
+        "SECURITY.md (new)",
+        "docs/security/* (new)",
+        "mask_report.py",
+        "tests/test_trust_report.py (new)"
+      ],
+      "platforms": [],
+      "rn": 16,
+      "title": "Publish inspectable threat and effect boundaries for review"
+    },
+    {
+      "ac": [
+        2,
+        3
+      ],
+      "depends": [
+        "trust-docs"
+      ],
+      "depends_on": [
+        "MASK-0061"
+      ],
+      "id": "MASK-0062",
+      "key": "release-verification",
+      "path": "docs/issues/10-backlog/MASK-0062-release-verification.md",
+      "paths": [
+        "release tooling (new, scoped)",
+        "docs/security/release-verification.md (new)",
+        "tests/test_release_verification.py (new)"
+      ],
+      "platforms": [],
+      "rn": 16,
+      "title": "Prepare optional reproducible release and signature verification"
+    },
+    {
+      "ac": [
+        1,
+        4
+      ],
+      "depends": [
+        "release-verification"
+      ],
+      "depends_on": [
+        "MASK-0062"
+      ],
+      "id": "MASK-0063",
+      "key": "trust-rotation",
+      "path": "docs/issues/10-backlog/MASK-0063-trust-rotation.md",
+      "paths": [
+        "docs/security/key-lifecycle.md (new)",
+        "tests/test_release_verification.py",
+        "docs/security/update-channel-evaluation.md (new)"
+      ],
+      "platforms": [],
+      "rn": 16,
+      "title": "Document and test signer rotation and future update-channel boundaries"
+    },
+    {
+      "ac": [
+        3
+      ],
+      "depends": [
+        "close-10",
+        "close-11",
+        "fleet-receipts"
+      ],
+      "depends_on": [
+        "MASK-0071",
+        "MASK-0072",
+        "MASK-0053"
+      ],
+      "id": "MASK-0064",
+      "key": "agent-handoff",
+      "path": "docs/issues/10-backlog/MASK-0064-agent-handoff.md",
+      "paths": [
+        "docs/development/agent-skills-handoff.md (new)",
+        "README.md",
+        "CONTRIBUTING.md",
+        ".mask/skill-config/implement-rfc/project.md"
+      ],
+      "platforms": [],
+      "rn": 17,
+      "title": "Coordinate canonical AgentSkills guidance and metadata handoff"
+    },
+    {
+      "ac": [
+        2,
+        3,
+        4
+      ],
+      "depends": [
+        "close-6",
+        "close-7",
+        "close-8",
+        "close-9",
+        "close-10",
+        "close-11",
+        "close-12",
+        "close-13",
+        "agent-handoff"
+      ],
+      "depends_on": [
+        "MASK-0067",
+        "MASK-0068",
+        "MASK-0069",
+        "MASK-0070",
+        "MASK-0071",
+        "MASK-0072",
+        "MASK-0073",
+        "MASK-0074",
+        "MASK-0064"
+      ],
+      "id": "MASK-0065",
+      "key": "core-migrate-docs",
+      "path": "docs/issues/10-backlog/MASK-0065-core-migrate-docs.md",
+      "paths": [
+        "README.md",
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "docs/architecture/*",
+        ".mask/skill-config/implement-rfc/*",
+        "docs/development/remote-stations.md"
+      ],
+      "platforms": [],
+      "rn": 17,
+      "title": "Reconcile shipped current contracts and selected consumer migrations"
+    },
+    {
+      "ac": [
+        2,
+        4,
+        5
+      ],
+      "depends": [
+        "core-migrate-docs"
+      ],
+      "depends_on": [
+        "MASK-0065"
+      ],
+      "id": "MASK-0066",
+      "key": "core-acceptance",
+      "path": "docs/issues/10-backlog/MASK-0066-core-acceptance.md",
+      "paths": [
+        "docs/releases/new core readiness note (new)",
+        "core RFC closeout evidence",
+        "docs/development/*acceptance.md"
+      ],
+      "platforms": [],
+      "rn": 17,
+      "title": "Record focused milestone and real owner-workflow acceptance"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "closeout": true,
+      "depends": [
+        "ensure-core",
+        "ensure-lifecycle",
+        "git-integration",
+        "host-integration",
+        "readiness-mac",
+        "readiness-win"
+      ],
+      "depends_on": [
+        "MASK-0024",
+        "MASK-0025",
+        "MASK-0026",
+        "MASK-0027",
+        "MASK-0028",
+        "MASK-0029"
+      ],
+      "id": "MASK-0067",
+      "key": "close-6",
+      "path": "docs/issues/10-backlog/MASK-0067-close-6.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0006-automatic-workspace-readiness.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 6,
+      "title": "Verify and close RFC-MASK-0006"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "closeout": true,
+      "depends": [
+        "sources",
+        "source-discovery",
+        "imports",
+        "package-guards"
+      ],
+      "depends_on": [
+        "MASK-0030",
+        "MASK-0031",
+        "MASK-0032",
+        "MASK-0033"
+      ],
+      "id": "MASK-0068",
+      "key": "close-7",
+      "path": "docs/issues/10-backlog/MASK-0068-close-7.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0007-sources-imports-and-provenance.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 7,
+      "title": "Verify and close RFC-MASK-0007"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "closeout": true,
+      "depends": [
+        "lock-model",
+        "artifact-store",
+        "artifact-reconcile",
+        "pin-migration"
+      ],
+      "depends_on": [
+        "MASK-0034",
+        "MASK-0035",
+        "MASK-0036",
+        "MASK-0037"
+      ],
+      "id": "MASK-0069",
+      "key": "close-8",
+      "path": "docs/issues/10-backlog/MASK-0069-close-8.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0008-pinned-artifacts-and-recovery.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 8,
+      "title": "Verify and close RFC-MASK-0008"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "closeout": true,
+      "depends": [
+        "target-model",
+        "adapter-contract",
+        "target-native"
+      ],
+      "depends_on": [
+        "MASK-0038",
+        "MASK-0039",
+        "MASK-0040"
+      ],
+      "id": "MASK-0070",
+      "key": "close-9",
+      "path": "docs/issues/10-backlog/MASK-0070-close-9.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0009-scope-agent-targeting-and-compatibility.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 9,
+      "title": "Verify and close RFC-MASK-0009"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "closeout": true,
+      "depends": [
+        "portable",
+        "bundles",
+        "subscriptions"
+      ],
+      "depends_on": [
+        "MASK-0041",
+        "MASK-0042",
+        "MASK-0043"
+      ],
+      "id": "MASK-0071",
+      "key": "close-10",
+      "path": "docs/issues/10-backlog/MASK-0071-close-10.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0010-portable-selections-and-bundles.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 10,
+      "title": "Verify and close RFC-MASK-0010"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "closeout": true,
+      "depends": [
+        "inventory",
+        "impact",
+        "report-render"
+      ],
+      "depends_on": [
+        "MASK-0044",
+        "MASK-0045",
+        "MASK-0046"
+      ],
+      "id": "MASK-0072",
+      "key": "close-11",
+      "path": "docs/issues/10-backlog/MASK-0072-close-11.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0011-inventory-and-update-impact.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 11,
+      "title": "Verify and close RFC-MASK-0011"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "closeout": true,
+      "depends": [
+        "fleet-identity",
+        "fleet-rpc",
+        "fleet-ssh",
+        "fleet-native"
+      ],
+      "depends_on": [
+        "MASK-0047",
+        "MASK-0048",
+        "MASK-0049",
+        "MASK-0050"
+      ],
+      "id": "MASK-0073",
+      "key": "close-12",
+      "path": "docs/issues/10-backlog/MASK-0073-close-12.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0012-fleet-enrollment-and-transport.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 12,
+      "title": "Verify and close RFC-MASK-0012"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "closeout": true,
+      "depends": [
+        "fleet-control",
+        "fleet-install",
+        "fleet-receipts",
+        "fleet-runner",
+        "fleet-dogfood"
+      ],
+      "depends_on": [
+        "MASK-0051",
+        "MASK-0052",
+        "MASK-0053",
+        "MASK-0054",
+        "MASK-0055"
+      ],
+      "id": "MASK-0074",
+      "key": "close-13",
+      "path": "docs/issues/10-backlog/MASK-0074-close-13.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0013-fleet-rollouts-and-continuous-sync.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 13,
+      "title": "Verify and close RFC-MASK-0013"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "closeout": true,
+      "depends": [
+        "mcp-service",
+        "mcp-hosts"
+      ],
+      "depends_on": [
+        "MASK-0056",
+        "MASK-0057"
+      ],
+      "id": "MASK-0075",
+      "key": "close-14",
+      "path": "docs/issues/10-backlog/MASK-0075-close-14.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0014-optional-mcp-management-facade.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 14,
+      "title": "Verify and close RFC-MASK-0014"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "closeout": true,
+      "depends": [
+        "credential-seam",
+        "sealed-vault",
+        "vault-recovery"
+      ],
+      "depends_on": [
+        "MASK-0058",
+        "MASK-0059",
+        "MASK-0060"
+      ],
+      "id": "MASK-0076",
+      "key": "close-15",
+      "path": "docs/issues/10-backlog/MASK-0076-close-15.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0015-credential-providers-and-vault.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 15,
+      "title": "Verify and close RFC-MASK-0015"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "closeout": true,
+      "depends": [
+        "trust-docs",
+        "release-verification",
+        "trust-rotation"
+      ],
+      "depends_on": [
+        "MASK-0061",
+        "MASK-0062",
+        "MASK-0063"
+      ],
+      "id": "MASK-0077",
+      "key": "close-16",
+      "path": "docs/issues/10-backlog/MASK-0077-close-16.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0016-public-trust-and-supply-chain-hardening.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 16,
+      "title": "Verify and close RFC-MASK-0016"
+    },
+    {
+      "ac": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "closeout": true,
+      "depends": [
+        "import",
+        "agent-handoff",
+        "core-migrate-docs",
+        "core-acceptance"
+      ],
+      "depends_on": [
+        "MASK-0023",
+        "MASK-0064",
+        "MASK-0065",
+        "MASK-0066"
+      ],
+      "id": "MASK-0078",
+      "key": "close-17",
+      "path": "docs/issues/10-backlog/MASK-0078-close-17.md",
+      "paths": [
+        "docs/rfcs/RFC-MASK-0017-integration-and-personal-dogfood.md",
+        "the corresponding live closeout card",
+        "current affected public contract docs"
+      ],
+      "platforms": [],
+      "rn": 17,
+      "title": "Verify and close RFC-MASK-0017"
+    }
+  ],
+  "fixture_commit": "efeff6d2bda88a7d4e09028bedb3c6c7eefff758",
+  "prepared": "2026-09-05",
+  "provisional_ids": true,
+  "reservation_count": 58,
+  "rfcs": [
+    {
+      "criteria": [
+        "Actual clone, worktree add, branch switch, merge and manual-merge completion fixtures invoke integration and converge without a user executing apply; unsupported Git integration reports its coverage accurately.",
+        "Ensure combines authorization, registration and selected-scope reconciliation through the existing safety engine; unchanged runs preserve managed bytes/generation and perform no unrelated scans.",
+        "Untrusted roots, collisions, replaced parents, busy locks and pending recovery cannot be converted to success or silently repaired; hooks never claim to roll back completed Git actions.",
+        "Inactive-branch handling distinguishes verified branch absence from deleted, sparse, unreadable or conflicted input; interrupted readiness refuses completion after its control files change.",
+        "Owned hook installation/removal preserves unrelated hooks/settings, suppresses configured and directory hooks for MASK internal Git commands, and prevents recursion.",
+        "Native Claude and Codex startup/worktree scenarios record actual versions and first-prompt discovery or an explicit fallback limitation; a warning-only adapter is not called a strict gate.",
+        "Native Windows and macOS readiness/launcher paths receive focused direct checks; worktree removal and unavailable-root handling preserve ownership and are independently tested."
+      ],
+      "deps": [],
+      "id": "RFC-MASK-0006",
+      "n": 6,
+      "path": "docs/rfcs/RFC-MASK-0006-automatic-workspace-readiness.md",
+      "stage": "A — first usable milestone",
+      "title": "Automatic workspace readiness for clone, worktree, branch and agent startup"
+    },
+    {
+      "criteria": [
+        "Two private/public-style local bare remotes expose independent taps and nested/root packages; name ambiguity, path/ref ambiguity and conflicting aliases are actionable rather than silently selected.",
+        "Source identity checks bind the approved repository and transport policy, not just the basename; credential-bearing/unsupported URLs and unapproved redirects refuse without leaking secrets.",
+        "Copy import preserves byte provenance and notices, refuses existing unrelated destinations, records local adaptations, and performs no commit/push unless separately authorized.",
+        "Adversarial package fixtures cannot traverse paths, introduce special entries, run hooks/filters/package scripts, silently activate a plugin, or bypass bounded resource limits.",
+        "Source lifecycle and legacy-config migration preserve current ownership and old declarations; removing a referenced source refuses and reads/dry-runs remain observational.",
+        "Public CLI/capabilities describe resolution, catalog-only addition, mutation/network boundaries and provenance verification levels with deterministic errors."
+      ],
+      "deps": [
+        6
+      ],
+      "id": "RFC-MASK-0007",
+      "n": 7,
+      "path": "docs/rfcs/RFC-MASK-0007-sources-imports-and-provenance.md",
+      "stage": "B — source foundation",
+      "title": "Multiple sources, taps, curated imports and upstream provenance"
+    },
+    {
+      "criteria": [
+        "Two worktrees simultaneously use distinct immutable versions of one skill, and source authoring/ref movement changes neither deployment until an explicit selected update.",
+        "Locks reproduce raw package bytes across fixture machines; digest, package path, source identity, executable mode, malformed lock and moved-ref errors fail closed.",
+        "Ensure restores available exact artifacts, optionally hydrates only approved locked content, never resolves latest or rewrites lockfiles, and reports unavailable exact commits honestly.",
+        "Planner/executor/adoption/recovery correctly retarget an unchanged owned legacy or old-artifact link to a new artifact and preserve collisions, rather than retaining the old target.",
+        "Interruptions before/after lock, link and state effects preserve bounded v3 recovery; configuration/state migrations preserve exact legacy rollback bytes and reject concurrent edits.",
+        "Explicit migration covers project and personal consumers, dirty/unborn sources, old pending journals, schema-incompatible old programs, and direct-entrypoint escape paths.",
+        "Cache preparation, retention, dev-link exceptions and scoped publishing cannot silently alter other consumers, delete authoring history or claim atomicity across readers/devices."
+      ],
+      "deps": [
+        7
+      ],
+      "id": "RFC-MASK-0008",
+      "n": 8,
+      "path": "docs/rfcs/RFC-MASK-0008-pinned-artifacts-and-recovery.md",
+      "stage": "B — reproducible content",
+      "title": "True version pinning, immutable deployment artifacts and recoverable migration"
+    },
+    {
+      "criteria": [
+        "The same skill has independently configurable personal and project agent sets, with new selections defaulting to all supported/enabled agents and no executable-detection side effects.",
+        "V1 migration preserves explicit and inherited target behavior; per-skill edits/locks/plans remain guarded and no-op stable.",
+        "Generic, absent and agent/platform-specific metadata produce distinct truthful reports; explicit incompatibilities block, and conditional/inapplicable bindings are not called installed.",
+        "Multi-source name conflicts, conflicting profiles and user/project duplicate names are explained without overwriting content, silently renaming packages or assuming host precedence.",
+        "A single adapter contract drives paths/capabilities/validation, and existing native Claude/Codex scope tests cover the change; additional agents stay unadvertised until independently proven."
+      ],
+      "deps": [
+        8
+      ],
+      "id": "RFC-MASK-0009",
+      "n": 9,
+      "path": "docs/rfcs/RFC-MASK-0009-scope-agent-targeting-and-compatibility.md",
+      "stage": "B — selection semantics",
+      "title": "Per-skill scope-specific agent targeting and advertised compatibility"
+    },
+    {
+      "criteria": [
+        "Export/import round-trips selections and exact content locks between different machine/home/source paths without including credentials, registry identities, journals or launchers.",
+        "Incremental and replace modes preserve their declared ownership scopes; exported all-agent behavior and optional frozen-agent behavior are explicit and tested.",
+        "Bundle expansion/refresh is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.",
+        "Profile subscription/removal preserves local contributions and reports version/target conflicts, unapproved sources, unavailable artifacts and offline freshness honestly.",
+        "One public import-and-apply path bootstraps selected personal scope through normal validation/recovery, with native Windows/macOS focused tests and no internal-state editing."
+      ],
+      "deps": [
+        8,
+        9
+      ],
+      "id": "RFC-MASK-0010",
+      "n": 10,
+      "path": "docs/rfcs/RFC-MASK-0010-portable-selections-and-bundles.md",
+      "stage": "C — portable composition",
+      "title": "Portable personal selections, reusable bundles and profile composition"
+    },
+    {
+      "criteria": [
+        "Where-used accurately joins source-qualified skill identities to each project/personal consumer, agent, origin and artifact, without conflating duplicate names or inferring unknown host loading.",
+        "Update reports include supporting-file/binary/metadata/provenance changes and affected consumers even when membership is unchanged, while distinguishing unaffected pinned consumers from legacy shared-source impact.",
+        "Reports and application use the same frozen candidate/plan; source/ref/control-file movement stales a guarded plan, while formatting changes do not.",
+        "Inspection preserves state and unmanaged content, scopes filesystem/network work explicitly, and labels unavailable consumers and stale fleet receipts.",
+        "Compact text/JSON and optional offline HTML safely display untrusted skill content with escaping/redaction; focused query workloads record actual bounded work."
+      ],
+      "deps": [
+        8,
+        9,
+        10
+      ],
+      "id": "RFC-MASK-0011",
+      "n": 11,
+      "path": "docs/rfcs/RFC-MASK-0011-inventory-and-update-impact.md",
+      "stage": "C — explainability",
+      "title": "Where-used inventory, update diffs and deployment impact reports"
+    },
+    {
+      "criteria": [
+        "Enrollment binds stable device/controller identities, permitted scopes/sources and host transport identity, and rejects changed/revoked/unknown peers without changing user SSH security settings.",
+        "Bounded framed RPC accepts only the fixed action schema; malformed messages, shell metacharacters, wrong device IDs and arbitrary paths cannot invoke generic remote execution.",
+        "Each remote mutation uses the ordinary local planner/lock/journal; duplicate operation IDs, changed payloads, disconnects and timeouts produce queryable truthful outcomes.",
+        "Exact package transfer validates paths/digests and never forwards credentials or unrelated private content; unavailable authentication remains a prerequisite.",
+        "Native Windows/macOS transport and launcher checks record actual host/runtime results, while fixture-only tests remain labelled as such.",
+        "Controller/device signing and receipt validation use the established provider with separate namespaces and no unsigned silent fallback for unattended requests."
+      ],
+      "deps": [
+        8,
+        9
+      ],
+      "id": "RFC-MASK-0012",
+      "n": 12,
+      "path": "docs/rfcs/RFC-MASK-0012-fleet-enrollment-and-transport.md",
+      "stage": "D — enrolled fleet foundation",
+      "title": "Explicit fleet enrollment, device identity and bounded remote transport"
+    },
+    {
+      "criteria": [
+        "A single name-or-GitHub-URL fleet install request composes copy/tap resolution, exact locking, authorized source/control publication, deployment and a per-device report without manual internal-state edits.",
+        "Frozen device/scope sets, local contribution preservation and source/package identity prevent unexpected project edits, hidden source enrollment or skill-name ambiguity.",
+        "Signed monotonic desired revisions and compare-and-swap publication handle two controllers, duplicate deliveries, replay, rollback-as-new-intent and revoked peers without silent last-writer overwrite.",
+        "Offline, unknown, incompatible, recovery-required, canceled and superseded devices are reported distinctly; incomplete rollouts never claim installed everywhere or reuse stale receipts.",
+        "An opt-in runner catches up to the latest approved state with bounded polling/backoff, preserves scheduler ownership, never upgrades upstream/programs implicitly, and resumes after interruptions.",
+        "Actual two-machine macOS/native-Windows rollout and offline catch-up evidence is recorded, or that acceptance stays open with the exact environmental limitation.",
+        "Failure between import/publication/remote apply/receipt steps is resumable and truthful, and reports preserve the difference between filesystem verification and host discovery."
+      ],
+      "deps": [
+        10,
+        11,
+        12
+      ],
+      "id": "RFC-MASK-0013",
+      "n": 13,
+      "path": "docs/rfcs/RFC-MASK-0013-fleet-rollouts-and-continuous-sync.md",
+      "stage": "D — personal fleet workflow",
+      "title": "Declarative fleet rollouts, optional continuous convergence and completion reports"
+    },
+    {
+      "criteria": [
+        "Optional facade installation does not alter core runtime requirements and advertises only implemented tools/protocol capabilities.",
+        "Tool operations produce the same selections/plans/effects/errors as the CLI and cannot bypass scope/source/device authorization, recovery or ownership checks.",
+        "Protocol negotiation, malformed inputs, output separation, bounded content and secret redaction pass direct client/fixture checks using the selected SDK.",
+        "Cancellation/disconnect/reconnect preserves durable operation truthfulness, and actual supported-client discovery/tool invocation is recorded before claiming host support."
+      ],
+      "deps": [
+        13
+      ],
+      "id": "RFC-MASK-0014",
+      "n": 14,
+      "path": "docs/rfcs/RFC-MASK-0014-optional-mcp-management-facade.md",
+      "stage": "E — optional interface extension",
+      "title": "Optional MCP facade over the MASK management API"
+    },
+    {
+      "criteria": [
+        "Credential handles remain separate from values, and existing Git/SSH providers keep working without migration or a mandatory shared vault.",
+        "An optional sealed provider uses a pinned established encryption/signature implementation and enforces explicit recipient/purpose grants without plaintext in portable data or tool responses.",
+        "Locked/unavailable providers, rotation, revoked/offline recipients and recovery-key loss produce accurate outcomes rather than silent fallback or premature completion.",
+        "Synthetic-secret leakage checks and actual selected native provider tests support the advertised exposure boundary; production credential changes are not part of fixture acceptance."
+      ],
+      "deps": [
+        12,
+        13
+      ],
+      "id": "RFC-MASK-0015",
+      "n": 15,
+      "path": "docs/rfcs/RFC-MASK-0015-credential-providers-and-vault.md",
+      "stage": "E — optional credential extension",
+      "title": "Credential-provider references and an optional encrypted fleet vault"
+    },
+    {
+      "criteria": [
+        "Threat/effect documentation distinguishes integrity, authorization, deployment, host loading and content safety, with explicit non-goals and no universal safety claim.",
+        "Core boundary tests and provider/dependency inventory are reused in a compact trust report that labels dirty/unsigned/unverified conditions truthfully.",
+        "A proposed public release has an explicitly authorized distribution/license decision, independently bootstrapped artifact verification and reproducible verification instructions; no publication is assumed.",
+        "Key rotation/revocation and update-channel rollback/freeze considerations are documented/tested at the selected provider boundary, without adding an unrequested automatic program updater."
+      ],
+      "deps": [
+        7,
+        8,
+        12,
+        13
+      ],
+      "id": "RFC-MASK-0016",
+      "n": 16,
+      "path": "docs/rfcs/RFC-MASK-0016-public-trust-and-supply-chain-hardening.md",
+      "stage": "E — stretch public assurance",
+      "title": "Public trust evidence and staged supply-chain hardening"
+    },
+    {
+      "criteria": [
+        "Live import preserves historical RFCs/cards/counters, uses real reservations and baseline commits, and imports one closeout per RFC with no fabricated evidence.",
+        "Readiness, multi-source/pinning/targeting, composition/reporting and fleet milestones have focused integrated evidence and current public docs/capabilities that match what shipped.",
+        "Actual canonical AgentSkills management guidance and selected metadata/bundle/provenance handoffs are recorded by upstream revision and verified locally without duplicate tracker ownership.",
+        "Explicit selected-scope migrations preserve declarations, user data, ownership/recovery and source history on native macOS/Windows; unknown/unavailable acceptance stays open.",
+        "The real one-request fleet story demonstrates exact revisions, online/offline reporting and catch-up on distinct devices; optional MCP/vault/public-release work remains separately tracked and does not falsify core status."
+      ],
+      "deps": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "id": "RFC-MASK-0017",
+      "n": 17,
+      "path": "docs/rfcs/RFC-MASK-0017-integration-and-personal-dogfood.md",
+      "stage": "A–D — integration and owner workflow",
+      "title": "Staged migration, agent workflow handoff and personal-use acceptance"
+    }
+  ],
+  "schema": "mask.rfc-pack.v1",
+  "snapshot_next_issue": "MASK-0023",
+  "source_dump_sha256": "57ac9173be3043ab6c3b7a6fb047542e0fad699aeafa9e7687c9a80b5ce36a8a",
+  "tracking_items": [
+    {
+      "id": "MASK-0079",
+      "key": "additional-agents",
+      "path": "docs/issues/00-inbox/MASK-0079-additional-agents.md",
+      "title": "Track additional agent adapters as an adoption opportunity"
+    },
+    {
+      "id": "MASK-0080",
+      "key": "passive-audit",
+      "path": "docs/issues/00-inbox/MASK-0080-passive-audit.md",
+      "title": "Defer passive heuristic skill auditing until a concrete need"
+    }
+  ]
+}

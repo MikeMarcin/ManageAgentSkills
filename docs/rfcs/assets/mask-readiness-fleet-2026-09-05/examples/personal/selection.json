@@ -1,0 +1,20 @@
+{
+  "default_agents": "all",
+  "schema_version": 2,
+  "skills": [
+    {
+      "agents": [
+        "claude"
+      ],
+      "id": "alpha",
+      "source": "fixture"
+    }
+  ],
+  "sources": {
+    "fixture": {
+      "packages": "skills",
+      "ref": "refs/heads/main",
+      "repository": "https://example.invalid/team/skills.git"
+    }
+  }
+}

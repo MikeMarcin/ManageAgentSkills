@@ -1,0 +1,20 @@
+{
+  "device_id": "mac-example",
+  "host_load": "not_verified",
+  "intent_digest": "sha256:3e914a621ca9d1f7cb7cc46986c94fa11fd3a4c68e5e71338131cef72a58e962",
+  "observed_at": "2026-09-05T23:01:00Z",
+  "operation_id": "example-only-0001",
+  "packages": [
+    {
+      "agents": [
+        "claude"
+      ],
+      "id": "alpha",
+      "payload_digest": "sha256:88f4912804b4d41dd1d9eabb096f92abf534365eaf3bab78cec1925b65304b7e",
+      "source": "fixture"
+    }
+  ],
+  "schema": "mask.receipt.v1",
+  "scope": "user",
+  "status": "applied_verified"
+}

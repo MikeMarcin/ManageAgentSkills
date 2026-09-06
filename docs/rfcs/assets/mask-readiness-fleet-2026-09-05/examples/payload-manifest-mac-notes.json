@@ -1,0 +1,14 @@
+[
+  {
+    "mode": "100644",
+    "path": "SKILL.md",
+    "sha256": "sha256:9d5259ef9c6f951728f494133ee58655ddf77e4698b5aa52b9eaffab818a6172",
+    "size": 233
+  },
+  {
+    "mode": "100644",
+    "path": "mask-skill.json",
+    "sha256": "sha256:2996101326cfb3daf84f329843832c1642be32187e208465aa3b800ea1bdd688",
+    "size": 144
+  }
+]

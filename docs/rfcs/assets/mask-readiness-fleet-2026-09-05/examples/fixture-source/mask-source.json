@@ -1,0 +1,27 @@
+{
+  "bundles": {
+    "basics": {
+      "description": "Synthetic flat bundle",
+      "skills": [
+        {
+          "id": "alpha",
+          "source": "fixture"
+        },
+        {
+          "id": "mac-notes",
+          "source": "fixture",
+          "when": {
+            "platforms": [
+              "macos"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "packages": {
+    "alpha": "skills/alpha",
+    "mac-notes": "skills/mac-notes"
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,33 @@
+{
+  "packages": [
+    {
+      "commit": "efeff6d2bda88a7d4e09028bedb3c6c7eefff758",
+      "git_object_format": "sha1",
+      "id": "alpha",
+      "metadata_digest": "sha256:80dc17d1e0c3a00b8f48788042e55dac302a24c0906a21f9b8071d3e8db939a2",
+      "path": "skills/alpha",
+      "payload_digest": "sha256:88f4912804b4d41dd1d9eabb096f92abf534365eaf3bab78cec1925b65304b7e",
+      "repository": "https://example.invalid/team/skills.git",
+      "selector": {
+        "ref": "refs/heads/main"
+      },
+      "source": "fixture"
+    },
+    {
+      "commit": "efeff6d2bda88a7d4e09028bedb3c6c7eefff758",
+      "git_object_format": "sha1",
+      "id": "mac-notes",
+      "metadata_digest": "sha256:f844b080124ee9275089f56eb460b9f6000381d47030571b22d7389c4e7dfe0c",
+      "path": "skills/mac-notes",
+      "payload_digest": "sha256:45052f7f5ace2b7066dcc230d2ee8a5b77aabbecfe51286477e34dbe6b807159",
+      "repository": "https://example.invalid/team/skills.git",
+      "selector": {
+        "ref": "refs/heads/main"
+      },
+      "source": "fixture"
+    }
+  ],
+  "resolver": "mask-lock-v1",
+  "schema_version": 1,
+  "selection_digest": "sha256:f665b0be5cae9f728aa60f5b83596cbfaadf5f12aeb8c5ed85705442300c3787"
+}

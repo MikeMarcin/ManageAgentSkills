@@ -1,0 +1,71 @@
+{
+  "actions": [
+    {
+      "kind": "fleet.intent.publish",
+      "status": "applied"
+    }
+  ],
+  "changed": true,
+  "command": "fleet.install",
+  "data": {
+    "complete": false,
+    "control_state": "published_in_example_only",
+    "device_results": [
+      {
+        "agents": [
+          "claude"
+        ],
+        "device_id": "mac-example",
+        "host_load": "not_verified",
+        "status": "applied_verified"
+      },
+      {
+        "agents": [
+          "claude"
+        ],
+        "device_id": "windows-example",
+        "host_load": "not_verified",
+        "status": "applied_verified"
+      },
+      {
+        "agents": [
+          "claude"
+        ],
+        "device_id": "offline-example",
+        "host_load": "not_verified",
+        "status": "queued_offline"
+      }
+    ],
+    "example_only": true,
+    "installed_everywhere": false,
+    "operation_id": "example-only-0001",
+    "payload_digest": "sha256:88f4912804b4d41dd1d9eabb096f92abf534365eaf3bab78cec1925b65304b7e"
+  },
+  "dry_run": false,
+  "error": {
+    "code": "fleet.incomplete",
+    "details": {
+      "pending": 1
+    },
+    "message": "One example device is offline; this is not a completed rollout.",
+    "remediation": [
+      {
+        "kind": "inspect",
+        "message": "Query the durable operation; do not blindly repeat a different request."
+      }
+    ],
+    "retryable": true
+  },
+  "ok": false,
+  "schema_version": 1,
+  "tool": "mask",
+  "tool_version": "EXAMPLE-NOT-IMPLEMENTED",
+  "transaction": "committed",
+  "warnings": [
+    {
+      "code": "example.only",
+      "message": "Synthetic proposed result; no device was contacted."
+    }
+  ],
+  "would_change": true
+}

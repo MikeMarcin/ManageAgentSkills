@@ -1,0 +1,32 @@
+{
+  "default_agents": "all",
+  "schema_version": 2,
+  "skills": [
+    {
+      "id": "alpha",
+      "introduced_by": [
+        "bundle:fixture/basics"
+      ],
+      "source": "fixture"
+    },
+    {
+      "id": "mac-notes",
+      "introduced_by": [
+        "bundle:fixture/basics"
+      ],
+      "source": "fixture",
+      "when": {
+        "platforms": [
+          "macos"
+        ]
+      }
+    }
+  ],
+  "sources": {
+    "fixture": {
+      "packages": "skills",
+      "ref": "refs/heads/main",
+      "repository": "https://example.invalid/team/skills.git"
+    }
+  }
+}

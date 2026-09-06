@@ -1,0 +1,11 @@
+{
+  "agents": [
+    "claude"
+  ],
+  "architectures": "generic",
+  "platforms": [
+    "macos"
+  ],
+  "requirements": [],
+  "schema_version": 1
+}

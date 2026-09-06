@@ -1,0 +1,20 @@
+{
+  "packages": [
+    {
+      "commit": "efeff6d2bda88a7d4e09028bedb3c6c7eefff758",
+      "git_object_format": "sha1",
+      "id": "alpha",
+      "metadata_digest": "sha256:80dc17d1e0c3a00b8f48788042e55dac302a24c0906a21f9b8071d3e8db939a2",
+      "path": "skills/alpha",
+      "payload_digest": "sha256:88f4912804b4d41dd1d9eabb096f92abf534365eaf3bab78cec1925b65304b7e",
+      "repository": "https://example.invalid/team/skills.git",
+      "selector": {
+        "ref": "refs/heads/main"
+      },
+      "source": "fixture"
+    }
+  ],
+  "resolver": "mask-lock-v1",
+  "schema_version": 1,
+  "selection_digest": "sha256:b3728bcc46ebc7c128efe067572015c3f62764d926c65aa37f2893aac7d607a4"
+}

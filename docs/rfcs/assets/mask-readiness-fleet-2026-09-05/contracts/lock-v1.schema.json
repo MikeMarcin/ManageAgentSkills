@@ -1,0 +1,117 @@
+{
+  "$comment": "Proposed portable lock. Semantic checks bind selection, source aliases, full object format/ID, exact paths and payload digests.",
+  "$id": "urn:mask:proposal:lock:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "packages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+            "type": "string"
+          },
+          "git_object_format": {
+            "enum": [
+              "sha1",
+              "sha256"
+            ]
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "metadata_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "payload_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "provenance_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "repository": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "commit": {
+                    "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commit"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "ref": {
+                    "pattern": "^refs/(heads|tags)/[^\\s]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "source": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "id",
+          "repository",
+          "path",
+          "commit",
+          "git_object_format",
+          "payload_digest",
+          "metadata_digest",
+          "selector"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "resolver": {
+      "const": "mask-lock-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "selection_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "selection_digest",
+    "resolver",
+    "packages"
+  ],
+  "type": "object"
+}

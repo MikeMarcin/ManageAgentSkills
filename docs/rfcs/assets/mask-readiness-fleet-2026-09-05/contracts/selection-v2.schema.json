@@ -1,0 +1,179 @@
+{
+  "$comment": "Proposed portable shape. Runtime additionally checks URI/source approvals, safe IDs, uniqueness, applicability and deployment-name conflicts. Not a shipped schema.",
+  "$id": "urn:mask:proposal:selection:v2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "default_agents": {
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "items": {
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      ]
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "skills": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "agents": {
+            "oneOf": [
+              {
+                "const": "all"
+              },
+              {
+                "items": {
+                  "enum": [
+                    "claude",
+                    "codex"
+                  ]
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            ]
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "introduced_by": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "source": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "version": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "commit": {
+                    "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commit"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "ref": {
+                    "pattern": "^refs/(heads|tags)/[^\\s]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "when": {
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "architectures": {
+                "items": {
+                  "enum": [
+                    "x86_64",
+                    "arm64",
+                    "x86"
+                  ]
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "platforms": {
+                "items": {
+                  "enum": [
+                    "windows",
+                    "macos",
+                    "linux"
+                  ]
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [],
+            "type": "object"
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "sources": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "packages": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ref": {
+            "pattern": "^refs/(heads|tags)/[^\\s]+$",
+            "type": "string"
+          },
+          "repository": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "sources",
+    "skills"
+  ],
+  "type": "object"
+}

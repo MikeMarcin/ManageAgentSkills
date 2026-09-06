@@ -1,0 +1,1 @@
+Synthetic supporting-file bytes for the pinned-artifact example.

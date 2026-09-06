@@ -1,0 +1,80 @@
+{
+  "$comment": "Publisher assertions, not certification or executable dependency instructions. Missing metadata is unspecified.",
+  "$id": "urn:mask:proposal:skill-metadata:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agents": {
+      "oneOf": [
+        {
+          "const": "generic"
+        },
+        {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      ]
+    },
+    "architectures": {
+      "oneOf": [
+        {
+          "const": "generic"
+        },
+        {
+          "items": {
+            "enum": [
+              "x86_64",
+              "arm64",
+              "x86"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      ]
+    },
+    "platforms": {
+      "oneOf": [
+        {
+          "const": "generic"
+        },
+        {
+          "items": {
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      ]
+    },
+    "requirements": {
+      "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schema_version"
+  ],
+  "type": "object"
+}
