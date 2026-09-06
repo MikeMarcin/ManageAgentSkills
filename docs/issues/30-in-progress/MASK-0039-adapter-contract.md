@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0039"
 title: "Consolidate adapter metadata and reject deployment-name conflicts"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0038"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "adapter-contract", "stage": "B — selection semantics", "provisional_id": false}
