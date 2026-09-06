@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0028"
 title: "Verify native macOS workspace and host readiness"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0026", "MASK-0027"]
 platforms: ["mac"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "readiness-mac", "stage": "A — first usable milestone", "provisional_id": false}
+acceptance: [{"criterion":"RFC-MASK-0006-AC01","outcome":"pass","revision":"98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a","evidence":{"kind":"command","detail":"Native macOS launcher/prelaunch test passed on macOS 26.6.2 arm64, APFS, Python 3.14.7, Apple Git 2.50.1. Claude 2.1.260 and Codex 0.153.2 version invocations succeeded. Git lifecycle evidence reused from 2c3fd27; first-prompt loading is explicitly unverified with prelaunch fallback, not claimed. Windows is separately open."}},{"criterion":"RFC-MASK-0006-AC06","outcome":"pass","revision":"98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a","evidence":{"kind":"command","detail":"Native macOS launcher/prelaunch test passed on macOS 26.6.2 arm64, APFS, Python 3.14.7, Apple Git 2.50.1. Claude 2.1.260 and Codex 0.153.2 version invocations succeeded. Git lifecycle evidence reused from 2c3fd27; first-prompt loading is explicitly unverified with prelaunch fallback, not claimed. Windows is separately open."}},{"criterion":"RFC-MASK-0006-AC07","outcome":"pass","revision":"98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a","evidence":{"kind":"command","detail":"Native macOS launcher/prelaunch test passed on macOS 26.6.2 arm64, APFS, Python 3.14.7, Apple Git 2.50.1. Claude 2.1.260 and Codex 0.153.2 version invocations succeeded. Git lifecycle evidence reused from 2c3fd27; first-prompt loading is explicitly unverified with prelaunch fallback, not claimed. Windows is separately open."}}]
 ---
 
 # MASK-0028: Verify native macOS workspace and host readiness

@@ -79,3 +79,7 @@ This release offers per-repository installation. Future-clone coverage is false,
 Revision `93b595dbfd2dbf8f660979ef6b2ec61e5fadfa94`: 22 startup/ensure/lifecycle/launcher tests passed; 17 host/Git/protocol tests passed; affected subprocess and settings-preservation checks passed after review. Direct argv subprocess fixtures verify distinct Claude/Codex output, joint project/personal preflight, personal-only sessions, preserving unrelated host settings and trust files, changed-entry refusal, and prelaunch outside the writer lock. Claude requests reload; Codex startup stop is documented but actual host loading/gating is unverified. Codex setup integration returns a pinned command without replacing existing scripts.
 
 Native versions observed: Claude Code 2.1.260; codex-cli 0.153.2. No host trust grant or live host configuration edit occurred. Current official contracts checked at https://code.claude.com/docs/en/hooks and https://learn.chatgpt.com/docs/hooks. Next: native macOS boundary, Windows target selection, and independent MASK-0044 inventory.
+
+## Native macOS boundary
+
+Revision `98c0f2e24666bcf0b50b11fd8f3973d80f2eaf9a`: installed launcher, native links and both host prelaunch version invocations passed; full boundary and limitations are in [readiness acceptance](../../development/readiness-acceptance.md). Required native Windows acceptance remains open. No terminal RFC claim.
