@@ -63,3 +63,25 @@ prerequisites. RFC-0006 is complete. The dependency path begins at MASK-0030,
 then source discovery/import/guards, pinning and targeting before enrollment;
 profiles and impact reporting are required before rollout composition. The
 original RFC_BASE_SHA and planned card IDs above remain unchanged.
+
+## Source catalog/discovery native evidence
+
+Source revision `d45a8811860b6d03ced50d912a472dcd66df38e3` was checked out
+from a local Git bundle on ExampleWinHost and exercised through native Windows Python
+3.14.6 and Git 2.55.0.windows.3 using explicit PowerShell over the existing
+`example-win-host` SSH alias as `ExampleWinHost\example`.
+
+`python -B -m unittest tests.test_sources tests.test_source_discovery
+tests.test_cli_protocol tests.test_git_update tests.test_launcher`: **31 passed**
+in 82.637s, no skips. This proves the committed catalog/discovery and legacy
+regression slice, not the later package guards or fleet. The implement-rfc
+`project_config.py --repo-root CHECKOUT` helper validated the native checkout
+after its temporary bundle origin was restored to the configured repository URL.
+
+Exact temporary roots were
+`C:/Users/example/AppData/Local/Temp/mask-catalog-win-0u27jcmp` and
+`/tmp/mask-catalog-win-0u27jcmp`.
+The native checkout was clean after tests and removed, clearing read-only
+attributes only on its owned Git pack files during cleanup. No station was
+restarted; the retained station and the owner's manual clone were untouched.
+Local transfer/log files were consumed into this record and removed.

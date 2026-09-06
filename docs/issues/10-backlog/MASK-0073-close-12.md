@@ -55,3 +55,19 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0012-AC06 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+
+## Native signing prerequisite observation
+
+While prerequisites were being implemented, disposable ED25519 keys signed and
+verified a fixed probe under namespace `mask-intent@mask.invalid` with
+`/usr/bin/ssh-keygen` on macOS and
+`C:/Windows/System32/OpenSSH/ssh-keygen.exe` on native ExampleWinHost. Both file-input
+verification invocations returned exit 0. No actual enrollment is asserted.
+
+Windows verification fed by Python `subprocess.run(input=bytes)` hung beyond
+45s. The exact task-owned `ssh-keygen` process was identified and stopped; its
+parent removed `C:/Users/example/AppData/Local/Temp/mask-signing-probe-3kliqunv`.
+Using an opened payload file for stdin then passed, and removed
+`C:/Users/example/AppData/Local/Temp/mask-signing-file-probe-9esxu4pt`. The fleet
+provider implementation should use bounded file input and native containment;
+this is a prerequisite observation, not evidence for an implemented signing API.
