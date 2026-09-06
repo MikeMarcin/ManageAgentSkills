@@ -7,6 +7,7 @@ from pathlib import Path
 
 import mask_core as c
 import mask_resolve as r
+import mask_adapters as adapters
 
 POLICY_BYTES = 1024 * 1024
 
@@ -90,6 +91,8 @@ def assertion(metadata):
 
 def evaluate(contributions, metadata, *, facts, enabled_agents, scope, root, identity, overrides=()):
     """No filesystem, Git, executable detection, hydration, or policy mutation."""
+    if scope not in ('project', 'user') or not isinstance(metadata, dict):
+        c.fail('selection.invalid', 'Effective selection requires a known scope and verified metadata map.', 4)
     if not isinstance(contributions, list) or len(contributions) > 64:
         c.fail('selection.invalid', 'Expected bounded attributed contributions.', 4)
     overrides = policy(dict(schema_version=1, enabled_agents=list(enabled_agents), overrides=list(overrides)))['overrides']
@@ -98,23 +101,29 @@ def evaluate(contributions, metadata, *, facts, enabled_agents, scope, root, ide
         c.fail('selection.invalid', 'Device facts require plain platform/architecture names.', 4)
     enabled = set(r.strings(list(enabled_agents), 'selection_policy', choices=set(c.ADAPTERS), empty=True))
     outcomes, deployable = [], []
+    binding_count = 0
     for contribution in contributions:
         c.fields(contribution, ('origin', 'declaration', 'lock'), family='selection')
         origin = contribution['origin']
         if not isinstance(origin, str) or not 1 <= len(origin) <= 500:
             c.fail('selection.invalid', 'Contribution needs bounded origin attribution.', 4)
         declaration = r.selection(contribution['declaration'])
+        binding_count += len(declaration['skills'])
+        if binding_count > r.BINDINGS:
+            c.fail('selection.limit', 'Effective contributions exceed the binding limit.', 4)
         locked = r.lock(contribution['lock'], declaration)
         rows = {r.coordinate(row): row for row in locked['packages']}
         for binding in declaration['skills']:
             key = r.coordinate(binding)
-            common = dict(coordinate=key, skill=binding['id'], scope=scope, root=str(root), origins=[origin], tested=False)
+            common = dict(coordinate=key, skill=binding['id'], scope=scope, root=str(root), origins=[origin], tested=False,
+                          resolutions=[dict(origin=origin, resolution=rows[key])])
             if not applies(binding, facts):
                 outcomes.append(dict(common, agent=None, status='not_applicable', reason='when_false', compatibility='not_evaluated'))
                 continue
-            if key not in metadata:
+            metadata_key = rows[key]['payload_digest'] if rows[key]['payload_digest'] in metadata else key
+            if metadata_key not in metadata:
                 c.fail('metadata.unavailable', 'Applicable binding needs verified metadata or explicit absence.', 4, skill=key)
-            advertised = metadata[key]
+            advertised = metadata[metadata_key]
             if advertised is not None:
                 advertised = r.metadata(r.canonical(advertised, 'metadata'))
             common.update(compatibility=assertion(advertised), requirements=(advertised or {}).get('requirements', []))
@@ -141,9 +150,69 @@ def evaluate(contributions, metadata, *, facts, enabled_agents, scope, root, ide
                 elif mismatches:
                     row.update(status='overridden', reason=override['reason'], warning='compatibility.local_override')
                 if row['status'] in ('selected', 'overridden'):
-                    deployable.append(dict(coordinate=key, agent=agent, resolution=rows[key], origins=[origin]))
+                    deployable.append(dict(coordinate=key, agent=agent, resolution=rows[key], origins=[origin],
+                                           resolutions=[dict(origin=origin, resolution=rows[key])]))
                 outcomes.append(row)
-    return dict(outcomes=outcomes, deployable=deployable, blocked=any(item['status'] == 'blocked' for item in outcomes))
+    return merge_edges(outcomes, deployable, scope)
+
+
+def require_compatible(evaluated):
+    if evaluated['conflicts']:
+        code = 'target.collision' if any(row['kind'] == 'invocation_name' for row in evaluated['conflicts']) else 'selection.conflict'
+        c.fail(code, 'Effective contributions require conflicting artifact authority or invocation names.', 4,
+               conflicts=evaluated['conflicts'], outcomes=evaluated['outcomes'])
+    if evaluated['blocked']:
+        c.fail('compatibility.unsupported', 'Explicit agent or device compatibility blocks activation.', 4, outcomes=evaluated['outcomes'])
+
+
+def merge_edges(outcomes, deployments, scope):
+    """Union positive edges; retain exact source facts and refuse competing authority."""
+    def attribution(rows):
+        unique = {r.canonical(item): item for row in rows for item in row['resolutions']}
+        return [unique[key] for key in sorted(unique)]
+
+    by_coordinate = {}
+    for row in deployments:
+        by_coordinate.setdefault(row['coordinate'], []).append(row)
+    conflicts, refused = [], set()
+    representatives = {}
+    for coordinate, rows in sorted(by_coordinate.items()):
+        claims = {tuple(row['resolution'].get(field) for field in ('repository', 'payload_digest', 'metadata_digest', 'provenance_digest')) for row in rows}
+        if len(claims) > 1:
+            conflicts.append(dict(kind='artifact_authority', coordinate=coordinate, resolutions=attribution(rows)))
+            refused.update((coordinate, row['agent']) for row in rows)
+        else:
+            # Equal artifact/authority has one destination. Preserve every exact
+            # resolution and select a canonical representative, never arrival order.
+            representatives[coordinate] = min((row['resolution'] for row in rows), key=r.canonical)
+    by_edge = {}
+    for row in deployments:
+        key = (row['coordinate'], row['agent'])
+        if key not in refused:
+            by_edge.setdefault(key, []).append(row)
+    merged = []
+    for (coordinate, agent), rows in sorted(by_edge.items()):
+        merged.append(dict(coordinate=coordinate, agent=agent, resolution=representatives[coordinate],
+                           origins=sorted({origin for row in rows for origin in row['origins']}), resolutions=attribution(rows)))
+    by_name = {}
+    for row in merged:
+        by_name.setdefault((row['agent'], row['resolution']['id']), []).append(row)
+    for (agent, name), rows in sorted(by_name.items()):
+        if len({row['coordinate'] for row in rows}) > 1:
+            conflicts.append(dict(kind='invocation_name', agent=agent, name=name,
+                                  relative=adapters.relative(agent, scope, name), candidates=rows))
+            refused.update((row['coordinate'], agent) for row in rows)
+    for row in outcomes:
+        if (row['coordinate'], row['agent']) in refused and row['status'] in ('selected', 'overridden'):
+            row.update(status='blocked', reason='selection_conflict')
+    grouped = {}
+    for row in outcomes:
+        key = r.canonical({field: value for field, value in row.items() if field not in ('origins', 'resolutions')})
+        grouped.setdefault(key, []).append(row)
+    outcomes = [dict(rows[0], origins=sorted({origin for row in rows for origin in row['origins']}), resolutions=attribution(rows))
+                for key, rows in sorted(grouped.items())]
+    return dict(outcomes=outcomes, deployable=[row for row in merged if (row['coordinate'], row['agent']) not in refused],
+                conflicts=conflicts, blocked=bool(conflicts) or any(item['status'] == 'blocked' for item in outcomes))
 
 
 def parse_policy_text(raw):
@@ -238,7 +307,7 @@ def validate_after_links(pending, home, after_policy):
             agents = manifest.get('targets', config['default_targets'])
             if manifest['skills'] and set(agents) - set(after_policy['enabled_agents']):
                 c.fail('recovery.conflict', 'Legacy explicit targets exceed after-policy authority.', 8)
-            expected = {c.ADAPTERS[agent] + '/' + identifier: dict(skill=identifier, target=agent)
+            expected = {adapters.relative(agent, c.consumer_scope(pending['after_state'], root), identifier): dict(skill=identifier, target=agent)
                         for identifier in manifest['skills'] for agent in agents}
         if set(expected) != set(record['links']):
             c.fail('recovery.conflict', 'After ownership differs from effective selection authority.', 8)

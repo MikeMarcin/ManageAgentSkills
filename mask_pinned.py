@@ -6,6 +6,7 @@ from pathlib import Path
 
 import mask_core as c
 import mask_resolve as r
+import mask_adapters as adapters
 
 
 def is_pinned(record):
@@ -132,12 +133,12 @@ def expected_links(home, declaration, resolved, config, payload_views=None, *, r
                                     payload_views=payload_views, policy_value=policy_value, devs=devs)
     if outcomes is not None:
         outcomes.extend(evaluated['outcomes'])
-    if evaluated['blocked']:
-        c.fail('compatibility.unsupported', 'Explicit agent or device compatibility is unsupported; use conditional intent or a reasoned local override.', 4, outcomes=evaluated['outcomes'])
+    import mask_selection as selection
+    selection.require_compatible(evaluated)
     expected = {}
     for deployment in evaluated['deployable']:
         row, agent = deployment['resolution'], deployment['agent']
-        relative = c.ADAPTERS[agent] + '/' + row['id']
+        relative = adapters.relative(agent, scope, row['id'])
         if relative in expected and expected[relative]['resolution'] != row:
             c.fail('target.collision', 'Different coordinates share one agent invocation path.', 4, path=relative)
         expected[relative] = dict(skill=row['id'], target=agent, resolution=row,
@@ -403,8 +404,7 @@ def prepare_dispatch(args, output, home):
             effects.append(item)
             store.ensure(home, declaration, resolved, config, offline=row['source'] not in allowed, coordinates=[r.coordinate(row)], effects=item['effects'])
         evaluated = effective_selection(home, declaration, resolved, config, root=root, scope=scope)
-        if evaluated['blocked']:
-            c.fail('compatibility.unsupported', 'Applicable compatibility blocks activation.', 4, outcomes=evaluated['outcomes'])
+        selection.require_compatible(evaluated)
     return dict(before=before, consumers=consumers, effects=effects)
 
 

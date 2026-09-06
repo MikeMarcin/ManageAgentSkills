@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 import mask_core as c
+import mask_adapters as adapters
 import mask_fs as fs
 
 
@@ -40,9 +41,9 @@ def validate_registration(value):
 
 def validate_record(root, record):
     c.fields(record, ('root', 'identity', 'common', 'common_identity', 'mode', 'interpreter', 'program', 'home'), ('scope',), family='integration')
-    if record.get('scope', 'project') not in ('project', 'user') or record.get('scope') == 'user' and record['mode'] not in ('claude', 'codex'):
+    if record.get('scope', 'project') not in ('project', 'user') or record.get('scope') == 'user' and record['mode'] not in adapters.BY_ID:
         c.fail('integration.invalid', 'Invalid integration scope.')
-    if binding(record) != root or record['mode'] not in ('named', 'directory', 'claude', 'codex'):
+    if binding(record) != root or record['mode'] not in ('named', 'directory', *adapters.BY_ID):
         c.fail('integration.invalid', 'Invalid integration binding.')
     for key in ('root', 'common', 'interpreter', 'program', 'home'):
         if not isinstance(record[key], str) or not Path(record[key]).is_absolute() or any(ch in record[key] for ch in '\0\r\n'):
@@ -58,7 +59,7 @@ def check_record(record):
     for path, expected in ((root, record['identity']), (common, record['common_identity'])):
         if not path.is_dir() or path.resolve() != path or c.identity(path) != expected:
             c.fail('integration.drift', 'Integration root identity changed.', 4)
-    if record['mode'] in ('claude', 'codex'):
+    if record['mode'] in adapters.BY_ID:
         return
     actual = c.git(root, 'rev-parse', '--git-common-dir')
     if (root / actual).resolve() != common:
@@ -80,14 +81,11 @@ def hook_command(record, event):
 
 
 def binding(record):
-    return record['root'] + ('::' + record['mode'] if record['mode'] in ('claude', 'codex') else '')
+    return record['root'] + ('::' + record['mode'] if record['mode'] in adapters.BY_ID else '')
 
 
 def host_file(record):
-    relative = '.codex/hooks.json'
-    if record['mode'] == 'claude':
-        relative = '.claude/settings.json' if record.get('scope') == 'user' else '.claude/settings.local.json'
-    return Path(record['root']) / relative
+    return Path(record['root']) / adapters.BY_ID[record['mode']].config_path(record.get('scope', 'project'))
 
 
 def host_root(home):
@@ -110,7 +108,7 @@ def host_settings(record):
 
 
 def entries(record):
-    if record['mode'] in ('claude', 'codex'):
+    if record['mode'] in adapters.BY_ID:
         command = shlex.join([record['interpreter'], str(Path(record['program']) / 'mask_integration.py'),
                               'host-hook', record['home'], record['mode']])
         group = dict(matcher='startup|resume|clear|compact', hooks=[dict(type='command', command=command, timeout=45)])
@@ -174,7 +172,7 @@ def inspect_coverage(home, root):
     owned = registration(home)['installations']
     result = coverage(owned.get(str(root)))
     result['agents'] = {}
-    for name, key in [('git', str(root)), ('claude', str(root) + '::claude'), ('codex', str(root) + '::codex')]:
+    for name, key in [('git', str(root)), *((agent, str(root) + '::' + agent) for agent in adapters.BY_ID)]:
         record = owned.get(key)
         if record is None:
             continue
@@ -194,7 +192,7 @@ def inspect_coverage(home, root):
 
 def dispatch(args, output, home):
     agent = getattr(args, 'agent', None)
-    if bool(getattr(args, 'git', False)) == bool(agent) or agent is not None and agent not in ('claude', 'codex'):
+    if bool(getattr(args, 'git', False)) == bool(agent) or agent is not None and agent not in adapters.BY_ID:
         c.fail('invocation.invalid', 'Select exactly one of --git or --agent claude|codex.', 2)
     project = getattr(args, 'project', None)
     if agent is None and project is None:
@@ -235,8 +233,8 @@ def dispatch(args, output, home):
     if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
         c.fail('plan.stale', 'Integration inputs changed; preview again.', 4)
     output['data'] = dict(plan_hash=plan_hash, coverage=coverage(record if enable else None) if not agent else
-                         dict(agent=agent, startup=enable, gate='warning' if agent == 'claude' else 'documented_stop_unverified',
-                              reload='requested' if agent == 'claude' else 'restart_may_be_required', host_load='not_verified', trust='host_managed'),
+                         dict(agent=agent, startup=enable, gate=adapters.BY_ID[agent].gate,
+                              reload=adapters.BY_ID[agent].reload, host_load='not_verified', trust='host_managed'),
                          named_hooks=named_hooks(root) if not agent else None)
     output['data']['files'] = sorted({str(host_file(record)) if entry['role'] == 'host-hook' else
                                        str(common / 'config') if entry['role'] == 'git-config' else str(common / 'hooks' / entry['name'])
@@ -382,7 +380,7 @@ def git_hook(home, event):
 
 
 def host_hook(home, agent):
-    if agent not in ('claude', 'codex'):
+    if agent not in adapters.BY_ID:
         return 2
     command = [sys.executable, str(Path(__file__).resolve().parent / 'mask.py'), 'ensure', '--home', home, '--event', 'startup', '--json']
     try:
@@ -395,9 +393,9 @@ def host_hook(home, agent):
         message = 'MASK readiness could not finish. Inspect pending recovery before continuing.'
     specific = dict(hookEventName='SessionStart', additionalContext=message)
     output = dict(hookSpecificOutput=specific)
-    if agent == 'claude':
+    if adapters.BY_ID[agent].reload_skills:
         specific['reloadSkills'] = ready
-    elif not ready:
+    elif not ready and adapters.BY_ID[agent].stop_on_failure:
         output.update({'continue': False, 'stopReason': message})
     print(json.dumps(output))
     return 0

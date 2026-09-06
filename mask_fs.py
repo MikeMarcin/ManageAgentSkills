@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import mask_core as c
+import mask_adapters as adapters
 import mask_pinned as pinned
 import mask_resolve as resolve
 
@@ -120,7 +121,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                         if identifier not in packages:
                             packages[identifier] = candidate['packages'][identifier] if candidate else c.package(source, identifier)
                         for agent in desired.get('targets', config['default_targets']):
-                            relative = f'{c.ADAPTERS[agent]}/{identifier}'
+                            relative = adapters.relative(agent, scope, identifier)
                             expected[relative] = dict(skill=identifier, target=agent, link_text=creation_link_text(source / 'skills' / identifier))
                 next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
             if register_only:
@@ -154,7 +155,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     links.append(entry)
                     actions.append(dict(kind='link.create' if after_raw else 'link.remove', status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
             for outcome in outcomes:
-                relative = c.ADAPTERS.get(outcome.get('agent'), '') + '/' + outcome['skill']
+                relative = adapters.relative(outcome['agent'], scope, outcome['skill']) if outcome.get('agent') in adapters.BY_ID else ''
                 owned = next_record['links'].get(relative)
                 if outcome['root'] == key and outcome['status'] == 'selected' and outcome.get('target_verified', False) and owned is not None and link_value(root / relative) == dict(type='symlink', link_text=owned['link_text']):
                     outcome['status'] = 'deployed'
@@ -187,7 +188,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if candidate:
         payload['transition'] = candidate.get('transition')
     payload['selection_policy'] = policy_value
-    result = dict(outcomes=outcomes, applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
+    shadowing = scope_shadowing(after, config, home, {str(root) for root in roots})
+    result = dict(outcomes=outcomes, shadowing=shadowing, applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
                 projects=[entry for entry in observations if entry['scope'] == 'project'],
                 users=[entry for entry in observations if entry['scope'] == 'user'], actions=actions, would_change=bool(actions),
                 intent=dict(operation=operation, selected=[str(root) for root in roots], links=links, manifests=files,
@@ -199,10 +201,55 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     return result
 
 
+def scope_shadowing(state, config, home, selected):
+    """Report owned/proposed discovery-name overlap without predicting host precedence."""
+    user = state.get('user')
+    if user is None:
+        return []
+    edges = {}
+    for key, record in c.consumer_records(state).items():
+        root = Path(key)
+        scope = c.consumer_scope(state, root)
+        try:
+            c.registered_root(root, record, scope)
+            for relative, link in record['links'].items():
+                leaf = root / relative
+                c.parents_safe(root, leaf)
+                target = pinned.target(link, config, home)
+                observed = (link_value(leaf) == dict(type='symlink', link_text=link['link_text'])
+                            and normalized_link(leaf, link['link_text']) == target and c.kind(target) == 'directory')
+                if not observed and key not in selected:
+                    continue
+                row = link.get('resolution')
+                edge = dict(root=key, scope=scope, agent=link['target'], name=link['skill'], path=str(leaf),
+                            coordinate=resolve.coordinate(row) if row else None,
+                            payload_digest=row['payload_digest'] if row else None,
+                            status='observed' if observed else 'planned')
+                edges.setdefault((link['target'], link['skill']), []).append(edge)
+        except c.MaskError:
+            # An unavailable unrelated consumer is not evidence of an actual overlap.
+            continue
+    result = []
+    for (agent, name), rows in sorted(edges.items()):
+        users = [row for row in rows if row['scope'] == 'user']
+        projects = [row for row in rows if row['scope'] == 'project']
+        for personal in users:
+            for project in projects:
+                if personal['root'] in selected or project['root'] in selected:
+                    result.append(dict(agent=agent, name=name, user=personal, project=project,
+                                       host_precedence='not_assumed', host_load='not_verified'))
+    return result
+
+
+def shadow_warnings(rows):
+    return [dict(code='target.scope_shadowing', message='User and project discovery names overlap; host precedence is not assumed.', **row) for row in rows]
+
+
 def public_plan(planned, output):
     output['data'] = {key: value for key, value in planned.items() if key not in ('intent', 'actions', 'would_change')}
     output['actions'] = planned['actions']
     output['would_change'] = planned['would_change']
+    output['warnings'].extend(shadow_warnings(planned.get('shadowing', [])))
     for row in planned.get('outcomes', []):
         if row['status'] == 'overridden':
             output['warnings'].append(dict(code='compatibility.local_override', message=row['reason'], coordinate=row['coordinate'], root=row['root'], agent=row['agent']))
@@ -343,7 +390,8 @@ def validate_pending(pending, home):
         if touches or pending['operation'] in ('project.register', 'user.register', 'ensure', 'ensure.deactivate'):
             selected_state = before if key in before_records else after
             c.registered_root(Path(key), record, c.consumer_scope(selected_state, key))
-        for adapter in c.ADAPTERS.values():
+        selected_state = before if key in before_records else after
+        for adapter in adapters.paths(c.consumer_scope(selected_state, key)).values():
             allowed_directories.update((str(Path(key) / Path(adapter).parent), str(Path(key) / adapter)))
     if not isinstance(pending['directories'], list) or not set(pending['directories']) <= allowed_directories:
         c.fail('recovery.conflict', 'Unsafe pending directory intent.', 8)
@@ -351,7 +399,7 @@ def validate_pending(pending, home):
     for entry in pending['links']:
         c.fields(entry, ('root', 'relative', 'skill', 'target', 'before', 'after'), family='recovery')
         c.skill_id(entry['skill'])
-        if entry['root'] not in selected or entry['target'] not in c.ADAPTERS or entry['relative'] != f"{c.ADAPTERS[entry['target']]}/{entry['skill']}":
+        if entry['root'] not in selected or entry['target'] not in c.ADAPTERS or entry['relative'] != adapters.relative(entry['target'], c.consumer_scope(before if entry['root'] in before_records else after, entry['root']), entry['skill']):
             c.fail('recovery.conflict', 'Unsafe pending link path.', 8)
         leaf = Path(entry['root']) / entry['relative']
         key = (entry['root'], entry['relative'])
@@ -577,7 +625,7 @@ def execute(planned, home, output, *, pending=None):
             if outcome['status'] not in ('selected', 'overridden'):
                 continue
             record = c.consumer_records(pending['after_state']).get(outcome['root'], {})
-            relative = c.ADAPTERS[outcome['agent']] + '/' + outcome['skill']
+            relative = adapters.relative(outcome['agent'], outcome['scope'], outcome['skill'])
             owned = record.get('links', {}).get(relative)
             if owned is not None and link_value(Path(outcome['root']) / relative) == dict(type='symlink', link_text=owned['link_text']):
                 outcome['deployed'] = True
@@ -656,7 +704,7 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
         if declaration != record['last_manifest'] or locked != record['last_lock']:
             c.fail('target.adoption_stale', 'Reconcile changed pinned selection/lock through apply before adopting its links.', 4)
         expected_links = pinned.expected_links(home, declaration, locked, config, root=root, scope=scope)
-        wanted = expected_links.get(c.ADAPTERS[target] + '/' + identifier)
+        wanted = expected_links.get(adapters.relative(target, scope, identifier))
         if wanted is None:
             c.fail('target.unmanaged_link', 'Adoption requires a selected pinned skill and target.', 4)
         import mask_store as store
@@ -672,7 +720,7 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
         wanted = dict(skill=identifier, target=target)
     if not Path(expected_source).is_absolute() or Path(expected_source).resolve() != expected:
         c.fail('target.unmanaged_link', 'Expected source does not match the configured package.', 4)
-    relative = f'{c.ADAPTERS[target]}/{identifier}'
+    relative = adapters.relative(target, scope, identifier)
     leaf = root / relative
     c.parents_safe(root, leaf)
     current = link_value(leaf)

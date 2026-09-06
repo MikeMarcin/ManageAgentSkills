@@ -389,7 +389,7 @@ copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
 new v2 consumers can deploy isolated artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Contribution conflicts, profiles, bundles, fleet
+remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.
 
@@ -473,5 +473,31 @@ Every override needs a reason and produces a warning; it cannot enable an
 unsupported/disabled adapter or grant source trust. Local policy is bounded to
 1 MiB and is never imported from a package. Policy, declaration and lock effects
 use the existing recoverable journal. Dev-link evaluation reads validated live
-metadata and remains unpinned. Profile/contribution conflict semantics remain
-separate work; duplicate invocation destinations currently refuse safely.
+metadata and remains unpinned. Identical coordinate/content contributions merge positive agent edges with all
+origins retained. Different artifact authority under one coordinate refuses;
+different coordinates conflict only when they share an agent invocation path.
+Disjoint agents/scopes are allowed. Public profile storage remains separate work.
+
+
+### Adapter facts and conflicting names
+
+`mask capabilities --json` exposes the built-in Claude/Codex adapter contract:
+project/personal discovery paths, startup configuration paths, reserved names,
+package hazards and recorded readiness evidence. macOS/Windows readiness evidence
+is distinct from first-prompt host loading, which remains unverified. Linux
+behavior remains best-effort; no executable detection changes the agent set.
+
+A plan rejects different source coordinates named `alpha` when both require, for
+example, the same project's Codex `alpha` path. It reports both coordinates,
+origins and exact artifact claims. Assigning those coordinates to disjoint agents
+is allowed. MASK never renames a package or chooses a last contribution. Equal
+coordinate, repository identity and payload/metadata/provenance digests merge
+positive agent selections, retaining all exact commits/selectors and origins.
+Inapplicable contributions retain their lock attribution without participating
+in conflicts or requiring their content. Public profile storage is still RFC10.
+
+`plan`, `apply`, and project/user `show` expose `shadowing` and
+`target.scope_shadowing` warnings for user/project discovery names. Observed owned
+links and prospective overlaps are distinguished. Both scopes remain independent;
+MASK does not assert which one the host loads. Full pinned where-used inventory
+remains a separate reporting slice.

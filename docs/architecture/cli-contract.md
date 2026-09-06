@@ -524,8 +524,9 @@ New v2 consumers use `project register [--apply]` or `user register [--apply]`,
 then ordinary `plan`, `apply`, `ensure`, `doctor`, adoption and unregister.
 Whole-selection `default_agents`, per-binding `agents` and `when` are operational.
 The evaluator reports implicit metadata exclusions and blocks explicit incompatible
-intent. Duplicate invocation destinations currently fail closed; contribution
-union/conflict semantics remain a separate slice.
+intent. Different-coordinate invocation collisions fail at a shared consumer/agent
+destination; disjoint agents are permitted. Attributed contribution semantics
+are described below.
 An already registered legacy consumer requires explicit migration. Ordinary
 `mask lock` refuses a changed active pinned lock with `lock.active`; lock changes
 must go through the journaled update seam, not a separate file write.
@@ -671,5 +672,50 @@ agent requests block unless covered by local reasoned authority.
 
 `mask_selection.evaluate` is a pure attributed-contribution input seam, currently
 fed only the local declaration. Filesystem effects remain in the ordinary
-planner. Full contribution union/conflict/shadowing is MASK-0039; public profiles
-are RFC10. No native targeting acceptance is claimed by this implementation.
+planner. Attributed contribution union/conflict/shadowing is operational internally;
+public profile producers remain RFC10. No native targeting acceptance is claimed by this implementation.
+
+
+### Audited adapters and effective contribution conflicts
+
+`mask_adapters.py` is the only built-in adapter data source. It supplies project
+and user paths, startup-config paths, reload/gate fields, reserved invocation
+names and known package-kind hazards. CLI/core path maps are derived views;
+persisted schema enums have an explicit parity test. Capability
+`adapter_contracts` exposes these facts and per-adapter evidence. Future rows have
+no native evidence by default. Claude/Codex retain recorded macOS/Windows
+readiness evidence and unverified host loading; Linux remains best-effort. There
+are no dynamically loaded adapter plugins or additional advertised agents.
+
+`mask_selection.evaluate` accepts up to 64 attributed contributions and 4096 total
+bindings for one physical consumer scope. Evaluate `when` first. Inapplicable
+contributions retain `not_applicable` outcomes and exact lock attribution without
+metadata/content access or conflicts against an applicable edge. Positive edges
+with equal coordinate, approved repository identity, payload digest, metadata
+digest and optional provenance digest merge by union. Ordinary explicit agent
+lists and absence are positive choices, never denials of another contribution.
+
+Pure deployment/outcome rows retain `origins` and `resolutions` (every exact
+origin/locked-resolution pair). Equal content at differing commits/selectors is
+allowed; the canonical-byte-smallest complete resolution is the deterministic
+representative for its identical destination. All source facts remain in the
+attribution, so this is neither an implicit version update nor last-wins policy.
+The caller must approve every contribution's source requirements before planning
+effects; attribution itself grants no source authority.
+
+Competing repository identities or content/metadata/provenance claims under one
+coordinate yield `selection.conflict`. Different coordinates with one invocation
+name collide only at the same consumer/agent destination and yield
+`target.collision`. `conflicts` explains every competing origin and resolution.
+Disjoint agent destinations are allowed. No renaming or implicit override occurs.
+Unknown future agent names remain valid publisher restrictions while unsupported
+consumer agent requests are rejected.
+
+Planner/show `shadowing` rows report matched user/project names, scope, agent,
+coordinate/digest when pinned, and observed-versus-planned link status. An observed
+row means the recorded symlink and directory target are present, not that host
+loading or unrelated payload integrity was attested. Corresponding warnings use
+`target.scope_shadowing`; host precedence remains `not_assumed`. These diagnostic
+observations never suppress a deployment or change unrelated scope ownership.
+Full pinned inventory/where-used remains RFC11; public profiles/bundles remain
+RFC10. Native integrated adapter acceptance remains MASK-0040.

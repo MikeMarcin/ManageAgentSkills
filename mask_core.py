@@ -14,9 +14,11 @@ import tempfile
 import threading
 import time
 
-ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
+import mask_adapters as adapters
+
+ADAPTERS = adapters.paths()
 ID_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-RESERVED = {'synced', 'con', 'prn', 'aux', 'nul', 'clock$', *(f'{p}{n}' for p in ('com', 'lpt') for n in range(1, 10))}
+RESERVED = set(adapters.RESERVED_NAMES) | {'con', 'prn', 'aux', 'nul', 'clock$', *(f'{p}{n}' for p in ('com', 'lpt') for n in range(1, 10))}
 
 
 class MaskError(Exception):
@@ -582,7 +584,7 @@ def state(value):
         for relative, link in record['links'].items():
             fields(link, ('skill', 'target', 'link_text'), ('resolution', 'dev') if pinned else (), family='state')
             skill_id(link['skill'])
-            if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
+            if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != adapters.relative(link['target'], consumer_scope(value, key), link['skill']) or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
     return value
 
@@ -636,7 +638,7 @@ def consumer_manifest(root, scope='project', home=None):
 def registration_safe(root, source, home, value, scope):
     if str(root) in consumer_records(value) and consumer_scope(value, root) != scope:
         fail('target.overlap', 'The root is already registered in another scope.', 4, root=str(root))
-    for adapter in ADAPTERS.values():
+    for adapter in adapters.paths(scope).values():
         destination = root / adapter
         if source.is_relative_to(destination) or (home is not None and home.is_relative_to(destination)) or destination.is_relative_to(source / 'skills') or root == home:
             fail('config.invalid', 'Managed source, state and destination locations overlap.')
@@ -644,7 +646,7 @@ def registration_safe(root, source, home, value, scope):
         for known in consumer_records(value):
             if known == str(root):
                 continue
-            for other_adapter in ADAPTERS.values():
+            for other_adapter in adapters.paths(consumer_scope(value, known)).values():
                 other = Path(known) / other_adapter
                 if destination.is_relative_to(other) or other.is_relative_to(destination):
                     fail('target.overlap', 'Registered consumer destinations overlap.', 4, path=str(destination), other=str(other))

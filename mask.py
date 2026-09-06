@@ -13,7 +13,9 @@ import subprocess
 
 VERSION = '0.2.0'
 PROTOCOL_VERSION = 1
-ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
+import mask_adapters as adapters
+
+ADAPTERS = adapters.paths()
 PROGRAM_ROOT = Path(__file__).resolve().parent
 
 
@@ -174,7 +176,7 @@ def capabilities(leaves):
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                pinned_deployment=True, per_binding_targeting=True, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+                pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
 CONFLICTS = {
@@ -377,6 +379,8 @@ def project_dispatch(args, output, home):
             output['data']['actual_links'] = observations[0]['leaves'] if observations else []
             output['data']['blockers'] = inspection['blockers']
             output['data']['outcomes'] = inspection['outcomes']
+            output['data']['shadowing'] = inspection['shadowing']
+            output['warnings'].extend(fs.shadow_warnings(inspection['shadowing']))
             if declaration['schema_version'] == 2:
                 output['data']['effective_targets'] = sorted({row['agent'] for row in inspection['outcomes'] if row['status'] in ('selected', 'deployed', 'overridden')})
         output['data']['host_load'] = 'not_verified'
@@ -485,7 +489,7 @@ def local_dispatch(args, output, leaves):
         if source == PROGRAM_ROOT or home.is_relative_to(source / 'skills') or source.is_relative_to(home):
             core.fail('config.invalid', 'Source, program and machine state must have distinct non-overlapping write locations.')
         proposal = core.config(dict(schema_version=1, source=dict(root=str(source), remote=getattr(args, 'remote', 'origin'), branch=getattr(args, 'branch', 'main')),
-                                    default_targets=getattr(args, 'target', ['claude', 'codex']), git_timeout_seconds=30))
+                                    default_targets=getattr(args, 'target', list(adapters.BY_ID)), git_timeout_seconds=30))
         if core.git(source, 'check-ref-format', '--branch', proposal['source']['branch'], optional=True) is None or core.git(source, 'check-ref-format', 'refs/remotes/' + proposal['source']['remote'] + '/mask-check', optional=True) is None:
             core.fail('config.invalid', 'Invalid Git remote or branch name.')
         core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))

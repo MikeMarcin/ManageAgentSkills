@@ -7,6 +7,7 @@ import re
 import unicodedata
 
 import mask_core as c
+import mask_adapters as adapters
 
 FILE_BYTES = 64 * 1024 * 1024
 PACKAGE_BYTES = 256 * 1024 * 1024
@@ -17,13 +18,13 @@ TREE_BYTES = 16 * 1024 * 1024
 
 def passive_frontmatter(text):
     """Accept a closed passive scalar subset, never ignore unknown YAML syntax."""
-    if '!`' in text or '```!' in text:
+    if any(syntax in text for syntax in adapters.DYNAMIC_SYNTAX):
         c.fail('skill.activation_unsupported', 'Dynamic shell preprocessing in SKILL.md is unsupported for plain skills.', 4)
     lines = text.splitlines()
     if not lines or lines[0] != '---' or '---' not in lines[1:]:
         c.fail('skill.invalid', 'SKILL.md needs frontmatter.', 4)
     seen, nested = set(), None
-    active = {'hooks', 'allowed-tools', 'mcp', 'mcpservers', 'mcp-servers', 'plugin', 'plugins'}
+    active = adapters.ACTIVE_FRONTMATTER
     for line in lines[1:lines.index('---', 1)]:
         if not line.strip() or line.lstrip().startswith('#'):
             continue
@@ -86,10 +87,7 @@ def portable_path(path):
 
 def passive_path(parts):
     # These are package-kind boundaries, not a claim to detect arbitrary malware.
-    names = [part.casefold() for part in parts]
-    if (any(name in {'.git', '.claude-plugin', '.codex-plugin', '.claude', '.codex', '.agents'} for name in names)
-            or names[-1] in {'.mcp.json', 'mcp.json', '.gitmodules'}
-            or names[-2:] == ['hooks', 'hooks.json']):
+    if not adapters.passive_path(parts):
         c.fail('skill.activation_unsupported', 'Plain skills cannot include host activation or Git administration metadata.', 4)
 
 
