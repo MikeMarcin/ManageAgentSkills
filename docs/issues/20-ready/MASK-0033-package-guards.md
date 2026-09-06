@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0033"
 title: "Harden passive package acquisition and plain-skill boundaries"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0007"]
 depends_on: ["MASK-0031"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "package-guards", "stage": "B — source foundation", "provisional_id": false}
@@ -32,3 +32,22 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded implementation plan
+
+Implement before copy imports so only validated passive payloads can reach new
+curated paths. Extend owned paths to the shared bounded Git subprocess primitive
+in `mask_core.py`, the CLI validation dispatcher in `mask.py`, and a new
+`mask_packages.py` module if warranted (plus `mask_install.py`/launcher module
+inventory and current docs). Git acquisition must cap command output before
+allocation and stop/reap the process tree on size/time limits; fetch pack bytes
+need an explicit bounded policy as well. Preserve the existing hook, auth and
+process-tree contracts.
+
+Expose one reusable frozen-object payload validator for later copy imports and
+artifacts: exact regular file bytes and logical Git modes, per-file/cumulative
+size, count/depth, portable path components/case/NFC collisions, LFS/submodule/
+link/plugin/host-active rejection, and the existing frontmatter subset. Source
+indexes should avoid enumerating unrelated large trees when exact package paths
+are available. Public validation must exercise the chosen package path. No
+package code or filter runs. Use only synthetic local Git fixtures.
