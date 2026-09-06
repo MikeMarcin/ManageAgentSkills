@@ -15,8 +15,7 @@
     "config",
     "before_state_text",
     "after_state_text",
-    "directories",
-    "controls"
+    "directories"
   ],
   "properties": {
     "schema_version": {
@@ -219,6 +218,12 @@
               },
               "scope": {
                 "const": "user"
+              },
+              "lock": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
@@ -230,6 +235,137 @@
           ]
         },
         "policy_after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "role",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "project_declaration",
+              "project_lock",
+              "user_declaration",
+              "user_lock"
+            ]
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "pinned": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaces",
+        "config_text",
+        "policy_text"
+      ],
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "root",
+              "identity",
+              "head",
+              "git_dir",
+              "git_identity",
+              "index",
+              "unsafe",
+              "manifest"
+            ],
+            "properties": {
+              "root": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "identity": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "head": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "git_dir": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "git_identity": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "index": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unsafe": {
+                "type": "boolean"
+              },
+              "manifest": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scope": {
+                "const": "user"
+              },
+              "lock": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "config_text": {
+          "type": "string"
+        },
+        "policy_text": {
           "type": [
             "string",
             "null"

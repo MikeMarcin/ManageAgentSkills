@@ -387,12 +387,11 @@ def read_exact_lock(root, scope='project', home=None, config=None, *, verify=Tru
 
 
 def guard_legacy(root, scope='project', home=None):
-    """Refuse v2 before legacy mutation/target iteration; persisted v1 readers stay strict."""
+    """Validate v2 lock before entering version-dispatched consumer operations."""
     value, _ = read_model(c.declaration_path(root, scope, home), 'manifest', missing=True)
     if isinstance(value, dict) and value.get('schema_version') == 2:
         declaration = selection(value)
-        resolved = lock(read_model(lock_path(root, scope, home), 'lock')[0], declaration)
-        c.fail('deployment.unsupported_version', 'Selection v2 and its coherent lock are readable; pinned deployment and per-binding targeting are not implemented yet.', 4, selection_digest=resolved['selection_digest'])
+        lock(read_model(lock_path(root, scope, home), 'lock')[0], declaration)
 
 
 def dispatch(args, output, home):
@@ -411,8 +410,12 @@ def dispatch(args, output, home):
     if len(serialized.encode('utf-8')) > MODEL_BYTES:
         c.fail('lock.limit', 'Serialized lock exceeds the 4 MiB control-file limit.', 4)
     changed = original is None or lock(original) != proposal
+    state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+    record = state.get('user') if scope == 'user' else state['projects'].get(str(root))
+    if changed and record is not None and record.get('mode') == 'pinned':
+        c.fail('lock.active', 'Use the journaled pinned update flow to change an active consumer lock.', 4)
     plan_hash = c.digest(dict(command='lock', declaration=c.digest(declaration_raw), before=c.digest(before) if before is not None else None, after=proposal, config=c.digest(config_raw.encode('utf-8')), path=str(target), identities=identities))
-    output['data'] = dict(scope=scope, lock_path=str(target), lock=proposal, plan_hash=plan_hash, network='none', portable=all(not entry['repository'].startswith('file:') for entry in declaration['sources'].values()), targeting='not_implemented', deployment='not_implemented')
+    output['data'] = dict(scope=scope, lock_path=str(target), lock=proposal, plan_hash=plan_hash, network='none', portable=all(not entry['repository'].startswith('file:') for entry in declaration['sources'].values()), targeting='not_evaluated', deployment='not_requested')
     output['would_change'] = changed
     if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
         c.fail('plan.stale', 'Lock candidate or observed inputs changed since preview.', 4)
@@ -453,3 +456,6 @@ def guard_command(args, home):
     for root, scope in roots:
         if root.is_dir():
             guard_legacy(root, scope, home)
+            value = c.read_json(c.declaration_path(root, scope, home), 'manifest', default={})
+            if value.get('schema_version') == 2 and command in {'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets'}:
+                c.fail('selection.command_unsupported', 'Legacy consumer mutation requires an explicit pinned-aware operation.', 4)

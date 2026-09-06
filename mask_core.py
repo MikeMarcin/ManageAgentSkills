@@ -543,8 +543,8 @@ def empty_state():
 
 
 def state(value):
-    fields(value, ('schema_version', 'generation', 'projects', 'launchers'), ('user',), family='state', versions=(1, 2))
-    if (value['schema_version'] == 1 and 'user' in value) or (value['schema_version'] == 2 and 'user' not in value):
+    fields(value, ('schema_version', 'generation', 'projects', 'launchers'), ('user',), family='state', versions=(1, 2, 3))
+    if (value['schema_version'] == 1 and 'user' in value) or (value['schema_version'] in (2, 3) and 'user' not in value):
         fail('state.invalid', 'User records require state version 2.')
     user = value.get('user')
     if user is not None and (not isinstance(user, dict) or not isinstance(user.get('root'), str)):
@@ -558,13 +558,20 @@ def state(value):
     if user and user['root'] in value['projects']:
         fail('state.invalid', 'User and project roots overlap.')
     for key, record in consumer_records(value).items():
-        fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), family='state')
+        from mask_pinned import is_pinned, validate_record
+        pinned = is_pinned(record)
+        if pinned:
+            if value['schema_version'] != 3:
+                fail('state.invalid', 'Pinned ownership requires state v3.')
+            validate_record(record)
+        else:
+            fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), family='state')
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
             fail('state.invalid', 'Noncanonical registry root.')
         fields(record['root_identity'], ('device', 'inode'), family='state')
         if any(type(v) is not int for v in record['root_identity'].values()):
             fail('state.invalid', 'Invalid root identity.')
-        previous_manifest = manifest(record['last_manifest'])
+        previous_manifest = selection_manifest(record['last_manifest']) if pinned else manifest(record['last_manifest'])
         if not isinstance(record['last_manifest_digest'], str) or record['last_manifest_digest'] != digest(previous_manifest):
             fail('state.invalid', 'Invalid cached manifest digest.')
         revision = record['last_source_revision']
@@ -573,7 +580,7 @@ def state(value):
         if not isinstance(record['links'], dict):
             fail('state.invalid', 'Invalid ownership map.')
         for relative, link in record['links'].items():
-            fields(link, ('skill', 'target', 'link_text'), family='state')
+            fields(link, ('skill', 'target', 'link_text'), ('resolution',) if pinned else (), family='state')
             skill_id(link['skill'])
             if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != f"{ADAPTERS[link['target']]}/{link['skill']}" or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
@@ -594,8 +601,10 @@ def consumer_scope(value, root):
 
 
 def set_consumer(value, root, record, scope):
+    if isinstance(record, dict) and record.get('mode') == 'pinned':
+        value.update(schema_version=3, user=value.get('user'))
     if scope == 'user':
-        value.update(schema_version=2, user=record)
+        value.update(schema_version=max(value['schema_version'], 2), user=record)
     elif record is None:
         value['projects'].pop(str(root), None)
     else:

@@ -124,11 +124,12 @@ adding or removing a personal requirement never edits a project declaration.
 Hosts decide how duplicate skill names are discovered; MASK does not suppress
 one scope because another declares the same skill.
 
-Existing project-only v1 state is read without conversion. The first user
-registration upgrades state through a recoverable v2 journal. Readiness and
-integration changes use typed v3 journals; v1/v2 recovery readers remain available.
+Existing project-only v1 state is read without conversion. The first legacy user
+registration upgrades state through a recoverable v2 journal. New pinned
+consumers use selection v2 and ownership state v3. Readiness, integration, and
+pinned changes use typed v3 journals; v1/v2 recovery readers remain available.
 Pending operations must be recovered before further mutation. The JSON result
-protocol and declarations remain version 1, and ownership state remains v1/v2.
+protocol remains version 1; declarations read v1/v2 and ownership state reads v1/v2/v3.
 Finish recovery with a compatible program before changing installations. The
 self-updater refuses changed schema contracts; adopting these additions from an
 older schema boundary requires an explicit, reviewed program-checkout update.
@@ -369,8 +370,8 @@ selection. Approve and fetch the source explicitly first, then run `mask lock`
 with the returned `--expect-plan-hash`. `--user` selects the personal declaration.
 Locking uses cached objects only and never changes deployed skills. Existing locks
 retain their resolution; `--refresh --skill SOURCE/ID` updates selected bindings.
-Ref rewrites require explicit `--allow-ref-rebind`. V2 deployment currently returns
-a typed unsupported error after checking for a missing or stale lock. See the
+Ref rewrites require explicit `--allow-ref-rebind`. New v2 consumers can register/apply those artifacts; existing legacy consumers
+require an explicit migration. Missing or stale locks block readiness. See the
 [selection/lock contract](docs/architecture/cli-contract.md#cached-selection-locks)
 for canonical defaults, exact digests and the machine-local file-source limitation.
 
@@ -386,8 +387,10 @@ readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. 
 catalog supports explicit migration, taps, fetch, package validation, curated
 copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
-deployment of those artifacts, profiles, bundles, fleet management
-and full update-impact reports remain RFC work. Importing their specifications does not
+new v2 consumers can deploy isolated artifacts through the recoverable engine.
+Pinned engine verification is currently local; native pinned-deployment acceptance
+remains pending. Legacy-to-pinned migration, per-binding targeting, profiles, bundles, fleet
+management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon or publishing command.
 
 Both named repositories consume the shared skills. Verified bootstrap copies

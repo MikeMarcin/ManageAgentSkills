@@ -113,7 +113,14 @@
       }
     },
     "before_state": {
-      "$ref": "state.schema.json"
+      "oneOf": [
+        {
+          "$ref": "state-v1.schema.json"
+        },
+        {
+          "$ref": "state-v2.schema.json"
+        }
+      ]
     },
     "after_state": {
       "$ref": "state-v2.schema.json"

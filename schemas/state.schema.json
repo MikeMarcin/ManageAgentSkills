@@ -7,6 +7,9 @@
     },
     {
       "$ref": "state-v2.schema.json"
+    },
+    {
+      "$ref": "state-v3.schema.json"
     }
   ]
 }

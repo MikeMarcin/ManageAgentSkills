@@ -35,12 +35,17 @@ def validate_policy(value):
     for root, entry in value['approvals'].items():
         if not isinstance(root, str) or not Path(root).is_absolute():
             c.fail('integration.invalid', 'Approval roots must be absolute.')
-        c.fields(entry, ('identity',), ('common_dir', 'common_identity', 'linked_worktrees', 'inactive_branches', 'tracked'), family='integration')
+        c.fields(entry, ('identity',), ('common_dir', 'common_identity', 'linked_worktrees', 'inactive_branches', 'tracked', 'allow_locked_fetch'), family='integration')
         for flag in ('linked_worktrees', 'inactive_branches'):
             if flag in entry and type(entry[flag]) is not bool:
                 c.fail('integration.invalid', 'Approval flags must be booleans.')
+        if 'allow_locked_fetch' in entry:
+            import mask_resolve as resolve
+            resolve.strings(entry['allow_locked_fetch'], 'integration', empty=True, limit=256)
+            for name in entry['allow_locked_fetch']:
+                c.skill_id(name)
         if 'tracked' in entry:
-            c.fields(entry['tracked'], ('head', 'manifest_digest'), family='integration')
+            c.fields(entry['tracked'], ('head', 'manifest_digest'), ('lock_digest',), family='integration')
             if any(not isinstance(value, str) for value in entry['tracked'].values()):
                 c.fail('integration.invalid', 'Invalid tracked-declaration evidence.')
         for field in ('identity', 'common_identity'):
@@ -120,6 +125,8 @@ def integration(args, output, home):
     proposal = copy.deepcopy(approval)
     root = None
     selected_approval = None
+    if getattr(args, 'allow_locked_fetch', None) is not None and (repository or args.command != 'integration.approve'):
+        c.fail('invocation.invalid', 'Locked-fetch grants require an explicit project approval.', 2)
     if repository:
         repository_identity(repository)
         boundary = Path(under).expanduser().resolve()
@@ -146,6 +153,15 @@ def integration(args, output, home):
                 c.fail('integration.invalid', 'Linked-worktree approval requires a Git worktree root.', 4)
             entry.update(common_dir=str(common), common_identity=c.identity(common))
         previous = approval['approvals'].get(str(root), {})
+        if hasattr(args, 'allow_locked_fetch'):
+            import mask_sources as sources
+            config = c.config(c.read_json(home / 'config.json'))
+            grants = sorted(set(args.allow_locked_fetch))
+            for name in grants:
+                sources.selected(config, name)
+            entry['allow_locked_fetch'] = grants
+        elif previous.get('identity') == entry['identity'] and 'allow_locked_fetch' in previous:
+            entry['allow_locked_fetch'] = previous['allow_locked_fetch']
         if previous.get('identity') == entry['identity'] and 'tracked' in previous:
             entry['tracked'] = previous['tracked']
         proposal['approvals'][str(root)] = entry
@@ -220,9 +236,13 @@ def ensure(args, output, home):
         elif entry is not None and observation['head'] is not None:
             tracked = c.git(project, 'show', observation['head'] + ':./.mask.json', optional=True)
             if tracked is not None and tracked == observation['manifest'].strip() and not observation['unsafe']:
-                manifest_digest = c.digest(c.manifest(c.parse_json(observation['manifest'], 'manifest')))
+                manifest_digest = c.digest(c.selection_manifest(c.parse_json(observation['manifest'], 'manifest')))
                 if entry.get('tracked', {}).get('manifest_digest') != manifest_digest:
                     entry['tracked'] = dict(head=observation['head'], manifest_digest=manifest_digest)
+                if 'lock' in observation and observation['lock'] is not None:
+                    tracked_lock = c.git(project, 'show', observation['head'] + ':./.mask.lock.json', optional=True)
+                    if tracked_lock is not None and tracked_lock == observation['lock'].strip():
+                        entry['tracked']['lock_digest'] = c.digest(observation['lock'].encode('utf-8'))
     roots = list(projects)
     user_root = Path(state['user']['root']) if event == 'startup' and state.get('user') else None
     if user_root is not None:
@@ -242,6 +262,8 @@ def ensure(args, output, home):
     output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none')
     fs.ensure_applicable(planned)
     if getattr(args, 'check', False):
+        if not planned['would_change']:
+            fs.pinned.verify_artifacts(planned['intent']['after_state'], [str(root) for root in roots], home)
         if planned['would_change']:
             output['data']['readiness'] = 'drifted'
             c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7)
@@ -250,8 +272,9 @@ def ensure(args, output, home):
         if policy(home) != approval or any(not authorized(project, approval) for project in projects):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
-    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_legacy_unpinned') for selected in roots]
-    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_legacy_unpinned'
+    final_records = c.consumer_records(planned['intent']['after_state'])
+    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned') for selected in roots]
+    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_legacy_unpinned'
 
 
 def dispatch(args, output, home):
@@ -272,10 +295,15 @@ def workspace_observation(root, *, scope='project', home=None):
         unsafe = (c.git(root, 'config', '--bool', 'core.sparseCheckout', optional=True) == 'true'
                   or bool(c.git(root, 'ls-files', '--unmerged'))
                   or any(c.kind(directory / name) != 'missing' for name in ('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD')))
-        index = c.git(root, 'ls-files', '--stage', '--', '.mask.json')
+        index = c.git(root, 'ls-files', '--stage', '--', '.mask.json', '.mask.lock.json')
     result = dict(root=str(root), identity=c.identity(root), head=head, git_dir=git_dir,
                 git_identity=c.identity(Path(git_dir)) if git_dir else None,
                 index=index, unsafe=unsafe, manifest=c.read_text(c.declaration_path(root, scope, home), 'manifest', missing=True))
+    value = c.parse_json(result['manifest'], 'manifest') if result['manifest'] is not None else {}
+    import mask_resolve as resolve
+    lock_path = resolve.lock_path(root, scope, home)
+    if value.get('schema_version') == 2 or c.kind(lock_path) != 'missing':
+        result['lock'] = c.read_text(lock_path, 'lock', missing=True)
     if scope == 'user':
         result['scope'] = 'user'
     return result
@@ -291,11 +319,17 @@ def inactive_branch(root, record, entry, observation):
     if c.git(root, 'cat-file', '-e', observation['head'] + ':./.mask.json', optional=True) is not None:
         return False
     text = c.git(root, 'show', tracked['head'] + ':./.mask.json', optional=True)
-    return text is not None and c.digest(c.manifest(c.parse_json(text, 'manifest'))) == tracked['manifest_digest']
+    if record.get('mode') == 'pinned':
+        if observation.get('lock') is not None or not tracked.get('lock_digest') or c.git(root, 'cat-file', '-e', observation['head'] + ':./.mask.lock.json', optional=True) is not None:
+            return False
+        old_lock = c.git(root, 'show', tracked['head'] + ':./.mask.lock.json', optional=True, binary=True)
+        if old_lock is None or c.digest(old_lock + b'\n') != tracked['lock_digest'] and c.digest(old_lock) != tracked['lock_digest']:
+            return False
+    return text is not None and c.digest(c.selection_manifest(c.parse_json(text, 'manifest'))) == tracked['manifest_digest']
 
 
 def validate_controls(pending, home):
-    if pending['operation'] not in ('ensure', 'ensure.deactivate') or pending['manifests'] or 'git' in pending or 'launcher' in pending:
+    if pending['operation'] not in ('ensure', 'ensure.deactivate') or pending['manifests'] or pending.get('files') or 'git' in pending or 'launcher' in pending:
         c.fail('recovery.conflict', 'Invalid readiness journal operation.', 8)
     controls = pending['controls']
     c.fields(controls, ('workspaces', 'policy_before', 'policy_after'), family='recovery')
@@ -303,7 +337,7 @@ def validate_controls(pending, home):
         c.fail('recovery.conflict', 'Invalid readiness observations.', 8)
     roots = []
     for observation in controls['workspaces']:
-        c.fields(observation, ('root', 'identity', 'head', 'git_dir', 'git_identity', 'index', 'unsafe', 'manifest'), ('scope',), family='recovery')
+        c.fields(observation, ('root', 'identity', 'head', 'git_dir', 'git_identity', 'index', 'unsafe', 'manifest'), ('scope', 'lock'), family='recovery')
         roots.append(observation['root'])
         if observation['root'] not in pending['selected']:
             c.fail('recovery.conflict', 'Unselected readiness root.', 8)
@@ -311,7 +345,12 @@ def validate_controls(pending, home):
         if observation.get('scope', 'project') != c.consumer_scope(selected_state, observation['root']):
             c.fail('recovery.conflict', 'Readiness scope differs from ownership.', 8)
         if observation['manifest'] is not None:
-            c.manifest(c.parse_json(observation['manifest'], 'manifest'))
+            value = c.selection_manifest(c.parse_json(observation['manifest'], 'manifest'))
+            if value['schema_version'] == 2:
+                if max(pending['before_state']['schema_version'], pending['after_state']['schema_version']) != 3:
+                    c.fail('recovery.conflict', 'Historical ownership cannot cache v2 readiness controls.', 8)
+                import mask_resolve as resolve
+                resolve.lock(c.parse_json(observation.get('lock'), 'lock'), value)
     if sorted(roots) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Readiness control coverage differs from selection.', 8)
     before, after = [validate_policy(c.parse_json(controls['policy_' + side], 'integration')) if controls['policy_' + side] is not None else dict(schema_version=1, approvals={}) for side in ('before', 'after')]

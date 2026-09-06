@@ -63,8 +63,8 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
-    'ensure': (True, False, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag')]),
-    'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag')]),
+    'ensure': (True, True, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag')]),
+    'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag'), ('allow-locked-fetch', 'repeat')]),
     'integration.revoke': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value')]),
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
     'integration.enable': (True, False, [('project', 'value'), ('git', 'flag'), ('agent', 'value')]),
@@ -163,9 +163,9 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=2, pending=3),
-                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
-                pinned_deployment=False, per_binding_targeting=False, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+    return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
+                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
+                pinned_deployment=True, per_binding_targeting=False, targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
 CONFLICTS = {
@@ -236,7 +236,12 @@ def diagnostics(args, output, home):
     if core.kind(home / 'pending.json') != 'missing':
         issues.append(MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict())
     try:
-        core.checkout(Path(config['source']['root']))
+        if any(not fs.pinned.is_pinned(core.consumer_records(state).get(str(root))) for root in roots):
+            core.checkout(Path(config['source']['root']))
+    except MaskError as error:
+        issues.append(error.as_dict())
+    try:
+        fs.pinned.verify_artifacts(planned['intent']['after_state'], [str(root) for root in roots], home)
     except MaskError as error:
         issues.append(error.as_dict())
     drift = bool(planned['would_change'])
@@ -300,7 +305,7 @@ def project_dispatch(args, output, home):
     record = state.get('user') if scope == 'user' else state['projects'].get(key)
     if command == 'project.init':
         if core.kind(path) != 'missing':
-            declaration = core.consumer_manifest(root, scope, home)
+            declaration = core.selection_manifest(core.read_json(path, 'manifest'))
             output['data'] = dict(root=key, manifest=declaration)
             return
         output['data'] = dict(root=key, manifest=dict(schema_version=1, skills=[]))
@@ -335,11 +340,14 @@ def project_dispatch(args, output, home):
             output.update(changed=True, transaction='committed')
         return
     declaration_text = core.read_text(path, 'manifest')
-    declaration = core.manifest(core.parse_json(declaration_text, 'manifest'))
+    declaration = core.selection_manifest(core.parse_json(declaration_text, 'manifest'))
     if record:
         core.registered_root(root, record, scope)
     output['data'] = dict(root=key, scope=scope, manifest_path=str(path), manifest=declaration, registered=record is not None,
                           configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
+    if declaration['schema_version'] == 2:
+        import mask_pinned
+        output['data'].update(mode='pinned', effective_targets=mask_pinned.simple_targets(declaration))
     if command == 'project.show':
         output['data']['source'] = config['source'] if config else None
         output['data']['ownership'] = record['links'] if record else {}
@@ -363,9 +371,10 @@ def project_dispatch(args, output, home):
         if record and not getattr(args, 'apply', False):
             return
         core.registration_safe(root, source, home, state, scope)
-        for identifier in declaration['skills']:
-            core.package(source, identifier)
-        if scope == 'user' or getattr(args, 'apply', False):
+        if declaration['schema_version'] == 1:
+            for identifier in declaration['skills']:
+                core.package(source, identifier)
+        if declaration['schema_version'] == 2 or scope == 'user' or getattr(args, 'apply', False):
             planned = fs.plan(config, state, [root], register=[key], operation=args.command, home=home,
                               user_root=root if scope == 'user' else None, register_only=not getattr(args, 'apply', False))
             fs.public_plan(planned, output)
@@ -384,6 +393,8 @@ def project_dispatch(args, output, home):
             core.save_state(home, state, after)
             output.update(changed=True, transaction='committed')
         return
+    if declaration['schema_version'] == 2:
+        core.fail('selection.command_unsupported', 'Edit v2 selection intent explicitly; legacy string mutation commands do not apply.', 4)
     proposal = copy.deepcopy(declaration)
     if command == 'project.set':
         proposal['skills'] = getattr(args, 'skill', [])
@@ -529,7 +540,7 @@ def local_dispatch(args, output, leaves):
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
 
 
-def dispatch(args, output, leaves):
+def dispatch_impl(args, output, leaves):
     if args.command == 'launch':
         if args.agent not in ADAPTERS:
             core.fail('invocation.invalid', 'Choose a supported agent.', 2)
@@ -556,11 +567,23 @@ def dispatch(args, output, leaves):
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
     mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))
     home = machine_home(args)
+    if args.command == 'source.fetch' and getattr(args, 'locked', False):
+        if core.kind(home / 'pending.json') != 'missing':
+            core.fail('recovery.required', 'Recover pending consumer effects before exact preparation.', 8)
+        return local_dispatch(args, output, leaves)
+    import mask_pinned
+    preparation = mask_pinned.prepare_dispatch(args, output, home) if mutates else None
     if mutates:
         with core.writer_lock(home):
             if args.command != 'recover' and core.kind(home / 'pending.json') != 'missing':
                 core.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
-            local_dispatch(args, output, leaves)
+            mask_pinned.recheck_preparation(preparation, home)
+            try:
+                local_dispatch(args, output, leaves)
+            finally:
+                if preparation is not None:
+                    output['data']['preparation'] = preparation['effects']
+                    output['data']['network'] = 'locked_fetch' if any(item['effects'].get('network_attempted') for item in preparation['effects']) else 'none'
     else:
         observed = args.command not in ('capabilities',)
         before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json')] if observed else []
@@ -573,6 +596,16 @@ def dispatch(args, output, leaves):
     for action in output['actions']:
         if output['changed']:
             action['status'] = 'applied'
+
+
+def dispatch(args, output, leaves):
+    import mask_pinned
+    completed = False
+    try:
+        dispatch_impl(args, output, leaves)
+        completed = True
+    finally:
+        mask_pinned.merge_preparation(output, completed=completed)
 
 
 def main(argv=None):

@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 import mask_core as c
+import mask_pinned as pinned
+import mask_resolve as resolve
 
 
 def link_value(path):
@@ -29,13 +31,14 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=()):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False):
     proposals = proposals or {}
+    lock_proposals = lock_proposals or {}
     source = Path(config['source']['root'])
     after = copy.deepcopy(state)
     links, files, actions, blockers, observations, packages = [], [], [], [], [], {}
-    revision = candidate['revision'] if candidate else c.git(source, 'rev-parse', 'HEAD', optional=True)
-    dirty = (bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False) if source_status else None
+    typed_files, uses_pinned = [], False
+    revision, dirty = None, None
     for root in sorted(roots, key=str):
         key = str(root)
         record = c.consumer_records(state).get(key)
@@ -55,8 +58,6 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 c.registered_root(root, record, scope)
             elif not root.is_dir():
                 c.fail('project.unavailable', 'Project is unavailable.', 4, root=key)
-            import mask_resolve
-            mask_resolve.guard_legacy(root, scope, home)
             before_text = c.read_text(manifest_path, 'manifest', missing=key in inactive)
             if key in inactive:
                 if before_text is not None or record is None:
@@ -64,20 +65,46 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 current = record['last_manifest']
                 desired = dict(schema_version=1, skills=[])
             else:
-                current = c.manifest(c.parse_json(before_text, 'manifest'))
-                desired = c.manifest(proposals.get(key, current))
+                current = c.selection_manifest(c.parse_json(before_text, 'manifest'))
+                desired = c.selection_manifest(proposals.get(key, current))
             old_links = record['links'] if record else {}
+            selected_pinned = desired['schema_version'] == 2 or pinned.is_pinned(record)
             expected = {}
-            if key not in unregister:
-                for identifier in desired['skills']:
-                    if identifier not in packages:
-                        packages[identifier] = candidate['packages'][identifier] if candidate else c.package(source, identifier)
-                    for target in desired.get('targets', config['default_targets']):
-                        relative = f'{c.ADAPTERS[target]}/{identifier}'
-                        expected[relative] = dict(skill=identifier, target=target, link_text=creation_link_text(source / 'skills' / identifier))
+            if selected_pinned:
+                uses_pinned = True
+                if record is not None and not pinned.is_pinned(record) and not allow_migration:
+                    c.fail('migration.required', 'Convert legacy ownership through explicit pinned migration.', 4)
+                if key in inactive:
+                    desired, locked = record['last_manifest'], record['last_lock']
+                    lock_before = None
+                else:
+                    lock_value, lock_raw = resolve.read_model(resolve.lock_path(root, scope, home), 'lock', missing=key in lock_proposals)
+                    locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
+                    lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
+                if key not in unregister and key not in inactive:
+                    expected = pinned.expected_links(home, desired, locked, config)
+                next_record = dict(root=key, root_identity=c.identity(root), mode='pinned', last_manifest=desired,
+                                   last_manifest_digest=resolve.selection_digest(desired), last_source_revision=None,
+                                   last_lock=locked, links={})
+                if key not in inactive:
+                    for role, before_raw, after_raw in (('declaration', before_text, c.text_json(desired)), ('lock', lock_before, c.text_json(locked))):
+                        changed = desired != current if role == 'declaration' else lock_value != locked
+                        if changed:
+                            typed_files.append(dict(root=key, role=scope + '_' + role, before=before_raw, after=after_raw))
+                            actions.append(dict(kind=role + '.write', status='planned', path=str(c.declaration_path(root, scope, home) if role == 'declaration' else resolve.lock_path(root, scope, home))))
+            else:
+                revision = candidate['revision'] if candidate else c.git(source, 'rev-parse', 'HEAD', optional=True)
+                dirty = (bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False) if source_status else None
+                if key not in unregister:
+                    for identifier in desired['skills']:
+                        if identifier not in packages:
+                            packages[identifier] = candidate['packages'][identifier] if candidate else c.package(source, identifier)
+                        for agent in desired.get('targets', config['default_targets']):
+                            relative = f'{c.ADAPTERS[agent]}/{identifier}'
+                            expected[relative] = dict(skill=identifier, target=agent, link_text=creation_link_text(source / 'skills' / identifier))
+                next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
             if register_only:
                 expected = old_links
-            next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
             next_record['links'] = {}
             leaves = []
             for relative in sorted(set(old_links) | set(expected)):
@@ -89,7 +116,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 wanted = expected.get(relative)
                 if actual['type'] not in ('missing', 'symlink'):
                     c.fail('target.collision', 'A real or special entry occupies the target.', 4, path=str(leaf), existing_type=actual['type'])
-                if old and normalized_link(leaf, old['link_text']) != source / 'skills' / old['skill']:
+                if old and normalized_link(leaf, old['link_text']) != pinned.target(old, config, home):
                     c.fail('state.invalid', 'Ownership value does not name the configured source.', path=str(leaf))
                 if actual['type'] == 'symlink':
                     if old is None:
@@ -98,7 +125,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                         c.fail('target.drift', 'Owned link changed since it was recorded.', 4, path=str(leaf))
                 before = actual['link_text'] if actual['type'] == 'symlink' else None
                 if wanted:
-                    after_raw = old['link_text'] if old else wanted['link_text']
+                    after_raw = old['link_text'] if old and normalized_link(leaf, old['link_text']) == pinned.target(wanted, config, home) else wanted['link_text']
                     next_record['links'][relative] = dict(wanted, link_text=after_raw)
                 else:
                     after_raw = None
@@ -110,10 +137,10 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
             if key in unregister:
                 c.set_consumer(after, root, None, scope)
             else:
-                if key not in inactive:
+                if key not in inactive and not selected_pinned:
                     next_record.update(last_manifest=desired, last_manifest_digest=c.digest(desired), last_source_revision=revision)
                 c.set_consumer(after, root, next_record, scope)
-            if desired != current and key not in inactive:
+            if desired != current and key not in inactive and not selected_pinned:
                 files.append(dict(root=key, before=before_text, after=c.text_json(desired)))
                 actions.append(dict(kind='manifest.write', status='planned', path=str(manifest_path)))
         except c.MaskError as error:
@@ -123,16 +150,22 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
         after['generation'] = state['generation'] + 1
     source_data = dict(root=str(source), revision=revision, dirty=dirty,
                        fingerprint=c.digest({key: value['fingerprint'] for key, value in sorted(packages.items())}))
+    pinned_controls = dict(workspaces=pinned.observe(roots, state, home, user_root=user_root), config_text=c.read_text(home / 'config.json'), policy_text=c.read_text(home / 'integration.json', missing=True)) if uses_pinned else None
     payload = dict(protocol=1, adapters=c.ADAPTERS, operation=operation, config=config, generation=state['generation'],
                    state=state, observations=observations, source=source_data, links=links, manifests=files,
                    register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only, inactive=sorted(inactive))
+    if uses_pinned:
+        payload.update(files=typed_files, pinned=pinned_controls)
     if candidate:
         payload['transition'] = candidate.get('transition')
-    return dict(applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
+    result = dict(applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
                 projects=[entry for entry in observations if entry['scope'] == 'project'],
                 users=[entry for entry in observations if entry['scope'] == 'user'], actions=actions, would_change=bool(actions),
                 intent=dict(operation=operation, selected=[str(root) for root in roots], links=links, manifests=files,
                             before_state=state, after_state=after, config=config))
+    if uses_pinned:
+        result['intent'].update(files=typed_files, pinned=pinned_controls)
+    return result
 
 
 def public_plan(planned, output):
@@ -186,15 +219,17 @@ def make_pending(planned, home):
 def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls'), 'recovery', versions=(1, 2, 3))
+             ('git', 'launcher', 'controls', 'files', 'pinned'), 'recovery', versions=(1, 2, 3))
     if pending['operation'] not in {'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
+    if 'files' in pending and not isinstance(pending['files'], list):
+        c.fail('recovery.conflict', 'Typed pending files must be a list.', 8)
     for field in ('selected', 'links', 'manifests', 'directories'):
         if not isinstance(pending[field], list):
             c.fail('recovery.conflict', 'Invalid pending collection.', 8)
-    if any(not isinstance(item, str) for item in pending['selected'] + pending['directories']) or any(not isinstance(item, dict) for item in pending['links'] + pending['manifests']):
+    if any(not isinstance(item, str) for item in pending['selected'] + pending['directories']) or any(not isinstance(item, dict) for item in pending['links'] + pending['manifests'] + pending.get('files', [])):
         c.fail('recovery.conflict', 'Invalid pending collection item.', 8)
     if not isinstance(pending['transaction_id'], str) or pending['phase'] not in ('prepared', 'git_started', 'git_advanced'):
         c.fail('recovery.conflict', 'Invalid pending transaction identity or phase.', 8)
@@ -204,7 +239,7 @@ def validate_pending(pending, home):
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
     if pending['schema_version'] != (3 if 'controls' in pending else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
-    if before['schema_version'] != after['schema_version'] and not (pending['operation'] == 'user.register' and before['schema_version'] == 1 and after['schema_version'] == 2):
+    if before['schema_version'] != after['schema_version'] and not (pending['operation'] == 'user.register' and before['schema_version'] == 1 and after['schema_version'] == 2) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
         c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
     before_records, after_records = c.consumer_records(before), c.consumer_records(after)
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
@@ -219,9 +254,27 @@ def validate_pending(pending, home):
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
-    if pending['schema_version'] == 3:
+    if 'pinned' not in pending:
+        for root in selected:
+            old, new = before_records.get(root), after_records.get(root)
+            if not (pinned.is_pinned(old) or pinned.is_pinned(new)):
+                continue
+            # Keep-links unregister only abandons ownership; it has no root effects.
+            abandoned = (pinned.is_pinned(old) and new is None
+                         and pending['operation'] == c.consumer_scope(before, root) + '.unregister'
+                         and not any(entry.get('root') == root for entry in pending['links'] + pending['manifests'] + pending.get('files', []))
+                         and not any(name in pending for name in ('git', 'launcher', 'controls')))
+            if not abandoned:
+                c.fail('recovery.conflict', 'Selected pinned ownership requires pinned journal observations.', 8)
+    if 'controls' in pending:
         from mask_ensure import validate_controls
         validate_controls(pending, home)
+    if 'pinned' in pending:
+        if pending['schema_version'] != 3 or not isinstance(pending.get('files'), list):
+            c.fail('recovery.conflict', 'Pinned journals require typed files and version 3.', 8)
+        pinned.validate_observations(pending, home)
+    elif 'files' in pending or max(before['schema_version'], after['schema_version']) < 3 and pending['schema_version'] == 3 and 'controls' not in pending:
+        c.fail('recovery.conflict', 'Unexpected journal extension.', 8)
     if not selected <= before_records.keys() | after_records.keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
     if 'launcher' in pending:
@@ -230,6 +283,8 @@ def validate_pending(pending, home):
     elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
     for root in before_records.keys() | after_records.keys():
+        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]):
+            c.fail('recovery.conflict', 'Existing consumer mode conversion requires an explicit migration journal.', 8)
         if root in before_records and root in after_records and c.consumer_scope(before, root) != c.consumer_scope(after, root):
             c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
         if root not in selected and before_records.get(root) != after_records.get(root):
@@ -238,7 +293,7 @@ def validate_pending(pending, home):
     for key in selected:
         record = before_records.get(key) or after_records[key]
         # Explicit keep-links may abandon an unavailable root without effects.
-        touches = any(entry.get('root') == key for entry in pending['links'] + pending['manifests'])
+        touches = any(entry.get('root') == key for entry in pending['links'] + pending['manifests'] + pending.get('files', []))
         if touches or pending['operation'] in ('project.register', 'user.register', 'ensure', 'ensure.deactivate'):
             selected_state = before if key in before_records else after
             c.registered_root(Path(key), record, c.consumer_scope(selected_state, key))
@@ -246,21 +301,32 @@ def validate_pending(pending, home):
             allowed_directories.update((str(Path(key) / Path(adapter).parent), str(Path(key) / adapter)))
     if not isinstance(pending['directories'], list) or not set(pending['directories']) <= allowed_directories:
         c.fail('recovery.conflict', 'Unsafe pending directory intent.', 8)
+    link_keys = set()
     for entry in pending['links']:
         c.fields(entry, ('root', 'relative', 'skill', 'target', 'before', 'after'), family='recovery')
         c.skill_id(entry['skill'])
         if entry['root'] not in selected or entry['target'] not in c.ADAPTERS or entry['relative'] != f"{c.ADAPTERS[entry['target']]}/{entry['skill']}":
             c.fail('recovery.conflict', 'Unsafe pending link path.', 8)
         leaf = Path(entry['root']) / entry['relative']
-        for side in ('before', 'after'):
-            raw = entry[side]
-            if raw is not None and (not isinstance(raw, str) or normalized_link(leaf, raw) != source / 'skills' / entry['skill']):
-                c.fail('recovery.conflict', 'Pending link points outside its configured package.', 8)
+        key = (entry['root'], entry['relative'])
+        if key in link_keys:
+            c.fail('recovery.conflict', 'Duplicate pending link transition.', 8)
+        link_keys.add(key)
         for side, state in (('before', before), ('after', after)):
             record = c.consumer_records(state).get(entry['root'], {}).get('links', {}).get(entry['relative'])
             raw = entry[side]
-            if raw is not None and (not record or record['link_text'] != raw):
+            if raw is not None and (not record or not isinstance(raw, str) or record['link_text'] != raw or normalized_link(leaf, raw) != pinned.target(record, pending['config'], home)):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
+            if side == 'after' and raw != (record['link_text'] if record else None):
+                c.fail('recovery.conflict', 'Pending link omits its desired ownership target.', 8)
+    for root in selected:
+        old, new = before_records.get(root), after_records.get(root)
+        if not (pinned.is_pinned(old) or pinned.is_pinned(new)) or 'pinned' not in pending:
+            continue
+        old_links, new_links = (old or {}).get('links', {}), (new or {}).get('links', {})
+        for relative in old_links.keys() | new_links.keys():
+            if old_links.get(relative, {}).get('link_text') != new_links.get(relative, {}).get('link_text') and (root, relative) not in link_keys:
+                c.fail('recovery.conflict', 'Pinned journal omits an owned link transition.', 8)
     for entry in pending['manifests']:
         c.fields(entry, ('root', 'before', 'after'), family='recovery')
         if entry['root'] not in selected:
@@ -287,6 +353,9 @@ def pending_manifest_path(pending, entry, home):
 def check_current(pending, home):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
+    if 'pinned' in pending:
+        pinned.check_observations(pending, home)
+        pinned.verify_transition(pending, home)
     if 'controls' in pending:
         from mask_ensure import check_controls
         check_controls(pending, home)
@@ -297,29 +366,41 @@ def check_current(pending, home):
         leaf = Path(entry['root']) / entry['relative']
         c.parents_safe(Path(entry['root']), leaf)
         actual = link_value(leaf)
-        if actual['type'] not in ('missing', 'symlink') or actual['link_text'] not in (entry['before'], entry['after']):
+        if not recoverable_link(actual, entry):
             c.fail('recovery.conflict', 'A pending link was replaced or edited.', 8, path=str(leaf))
     for entry in pending['manifests']:
         path = pending_manifest_path(pending, entry, home)
         if c.read_text(path, 'manifest') not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A pending manifest was edited.', 8, path=str(path))
+    for entry in pending.get('files', []):
+        if c.read_text(pinned.file_path(entry, home), missing=True) not in (entry['before'], entry['after']):
+            c.fail('recovery.conflict', 'A typed pending control was edited.', 8)
     actual = c.read_text(home / 'state.json', 'state', missing=True)
     if actual not in (pending['before_state_text'], pending['after_state_text']):
         c.fail('recovery.conflict', 'Registry changed after the pending operation.', 8)
 
 
-def set_link(entry, side):
+def recoverable_link(actual, entry):
+    # A scheduled replacement may stop after unlink and before symlink creation.
+    return (actual['type'] in ('missing', 'symlink')
+            and (actual['link_text'] in (entry['before'], entry['after'])
+                 or actual['type'] == 'missing' and entry['before'] != entry['after']))
+
+
+def set_link(entry, side, *, inject=False):
     root = Path(entry['root'])
     leaf = root / entry['relative']
     c.parents_safe(root, leaf)
     actual = link_value(leaf)
     wanted = entry[side]
-    if actual['type'] not in ('missing', 'symlink') or actual['link_text'] not in (entry['before'], entry['after']):
+    if not recoverable_link(actual, entry):
         c.fail('recovery.conflict', 'Link precondition changed immediately before effect.', 8, path=str(leaf))
     if actual['link_text'] == wanted:
         return
     if actual['type'] == 'symlink':
         leaf.unlink()
+        if inject:
+            checkpoint('link_unlinked')
     if wanted is not None:
         leaf.parent.mkdir(parents=True, exist_ok=True)
         c.parents_safe(root, leaf)
@@ -342,10 +423,13 @@ def restore(pending, home, side, *, inject=False):
             checkpoint('launcher')
     entries = pending['links'] if side == 'after' else reversed(pending['links'])
     for entry in entries:
+        if 'pinned' in pending:
+            pinned.check_observations(pending, home)
+            pinned.verify_transition(pending, home, entry)
         if 'controls' in pending:
             from mask_ensure import check_controls
             check_controls(pending, home)
-        set_link(entry, side)
+        set_link(entry, side, inject=inject)
         if inject:
             checkpoint('link')
     for entry in pending['manifests']:
@@ -356,6 +440,29 @@ def restore(pending, home, side, *, inject=False):
         c.atomic_text(path, entry[side], actual)
         if inject:
             checkpoint('manifest')
+    for entry in pending.get('files', []):
+        pinned.check_observations(pending, home)
+        path = pinned.file_path(entry, home)
+        actual = c.read_text(path, missing=True)
+        if actual not in (entry['before'], entry['after']):
+            c.fail('recovery.conflict', 'Typed control changed before replacement.', 8)
+        wanted = entry[side]
+        if wanted is None:
+            if actual is not None:
+                path.unlink()
+        else:
+            c.atomic_text(path, wanted, actual)
+        if inject:
+            checkpoint('lock' if entry['role'].endswith('_lock') else 'manifest')
+    if side == 'after' and 'pinned' in pending:
+        for root, record in c.consumer_records(pending['after_state']).items():
+            if root not in pending['selected'] or not pinned.is_pinned(record):
+                continue
+            for relative, link in record['links'].items():
+                leaf = Path(root) / relative
+                c.parents_safe(Path(root), leaf)
+                if link_value(leaf) != dict(type='symlink', link_text=link['link_text']):
+                    c.fail('recovery.conflict', 'Pinned after ownership is not present on disk.', 8, path=str(leaf))
     if 'controls' in pending:
         from mask_ensure import restore_controls
         restore_controls(pending, home, side)
@@ -435,7 +542,7 @@ def recover(home, output, mode):
         source = Path(pending['config']['source']['root']) if pending['config'] else None
         for key in pending['selected']:
             record = c.consumer_records(pending['after_state']).get(key)
-            if record:
+            if record and not pinned.is_pinned(record):
                 identifiers = {link['skill'] for link in record['links'].values()} if pending['operation'] == 'ensure.deactivate' else record['last_manifest']['skills']
                 for identifier in identifiers:
                     c.package(source, identifier)
@@ -462,12 +569,25 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     if record is None:
         c.fail('project.not_registered', 'Adoption requires registration.', 4)
     c.registered_root(root, record, scope)
-    declaration = c.consumer_manifest(root, scope, home)
-    if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
-        c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)
-    source = Path(config['source']['root'])
-    package = c.package(source, identifier)
-    expected = source / 'skills' / identifier
+    if pinned.is_pinned(record):
+        declaration, locked = resolve.read_exact_lock(root, scope, home, config, verify=False)
+        if declaration != record['last_manifest'] or locked != record['last_lock']:
+            c.fail('target.adoption_stale', 'Reconcile changed pinned selection/lock through apply before adopting its links.', 4)
+        expected_links = pinned.expected_links(home, declaration, locked, config)
+        wanted = expected_links.get(c.ADAPTERS[target] + '/' + identifier)
+        if wanted is None:
+            c.fail('target.unmanaged_link', 'Adoption requires a selected pinned skill and target.', 4)
+        import mask_store as store
+        expected = store.verify(home, wanted['resolution'])
+        package = wanted['resolution']
+    else:
+        declaration = c.consumer_manifest(root, scope, home)
+        if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
+            c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)
+        source = Path(config['source']['root'])
+        package = c.package(source, identifier)
+        expected = source / 'skills' / identifier
+        wanted = dict(skill=identifier, target=target)
     if not Path(expected_source).is_absolute() or Path(expected_source).resolve() != expected:
         c.fail('target.unmanaged_link', 'Expected source does not match the configured package.', 4)
     relative = f'{c.ADAPTERS[target]}/{identifier}'
@@ -492,6 +612,6 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
         if link_value(leaf) != current:
             c.fail('target.drift', 'Link changed before adoption.', 4)
         after = copy.deepcopy(state)
-        c.consumer_records(after)[str(root)]['links'][relative] = dict(skill=identifier, target=target, link_text=current['link_text'])
+        c.consumer_records(after)[str(root)]['links'][relative] = dict(wanted, link_text=current['link_text'])
         c.save_state(home, state, after)
         output.update(changed=True, transaction='committed')

@@ -170,16 +170,21 @@ class LockTests(Fixture):
         self.assertEqual(self.locked('--refresh')['data']['lock']['packages'][0], r.lock(json.loads(before))['packages'][0])
 
     def test_v2_missing_stale_coherent_guards_and_legacy_mutations(self):
-        for args in [('ensure', '--project', self.project), ('apply', '--project', self.project), ('project', 'show'), ('project', 'set', '--clear'), ('project', 'register')]:
+        self.assertEqual(self.call('ensure', code=4)['error']['code'], 'integration.approval_required')
+        self.assertEqual(self.call('apply', code=4)['error']['code'], 'project.not_registered')
+        for args in [('project', 'show'), ('project', 'set', '--clear'), ('project', 'register')]:
             self.assertEqual(self.call(*args, code=4)['error']['code'], 'lock.missing')
         self.fetch()
         self.locked()
+        self.call('integration', 'approve', '--project', self.project)
         self.declaration['skills'][0]['introduced_by'] = ['edit']
         self.write_selection()
         self.assertEqual(self.call('ensure', code=4)['error']['code'], 'lock.stale')
         self.locked()
-        for args in [('ensure',), ('apply', '--project', self.project), ('project', 'require', 'beta'), ('project', 'show')]:
-            self.assertEqual(self.call(*args, code=4)['error']['code'], 'deployment.unsupported_version')
+        for args in [('ensure',), ('project', 'show')]:
+            self.assertEqual(self.call(*args, code=4)['error']['code'], 'targeting.unsupported')
+        self.assertEqual(self.call('apply', code=4)['error']['code'], 'project.not_registered')
+        self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'selection.command_unsupported')
         self.declare(['alpha'])
         self.call('project', 'require', 'beta')
         self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])

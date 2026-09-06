@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Current CLI contract through RFC-MASK-0007, with the implemented legacy inventory slice of RFC-MASK-0011. The result envelope remains v1; machine configuration reads v1/v2, ownership state reads v1/v2, and pending journals read v1/v2/v3. Source-catalog migration is explicit. Historical and current native evidence is recorded in the corresponding RFC closeouts.
+Current CLI contract through RFC-MASK-0007, with the implemented lock, artifact store, and new pinned-consumer engine slices of RFC-MASK-0008 and the legacy inventory slice of RFC-MASK-0011. The result envelope remains v1; machine configuration and declarations read v1/v2, ownership state reads v1/v2/v3, and pending journals read v1/v2/v3. Source-catalog migration is explicit; existing consumer conversion remains pending. Historical and current native evidence is recorded in the corresponding RFC closeouts; pinned-engine native acceptance is pending.
 
 ## Common options
 
@@ -319,8 +319,8 @@ manifest destinations are recomputed as `<project>/.mask.json` or the current
 `MASK_HOME/user.json`, never accepted as arbitrary serialized write paths.
 V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
 bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
-Capabilities retain readable state versions `[1, 2]` and state version 2. The readiness extension below adds journal v3 while preserving the v1/v2 readers.
-User declarations remain v1 and the result envelope remains v1. The later source-catalog extension reads machine v1/v2 and migrates explicitly to v2.
+Current capabilities report readable state versions `[1, 2, 3]` and state version 3. The readiness and pinned extensions use journal v3 while preserving the v1/v2 readers.
+Legacy user declarations remain v1; pinned user selections use v2. The result envelope remains v1. The source-catalog extension reads machine v1/v2 and migrates explicitly to v2.
 
 ## Workspace readiness (unreleased RFC-MASK-0006 additions)
 
@@ -355,7 +355,7 @@ selection, and creates no manifest. A linked worktree must receive its own
 inactivity opt-in. Missing or ambiguous inputs block without treating them as
 empty selections.
 
-Readiness journals use v3 control observations, while state remains v1/v2.
+Readiness journals use v3 control observations. Legacy consumers retain state v1/v2; pinned ownership uses state v3 with additional pinned journal observations.
 Recovery checks exact declaration bytes or expected absence, Git/index identity,
 physical roots, and approval bytes. Changed inputs block both stale completion
 and rollback. Integration-entry journals are another typed v3 variant; recover
@@ -449,9 +449,10 @@ The explicit `project-v2.schema.json` and `lock-v1.schema.json` contracts are
 closed. `project.schema.json` remains the historical v1 contract, including its
 references from state v1/v2; the user declaration schema accepts either version.
 `core.manifest` retains strict v1 persisted-state semantics. The separate
-`selection_manifest` reader dispatches declaration versions. V2 consumer commands
-report `lock.missing` or `lock.stale`, then `deployment.unsupported_version` for a
-coherent lock; pinned deployment and per-binding targeting are not operational.
+`selection_manifest` reader dispatches declaration versions. V2 consumer commands report `lock.missing` or `lock.stale` when required. New
+v2 project/user consumers support pinned registration/apply/ensure. Per-binding
+targeting and explicit conversion of existing legacy consumers remain separate
+implementation steps.
 
 Canonical bytes are sorted-key compact UTF-8 JSON without ASCII escaping or a
 trailing newline. Duplicate keys, floats, nonfinite numbers, unsafe/negative
@@ -516,3 +517,52 @@ The internal `mask_store.ensure` defaults to offline preparation. Its optional
 default preparation includes all bindings. It does not activate links or evaluate
 target policies. Artifact availability and acquisition
 effects are preparation observations, not part of the consumer's exact intent.
+
+
+### Pinned consumers and recoverable activation
+
+New v2 consumers use `project register [--apply]` or `user register [--apply]`,
+then ordinary `plan`, `apply`, `ensure`, `doctor`, adoption and unregister.
+Whole-selection `default_agents: "all"` or a supported agent list is operational.
+Explicit per-binding `agents`, `when`, duplicate invocation names and restrictive
+package metadata fail with a typed error until per-binding targeting ships.
+An already registered legacy consumer requires explicit migration. Ordinary
+`mask lock` refuses a changed active pinned lock with `lock.active`; lock changes
+must go through the journaled update seam, not a separate file write.
+
+State v3 adds pinned records containing cached selection/lock models and exact
+resolution identities on owned links. Unselected legacy records remain unchanged;
+user and launcher operations cannot downgrade state v3. Historical state v1/v2
+and journal v1/v2 readers keep their original manifest semantics. Partial legacy
+inventory explicitly marks omitted pinned detail instead of reporting it as a
+legacy live-source deployment.
+
+The existing engine derives old and new artifact targets independently and only
+retains an old raw link spelling when it still names the desired target. Journal
+v3 extends its bounded roles with project/user declaration and lock files. Paths
+are reconstructed from selected roots; exact before text binds the observed live
+controls, while after text binds desired ownership. Recovery checks both artifact
+versions, root identities, branch/index observations, configuration and authority
+before effects. Corrupt artifacts or changed control/branch evidence produce a
+recovery conflict and preserve the journal. Rollback retains artifacts and restores
+only unchanged owned links/control bytes. This is recoverable convergence across
+files, not an atomic switch for running readers.
+
+Preparation runs outside the consumer writer lock. After reacquiring the lock,
+MASK compares exact control/policy/state bytes, generations and physical/worktree
+identities before activation. Plan hashes describe consumer intent and remain
+stable across artifact materialization. Plans/checks/previews do not fetch or
+materialize. Warm artifact validation does not consult source Git; worktree Git
+observations still establish branch/index preconditions. Each activation rechecks
+its relevant old/new artifacts, with a deduplicated complete preflight.
+
+`ensure` may fetch an unavailable exact commit only after an explicit
+`integration approve --project PATH --allow-locked-fetch SOURCE` grant for that
+physical scope/source. Ordinary integration approval grants no network authority;
+omitting this option preserves existing grants. Generic/linked-worktree approval
+does not infer a fetch grant for another root. `--offline` always prohibits fetch.
+Personal readiness infers no network authority; `source fetch --locked --user`
+remains the explicit preparation command. No readiness operation resolves a newer
+ref or rewrites its selection/lock. Retained preparation effects survive failures,
+including stale post-preparation inputs and consumer noops; consumer partial or
+rollback status is preserved separately from those cache/store observations.
