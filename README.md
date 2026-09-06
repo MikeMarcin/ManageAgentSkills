@@ -282,8 +282,22 @@ repository and reports package coordinates, without deploying them. Its dry run
 uses cached refs/objects and reports `resolution_required` when they are missing.
 Root, flat and indexed nested layouts are supported. GitHub tree/blob URLs with
 ambiguous branch/path splits return choices. Package metadata inspection is not
-full payload validation; imports and multi-source consumer selections are still
-being implemented.
+full payload validation. Use `mask skill validate SOURCE/ID --json` (or `--all`)
+to validate exact cached payload bytes and logical Git modes without fetching or
+checking out files. It rejects links, submodules, LFS pointers, nonportable or
+colliding paths, and known host activation metadata. Limits are 64 MiB per file,
+256 MiB per package, 10,000 tree entries, and depth 32. Plain frontmatter uses a
+closed passive scalar subset; tool grants, hooks and dynamic shell preprocessing
+refuse (including executable examples). Arbitrary package scripts
+remain passive data; this is structural validation, not a malware safety claim.
+Imports and multi-source consumer selections are still being implemented.
+
+Managed source fetches stage refs before advancing the catalog cursor. They
+enforce the configured timeout and bounded command output, and monitor object
+storage against 256 MiB growth per fetch and a 1 GiB cache ceiling. Storage is
+sampled every 50 ms and checked after fetch; it can overshoot between samples.
+This is not a hard network transfer or disk quota. Refused acquisitions may
+retain objects and a staging ref for inspection, but do not select the package.
 
 `mask self update --json` updates only the running ManageAgentSkills checkout. It checks protocol/schema compatibility and returns `next_invocation_required`; the next command loads the new implementation. It does not update skills or reinstall the launcher. Local skill management remains available while the program checkout has authoring changes.
 

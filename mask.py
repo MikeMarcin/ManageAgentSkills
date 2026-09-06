@@ -471,7 +471,7 @@ def local_dispatch(args, output, leaves):
         return project_dispatch(args, output, home)
     config = machine_config(home)
     source = Path(config['source']['root'])
-    if config['schema_version'] == 2 and command in ('skill.list', 'skill.show'):
+    if config['schema_version'] == 2 and command in ('skill.list', 'skill.show', 'skill.validate'):
         return sources_ops.query(args, output, home)
     if command == 'source.status':
         output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])

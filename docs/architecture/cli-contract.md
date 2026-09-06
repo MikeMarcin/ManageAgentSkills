@@ -77,9 +77,53 @@ ambiguity. HTTP(S) GitHub browser spellings with and without `.git` may locate a
 already approved HTTPS binding, but never grant SSH or a different host approval.
 Remote inspection is explicit and fetches an exact advertised object. Inspecting
 another ref does not advance the configured catalog cursor. Read/dry-run results
-report missing cached resolution. `validation=metadata_only` makes the current
-boundary explicit; provenance, payload guards and v2 consumer selection follow
-in later slices.
+report missing cached resolution. List/show retain `validation=metadata_only`.
+`skill validate SOURCE/ID` and `skill validate --all` read full frozen payloads
+and return `validation=payload`, `payload_digest`, `file_count`, `total_bytes`
+and the selected commit/path. These observational commands never fetch or write.
+Missing catalogs refuse validation. The payload digest is `sha256:` plus the
+SHA-256 of MASK canonical JSON for the path-sorted manifest array. Each entry is
+exactly `{path, mode, size, sha256}`: package-relative UTF-8 path, logical Git
+mode string, byte count and bare hexadecimal SHA-256 of the exact file bytes.
+Every regular payload file is included, including provenance stored inside the
+package. Source provenance records outside the payload are excluded.
+
+Plain payloads permit regular Git blobs only, capped at 64 MiB per file,
+256 MiB cumulative bytes, 10,000 tree entries (including directories), depth 32,
+and 1024 UTF-8 bytes per path. Tree output is capped at 16 MiB and metadata at
+1 MiB before complete capture; all Git diagnostic streams are capped at 64 KiB.
+Case-colliding components, non-NFC paths, Windows reserved components, traversal,
+links/submodules and LFS pointers refuse. `.git`, `.gitmodules`, `.claude`,
+`.codex`, `.agents`, `.claude-plugin`, `.codex-plugin`, MCP JSON configuration
+and `hooks/hooks.json` are unsupported activation/administration content at any
+payload depth. Plain-skill frontmatter accepts unquoted `name`, `description`,
+`license`, `compatibility` keys with single-line scalars and an optional flat
+two-space-indented `metadata` scalar map. Quoted keys, flow/complex YAML, aliases,
+unknown extensions, tool grants, hooks, MCP and plugin frontmatter refuse; bytes
+are never rewritten. Every nested `SKILL.md` receives this guard too. Inline
+shell preprocessing and executable fenced blocks refuse even in example text,
+because [Claude skills support preprocessing and tool grants](https://code.claude.com/docs/en/skills#inject-dynamic-context)
+and [frontmatter hooks](https://code.claude.com/docs/en/hooks#hooks-in-skills-and-agents).
+Scripts
+are read as bytes, never executed; raw Git object reads bypass checkout filters
+and replacement objects. This is a structural package-kind boundary, not a
+general malware detector or complete Agent Skills conformance check.
+
+Managed bare-cache fetches use a staging ref, bounded stdout/stderr and the
+configured Git timeout. Object storage is sampled every 50 ms and checked after
+fetch: maximum growth is 256 MiB per fetch, total cache ceiling 1 GiB. This
+polling policy permits transient disk overshoot and does not bound wire bytes.
+Only a successful final check permits the selected ref to advance. A refusal
+reports retained-object possibility and the staging ref; caches are never
+silently deleted. Code-owned limits cannot be raised by downloaded metadata.
+On Windows, Git starts suspended and joins an owned kill-on-close Job Object
+before its primary thread resumes. Assignment/resume failure terminates the
+suspended process and returns `git.containment_unavailable`; there is no
+uncontained fallback. Job termination includes helpers after their parent exits.
+POSIX uses a separate process group. Output-reader failures refuse incomplete
+observations through the same cleanup path.
+Legacy authoring-checkout updates retain their existing acquisition behavior.
+Provenance/imports and v2 consumer selection follow in later slices.
 
 ## JSON envelope
 

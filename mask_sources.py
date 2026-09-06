@@ -2,12 +2,35 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 import re
+import time
+import uuid
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import url2pathname
 
 import mask_core as c
+
+FETCH_BYTES = 256 * 1024 * 1024
+CACHE_BYTES = 1024 * 1024 * 1024
+
+
+def cache_bytes(root):
+    if c.kind(root / 'objects') != 'directory':
+        c.fail('source.cache_invalid', 'Cache object storage must be a real directory.', 4)
+    total = 0
+    for parent, directories, files in os.walk(root / 'objects', followlinks=False):
+        for name in directories + files:
+            path = Path(parent) / name
+            if c.kind(path) not in ('directory', 'file', 'missing'):
+                c.fail('source.cache_invalid', 'Cache object storage contains a link or special entry.', 4)
+        for name in files:
+            try:
+                total += (Path(parent) / name).stat().st_size
+            except FileNotFoundError:
+                pass  # Git may rename its own temporary pack during the scan.
+    return total
 
 
 def alias(value):
@@ -176,7 +199,7 @@ def remote_refs(root, entry, timeout, output):
     protocol = urlsplit(entry['repository']).scheme
     options += ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
     output['data']['resolution_effects'] = dict(network_attempted=True)
-    raw = c.git(root, *options, 'ls-remote', entry['transport'], timeout=timeout)
+    raw = c.git(root, *options, 'ls-remote', entry['transport'], timeout=timeout, max_output=1024 * 1024)
     refs = {}
     if len(raw.encode('utf-8')) > 1024 * 1024:
         c.fail('source.limit', 'Repository advertises too many refs.', 4)
@@ -244,9 +267,31 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
     destination = 'refs/mask/selected' if ref is None else 'refs/mask/frozen/' + oid
     before = c.git(root, 'rev-parse', '--verify', destination + '^{commit}', optional=True)
     output['data']['fetch_effects'] = dict(attempted=True, before=before, after=before)
+    baseline = cache_bytes(root)
+    last_check = 0
+    def resource_check(force=False):
+        nonlocal last_check
+        now = time.monotonic()
+        if not force and now - last_check < 0.05:
+            return
+        last_check = now
+        size = cache_bytes(root)
+        if size > CACHE_BYTES or size - baseline > FETCH_BYTES:
+            c.fail('source.fetch_limit', 'Fetch exceeds the cache storage policy; acquired objects are retained for inspection.', 4)
+    staged = 'refs/mask/acquiring/' + uuid.uuid4().hex
+    output['data']['fetch_effects'].update(staging_ref=staged, retained_objects_possible=True,
+        resource_policy=dict(fetch_growth_bytes=FETCH_BYTES, cache_bytes=CACHE_BYTES,
+                             storage_poll_seconds=0.05, hard_wire_byte_limit=False))
     try:
-        c.git(root, *options, 'fetch', '--no-tags', '--no-recurse-submodules', entry['transport'],
-              '+' + oid + ':' + destination, timeout=timeout, mutating=True)
+        resource_check(force=True)
+        c.git(root, *options, '-c', 'fetch.unpackLimit=0', '-c', 'gc.auto=0',
+              'fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
+              '--no-auto-maintenance', entry['transport'],
+              '+' + oid + ':' + staged, timeout=timeout, mutating=True, monitor=resource_check)
+        resource_check(force=True)
+        resolved = c.git(root, 'rev-parse', '--verify', staged + '^{commit}')
+        c.git(root, 'update-ref', destination, resolved, before or '0' * len(resolved), mutating=True)
+        c.git(root, 'update-ref', '-d', staged, oid, mutating=True)
         path = root / 'mask-refs.json'
         c.atomic_text(path, c.text_json(dict(schema_version=1, repository=entry['repository'], refs=refs)), c.read_text(path, missing=True))
     finally:
@@ -347,10 +392,10 @@ def dispatch(args, output, home):
 
 
 def object_blob(root, oid, limit=1024 * 1024):
-    size = c.git(root, 'cat-file', '-s', oid)
+    size = c.git(root, 'cat-file', '-s', oid, max_output=32)
     if not size.isdecimal() or int(size) > limit:
         c.fail('source.limit', 'Selected metadata exceeds its byte limit.', 4)
-    return c.git(root, 'cat-file', 'blob', oid, binary=True)
+    return c.git(root, 'cat-file', 'blob', oid, binary=True, max_output=limit)
 
 
 def object_text(root, oid):
@@ -360,9 +405,9 @@ def object_text(root, oid):
         c.fail('source.metadata_invalid', 'Selected metadata requires UTF-8 text.', 4)
 
 
-def tree_entries(root, commit):
+def tree_entries(root, commit, path=''):
     from mask_git import tree
-    rows = tree(root, commit, recursive=True)
+    rows = tree(root, commit, path, recursive=True)
     if len(rows) > 10000:
         c.fail('source.limit', 'Discovery exceeds 10,000 tree entries; use a smaller source layout.', 4)
     result, folded = {}, set()
@@ -427,14 +472,34 @@ def source_index(root, entries):
     return value
 
 
-def discover(root, name, entry, commit, *, path=None, content=False):
-    entries = tree_entries(root, commit)
-    index = source_index(root, entries)
+def exact_entry(root, commit, path):
+    from mask_git import tree
+    rows = tree(root, commit, exact=path, max_output=4096)
+    matches = [row[:3] for row in rows if row[3] == path]
+    return matches[0] if len(matches) == 1 else None
+
+
+def discover(root, name, entry, commit, *, path=None, content=False, identifier=None):
+    index_record = exact_entry(root, commit, 'mask-source.json')
+    index = source_index(root, {'mask-source.json': index_record} if index_record else {})
     selected_path = package_path(path) if path is not None else None
     candidates = []
     if index is not None:
-        paths = list(index['packages'].items())
+        paths = [(key, value) for key, value in index['packages'].items() if identifier is None or key == identifier]
+        entries = {}
     else:
+        selected_root = selected_path if selected_path not in (None, '.') else entry['packages']
+        # A root-level skill is still discoverable with the default flat layout.
+        root_skill = exact_entry(root, commit, 'SKILL.md')
+        selected_tree = exact_entry(root, commit, selected_root) if selected_root != '.' else None
+        if selected_root == '.' or selected_tree and selected_tree[:2] == ('040000', 'tree'):
+            entries = tree_entries(root, commit, '' if selected_root == '.' else selected_root)
+            if selected_root != '.':
+                entries = {selected_root + '/' + key: value for key, value in entries.items()}
+        else:
+            entries = {}
+        if root_skill and selected_path is None:
+            entries['SKILL.md'] = root_skill
         prefix = '' if entry['packages'] == '.' else entry['packages'] + '/'
         paths = [(None, key.removesuffix('/SKILL.md') if key != 'SKILL.md' else '.')
                  for key in entries if (key == 'SKILL.md' or key.endswith('/SKILL.md'))
@@ -443,6 +508,10 @@ def discover(root, name, entry, commit, *, path=None, content=False):
         if selected_path is not None and selected_path != '.' and package != selected_path and not package.startswith(selected_path + '/'):
             continue
         key = 'SKILL.md' if package == '.' else package + '/SKILL.md'
+        if index is not None:
+            record = exact_entry(root, commit, key)
+            if record:
+                entries[key] = record
         if key not in entries:
             c.fail('source.index_invalid', 'Indexed package has no SKILL.md at its exact path.', 4, path=package)
         metadata, text = package_metadata(root, entries[key], identifier)
@@ -555,9 +624,15 @@ def query(args, output, home):
         if commit is None:
             unresolved.append(name)
         else:
-            rows.extend(discover(root, name, entry, commit, content=getattr(args, 'content', False)))
+            rows.extend(discover(root, name, entry, commit, content=getattr(args, 'content', False), identifier=identifier))
     output['data'] = dict(skills=rows, resolution_required=bool(unresolved), unresolved_sources=unresolved, validation='metadata_only')
     if identifier is None:
+        if args.command == 'skill.validate':
+            if unresolved:
+                c.fail('source.resolution_required', 'Fetch sources before validating their payloads.', 4, sources=unresolved)
+            for row in rows:
+                validate_row(home, config, row)
+            output['data']['validation'] = 'payload'
         return
     if unresolved:
         c.fail('source.resolution_required', 'Fetch the named sources before establishing a unique package match.', 4, sources=unresolved)
@@ -567,3 +642,12 @@ def query(args, output, home):
     if not matches:
         c.fail('skill.unknown', 'Skill is unavailable in the selected sources.', 4, skill=identifier)
     output['data'] = matches[0]
+    if args.command == 'skill.validate':
+        validate_row(home, config, output['data'])
+
+
+def validate_row(home, config, row):
+    from mask_packages import validate
+    entry = selected(config, row['source'])
+    payload = validate(cached(home, row['source'], entry), row['commit'], row['path'], row['id'])
+    row.update(payload.summary())

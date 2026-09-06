@@ -78,12 +78,17 @@ def fetch(root, remote, branch, timeout, output):
         output['data']['fetch_effects'].update(remote_refs_changed=before != after, before=before, after=after)
 
 
-def tree(root, revision, path='', recursive=False):
+def tree(root, revision, path='', recursive=False, *, max_output=16 * 1024 * 1024,
+         exact=None, include_trees=False):
     args = ['ls-tree', '-z']
     if recursive:
         args.append('-r')
+    if include_trees:
+        args.append('-t')
     args.append(revision + (':' + path if path else ''))
-    raw = c.git(root, *args, binary=True)
+    if exact is not None:
+        args = ['--literal-pathspecs', *args, '--', exact]
+    raw = c.git(root, *args, binary=True, max_output=max_output)
     rows = []
     for item in raw.split(b'\0'):
         if not item:

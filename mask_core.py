@@ -11,6 +11,8 @@ import stat
 import signal
 import subprocess
 import tempfile
+import threading
+import time
 
 ADAPTERS = {'claude': '.claude/skills', 'codex': '.agents/skills'}
 ID_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -211,13 +213,15 @@ HOOK_EVENTS = ('applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commi
                'p4-pre-submit', 'post-index-change')
 
 
-def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False):
+def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,
+        max_output=16 * 1024 * 1024, monitor=None):
     selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
                  'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
                  'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
     environment = {key: value for key, value in os.environ.items() if key not in selectors and not key.startswith(('GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_'))}
     environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
-                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1')
+                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1',
+                       GIT_NO_REPLACE_OBJECTS='1', GIT_NO_LAZY_FETCH='1')
     if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
         environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
     options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
@@ -230,26 +234,124 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
         for event in HOOK_EVENTS:
             hook_options.extend(('-c', f'hook.{event}.enabled=false'))
     command = ['git', *hook_options, '-C', str(root), *args]
-    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
+    job = None
+    if os.name == 'nt':
+        from mask_process import WindowsJob, CREATE_SUSPENDED
+        try:
+            job = WindowsJob()
+        except OSError:
+            fail('git.containment_unavailable', 'Windows Job Object containment is unavailable; Git was not started.', 4)
+        options['creationflags'] |= CREATE_SUSPENDED
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
-    except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
+    except BaseException:
+        if job is not None:
+            job.close()
+        raise
+    if job is not None:
+        try:
+            job.start(process.pid)
+        except (OSError, KeyboardInterrupt) as error:
+            try:
+                job.close()
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=10)
+            except (OSError, subprocess.TimeoutExpired):
+                fail('recovery.required', 'Git containment setup failed and process termination could not be confirmed.', 8, indeterminate=True)
+            finally:
+                process.stdout.close()
+                process.stderr.close()
+            if isinstance(error, KeyboardInterrupt):
+                raise
+            fail('git.containment_unavailable', 'Git could not join and resume in its Windows Job Object; the suspended process was terminated.', 4)
+    # Drain both pipes concurrently into bounded buffers. communicate() allocates
+    # the complete output before its caller can inspect a size limit.
+    buffers = [bytearray(), bytearray()]
+    exceeded = threading.Event()
+    read_failed = threading.Event()
+    def drain(stream, buffer, limit):
+        try:
+            while True:
+                chunk = stream.read1(min(65536, max(1, limit - len(buffer) + 1)))
+                if not chunk:
+                    break
+                if len(buffer) + len(chunk) > limit:
+                    exceeded.set()
+                    break
+                buffer.extend(chunk)
+        except Exception:
+            read_failed.set()
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                read_failed.set()
+    readers = [threading.Thread(target=drain, args=(stream, buffer, limit), daemon=True)
+               for stream, buffer, limit in ((process.stdout, buffers[0], max_output),
+                                              (process.stderr, buffers[1], 65536))]
+    for reader in readers:
+        reader.start()
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            if read_failed.is_set():
+                fail('git.output_failed', 'Git output could not be read completely.', 5)
+            if exceeded.is_set():
+                fail('git.output_limit', 'Git exceeded its bounded output allowance.', 5)
+            if monitor is not None:
+                monitor()
+            if process.poll() is not None and not any(reader.is_alive() for reader in readers):
+                break
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(command, timeout)
+            exceeded.wait(0.01)
+        if read_failed.is_set():
+            fail('git.output_failed', 'Git output could not be read completely.', 5)
+        if exceeded.is_set():
+            fail('git.output_limit', 'Git exceeded its bounded output allowance.', 5)
+        if job is not None:
+            try:
+                job.stop()
+            except OSError:
+                fail('recovery.required', 'Windows Git job cleanup could not be confirmed.', 8, indeterminate=True)
+        stdout, stderr = map(bytes, buffers)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt, MaskError) as error:
         confirmed = False
         try:
             if os.name == 'nt':
-                cleanup = subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
-                confirmed = cleanup.returncode == 0
-            else:
-                os.killpg(process.pid, signal.SIGKILL)
+                job.stop()
                 confirmed = True
-            process.communicate(timeout=10)
+            else:
+                process.poll()  # Reap an exited leader before signaling its group.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except PermissionError:
+                    # macOS can report EPERM for a group with a zombie leader.
+                    # Reap it, then signal again so live descendants still must
+                    # be terminated (or the group proven absent).
+                    process.wait(timeout=0.1)
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                except ProcessLookupError:
+                    pass  # The entire process group already exited.
+                confirmed = True
+            process.wait(timeout=10)
+            for reader in readers:
+                reader.join(timeout=10)
+            confirmed = confirmed and not any(reader.is_alive() for reader in readers)
         except (OSError, subprocess.TimeoutExpired):
             confirmed = False
         if not confirmed:
             fail('recovery.required', 'Git process-tree termination could not be confirmed; inspect before retrying.', 8, indeterminate=True)
-        if isinstance(error, KeyboardInterrupt):
+        if isinstance(error, (KeyboardInterrupt, MaskError)):
             raise
         fail('git.timeout', 'Git exceeded its timeout; its process tree was terminated and reaped.', 5)
+    finally:
+        if job is not None:
+            job.close()
     if process.returncode and not optional:
         lower = stderr.lower()
         auth = any(token in lower for token in (b'authentication failed', b'could not read username', b'permission denied (publickey)'))
