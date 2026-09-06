@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0007"
 title: "Multiple sources, taps, curated imports and upstream provenance"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -81,3 +81,7 @@ Own new `mask_sources.py`, source schema/capabilities and import fixtures, plus 
 - **RFC-MASK-0007-AC04** — Adversarial package fixtures cannot traverse paths, introduce special entries, run hooks/filters/package scripts, silently activate a plugin, or bypass bounded resource limits.
 - **RFC-MASK-0007-AC05** — Source lifecycle and legacy-config migration preserve current ownership and old declarations; removing a referenced source refuses and reads/dry-runs remain observational.
 - **RFC-MASK-0007-AC06** — Public CLI/capabilities describe resolution, catalog-only addition, mutation/network boundaries and provenance verification levels with deterministic errors.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

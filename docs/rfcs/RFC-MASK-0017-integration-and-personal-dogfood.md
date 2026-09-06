@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0017"
 title: "Staged migration, agent workflow handoff and personal-use acceptance"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -75,3 +75,7 @@ Close the core integration RFC after A–D required criteria and the actual cano
 - **RFC-MASK-0017-AC03** — Actual canonical AgentSkills management guidance and selected metadata/bundle/provenance handoffs are recorded by upstream revision and verified locally without duplicate tracker ownership.
 - **RFC-MASK-0017-AC04** — Explicit selected-scope migrations preserve declarations, user data, ownership/recovery and source history on native macOS/Windows; unknown/unavailable acceptance stays open.
 - **RFC-MASK-0017-AC05** — The real one-request fleet story demonstrates exact revisions, online/offline reporting and catch-up on distinct devices; optional MCP/vault/public-release work remains separately tracked and does not falsify core status.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

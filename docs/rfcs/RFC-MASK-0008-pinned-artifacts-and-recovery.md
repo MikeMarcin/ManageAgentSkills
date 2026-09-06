@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0008"
 title: "True version pinning, immutable deployment artifacts and recoverable migration"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -88,3 +88,7 @@ Automatic garbage collection is not required. Retain artifacts referenced by any
 - **RFC-MASK-0008-AC05** — Interruptions before/after lock, link and state effects preserve bounded v3 recovery; configuration/state migrations preserve exact legacy rollback bytes and reject concurrent edits.
 - **RFC-MASK-0008-AC06** — Explicit migration covers project and personal consumers, dirty/unborn sources, old pending journals, schema-incompatible old programs, and direct-entrypoint escape paths.
 - **RFC-MASK-0008-AC07** — Cache preparation, retention, dev-link exceptions and scoped publishing cannot silently alter other consumers, delete authoring history or claim atomicity across readers/devices.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

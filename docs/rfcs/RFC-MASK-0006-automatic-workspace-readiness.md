@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0006"
 title: "Automatic workspace readiness for clone, worktree, branch and agent startup"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -104,3 +104,7 @@ Integration enable/disable must itself be recoverable: allowlisted destination r
 - **RFC-MASK-0006-AC05** — Owned hook installation/removal preserves unrelated hooks/settings, suppresses configured and directory hooks for MASK internal Git commands, and prevents recursion.
 - **RFC-MASK-0006-AC06** — Native Claude and Codex startup/worktree scenarios record actual versions and first-prompt discovery or an explicit fallback limitation; a warning-only adapter is not called a strict gate.
 - **RFC-MASK-0006-AC07** — Native Windows and macOS readiness/launcher paths receive focused direct checks; worktree removal and unavailable-root handling preserve ownership and are independently tested.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

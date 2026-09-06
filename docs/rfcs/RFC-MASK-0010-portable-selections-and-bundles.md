@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0010"
 title: "Portable personal selections, reusable bundles and profile composition"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -85,3 +85,7 @@ Use two independent temporary machine roots with different local source and home
 - **RFC-MASK-0010-AC03** — Bundle expansion/refresh is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.
 - **RFC-MASK-0010-AC04** — Profile subscription/removal preserves local contributions and reports version/target conflicts, unapproved sources, unavailable artifacts and offline freshness honestly.
 - **RFC-MASK-0010-AC05** — One public import-and-apply path bootstraps selected personal scope through normal validation/recovery, with native Windows/macOS focused tests and no internal-state editing.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

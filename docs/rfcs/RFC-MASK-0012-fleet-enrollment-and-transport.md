@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0012"
 title: "Explicit fleet enrollment, device identity and bounded remote transport"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -82,3 +82,7 @@ Test native Windows remote invocation, PowerShell/cmd quoting boundaries, path s
 - **RFC-MASK-0012-AC04** — Exact package transfer validates paths/digests and never forwards credentials or unrelated private content; unavailable authentication remains a prerequisite.
 - **RFC-MASK-0012-AC05** — Native Windows/macOS transport and launcher checks record actual host/runtime results, while fixture-only tests remain labelled as such.
 - **RFC-MASK-0012-AC06** — Controller/device signing and receipt validation use the established provider with separate namespaces and no unsigned silent fallback for unattended requests.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

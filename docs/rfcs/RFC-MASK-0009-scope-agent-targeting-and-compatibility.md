@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0009"
 title: "Per-skill scope-specific agent targeting and advertised compatibility"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -80,3 +80,7 @@ Each candidate deployment gets a stable outcome: selected, deployed, not_applica
 - **RFC-MASK-0009-AC03** — Generic, absent and agent/platform-specific metadata produce distinct truthful reports; explicit incompatibilities block, and conditional/inapplicable bindings are not called installed.
 - **RFC-MASK-0009-AC04** — Multi-source name conflicts, conflicting profiles and user/project duplicate names are explained without overwriting content, silently renaming packages or assuming host precedence.
 - **RFC-MASK-0009-AC05** — A single adapter contract drives paths/capabilities/validation, and existing native Claude/Codex scope tests cover the change; additional agents stay unadvertised until independently proven.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

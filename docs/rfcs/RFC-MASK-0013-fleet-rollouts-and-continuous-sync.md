@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0013"
 title: "Declarative fleet rollouts, optional continuous convergence and completion reports"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -105,3 +105,7 @@ Required dogfood: at least two genuinely distinct enrolled machines, including t
 - **RFC-MASK-0013-AC05** — An opt-in runner catches up to the latest approved state with bounded polling/backoff, preserves scheduler ownership, never upgrades upstream/programs implicitly, and resumes after interruptions.
 - **RFC-MASK-0013-AC06** — Actual two-machine macOS/native-Windows rollout and offline catch-up evidence is recorded, or that acceptance stays open with the exact environmental limitation.
 - **RFC-MASK-0013-AC07** — Failure between import/publication/remote apply/receipt steps is resumable and truthful, and reports preserve the difference between filesystem verification and host discovery.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.

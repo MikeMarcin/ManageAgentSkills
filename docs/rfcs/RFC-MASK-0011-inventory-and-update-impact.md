@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0011"
 title: "Where-used inventory, update diffs and deployment impact reports"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -67,3 +67,7 @@ Instrument representative cold/warm selected-scope queries, file counts and byte
 - **RFC-MASK-0011-AC03** — Reports and application use the same frozen candidate/plan; source/ref/control-file movement stales a guarded plan, while formatting changes do not.
 - **RFC-MASK-0011-AC04** — Inspection preserves state and unmanaged content, scopes filesystem/network work explicitly, and labels unavailable consumers and stale fleet receipts.
 - **RFC-MASK-0011-AC05** — Compact text/JSON and optional offline HTML safely display untrusted skill content with escaping/redaction; focused query workloads record actual bounded work.
+
+## Live authorization
+
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
