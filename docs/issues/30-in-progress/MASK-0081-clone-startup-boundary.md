@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0081"
 title: "Complete approved clone boundaries and user-level startup fallback"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0006"]
 depends_on: ["MASK-0024", "MASK-0027"]
 metadata: {"discovery": "Integration review found that explicit-root-only approval and project-local host hooks require repeated setup for future clones."}
