@@ -67,7 +67,7 @@ class EnsureTests(Fixture):
         nested.mkdir()
         self.git(nested, 'init', '-b', 'main')
         self.approve()
-        self.assertEqual(self.call('ensure', cwd=nested, code=3)['error']['code'], 'manifest.missing')
+        self.assertEqual(self.call('ensure', cwd=nested, code=4)['error']['code'], 'integration.approval_required')
         ordinary = self.base / 'ordinary'
         ordinary.mkdir()
         (ordinary / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['beta'])))

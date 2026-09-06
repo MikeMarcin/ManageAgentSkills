@@ -7,6 +7,9 @@
     },
     {
       "$ref": "pending-v2.schema.json"
+    },
+    {
+      "$ref": "pending-v3.schema.json"
     }
   ]
 }

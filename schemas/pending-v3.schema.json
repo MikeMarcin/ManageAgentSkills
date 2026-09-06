@@ -1,0 +1,235 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "transaction_id",
+    "phase",
+    "operation",
+    "base_generation",
+    "selected",
+    "links",
+    "manifests",
+    "before_state",
+    "after_state",
+    "config",
+    "before_state_text",
+    "after_state_text",
+    "directories",
+    "controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "prepared",
+        "git_started",
+        "git_advanced"
+      ]
+    },
+    "operation": {
+      "enum": [
+        "ensure",
+        "ensure.deactivate"
+      ]
+    },
+    "base_generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "relative",
+          "skill",
+          "target",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "relative": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "target": {
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "manifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "before_state": {
+      "$ref": "state.schema.json"
+    },
+    "after_state": {
+      "$ref": "state.schema.json"
+    },
+    "config": {
+      "anyOf": [
+        {
+          "$ref": "machine.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "before_state_text": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "after_state_text": {
+      "type": "string"
+    },
+    "directories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaces",
+        "policy_before",
+        "policy_after"
+      ],
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "root",
+              "identity",
+              "head",
+              "git_dir",
+              "git_identity",
+              "index",
+              "unsafe",
+              "manifest"
+            ],
+            "properties": {
+              "root": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "identity": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "head": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "git_dir": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "git_identity": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "index": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unsafe": {
+                "type": "boolean"
+              },
+              "manifest": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "policy_before": {
+          "type": "string"
+        },
+        "policy_after": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mask:pending:v3",
+  "$comment": "Readiness-only typed control observations; state remains v1/v2. Runtime checks selected roots, unchanged authority and live Git/control-file inputs before any effect."
+}

@@ -54,9 +54,10 @@ COMMANDS = {
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'ensure': (True, False, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag')]),
-    'integration.approve': (True, False, [('project', 'required'), ('linked-worktrees', 'flag')]),
+    'integration.approve': (True, False, [('project', 'required'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag')]),
     'integration.revoke': (True, False, [('project', 'required')]),
     'integration.inspect': (False, False, [('project', 'value')]),
+    'workspace.forget': (True, False, [('path', 'pos'), ('expect-identity', 'required')]),
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
     'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
@@ -137,8 +138,8 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=1, state=2, pending=2),
-                readable_versions=dict(state=[1, 2], pending=[1, 2]), scopes=['project', 'user'],
+    return dict(commands=descriptors, schemas=dict(result=1, project=1, user=1, machine=1, state=2, pending=3),
+                readable_versions=dict(state=[1, 2], pending=[1, 2, 3]), scopes=['project', 'user'],
                 targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
 
 
@@ -395,7 +396,7 @@ def local_dispatch(args, output, leaves):
     if command == 'capabilities':
         output['data'] = capabilities(leaves)
         return
-    if command == 'ensure' or command.startswith('integration.'):
+    if command in ('ensure', 'workspace.forget') or command.startswith('integration.'):
         return ensure_ops.dispatch(args, output, home)
     if command == 'init':
         source = Path(args.source).expanduser().resolve()
