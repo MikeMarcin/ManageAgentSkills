@@ -90,6 +90,37 @@
                     }
                   }
                 }
+              },
+              "native_roles": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "skill",
+                    "agent",
+                    "name",
+                    "sha256"
+                  ],
+                  "properties": {
+                    "skill": {
+                      "type": "string"
+                    },
+                    "agent": {
+                      "enum": [
+                        "claude",
+                        "codex"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                }
               }
             }
           },
@@ -262,6 +293,37 @@
                     },
                     "path": {
                       "type": "string"
+                    }
+                  }
+                }
+              },
+              "native_roles": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "skill",
+                    "agent",
+                    "name",
+                    "sha256"
+                  ],
+                  "properties": {
+                    "skill": {
+                      "type": "string"
+                    },
+                    "agent": {
+                      "enum": [
+                        "claude",
+                        "codex"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
                     }
                   }
                 }

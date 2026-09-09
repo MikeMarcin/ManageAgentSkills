@@ -584,6 +584,55 @@
           "pattern": "^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
         }
       }
+    },
+    "native_roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "relative",
+          "skill",
+          "agent",
+          "name",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "relative": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "agent": {
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

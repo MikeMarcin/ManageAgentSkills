@@ -272,20 +272,34 @@ def ensure(args, output, home):
         else:
             output['data']['readiness'] = 'confirmation_required'
             consent.require(args, output, proposal)
+    # Declared workflow prerequisites (RFC-MASK-0019): links alone are not complete readiness.
+    incomplete = [entry for entry in planned.get('workflow_readiness', []) if not entry['complete']]
     if getattr(args, 'check', False):
         if not planned['would_change']:
             fs.pinned.verify_artifacts(planned['intent']['after_state'], [str(root) for root in roots], home)
         if planned['would_change']:
             output['data']['readiness'] = 'drifted'
-            c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7)
+            c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7, **workflow_details(planned.get('workflow_readiness', [])))
     elif not output['dry_run']:
         # Recheck mutable inputs under the same writer lock, with no second payload scan.
         if policy(home) != approval or any(not authorized(project, approval) for project in projects if project not in unauthorized):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
     final_records = c.consumer_records(planned['intent']['after_state'])
-    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned') for selected in roots]
+    workflows = {entry['root']: entry for entry in planned.get('workflow_readiness', [])}
+    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned',
+                                              workflow='not_declared' if not workflows.get(str(selected), {}).get('skills') or all(item['workflow'] == 'not_declared' for item in workflows[str(selected)]['skills']) else 'complete' if workflows[str(selected)]['complete'] else 'unexamined' if all(item['workflow'] in ('not_declared', 'unexamined') for item in workflows[str(selected)]['skills']) else 'incomplete') for selected in roots]
     output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_legacy_unpinned'
+    if incomplete:
+        # Links may already be committed above; the task still did not reach complete readiness.
+        output['data']['readiness'] = 'workflow_incomplete'
+        c.fail('workflow.incomplete', 'Declared native roles or consumer inputs are incomplete; nothing was overwritten and no package code ran.', 4, **workflow_details(incomplete, deployable=False))
+
+
+def workflow_details(entries, *, deployable=True):
+    import mask_workflow as workflow
+    rows = [row for entry in entries for row in workflow.summarize(entry['skills'], deployable=deployable)]
+    return dict(workflow=rows) if rows else {}
 
 
 def dispatch(args, output, home):

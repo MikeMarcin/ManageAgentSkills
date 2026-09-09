@@ -99,12 +99,16 @@ class PublicFixture(unittest.TestCase):
         self.assertTrue(self.machine('project', 'register', '--project', self.project)['ok'])
         self.assertTrue(self.machine('project', 'require', 'alpha', 'implement-rfc', '--project', self.project, '--apply')['ok'])
         self.assertTrue(self.machine('integration', 'approve', '--project', self.project)['ok'])
+        # Since MASK-0088 the engine deploys declared static roles with the links; the
+        # old-host starting state is then restored by hand: the integrator role is absent
+        # and the worker role carries older bytes. Nothing below repairs that state.
         for agent, suffix in (('codex', 'toml'), ('claude', 'md')):
             roles = self.project / f'.{agent}/agents'
-            roles.mkdir(parents=True)
+            roles.mkdir(parents=True, exist_ok=True)
+            for path in roles.glob('*'):
+                path.unlink()
             (roles / f'{STALE_ROLE}.{suffix}').write_text(f'# older {STALE_ROLE} definition for {agent}\n', encoding='utf-8')
-        ensure = self.machine('ensure', '--project', self.project)
-        self.assertEqual(ensure['data']['readiness'], 'ready_legacy_unpinned')
         for agent in ('codex', 'claude'):
+            self.assertTrue((self.project / f'.agents/skills/implement-rfc').is_symlink())
             self.assertFalse(any((self.project / f'.{agent}/agents').glob(MISSING_ROLE + '.*')))
-        return ensure
+        return self.machine('project', 'list')

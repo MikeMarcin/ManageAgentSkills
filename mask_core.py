@@ -37,6 +37,9 @@ REMEDIATION = {
     'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
     'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",
     'plan.stale': 'Preview again and pass the newly reported --expect-plan-hash.',
+    'workflow.incomplete': 'Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock (approved setup is not available yet).',
+    'workflow.invalid': 'The package workflow descriptor or a role asset is invalid; fix the package (MASK never runs package code to repair it).',
+    'workflow.role_invalid': 'The native role content uses unsupported or mismatched fields; correct the package asset or role file.',
     'project.not_registered': "Register the project first: 'mask project register PATH'.",
     'manifest.missing': "Create the declaration first: 'mask project init' or 'mask user init'.",
     'config.missing': "Select the skill source first: 'mask init --source DIR'.",
@@ -593,7 +596,7 @@ def state(value):
                 fail('state.invalid', 'Pinned ownership requires state v3.')
             validate_record(record)
         else:
-            fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), family='state')
+            fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), ('native_roles',), family='state')
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
             fail('state.invalid', 'Noncanonical registry root.')
         fields(record['root_identity'], ('device', 'inode'), family='state')
@@ -607,6 +610,9 @@ def state(value):
             fail('state.invalid', 'Invalid recorded source revision.')
         if not isinstance(record['links'], dict):
             fail('state.invalid', 'Invalid ownership map.')
+        if 'native_roles' in record:
+            from mask_workflow import validate_record_roles
+            validate_record_roles(record['native_roles'], consumer_scope(value, key))
         for relative, link in record['links'].items():
             fields(link, ('skill', 'target', 'link_text'), ('resolution', 'dev') if pinned else (), family='state')
             skill_id(link['skill'])

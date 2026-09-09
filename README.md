@@ -166,6 +166,20 @@ source and never fetches. Registration alone does not grant readiness approval.
 recovery exits 8. A ready result describes filesystem deployment of unpinned
 local content, not confirmation that an agent has loaded the skills.
 
+A package may declare workflow prerequisites in a passive `mask-workflow.json`
+beside `SKILL.md`: bounded consumer inputs and the native role files each
+selected agent needs (`.codex/agents/<name>.toml`, `.claude/agents/<name>.md`).
+`ensure` checks them with the links. Static role assets shipped by the package
+are copied exactly through the same journaled engine; roles already committed in
+the consumer (optionally vouched for by
+`.mask/skill-config/<skill>/native-roles.lock.json`) pass as repository-owned
+and are never adopted, rewritten or deleted. Modified, unknown or colliding
+files are preserved and reported, and `ensure` exits 4 with `workflow.incomplete`
+until every applicable role and input matches. No package script runs; approved
+setup for generated roles is a separate, later contract. The result field
+`workflow_readiness` lists each role's state, ownership and configured route;
+host loading stays `not_verified`.
+
 To run readiness before starting an installed host:
 
 ```sh
@@ -244,6 +258,7 @@ A portable declaration contains skill IDs and optional targets:
 | `MASK_HOME/user.json` | Personal requirements, separate from deployment state |
 | `<user-home>/.agents/skills/<id>` / `.claude/skills/<id>` | Generated personal skill links |
 | `<project>/.mask/skill-config/implement-rfc/` | Versioned workflow context for that consumer |
+| `<project>/.codex/agents/<name>.toml` / `.claude/agents/<name>.md` | Declared native role files: package-managed copies or repository-owned checked-in definitions |
 | `<project>/.agents/skills/<id>` | Generated Codex directory symlink |
 | `<project>/.claude/skills/<id>` | Generated Claude directory symlink |
 | `~/.mask/` | Local machine configuration, ownership and recovery state |

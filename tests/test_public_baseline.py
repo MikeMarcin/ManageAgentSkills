@@ -1,5 +1,8 @@
 """Public regression baseline for RFC-MASK-0018 and RFC-MASK-0019 (MASK-0083).
 
+MASK-0088 turned the RFC-MASK-0019-AC01 rows: declared native roles now
+participate in readiness and static assets deploy through the typed engine.
+
 Each ``expectedFailure`` test states the behavior the RFCs require and fails on
 the pre-implementation program. A later card that fixes a defect removes its
 decorator; an unexpected success is the signal to do so. Nothing here prepares
@@ -9,7 +12,7 @@ fresh states and no role repair for the linked consumer.
 import json
 import unittest
 
-from tests.public_support import PublicFixture, MISSING_ROLE
+from tests.public_support import PublicFixture, MISSING_ROLE, STATIC_PACKAGE
 
 
 class StartingStates(PublicFixture):
@@ -73,7 +76,6 @@ class TaskCommandBaseline(PublicFixture):
 class WorkflowReadinessBaseline(PublicFixture):
     """RFC-MASK-0019-AC01: declared native roles participate in readiness (W01)."""
 
-    @unittest.expectedFailure
     def test_ensure_check_fails_with_missing_integrator_role(self):
         self.linked_consumer_with_stale_roles()
         check = self.raw('ensure', '--project', self.project, '--check', '--json')
@@ -82,12 +84,16 @@ class WorkflowReadinessBaseline(PublicFixture):
         self.assertIn(MISSING_ROLE, check.stdout)
         self.assertFalse(data['ok'])
 
-    @unittest.expectedFailure
     def test_ensure_does_not_report_ready_with_missing_integrator_role(self):
         self.linked_consumer_with_stale_roles()
-        again = self.machine('ensure', '--project', self.project)
+        run = self.raw('ensure', '--project', self.project, '--json')
+        again = json.loads(run.stdout)
         self.assertNotEqual(again['data']['readiness'], 'ready_legacy_unpinned')
-        self.assertFalse((self.project / f'.codex/agents/{MISSING_ROLE}.toml').exists(), 'no generator ran')
+        # MASK-0088: the static package supplies the exact role bytes; no generator or script exists to run.
+        self.assertEqual((self.project / f'.codex/agents/{MISSING_ROLE}.toml').read_bytes(), (STATIC_PACKAGE / f'runtime/roles/codex/{MISSING_ROLE}.toml').read_bytes())
+        self.assertEqual((self.project / '.codex/agents/rfc-worker.toml').read_text(encoding='utf-8'), '# older rfc-worker definition for codex\n', 'the edited role is preserved')
+        self.assertFalse(again['ok'])
+        self.assertEqual(again['error']['code'], 'workflow.incomplete')
 
 
 if __name__ == '__main__':

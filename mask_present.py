@@ -252,6 +252,7 @@ def render_ensure(data, output):
     lines.extend(fields(data, [('event', 'event'), ('network', 'network'), ('host loading', 'host_load'), ('approval', 'approval')]))
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
+    lines.extend(workflow_lines(data))
     lines.extend(actions(output))
     if data.get('readiness') == 'approval_required':
         lines.append("  approve the consumer with 'mask integration approve --project ROOT' before automatic readiness")
@@ -261,6 +262,26 @@ def render_ensure(data, output):
     elif confirmation:
         lines.append("  would ask for one-time readiness consent; automatic readiness still needs 'mask integration approve'")
     return lines + plan_guard(data, output)
+
+
+def workflow_lines(data):
+    """Declared native roles and consumer inputs per consumer: what matches, what is preserved, what will be deployed."""
+    lines = []
+    for entry in data.get('workflow_readiness', []) or []:
+        for skill in entry.get('skills', []) or []:
+            if skill.get('workflow') != 'declared':
+                continue
+            lines.append(f"  {clean(skill.get('skill'))} workflow: {'complete' if skill.get('complete') else 'incomplete'} (host loading: not verified)")
+            for row in skill.get('inputs', []) or []:
+                if row.get('state') not in ('ok', 'absent'):
+                    lines.append(f"    input {clean(row.get('id'))} ({clean(row.get('path'))}): {clean(row.get('state'))}")
+            for row in skill.get('roles', []) or []:
+                state = row.get('state')
+                if state in ('ok', 'not_applicable'):
+                    continue
+                note = {'missing': 'will be deployed from the package', 'stale': 'managed copy will be updated from the package'}.get(state) or row.get('detail') or 'preserved'
+                lines.append(f"    {clean(row.get('agent'))}/{clean(row.get('name'))}: {clean(state)}; {clean(note)}")
+    return lines
 
 
 def render_recover(data, output):
@@ -511,6 +532,8 @@ def render_error(output):
     if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
         lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
     lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
+    if output.get('changed'):
+        lines.extend(actions(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
     lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
     for step in error.get('remediation', []):
         lines.append(f"  next: {clean(step.get('message'))}")

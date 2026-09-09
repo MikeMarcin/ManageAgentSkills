@@ -9,6 +9,7 @@ import mask_core as c
 import mask_adapters as adapters
 import mask_pinned as pinned
 import mask_resolve as resolve
+import mask_workflow as workflow
 
 
 def link_value(path):
@@ -42,6 +43,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     import mask_selection as selection
     policy_value = selection.policy(selection_policy) if selection_policy is not None else selection.read_policy(home)[0] if home is not None else selection.policy()
     typed_files, uses_pinned = [], selection_policy is not None
+    role_files, workflow_reports, released_roles = [], [], []
     outcomes = []
     revision, dirty = None, None
     for root in sorted(roots, key=str):
@@ -154,6 +156,24 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     entry = dict(root=key, relative=relative, skill=(wanted or old)['skill'], target=(wanted or old)['target'], before=before, after=after_raw)
                     links.append(entry)
                     actions.append(dict(kind='link.create' if after_raw else 'link.remove', status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
+            # Declared native roles follow the selected bindings; observation never touches the destinations.
+            bindings, targets = {}, {}
+            for link in next_record['links'].values():
+                bindings.setdefault(link['skill'], set()).add(link['target'])
+                if link['skill'] not in targets:
+                    location = pinned.target(link, config, home)
+                    view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'resolution' in link and 'dev' not in link else None
+                    targets[link['skill']] = workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
+            roles = workflow.requirements(root, scope, record, bindings, targets)
+            if roles['owned']:
+                next_record['native_roles'] = roles['owned']
+            else:
+                next_record.pop('native_roles', None)
+            for entry in roles['writes']:
+                role_files.append(entry)
+                actions.append(dict(kind='native_role.write' if entry['after'] is not None else 'native_role.remove', status='planned', path=str(root / entry['relative']), skill=entry['skill'], target=entry['agent'], name=entry['name']))
+            released_roles.extend(dict(item, root=key) for item in roles['released'])
+            workflow_reports.append(dict(root=key, scope=scope, skills=roles['reports'], complete=all(item['complete'] for item in roles['reports'])))
             for outcome in outcomes:
                 relative = adapters.relative(outcome['agent'], scope, outcome['skill']) if outcome.get('agent') in adapters.BY_ID else ''
                 owned = next_record['links'].get(relative)
@@ -182,6 +202,9 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                    register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only, inactive=sorted(inactive))
     if uses_pinned:
         payload.update(files=typed_files, pinned=pinned_controls)
+    if role_files:
+        # Only planned role effects bind the hash; an observation that merely differs in detail must not stale a reviewed plan.
+        payload['native_roles'] = role_files
     development = pinned.development_observations(state, after, [str(root) for root in roots], config) if uses_pinned else []
     if development:
         payload['development'] = development
@@ -196,6 +219,10 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                             before_state=state, after_state=after, config=config))
     if uses_pinned:
         result['intent'].update(files=typed_files, pinned=pinned_controls)
+    if workflow_reports:
+        result.update(workflow_readiness=workflow_reports, released_roles=released_roles)
+    if role_files:
+        result['intent']['native_roles'] = role_files
     if development or operation == 'source.dev-link':
         result['intent']['development'] = development
     return result
@@ -246,10 +273,12 @@ def shadow_warnings(rows):
 
 
 def public_plan(planned, output):
-    output['data'] = {key: value for key, value in planned.items() if key not in ('intent', 'actions', 'would_change')}
+    output['data'] = {key: value for key, value in planned.items() if key not in ('intent', 'actions', 'would_change', 'released_roles')}
     output['actions'] = planned['actions']
     output['would_change'] = planned['would_change']
     output['warnings'].extend(shadow_warnings(planned.get('shadowing', [])))
+    for item in planned.get('released_roles', []):
+        output['warnings'].append(dict(code='native_role.released', message='A managed native role file changed outside MASK; it is preserved and no longer managed.', **item))
     for row in planned.get('outcomes', []):
         if row['status'] == 'overridden':
             output['warnings'].append(dict(code='compatibility.local_override', message=row['reason'], coordinate=row['coordinate'], root=row['root'], agent=row['agent']))
@@ -280,6 +309,7 @@ def required_directories(intent):
             for parent in (leaf.parent.parent, leaf.parent):
                 if c.kind(parent) == 'missing':
                     directories.add(str(parent))
+    directories.update(workflow.role_directories(intent))
     return sorted(directories)
 
 
@@ -287,7 +317,7 @@ def make_pending(planned, home):
     import uuid
     intent = copy.deepcopy(planned['intent'])
     version = max(intent['before_state']['schema_version'], intent['after_state']['schema_version'])
-    if 'controls' in intent or 'selection_change' in intent:
+    if 'controls' in intent or 'selection_change' in intent or 'native_roles' in intent:
         version = 3
     intent.update(schema_version=version, transaction_id=str(uuid.uuid4()), phase='prepared',
                   base_generation=intent['before_state']['generation'],
@@ -301,7 +331,7 @@ def validate_pending(pending, home):
     import mask_selection as selection
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change'), 'recovery', versions=(1, 2, 3))
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles'), 'recovery', versions=(1, 2, 3))
     if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
@@ -319,7 +349,7 @@ def validate_pending(pending, home):
         from mask_git import validate_git_intent
         validate_git_intent(pending['git'], pending['config'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
-    if pending['schema_version'] != (3 if 'controls' in pending or 'selection_change' in pending else max(before['schema_version'], after['schema_version'])):
+    if pending['schema_version'] != (3 if 'controls' in pending or 'selection_change' in pending or 'native_roles' in pending else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
     if before['schema_version'] != after['schema_version'] and not (pending['operation'] in ('user.register', 'install') and before['schema_version'] == 1 and after['schema_version'] == 2 and before.get('user') is None and after.get('user') is not None) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
         c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
@@ -366,8 +396,12 @@ def validate_pending(pending, home):
         if pending['schema_version'] != 3 or not isinstance(pending.get('files'), list):
             c.fail('recovery.conflict', 'Pinned journals require typed files and version 3.', 8)
         pinned.validate_observations(pending, home)
-    elif 'files' in pending or max(before['schema_version'], after['schema_version']) < 3 and pending['schema_version'] == 3 and 'controls' not in pending:
+    elif 'files' in pending or max(before['schema_version'], after['schema_version']) < 3 and pending['schema_version'] == 3 and 'controls' not in pending and 'native_roles' not in pending:
         c.fail('recovery.conflict', 'Unexpected journal extension.', 8)
+    if 'native_roles' in pending:
+        if not isinstance(pending['native_roles'], list) or not pending['native_roles'] or any(not isinstance(item, dict) for item in pending['native_roles']):
+            c.fail('recovery.conflict', 'Typed native role journal entries must be a nonempty list.', 8)
+        workflow.validate_pending_roles(pending, before, after)
     if not selected <= before_records.keys() | after_records.keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
     if 'launcher' in pending:
@@ -393,6 +427,7 @@ def validate_pending(pending, home):
         selected_state = before if key in before_records else after
         for adapter in adapters.paths(c.consumer_scope(selected_state, key)).values():
             allowed_directories.update((str(Path(key) / Path(adapter).parent), str(Path(key) / adapter)))
+        allowed_directories.update(workflow.allowed_directories(key, c.consumer_scope(selected_state, key)))
     if not isinstance(pending['directories'], list) or not set(pending['directories']) <= allowed_directories:
         c.fail('recovery.conflict', 'Unsafe pending directory intent.', 8)
     link_keys = set()
@@ -473,6 +508,7 @@ def check_current(pending, home):
     for entry in pending.get('files', []):
         if c.read_text(pinned.file_path(entry, home), missing=True) not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A typed pending control was edited.', 8)
+    workflow.check_roles(pending)
     actual = c.read_text(home / 'state.json', 'state', missing=True)
     if actual not in (pending['before_state_text'], pending['after_state_text']):
         c.fail('recovery.conflict', 'Registry changed after the pending operation.', 8)
@@ -556,6 +592,10 @@ def restore(pending, home, side, *, inject=False):
             c.atomic_text(path, wanted, actual)
         if inject:
             checkpoint('selection_policy' if entry['role'] == 'selection_policy' else 'config' if entry['role'] == 'machine_config' else 'lock' if entry['role'].endswith('_lock') else 'manifest')
+    for entry in (pending.get('native_roles', []) if side == 'after' else reversed(pending.get('native_roles', []))):
+        workflow.set_role(entry, side)
+        if inject:
+            checkpoint('native_role')
     if side == 'after' and 'pinned' in pending:
         for root, record in c.consumer_records(pending['after_state']).items():
             if root not in pending['selected'] or not pinned.is_pinned(record):
@@ -621,6 +661,11 @@ def execute(planned, home, output, *, pending=None):
         output.update(changed=planned['would_change'], transaction='committed')
         for action in output['actions']:
             action['status'] = 'applied'
+        for entry in output['data'].get('workflow_readiness', []):
+            for report in entry['skills']:
+                for row in report['roles']:
+                    if row.get('action') in ('create', 'update'):
+                        row.update(state='ok', ownership='package-managed', observed_sha256=row['expected_sha256'], deployed=True)
         for outcome in output['data'].get('outcomes', []):
             if outcome['status'] not in ('selected', 'overridden'):
                 continue

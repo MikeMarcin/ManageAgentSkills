@@ -29,6 +29,8 @@ class Adapter:
     evidence: str | None = None
     host_load: str = 'not_verified'
     host_gate_enforcement: str = 'not_verified'
+    roles_path: str = ''
+    role_suffix: str = ''
 
     def path(self, scope):
         if scope not in ('project', 'user'):
@@ -40,8 +42,14 @@ class Adapter:
             raise ValueError('Unknown consumer scope')
         return self.project_config if scope == 'project' else self.user_config
 
+    def role_relative(self, scope, name):
+        if scope not in ('project', 'user') or not self.roles_path:
+            raise ValueError('Unsupported native role destination')
+        return f'{self.roles_path}/{name}{self.role_suffix}'
+
     def describe(self):
         return dict(id=self.id, paths={scope: self.path(scope) for scope in ('project', 'user')},
+                    native_roles=dict(path=self.roles_path or None, suffix=self.role_suffix or None, kind='native_role'),
                     startup_config={scope: self.config_path(scope) for scope in ('project', 'user')},
                     platforms=dict(self.platform_evidence),
                     discovery='directory_symlink', reload=self.reload, gate=self.gate,
@@ -57,12 +65,12 @@ BUILTINS = (
             'requested', 'warning', True, False, ('synced',), ('.claude', '.claude-plugin'),
             ('.mcp.json', 'mcp.json'), ('hooks', 'allowed-tools', 'mcp', 'mcpservers', 'mcp-servers', 'plugin', 'plugins'), ('!`', '```!'),
             platform_evidence=(('macos', 'native_readiness_recorded'), ('windows', 'native_readiness_recorded'), ('linux', 'best_effort_unverified')),
-            evidence='docs/development/readiness-acceptance.md'),
+            evidence='docs/development/readiness-acceptance.md', roles_path='.claude/agents', role_suffix='.md'),
     Adapter('codex', '.agents/skills', '.agents/skills', '.codex/hooks.json', '.codex/hooks.json',
             'restart_may_be_required', 'documented_stop_unverified', False, True, ('synced',), ('.codex', '.agents', '.codex-plugin'),
             ('.mcp.json', 'mcp.json'), ('hooks', 'mcp', 'mcpservers', 'mcp-servers', 'plugin', 'plugins'),
             platform_evidence=(('macos', 'native_readiness_recorded'), ('windows', 'native_readiness_recorded'), ('linux', 'best_effort_unverified')),
-            evidence='docs/development/readiness-acceptance.md'),
+            evidence='docs/development/readiness-acceptance.md', roles_path='.codex/agents', role_suffix='.toml'),
 )
 BY_ID = MappingProxyType({adapter.id: adapter for adapter in BUILTINS})
 # Git and common plugin envelopes are refused regardless of the requested agent.
@@ -82,6 +90,11 @@ def paths(scope='project'):
 
 def relative(agent, scope, identifier):
     return BY_ID[agent].path(scope) + '/' + identifier
+
+
+def role_relative(agent, scope, name):
+    """Typed native-role destination: the built-in adapter, never the package, chooses the path."""
+    return BY_ID[agent].role_relative(scope, name)
 
 
 def capabilities():

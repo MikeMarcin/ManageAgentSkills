@@ -53,6 +53,18 @@ a version line and handled errors go to stderr with code, relevant details,
 preserved state and a remediation line. The four AC01/W01 rows remain expected
 failures for MASK-0086 and MASK-0088.
 
+MASK-0086 removed the two RFC-MASK-0018-AC01 decorators (`install` from a fresh
+project and personal scope). MASK-0088 removed the two RFC-MASK-0019-AC01 rows:
+`mask_workflow.py` reads the passive `mask-workflow.json`, `mask_fs.plan` derives
+the required roles from the selected bindings and observes every destination,
+`ensure --check` names the missing `rfc-integrator` role (exit 7 when the static
+package can supply it, exit 4 `workflow.incomplete` when only preserved files
+remain), and `ensure` deploys exact package assets through the journal while the
+older `rfc-worker` bytes are kept. The starting state in `tests/public_support.py`
+is now restored by hand after the engine's own deployment, because the same
+engine that links also deploys declared static roles; nothing repairs that state
+before the command under test.
+
 ## Not observed here
 
 Native Windows journeys, terminal prompt mechanics, host role loading and the

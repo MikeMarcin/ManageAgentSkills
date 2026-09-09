@@ -14,7 +14,7 @@ def is_pinned(record):
 
 
 def validate_record(record):
-    c.fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links', 'mode', 'last_lock'), ('dev_links',), family='state')
+    c.fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links', 'mode', 'last_lock'), ('dev_links', 'native_roles'), family='state')
     if record['last_source_revision'] is not None:
         c.fail('state.invalid', 'Pinned records require exact lock identities, not a shared revision.')
     declaration = r.selection(record['last_manifest'])
