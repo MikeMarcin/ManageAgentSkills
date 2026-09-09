@@ -10,7 +10,7 @@ Import commit: the commit introducing this file (`git log --diff-filter=A --form
 
 Source reconciliation at import: every MASK file listed in the packet `source-basis.json` (`mask.py`, `mask_ensure.py`, `mask_fs.py`, `mask_pinned.py`, `mask_report.py`, `mask_packages.py`, `mask_adapters.py`, `mask_process.py`, `tests/support.py`, `tests/test_cli_protocol.py`, `tests/test_inventory.py`, `tests/test_ensure.py`, `docs/architecture/cli-contract.md`, `docs/architecture/test-boundaries.md`, `docs/rfcs/README.md`, `docs/issues/NEXT_ID`, `AGENTS.md`, `.mask/skill-config/implement-rfc/project.md`) matched the packet SHA-256 at the pre-import commit. No live work already fixes the described defects: non-JSON success still serializes the result envelope, `tests/support.py::Fixture.call` still appends `--json`, and `ensure` still plans only declared skill links. Packet validation (`tools/validate_pack.py`, `tools/test_pack.py`: 11 tests) passed before import; that establishes packet consistency only.
 
-Import starts Proposed. The user's 2026-09-09 mandate ("import and implement") authorizes implementation; acceptance is recorded under the live workflow in the commit following import. Only MASK-0083 starts Ready; every other card enters Ready after its actual dependencies are Done.
+Import starts Proposed. The user's 2026-09-09 mandate ("import and implement") authorizes implementation; acceptance was recorded under the live workflow in the commit following import (both RFCs Accepted; the user's directive is the acceptance decision, no acceptance evidence is claimed). Only MASK-0083 starts Ready; every other card enters Ready after its actual dependencies are Done.
 
 ## Identity mapping
 

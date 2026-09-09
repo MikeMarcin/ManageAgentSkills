@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0019"
 title: "Complete workflow readiness and checked-in native roles"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-08"
 ---

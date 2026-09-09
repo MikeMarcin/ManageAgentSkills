@@ -38,5 +38,5 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 
 | RFC | Status | Title |
 |---|---|---|
-| RFC-MASK-0018 | Proposed | Task-oriented CLI and human output |
-| RFC-MASK-0019 | Proposed | Complete workflow readiness and checked-in native roles |
+| RFC-MASK-0018 | Accepted | Task-oriented CLI and human output |
+| RFC-MASK-0019 | Accepted | Complete workflow readiness and checked-in native roles |

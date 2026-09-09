@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0018"
 title: "Task-oriented CLI and human output"
-status: "Proposed"
+status: "Accepted"
 owner: "MikeMarcin"
 created: "2026-09-08"
 ---
