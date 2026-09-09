@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0085"
 title: "Integrate consent without manual plan-hash copying"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0084"]
 priority: "P1"
