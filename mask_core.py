@@ -29,7 +29,22 @@ class MaskError(Exception):
 
     def as_dict(self):
         return dict(code=self.code, message=str(self), retryable=self.retryable, details=self.details,
-                    remediation=[dict(kind='inspect', message='Inspect the reported inputs and retry only after resolving the condition.')])
+                    remediation=[dict(kind='inspect', message=REMEDIATION.get(self.code, REMEDIATION[None]))])
+
+
+REMEDIATION = {
+    None: 'Inspect the reported inputs and retry only after resolving the condition.',
+    'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
+    'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",
+    'plan.stale': 'Preview again and pass the newly reported --expect-plan-hash.',
+    'project.not_registered': "Register the project first: 'mask project register PATH'.",
+    'manifest.missing': "Create the declaration first: 'mask project init' or 'mask user init'.",
+    'config.missing': "Select the skill source first: 'mask init --source DIR'.",
+    'state.drift': "Review the reported drift, then reconcile with 'mask apply' or 'mask ensure'.",
+    'integration.approval_required': "Approve the project once with 'mask integration approve --project ROOT', then rerun.",
+    'state.busy': 'Another MASK operation holds the lock; retry when it finishes.',
+    'state.pending': "Finish the interrupted operation with 'mask recover --inspect' before continuing.",
+}
 
 
 def fail(code, message, exit_code=3, **details):

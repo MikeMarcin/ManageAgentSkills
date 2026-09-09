@@ -40,9 +40,18 @@ state is retained, never repaired, before the command under test.
 | `mask ensure --project P --check --json` (missing rfc-integrator) | RFC-MASK-0019-AC01 (W01) | exit 0, `ok: true`, role never named |
 | `mask ensure --project P --json` (missing rfc-integrator) | RFC-MASK-0019-AC01 | readiness `ready_legacy_unpinned`; no generator ran |
 
-Run: `python3 -B -m unittest tests.test_public_baseline` — 10 tests, 3 pass
-(starting states and non-injecting human helper), 7 expected failures. A later
-fix removes the corresponding decorator; an unexpected success is that signal.
+Run: `python3 -B -m unittest tests.test_public_baseline` — 10 tests. At the
+baseline commit 3 passed (starting states and non-injecting human helper) and 7
+were expected failures. A later fix removes the corresponding decorator; an
+unexpected success is that signal.
+
+MASK-0084 removed the three RFC-MASK-0018-AC02 decorators: `mask_present.py`
+renders every registered command from the same result object (`RENDERERS` is the
+coverage table checked by `tests/test_human_output.py`), `mask.py::main` no longer
+falls back to indented JSON, `mask` alone prints everyday help, `--version` prints
+a version line and handled errors go to stderr with code, relevant details,
+preserved state and a remediation line. The four AC01/W01 rows remain expected
+failures for MASK-0086 and MASK-0088.
 
 ## Not observed here
 

@@ -36,22 +36,19 @@ class StartingStates(PublicFixture):
 
 
 class HumanOutputBaseline(PublicFixture):
-    """RFC-MASK-0018-AC02: commands without --json must not print the result envelope."""
+    """RFC-MASK-0018-AC02: commands without --json must not print the result envelope (fixed by MASK-0084)."""
 
-    @unittest.expectedFailure
     def test_inventory_without_json_is_not_an_envelope(self):
         self.linked_consumer_with_stale_roles()
         run = self.human('inventory', '--project', self.project)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout), run.stdout[:200])
 
-    @unittest.expectedFailure
     def test_version_without_json_is_not_an_envelope(self):
         run = self.human('--version')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout), run.stdout[:200])
 
-    @unittest.expectedFailure
     def test_capabilities_without_json_is_not_an_envelope(self):
         run = self.human('capabilities')
         self.assertEqual(run.returncode, 0, run.stderr)

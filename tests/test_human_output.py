@@ -1,0 +1,137 @@
+"""Human presentation for every registered command (MASK-0084, RFC-MASK-0018-AC02/AC03).
+
+The subprocess cases use ``PublicFixture.human``, which never injects ``--json``;
+the registry cases reject a command without an intentional renderer.
+"""
+import json
+from pathlib import Path
+import subprocess
+import unittest
+
+import mask
+import mask_present as present
+from tests.public_support import PublicFixture, PACK
+
+
+class RendererRegistry(unittest.TestCase):
+    def test_every_registered_command_has_an_intentional_renderer(self):
+        missing = sorted(set(mask.COMMANDS) - set(present.RENDERERS))
+        self.assertEqual(missing, [])
+        self.assertLessEqual({'help', 'version'}, set(present.RENDERERS))
+
+    def test_renderers_tolerate_minimal_results_and_never_emit_json(self):
+        for command in mask.COMMANDS:
+            with self.subTest(command=command):
+                text = present.render(mask.result(command))
+                self.assertTrue(text.endswith('\n'))
+                self.assertFalse(PublicFixture.parses_as_result_envelope(text))
+                self.assertRaises(ValueError, json.loads, text)
+
+    def test_legacy_fixture_renders_three_skill_rows_for_six_links(self):
+        envelope = json.loads((PACK / 'fixtures/legacy-inventory.json').read_text(encoding='utf-8'))
+        text = present.render(envelope)
+        self.assertIn('3 skill row(s), 6 link(s)', text)
+        lines = [line for line in text.splitlines() if line.startswith('  legacy/')]
+        self.assertEqual(len(lines), 3, text)
+        self.assertIn('CODEX', text)
+        self.assertIn('CLAUDE', text)
+        self.assertIn('legacy_unpinned', text)
+        self.assertFalse(PublicFixture.parses_as_result_envelope(text))
+
+    def test_control_characters_are_sanitized(self):
+        self.assertEqual(present.clean('a\x1b[31mb\x07'), 'a?[31mb?')
+        text = present.render_error(dict(mask.result('plan'), transaction='not_started', error=dict(code='x', message='bad\x1b[0m', details={}, remediation=[])))
+        self.assertNotIn('\x1b', text)
+
+
+class HumanTerminal(PublicFixture):
+    def test_no_operand_shows_everyday_help_and_exits_zero(self):
+        run = self.human()
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('Everyday commands:', run.stdout)
+        self.assertNotIn('"schema_version"', run.stdout)
+        self.assertEqual(run.stderr, '')
+
+    def test_version_is_a_version_line(self):
+        run = self.human('--version')
+        self.assertEqual((run.returncode, run.stdout), (0, f'mask {mask.VERSION}\n'))
+
+    def test_group_and_leaf_help_are_text(self):
+        for args, expected, code in ((('project',), 'subcommands: init', 2), (('project', '--help'), 'subcommands: init', 0), (('inventory', '--help'), 'usage: mask inventory', 0)):
+            with self.subTest(args=args):
+                run = self.human(*args)
+                self.assertEqual(run.returncode, code)
+                self.assertIn(expected, run.stdout + run.stderr)
+                self.assertFalse(self.parses_as_result_envelope(run.stdout))
+
+    def test_inventory_shows_three_skill_rows_with_separate_agent_states(self):
+        self.linked_consumer_with_stale_roles()
+        self.assertTrue(self.machine('project', 'require', 'beta', '--project', self.project, '--apply')['ok'])
+        run = self.human('inventory', '--project', self.project)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('3 skill row(s), 6 link(s) shown of 6 total', run.stdout)
+        self.assertEqual(len([line for line in run.stdout.splitlines() if line.startswith('  legacy/')]), 3, run.stdout)
+        self.assertIn('CLAUDE', run.stdout)
+        self.assertIn('CODEX', run.stdout)
+        self.assertIn('limitation:', run.stdout)
+        self.assertFalse(self.parses_as_result_envelope(run.stdout))
+        page = self.human('inventory', '--project', self.project, '--limit', '2')
+        self.assertIn('partial page', page.stdout)
+        self.assertIn('--offset 2', page.stdout)
+        self.assertIn('2 link(s) shown of 6 total', page.stdout)
+
+    def test_unregistered_inventory_is_a_readable_refusal(self):
+        self.assertTrue(self.machine('project', 'init')['ok'])
+        run = self.human('inventory')
+        self.assertEqual(run.returncode, 4, run.stderr)
+        self.assertEqual(run.stdout, '')
+        self.assertIn('error: Inventory requires a registered consumer.', run.stderr)
+        self.assertIn('next: Register the project first', run.stderr)
+        machine = self.raw('inventory', '--json')
+        self.assertEqual(machine.returncode, 4)
+        self.assertEqual(json.loads(machine.stdout)['error']['code'], 'project.not_registered')
+        self.assertEqual(machine.stderr, '')
+
+    def test_every_day_commands_render_text(self):
+        self.assertTrue(self.machine('project', 'init')['ok'])
+        self.assertTrue(self.machine('project', 'register')['ok'])
+        for args in (('capabilities',), ('skill', 'list'), ('project', 'list'), ('project', 'show'), ('config', 'show'), ('self', 'status'), ('plan',), ('doctor',), ('recover', '--inspect')):
+            with self.subTest(args=args):
+                run = self.human(*args)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertTrue(run.stdout.endswith('\n'))
+                self.assertFalse(self.parses_as_result_envelope(run.stdout), run.stdout[:200])
+                self.assertNotIn('{', run.stdout.splitlines()[0])
+
+    def test_change_commands_render_text_and_keep_json_effects_identical(self):
+        self.assertTrue(self.machine('project', 'init')['ok'])
+        self.assertTrue(self.machine('project', 'register')['ok'])
+        preview = self.human('project', 'require', 'alpha', '--apply', '--dry-run')
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertIn('would change (dry run)', preview.stdout)
+        self.assertIn('link.create', preview.stdout)
+        self.assertFalse((self.project / '.agents/skills/alpha').exists())
+        applied = self.human('project', 'require', 'alpha', '--apply')
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertIn('changed', applied.stdout.splitlines()[0])
+        self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
+        again = self.machine('project', 'require', 'alpha', '--apply')
+        self.assertFalse(again['changed'])
+
+    def test_redirected_output_and_operands_keep_the_selected_format(self):
+        run = self.raw('skill', 'show', '--', '--json')
+        self.assertEqual(run.stdout, '')
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn('error:', run.stderr)
+        machine = self.raw('skill', 'list', '--json')
+        self.assertEqual(len(machine.stdout.strip().splitlines()), 1)
+        self.assertTrue(json.loads(machine.stdout)['ok'])
+        env = {'NO_COLOR': '1', 'COLUMNS': '40'}
+        narrow = self.human('capabilities', env=env)
+        self.assertEqual(narrow.returncode, 0)
+        self.assertIn('inventory', narrow.stdout)
+        self.assertNotIn('\x1b', narrow.stdout)
+
+
+if __name__ == '__main__':
+    unittest.main()

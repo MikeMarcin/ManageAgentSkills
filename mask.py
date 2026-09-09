@@ -26,6 +26,7 @@ import mask_install as install_ops
 import mask_ensure as ensure_ops
 import mask_integration as integration_ops
 import mask_report as report_ops
+import mask_present as present
 import mask_sources as sources_ops
 from mask_core import MaskError
 
@@ -642,6 +643,20 @@ def dispatch(args, output, leaves):
         mask_pinned.merge_preparation(output, completed=completed)
 
 
+def help_text(parser, leaves, words):
+    """Compact everyday help for the root, the subcommand list for a group, argparse detail for a leaf."""
+    groups = sorted({name.split('.')[0] for name in COMMANDS if '.' in name})
+    selected = '.'.join(words[:2])
+    if selected in leaves:
+        return leaves[selected].format_help()
+    if words and words[0] in groups:
+        members = [name.split('.')[1] for name in COMMANDS if name.startswith(words[0] + '.')]
+        return f"usage: mask {words[0]} SUBCOMMAND [OPTIONS]\nsubcommands: {', '.join(members)}\nRun 'mask {words[0]} SUBCOMMAND --help' for arguments.\n"
+    if words and words[0] in leaves:
+        return leaves[words[0]].format_help()
+    return present.compact_help(VERSION, groups)
+
+
 def main(argv=None):
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
@@ -652,17 +667,17 @@ def main(argv=None):
     exit_code = 0
     try:
         parser, leaves = make_parser()
-        if '--help' in before_separator or '--version' in before_separator:
-            output['command'] = 'help' if '--help' in before_separator else 'version'
+        if '--help' in before_separator or '--version' in before_separator or not [item for item in before_separator if item not in ('--json', '--debug')]:
+            output['command'] = 'version' if '--version' in before_separator else 'help'
             output['data'] = {'version': VERSION}
             if output['command'] == 'help':
                 words = [item for item in before_separator if not item.startswith('-')]
-                selected = '.'.join(words[:2])
-                output['data']['help'] = leaves.get(selected, leaves.get(words[0] if words else '', parser)).format_help()
+                output['data']['help'] = help_text(parser, leaves, words)
         else:
             args = parser.parse_args(argv)
             if not hasattr(args, 'command'):
-                raise MaskError('invocation.invalid', 'A complete command is required.', 2)
+                members = [name.split('.')[1] for name in COMMANDS if name.startswith(f"{getattr(args, 'group', '')}.")]
+                raise MaskError('invocation.invalid', f"'mask {args.group}' needs one of these subcommands: {', '.join(members)}." if members else 'A complete command is required.', 2)
             output = result(args.command, getattr(args, 'dry_run', False))
             validate_arguments(args)
             dispatch(args, output, leaves)
@@ -692,9 +707,9 @@ def main(argv=None):
     if machine:
         print(json.dumps(output, ensure_ascii=False, sort_keys=True))
     elif output['error']:
-        print(f"{output['error']['code']}: {output['error']['message']}", file=sys.stderr)
+        sys.stderr.write(present.render_error(output))
     else:
-        print(output['data'].get('help', json.dumps(output, ensure_ascii=False, indent=2)))
+        sys.stdout.write(present.render(output))
     return exit_code
 
 
