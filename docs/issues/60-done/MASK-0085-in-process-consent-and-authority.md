@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0085"
 title: "Integrate consent without manual plan-hash copying"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0084"]
 priority: "P1"
 metadata: {"packet": "mask-corrective-ux-readiness", "provisional_id": false, "packet_key": "in-process-consent-and-authority"}
+acceptance: [{"criterion":"RFC-MASK-0018-AC03","outcome":"pass","revision":"af82cd80165e7a6b976e5a6715524c4ba24f4c33","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_consent tests.test_cli_protocol: JSON consent refusal is one document with data.confirmation; format does not change effects or authority"}},{"criterion":"RFC-MASK-0018-AC04","outcome":"pass","revision":"af82cd80165e7a6b976e5a6715524c4ba24f4c33","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_consent tests.test_ensure (macOS, POSIX pty): manual ensure asks once in-process; yes completes in the same invocation without hash copying or persisted approval; no-op and event/JSON/redirected paths never prompt; --yes grants only ordinary readiness and cannot widen events or bypass collisions. Native Windows console journey remains open on the AC08 lane."}},{"criterion":"RFC-MASK-0018-AC06","outcome":"pass","revision":"af82cd80165e7a6b976e5a6715524c4ba24f4c33","evidence":{"kind":"command","detail":"Same run: changed declaration after the prompt -> plan.stale, nothing applied; no/EOF -> confirmation.declined; SIGINT -> 130 with no pending.json; writer lock free while the prompt waits; existing collision/recovery refusals preserved"}}]
 ---
 
 # MASK-0085: Integrate consent without manual plan-hash copying
