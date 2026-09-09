@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0086"
 title: "Deliver complete project and personal task commands"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0085"]
 priority: "P1"
