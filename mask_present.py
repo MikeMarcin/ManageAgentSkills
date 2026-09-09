@@ -319,11 +319,25 @@ def render_sources(data, output):
 def render_update(data, output):
     lines = [headline(output, output['command'].replace('.', ' '))]
     lines.extend(fields(data, [('source before', 'source_before'), ('source after', 'source_after'), ('program before', 'program_before'), ('program after', 'program_after'),
-                               ('remote', 'remote_freshness'), ('fetch required', 'requires_fetch'), ('next invocation required', 'next_invocation_required'), ('network', 'network'), ('scope', 'scope')]))
-    effects = data.get('fetch_effects')
-    if effects:
-        lines.append(f"  fetch: {'fetched' if effects.get('fetched') else 'attempted, nothing new' if effects.get('attempted') else 'not attempted'}")
+                               ('remote', 'remote_freshness'), ('fetch required', 'requires_fetch'), ('next invocation required', 'next_invocation_required'), ('network', 'network')]))
+    if isinstance(data.get('scope'), str):
+        lines.append(f"  scope: {clean(data['scope'])}")
+    lines.extend(fetch_lines(data))
+    scope = data.get('scope')
+    if isinstance(scope, dict):
+        affected = scope.get('affected', [])
+        lines.append(f"  shared source: affects {len(affected)} legacy scope(s)" + (' (all registered)' if scope.get('selected') == affected else ' beyond the selected scope'))
+        lines.extend(f"    {clean(root)}" for root in affected)
+        if scope.get('pinned_unaffected'):
+            lines.append(f"  pinned scopes unaffected: {len(scope['pinned_unaffected'])}; update them with --project/--user/--all --skill")
     return lines + change()(data, output)[1:] if 'projects' in data else lines + actions(output) + plan_guard(data, output)
+
+
+def fetch_lines(data):
+    effects = data.get('fetch_effects')
+    if not effects:
+        return []
+    return [f"  fetch: {'fetched' if effects.get('fetched') else 'attempted, nothing new' if effects.get('attempted') else 'not attempted (cached candidate used)'}"]
 
 
 def render_launch(data, output):
@@ -496,6 +510,7 @@ def render_error(output):
         lines.append(f"  {clean(key).replace('_', ' ')}: {clean(value)}")
     if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
         lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
+    lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
     lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
     for step in error.get('remediation', []):
         lines.append(f"  next: {clean(step.get('message'))}")
@@ -512,7 +527,7 @@ EVERYDAY = [
     ('inventory [--project DIR|--user|--all]', 'detailed inventory across registered scopes'),
     ('plan / apply', 'preview or reconcile links for registered scopes'),
     ('ensure', 'make a registered project usable, fetching when allowed'),
-    ('update', 'fetch the source and reconcile registered scopes'),
+    ('update', 'fetch and apply the shared legacy source for every legacy scope; --project/--user/--all --skill updates pinned bindings'),
     ('doctor --check', 'report health problems and drift (exit 7 when found)'),
 ]
 

@@ -258,13 +258,10 @@ Commit declarations and project context. Ignore generated links and `.mask/gener
 > A source update affects **every registered project and personal consumer**. Run it between active tasks; all links share one checkout, and running agents may cache instructions.
 
 ```sh
-mask source status --json
-mask source fetch --json
-mask update --dry-run --json
-mask update --expect-plan-hash RETURNED_HASH --json
+mask update
 ```
 
-`source fetch` refreshes Git objects and remote-tracking refs without activating content. The dry run performs no fetch and reports last-fetched state. `update` validates a frozen candidate against live consumer declarations, fast-forwards the source, and reconciles its consumers. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
+One command fetches the approved candidate, freezes it, shows which registered scopes it affects, fast-forwards the source and reconciles their links. `mask update --dry-run` previews from the last fetch without touching the network (use `mask source fetch` first to preview new content); `--offline` applies only what is already fetched. `mask update --project DIR` on a shared legacy source shows every other affected scope and asks before widening; `--yes` never grants that, `--all` or the reported `--expect-plan-hash` does. A guarded run applies exactly the previewed candidate and never fetches a different one. Dirty, ahead, diverged, detached, unavailable or colliding inputs refuse instead of triggering a reset, stash, clean or push.
 
 Additional repositories can be registered in an approved source catalog. First
 preview `mask source migrate --dry-run --json`, then apply `mask source migrate

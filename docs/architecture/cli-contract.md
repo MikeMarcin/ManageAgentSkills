@@ -55,12 +55,12 @@ All mutators accept `--dry-run` and `--yes`; project manifest mutators may accep
 | `source migrate` | `[--alias NAME] [--expect-plan-hash HASH]` | Explicit machine v1 → v2 migration; legacy alias defaults to `legacy` | No |
 | `tap add` | `SOURCE URL [--ref REF] [--packages PATH] [--checkout PATH] [--expect-plan-hash HASH]` | Approved catalog binding only | No |
 | `tap remove` | `SOURCE [--expect-plan-hash HASH]` | Unreferenced catalog binding only; retains cache | No |
-| `update` | `[--expect-plan-hash HASH]` | Source fast-forward + all registered links/state | Yes |
+| `update` | `[--project PATH \| --user \| --all] [--skill SOURCE/ID ...] [--offline] [--expect-plan-hash HASH]` | Legacy: fetch, freeze, source fast-forward + every legacy scope's links/state; pinned: selected locks/links | Yes |
 | `self status` | none | None | No |
 | `self install` | `--bin-dir PATH` | Recognized launcher + ownership record | No |
 | `self update` | none | Program checkout only | Yes |
 
-`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks machine/source and all registered projects and the personal consumer. `update` always selects all; it cannot pretend to isolate shared content to one project. `source update` is deliberately not a separate bypass command; use `update` or fetch-only `source fetch`.
+`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks machine/source and all registered projects and the personal consumer. A legacy `update` always affects every legacy scope; `--project`/`--user` discloses that wider impact and needs in-process consent, `--all` or a reviewed `--expect-plan-hash` (never `--yes` alone). `source update` is deliberately not a separate bypass command; use `update` or fetch-only `source fetch`.
 
 A configuration default change does not relink anything until an explicit apply. There is no source-replacement command that silently relocates all ownership. v1 source relocation uses explicit unregister/setup/register as documented. `project init` and inspection can run before machine initialization where their operation does not need a source/registry. A missing source produces a typed refusal for operations that do need it.
 
@@ -670,9 +670,16 @@ selectors require `--allow-ref-rebind`. Explicit update can repair a changed
 selection with an older disk lock; exact before bytes remain rollback inputs and
 the after declaration/lock must be coherent. Ensure/apply do not repair stale
 locks. Unqualified update still advances the legacy shared source for all legacy
-consumers, including source-only updates with an empty registry. A targeted
-legacy update refuses with `migration.required`; pinned consumers are unaffected
-by a legacy shared-checkout update.
+consumers, including source-only updates with an empty registry. A normal online
+legacy update fetches, freezes the candidate, reports `data.scope` (selected,
+affected and unaffected pinned scopes) and applies it in one invocation; a dry
+run, `--offline`, `--expect-plan-hash` and the consented rerun never fetch, so a
+guarded application binds exactly the previewed candidate. A targeted legacy
+update (`--project`/`--user`) is the same shared operation: when other legacy
+scopes exist it raises a `scope.expand` proposal (`update.shared_source`) that
+`--yes` cannot grant; `--skill` on a legacy consumer still refuses with
+`migration.required`. Pinned consumers are unaffected by a legacy shared-checkout
+update.
 
 `source dev-link SOURCE/ID (--project PATH | --user) --authoring-root PATH`
 creates a scope-local live exception to an existing pinned selection. The source

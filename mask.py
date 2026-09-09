@@ -97,7 +97,7 @@ COMMANDS = {
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
-    'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
+    'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
     'migrate': (True, False, [('to-pinned', 'flag'), ('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
@@ -554,7 +554,7 @@ def local_dispatch(args, output, leaves):
             output['data'] = dict(fetch_effects=dict(attempted=False, fetched=False), remote_freshness='last_fetched')
     elif command == 'update':
         state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
-        return git_ops.update(config, state, home, output, getattr(args, 'expect_plan_hash', None))
+        return git_ops.update(config, state, home, output, args)
     elif command == 'config.show':
         output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home))
     elif command == 'config.set':

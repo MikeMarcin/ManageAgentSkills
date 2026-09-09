@@ -156,7 +156,11 @@ class LegacyUpdateTests(Fixture):
         self.assertFalse(self.call('update', '--dry-run')['would_change'])
         self.declare()
         self.call('project', 'register', '--apply')
-        self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'migration.required')
+        # A targeted legacy update is the shared operation with its impact disclosed; the sole legacy scope needs no wider consent.
+        targeted = self.call('update', '--project', self.project)
+        self.assertEqual(targeted['data']['scope']['affected'], [str(self.project)])
+        self.assertNotIn('confirmation', targeted['data'])
+        self.assertEqual(self.call('update', '--project', self.project, '--skill', 'legacy/alpha', code=4)['error']['code'], 'migration.required')
         clone = self.base / 'upstream'
         self.git(self.base, 'clone', str(remote), str(clone))
         self.git(clone, 'config', 'user.name', 'Fixture')

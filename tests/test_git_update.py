@@ -54,12 +54,18 @@ class UpdateTests(Fixture):
         self.git(self.source, 'checkout', '--detach')
         self.assertEqual(self.call('update', code=4)['error']['code'], 'source.detached')
 
-    def test_remote_movement_stales_guard(self):
-        self.upstream(); self.call('source', 'fetch')
-        preview = self.call('update', '--dry-run'); old = self.git(self.source, 'rev-parse', 'HEAD')
-        self.upstream('Another revision')
+    def test_guard_binds_the_previewed_candidate_without_fetching(self):
+        # RFC-MASK-0018 contract section 4: --expect-plan-hash never fetches a different candidate before applying.
+        reviewed = self.upstream(); self.call('source', 'fetch')
+        preview = self.call('update', '--dry-run')
+        newer = self.upstream('Another revision')
+        done = self.call('update', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.assertFalse(done['data']['fetch_effects']['attempted'])
+        self.assertEqual(reviewed, self.git(self.source, 'rev-parse', 'HEAD'))
+        self.call('source', 'fetch')
         self.assertEqual(self.call('update', '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'], 'plan.stale')
-        self.assertEqual(old, self.git(self.source, 'rev-parse', 'HEAD'))
+        self.assertEqual(reviewed, self.git(self.source, 'rev-parse', 'HEAD'))
+        self.assertEqual(self.call('update')['data']['source_after'], newer)
 
     def test_post_advance_crash_recovers_without_git_rollback(self):
         candidate = self.upstream()

@@ -166,7 +166,22 @@ def advance(root, candidate, pending, home, output, timeout):
         c.fail('recovery.required', 'Checkout may have changed; pending intent retained without resetting Git.', 8)
 
 
-def update(config, state, home, output, guard=None):
+def explicit_selection(args, state, legacy):
+    """Legacy roots the user named with --project/--user, or None for the shared operation itself."""
+    if not (getattr(args, 'project', None) or getattr(args, 'user', False)) or getattr(args, 'all', False):
+        return None
+    import mask
+    return [root for root in mask.selected_roots(args, state) if root in legacy]
+
+
+def update(config, state, home, output, args):
+    """One normal update: acquire, freeze, disclose impact, obtain any expanded-scope consent, activate, verify.
+
+    A dry run, --offline, --expect-plan-hash and a consented rerun never fetch: they bind
+    the candidate already in the cache so that the applied content is the reviewed one.
+    """
+    import mask_consent as consent
+    guard = getattr(args, 'expect_plan_hash', None)
     source = config['source']
     root, remote, branch = Path(source['root']), source['remote'], source['branch']
     timeout = config['git_timeout_seconds']
@@ -174,6 +189,7 @@ def update(config, state, home, output, guard=None):
     records = c.consumer_records(state)
     from mask_pinned import is_pinned
     roots = [Path(key) for key in sorted(records) if not is_pinned(records[key])]
+    selected = explicit_selection(args, state, roots)
     # Refuse unavailable/invalid declarations before any network operation.
     identifiers = set()
     for project in roots:
@@ -183,9 +199,10 @@ def update(config, state, home, output, guard=None):
     for blocker in local['blockers']:
         if blocker['code'] != 'skill.unknown':
             raise c.MaskError(blocker['code'], blocker['message'], 4, details=blocker['details'])
-    if not output['dry_run']:
+    acquire = not output['dry_run'] and not getattr(args, 'offline', False) and guard is None and getattr(args, 'consented', None) is None
+    if acquire:
         fetch(root, remote, branch, timeout, output)
-    fetched = output['data'].get('fetch_effects')
+    fetched = output['data'].get('fetch_effects', dict(attempted=False, fetched=False))
     observed = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     if observed['candidate'] is None:
         c.fail('source.remote_unknown', 'Fetch the configured source branch before previewing an update.', 4)
@@ -201,10 +218,18 @@ def update(config, state, home, output, guard=None):
         planned['would_change'] = True
         planned['actions'].insert(0, dict(kind='source.advance', status='planned', before=observed['revision'], after=candidate))
     fs.public_plan(planned, output)
-    output['data'].update(source_before=observed['revision'], source_after=observed['revision'], remote_freshness='last_fetched', requires_fetch=output['dry_run'])
-    if fetched is not None:
-        output['data']['fetch_effects'] = fetched
+    output['data'].update(source_before=observed['revision'], source_after=observed['revision'], remote_freshness='last_fetched', requires_fetch=not acquire, fetch_effects=fetched,
+                          scope=dict(kind='shared_source', selected=[str(item) for item in (roots if selected is None else selected)], affected=[str(item) for item in roots],
+                                     pinned_unaffected=[key for key in sorted(records) if is_pinned(records[key])]))
     fs.ensure_applicable(planned, guard)
+    if selected is not None and len(selected) < len(roots) and planned['would_change']:
+        # A shared checkout cannot be isolated to the named scope: disclose every affected legacy scope and ask for that wider effect.
+        proposal = consent.request('scope.expand', 'update.shared_source', output['data']['scope']['affected'], planned['actions'], planned['plan_hash'],
+                                   f"This update also changes {len(roots) - len(selected)} other legacy scope(s) sharing the source; apply it to all {len(roots)}?")
+        if output['dry_run']:
+            output['data']['confirmation'] = proposal
+        else:
+            consent.require(args, output, proposal)
     if output['dry_run'] or not planned['would_change']:
         return
     rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))

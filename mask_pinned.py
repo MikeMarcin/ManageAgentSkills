@@ -556,9 +556,9 @@ def transition_dispatch(args, output, home):
     if any(str(root) not in records for root in roots):
         c.fail('migration.registration_required', 'Register selected consumers before changing deployment mode.', 4)
     if args.command == 'update' and any(not is_pinned(records[str(root)]) for root in roots):
-        if any(getattr(args, flag, None) for flag in ('project', 'user', 'skill')):
-            c.fail('migration.required', 'Targeted updates require pinned consumers; migrate explicitly first.', 4)
-        return False
+        if getattr(args, 'skill', None):
+            c.fail('migration.required', 'Per-binding updates require pinned consumers; migrate explicitly first.', 4)
+        return False  # The legacy shared-source operation discloses its full impact itself.
     if args.command == 'update' and not roots:
         if getattr(args, 'skill', ()):
             c.fail('invocation.invalid', '--skill requires coordinates present in the selected consumer scopes.', 2)
