@@ -17,6 +17,9 @@ All mutators accept `--dry-run` and `--yes`; project manifest mutators may accep
 | `config show` | none | None | No |
 | `config set` | `[--target TARGET ...] [--git-timeout SECONDS]`, at least one | Machine defaults only | No |
 | `skill list` | none | None | No |
+| `install` | `ID-or-SOURCE/ID ... [--project PATH | --user] [--agent AGENT ...] [--offline] [--expect-plan-hash HASH]` | Declaration (created if missing), lock for pinned scopes, registration, links, state; approved source cache when a live install must resolve a new binding | Only for live resolution |
+| `remove` | `ID-or-SOURCE/ID ... [--project PATH | --user] [--expect-plan-hash HASH]` | Declaration, lock for pinned scopes, owned unchanged links, state | No |
+| `list` | `[--project PATH | --user]` | None | No |
 | `skill show` | `ID [--content]` | None | No |
 | `skill validate` | `ID` or `--all` | None | No |
 | `skill import` | `URL-or-SOURCE --mode copy --into SOURCE [--ref REF] [--path PATH] [--expect-plan-hash HASH]` | New curated directory and provenance; owned upstream cache | Yes |
@@ -321,6 +324,48 @@ V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
 bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
 Current capabilities report readable state versions `[1, 2, 3]` and state version 3. The readiness and pinned extensions use journal v3 while preserving the v1/v2 readers.
 Legacy user declarations remain v1; pinned user selections use v2. The result envelope remains v1. The source-catalog extension reads machine v1/v2 and migrates explicitly to v2.
+
+## Task commands (RFC-MASK-0018, MASK-0086)
+
+`install ID ...`, `remove ID ...` and `list` express one complete user task for the
+current project (worktree-aware; the worktree root when no declaration exists yet)
+or the personal scope with `--user`. They are engine operations, not shell aliases:
+`mask_task` builds one prospective declaration, and for pinned scopes one lock,
+through the shared resolver (`mask_resolve`), planner (`mask_fs.plan`) and journal,
+then activates that single frozen plan under the writer lock. A missing declaration
+and registration are folded into the same operation; a dry run of that case reports
+`declaration_created` and computes no plan. New consumers follow the machine's
+source mode: v1 on a schema-1 machine, v2 selection plus lock on a catalog machine.
+
+Legacy (v1) declarations are set union/subtraction. `--agent` on a legacy install
+sets whole-declaration targets only for a fresh declaration; otherwise a different
+agent set is refused with `selection.per_binding_unsupported` rather than editing
+every skill's targets. Pinned (v2) declarations resolve only the new bindings and
+retain unrelated exact resolutions, source declarations, conditions and agents; a
+v2 add/remove never reaches the legacy `selection.command_unsupported` branch.
+`--agent` selects the agents of the newly requested bindings; a no-op reinstall
+changes nothing, including an already selected binding's agents.
+
+A bare ID resolves only when exactly one relevant approved catalog offers it; a
+name already bound in the declaration prefers that source. Two matches return
+`skill.ambiguous` with `SOURCE/ID` choices; an unresolved approved catalog returns
+`source.unresolved`. A live install may fetch an approved source to resolve a new
+binding (reported under `data.acquisitions`, `data.network: fetch`); `--offline`
+and `--dry-run` never fetch and report `lock.resolution_required`. New source
+identities still require `tap add`.
+
+`remove` refuses with `target.collision` and applies nothing when an owned link was
+replaced by real content; it never deletes edited files. A remove for a skill that
+is not selected is a no-op with a `selection.not_selected` warning. `remove` on an
+unregistered scope is refused; nothing is deployed there. The other scope's
+selection is never touched. Both commands are plan-guarded (`--expect-plan-hash`);
+they ask no confirmation because their scoped engine effects are ordinary authority.
+
+`list` derives per-skill, per-agent states (`linked`, `missing`, `drift`,
+`collision`, `not deployed`, `excluded`, `unknown`) from the same plan, reports
+`links.expected/linked`, the source mode and pins, and states its limitations
+(host loading and workflow setup are not checked). An undeclared scope lists
+nothing and suggests `mask install ID`.
 
 ## Consent (RFC-MASK-0018, MASK-0085)
 

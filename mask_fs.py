@@ -302,7 +302,7 @@ def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
              ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change'), 'recovery', versions=(1, 2, 3))
-    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install'}:
+    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -321,7 +321,7 @@ def validate_pending(pending, home):
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
     if pending['schema_version'] != (3 if 'controls' in pending or 'selection_change' in pending else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
-    if before['schema_version'] != after['schema_version'] and not (pending['operation'] == 'user.register' and before['schema_version'] == 1 and after['schema_version'] == 2) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
+    if before['schema_version'] != after['schema_version'] and not (pending['operation'] in ('user.register', 'install') and before['schema_version'] == 1 and after['schema_version'] == 2 and before.get('user') is None and after.get('user') is not None) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
         c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
     before_records, after_records = c.consumer_records(before), c.consumer_records(after)
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):

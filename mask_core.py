@@ -46,6 +46,15 @@ REMEDIATION = {
     'confirmation.declined': 'Nothing was applied; rerun and answer yes when you want this proposal.',
     'state.busy': 'Another MASK operation holds the lock; retry when it finishes.',
     'state.pending': "Finish the interrupted operation with 'mask recover --inspect' before continuing.",
+    'skill.ambiguous': 'Name the source explicitly as SOURCE/ID; MASK never picks the first match.',
+    'skill.unknown': "Check the exact skill name with 'mask skill list' or 'mask source show NAME'.",
+    'source.unresolved': "Fetch the approved source with 'mask source fetch NAME', or name SOURCE/ID for a resolved source.",
+    'lock.resolution_required': "Fetch the approved source with 'mask source fetch NAME' before an offline or dry-run resolution.",
+    'selection.per_binding_unsupported': "Install without --agent to use the declaration's targets, or run 'mask migrate --to-pinned' for per-skill agents.",
+    'selection.source_unsupported': "Run 'mask migrate --to-pinned' before selecting skills from additional sources.",
+    'target.collision': 'Move or delete the conflicting entry yourself, then rerun; MASK never overwrites it.',
+    'recovery.required': "Run 'mask recover --inspect' and complete or roll back the pending operation.",
+    'lock.busy': 'Another MASK operation holds the lock; retry when it finishes.',
 }
 
 

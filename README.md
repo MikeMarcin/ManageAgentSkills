@@ -52,6 +52,19 @@ The direct entrypoint remains available if the launcher is missing: `python3 /ab
 
 ## Add skills to a project
 
+The task commands do this in one step from inside the project (or with
+`--project PATH`), creating the declaration and registration when they are missing:
+
+```sh
+mask install implement-rfc
+mask list
+mask remove implement-rfc
+```
+
+`mask install ID --user` and `mask list --user` do the same for your personal
+scope. Add `--dry-run` to preview; without `--json` the result is human text. The
+lower-level commands below remain available for explicit declaration edits.
+
 Use an existing project root. These examples use `/absolute/path/to/project` as a placeholder; replace it before running them. `project init` creates an empty declaration, while `project register` records the project on this machine.
 
 ```sh

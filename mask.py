@@ -52,6 +52,9 @@ COMMANDS = {
     'skill.show': (False, False, [('id', 'pos'), ('content', 'flag')]),
     'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int')]),
     'inventory': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('include-unmanaged', 'flag'), ('limit', 'int'), ('offset', 'int')]),
+    'install': (True, True, [('ids', 'many'), ('project', 'value'), ('user', 'flag'), ('agent', 'repeat'), ('offline', 'flag')]),
+    'remove': (True, False, [('ids', 'many'), ('project', 'value'), ('user', 'flag')]),
+    'list': (False, False, [('project', 'value'), ('user', 'flag')]),
     'skill.validate': (False, False, [('id', 'optional'), ('all', 'flag')]),
     'skill.import': (True, True, [('url', 'pos'), ('mode', 'required'), ('into', 'required'), ('ref', 'value'), ('path', 'value')]),
     'skill.provenance': (False, False, [('id', 'pos')]),
@@ -114,6 +117,7 @@ GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
 GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'migrate', 'source.dev-link', 'source.publish'})
 GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear'})
 GUARDED.add('ensure')
+GUARDED.update({'install', 'remove'})
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -199,6 +203,8 @@ for action in ('set', 'set-targets'):
 for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
+for command in ('install', 'remove', 'list'):
+    CONFLICTS[command] = {'project': ['user'], 'user': ['project']}
 CONFLICTS['source.dev-link'] = {'project': ['user'], 'user': ['project'], 'authoring_root': ['to_pinned'], 'to_pinned': ['authoring_root']}
 CONFLICTS['project.set-agents'] = {key: [other for other in ('agents', 'all', 'inherit') if other != key] for key in ('agents', 'all', 'inherit')}
 CONFLICTS['user.set-agents'] = CONFLICTS['project.set-agents']
@@ -474,6 +480,9 @@ def local_dispatch(args, output, leaves):
     mask_resolve.guard_command(args, home)
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
+    if command == 'list':
+        import mask_task
+        return mask_task.dispatch(args, output, home)
     if command in ('skill.import', 'skill.provenance', 'skill.record-adaptation'):
         import mask_provenance
         return mask_provenance.dispatch(args, output, home)
@@ -618,7 +627,8 @@ def dispatch_impl(args, output, leaves):
         return local_dispatch(args, output, leaves)
     import mask_pinned
     import mask_selection
-    if mask_selection.dispatch(args, output, home):
+    import mask_task
+    if mask_selection.dispatch(args, output, home) or mask_task.dispatch(args, output, home):
         return
     if args.command in ('migrate', 'update') and mask_pinned.transition_dispatch(args, output, home):
         return

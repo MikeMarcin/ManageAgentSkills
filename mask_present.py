@@ -373,6 +373,58 @@ def render_manifest(data, output):
     return lines
 
 
+TASK_SPEC = [('scope', 'scope'), ('root', 'root'), ('declaration', 'declaration_path'), ('mode', 'mode'), ('network', 'network')]
+
+
+def render_task(data, output):
+    """install/remove: what was requested, what changed, what was already so, then the engine actions."""
+    lines = [headline(output, output['command'])] + fields(data, TASK_SPEC)
+    if data.get('declaration_created'):
+        lines.append('  declaration: created for this scope' if output['changed'] else '  declaration: would be created for this scope')
+    if not data.get('registered', True):
+        lines.append('  registration: ' + ('recorded in this operation' if output['changed'] else 'part of this operation'))
+    for label, key in (('added', 'added'), ('removed', 'removed'), ('already selected' if output['command'] == 'install' else 'not selected', 'already')):
+        if data.get(key):
+            lines.append(f"  {label}: {clean(data[key])}")
+    if data.get('agents'):
+        lines.append(f"  agents for new skills: {clean(data['agents'])}")
+    if 'skills' in data:
+        lines.append(f"  selected now: {clean(data['skills'])}")
+    for blocker in data.get('blockers', []) or []:
+        lines.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
+    lines.extend(actions(output))
+    if not output.get('actions') and not data.get('blockers'):
+        lines.append('  nothing to do: the selection and links already match')
+    return lines + plan_guard(data, output)
+
+
+def render_list(data, output):
+    """One row per selected skill with a column per agent; footer counts and honest limitations."""
+    scope = clean(data.get('scope'))
+    lines = [f"{scope} skills at {clean(data.get('root'))}"]
+    if not data.get('declared'):
+        lines.append("  no skills are selected here; add one with 'mask install ID'")
+        return lines
+    source = data.get('source') or {}
+    if source.get('mode') == 'legacy':
+        lines.append(f"  source: {clean(source.get('alias'))} {clean(source.get('root'))} (live checkout, not version-pinned)")
+    else:
+        lines.append(f"  sources: {clean(source.get('sources'))} (pinned)")
+    if not data.get('registered'):
+        lines.append("  not registered: nothing is deployed; 'mask install ID' or 'mask ensure' deploys the selection")
+    agents = data.get('agents', [])
+    rows = [dict(skill=entry['skill'], version=entry.get('commit', '-')[:12] if entry.get('commit') else '-', **{agent: entry['states'].get(agent, 'unknown') for agent in agents}) for entry in data.get('skills', [])]
+    if rows:
+        lines.extend(table(rows, [('SKILL', 'skill'), ('PIN', 'version')] + [(agent.upper(), agent) for agent in agents]))
+    else:
+        lines.append('  no skills selected')
+    links = data.get('links') or {}
+    lines.append(f"{len(rows)} skill(s); {clean(links.get('linked', 0))} of {clean(links.get('expected', 0))} managed links in place")
+    for limitation in data.get('limitations', []):
+        lines.append(f'  limitation: {clean(limitation)}')
+    return lines
+
+
 def render_forget(data, output):
     return [headline(output, 'workspace forget')] + fields(data, [('root', 'root'), ('abandoned paths', 'abandoned_paths')]) + actions(output) + plan_guard(data, output)
 
@@ -382,6 +434,7 @@ RENDERERS = {
     'init': render_config, 'config.show': render_config, 'config.set': render_config,
     'skill.list': render_catalog, 'skill.validate': lambda data, output: render_catalog(data, output) if 'skills' in data else render_skill(data, output),
     'skill.show': render_skill, 'skill.where-used': render_where_used, 'inventory': render_inventory,
+    'install': render_task, 'remove': render_task, 'list': render_list,
     'skill.import': render_provenance, 'skill.provenance': render_provenance, 'skill.record-adaptation': render_provenance,
     'project.init': summary('project init', SCOPE_SPEC), 'project.show': render_show, 'project.set': render_manifest,
     'project.require': render_manifest, 'project.unrequire': render_manifest, 'project.set-agents': render_manifest, 'project.set-targets': render_manifest,
@@ -407,6 +460,7 @@ def warnings(output):
     lines = []
     for warning in output.get('warnings', []):
         detail = warning.get('details') or {key: value for key, value in warning.items() if key not in ('code', 'message')}
+        detail = {key: value for key, value in detail.items() if not isinstance(value, (dict, list))} if isinstance(detail, dict) else detail
         lines.append(f"warning: {clean(warning.get('message'))}" + (f" [{clean(detail)}]" if detail else ''))
     return lines
 
@@ -451,11 +505,11 @@ def render_error(output):
 EVERYDAY = [
     ('init --source DIR', 'select the AgentSkills checkout that supplies skills'),
     ('skill list', 'list the skills the source offers'),
-    ('project register [PATH]', 'register a project so MASK may manage its skill links'),
-    ('project require ID... --apply', 'add skills to the project declaration and deploy them'),
-    ('project unrequire ID... --apply', 'remove skills from the declaration and their links'),
-    ('user require ID... --apply', 'the same for your personal scope'),
-    ('inventory [--project DIR|--user|--all]', 'show deployed skills and per-agent link state'),
+    ('install ID...', 'add skills to this project and deploy them (declares/registers as needed)'),
+    ('install ID... --user', 'the same for your personal scope'),
+    ('remove ID...', 'remove skills from this project and their links'),
+    ('list [--project DIR|--user]', 'show the selected skills and per-agent link state'),
+    ('inventory [--project DIR|--user|--all]', 'detailed inventory across registered scopes'),
     ('plan / apply', 'preview or reconcile links for registered scopes'),
     ('ensure', 'make a registered project usable, fetching when allowed'),
     ('update', 'fetch the source and reconcile registered scopes'),

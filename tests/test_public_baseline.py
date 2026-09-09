@@ -58,13 +58,11 @@ class HumanOutputBaseline(PublicFixture):
 class TaskCommandBaseline(PublicFixture):
     """RFC-MASK-0018-AC01: one task command from an unregistered scope."""
 
-    @unittest.expectedFailure
     def test_install_from_fresh_project(self):
         run = self.human('install', 'alpha')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
 
-    @unittest.expectedFailure
     def test_install_user_from_fresh_personal_scope(self):
         run = self.human('install', 'alpha', '--user', cwd=self.base)
         self.assertEqual(run.returncode, 0, run.stderr)

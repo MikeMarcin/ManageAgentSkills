@@ -449,7 +449,7 @@ def merge_preparation(output, *, completed):
         changed |= any(row.get('created') or row.get('retained_directories') for row in item.get('artifacts', []))
         changed |= any(row.get('cache_created') or row.get('acquired') or row.get('retained_objects_possible') for row in item.get('acquisitions', []))
     if effects:
-        output['data']['network'] = 'locked_fetch' if network else 'none'
+        output['data']['network'] = 'locked_fetch' if network else output['data'].get('network', 'none')
     if changed:
         output['changed'] = True
         output['would_change'] = True
