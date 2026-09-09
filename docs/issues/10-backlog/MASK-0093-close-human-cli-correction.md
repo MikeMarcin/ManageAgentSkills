@@ -49,8 +49,8 @@ Planned cards: MASK-0083, MASK-0084, MASK-0085, MASK-0086, MASK-0087, MASK-0091.
 | Acceptance | Direct check / observation | Outcome | Implementation revision |
 |---|---|---|---|
 | RFC-MASK-0018-AC01 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0018-AC02 | Baseline only: `tests.test_public_baseline` retains envelope-dump failures for inventory/version/capabilities (MASK-0083) | Not run | Not recorded |
-| RFC-MASK-0018-AC03 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0018-AC02 | `python3 -B -m unittest tests.test_human_output tests.test_public_baseline` (macOS): every registered command has a renderer; inventory shows 3 skill rows / 6 links with per-agent states; help/version/empty/paginated/error results are text (MASK-0084) | Pass at card boundary; native lanes open | `bc579976a289eb65cff1dee7224e36ba3752c8c5` |
+| RFC-MASK-0018-AC03 | Same run: `--json` stays one document for success and handled errors, `--` operand containing `--json` is data, effects identical across formats (MASK-0084); interruption path unchanged | Pass at card boundary | `bc579976a289eb65cff1dee7224e36ba3752c8c5` |
 | RFC-MASK-0018-AC04 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC05 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC06 | Pending actual implementation evidence | Not run | Not recorded |
@@ -62,4 +62,8 @@ open until their actual evidence is linked. Do not invent a PASS to close the bo
 
 ## Current continuation (corrective pack)
 
-Milestone M0 (MASK-0083) is Done: import, reconciliation and the public regression baseline exist; see `docs/development/corrective-baseline.md`. Usable result: `tests/public_support.py` provides raw/machine/human helpers and the three unprepared starting states; `tests/test_public_baseline.py` records seven failing expectations as `expectedFailure`. Invariants: never inject `--json` in the human helper; never pre-register, approve or render roles for the command under test; the linked-consumer state keeps its old role files. Next bounded milestone: MASK-0084 (human renderer for every registered command, readable errors, help/version, remove the indented-JSON fallback in `mask.py::main`), which should flip the three `HumanOutputBaseline` expected failures. MASK-0088 is the independent RFC-MASK-0019 start after MASK-0083. Open obligations: native Windows lane (ExampleWinHost station), real AgentSkills handoff (no ASK ID yet), host-loading observation. MASK-0094 links here rather than duplicating this record.
+Milestone M0 (MASK-0083) is Done: import, reconciliation and the public regression baseline exist; see `docs/development/corrective-baseline.md`. Invariants: never inject `--json` in the human helper; never pre-register, approve or render roles for the command under test; the linked-consumer state keeps its old role files.
+
+Milestone M1 (MASK-0084) is Done at `bc579976a289eb65cff1dee7224e36ba3752c8c5`: `mask_present.py` renders every registered command from the same result object; `RENDERERS` is the coverage table (`tests/test_human_output.py` rejects an unregistered command); `mask.py::main` has no JSON fallback; errors go to stderr with code/details/preserved state/remediation (`mask_core.REMEDIATION`). Invariants for later cards: a new command must add a `RENDERERS` entry and a `REMEDIATION` entry for any new user-facing refusal code; keep engine decisions out of the renderer; `mask_install.validate_program` and `tests/test_launcher.py` list runtime modules and must include any new module. Known unrelated failure: `tests.test_user_scope.test_scope_selection_and_parser` (state readable versions) predates this pack.
+
+Next bounded milestone: MASK-0088 is Ready (RFC-MASK-0019 declarative native role artifacts); MASK-0085 (in-process consent) is the next RFC-MASK-0018 card and depends on MASK-0084. Open obligations: native Windows lane (ExampleWinHost station) for AC08, real AgentSkills handoff (no ASK ID yet), host-loading observation. MASK-0094 links here rather than duplicating this record.
