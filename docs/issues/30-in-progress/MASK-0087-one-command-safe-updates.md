@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0087"
 title: "Make updates complete without hiding their impact"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0086"]
 priority: "P1"
