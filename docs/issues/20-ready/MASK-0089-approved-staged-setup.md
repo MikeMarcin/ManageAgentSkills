@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0089"
 title: "Run genuinely required setup with exact consent and recovery"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0085", "MASK-0088"]
 priority: "P1"
