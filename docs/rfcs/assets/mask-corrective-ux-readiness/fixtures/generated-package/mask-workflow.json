@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "inputs": [
+    {
+      "id": "project-config",
+      "path": ".mask/skill-config/implement-rfc/project.json",
+      "kind": "json",
+      "required": true
+    },
+    {
+      "id": "project-rules",
+      "path": ".mask/skill-config/implement-rfc/project.md",
+      "kind": "text",
+      "required": true
+    }
+  ],
+  "native_roles": [
+    {
+      "agent": "codex",
+      "name": "rfc-integrator",
+      "setup": "prepare-roles"
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-integrator",
+      "setup": "prepare-roles"
+    }
+  ],
+  "setup": [
+    {
+      "id": "prepare-roles",
+      "entrypoint": "scripts/prepare_fixture_roles.py",
+      "inputs": [
+        "project-config",
+        "project-rules"
+      ],
+      "package_inputs": [
+        "scripts/prepare_fixture_roles.py"
+      ],
+      "parameters": {},
+      "timeout_seconds": 30,
+      "effects": "staged-native-roles"
+    }
+  ]
+}

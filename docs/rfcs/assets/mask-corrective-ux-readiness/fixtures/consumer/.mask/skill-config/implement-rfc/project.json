@@ -1,0 +1,5 @@
+{
+  "fixture": true,
+  "project": "disposable-srv-shape",
+  "routing": "fixture-only"
+}

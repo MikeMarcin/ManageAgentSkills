@@ -1,0 +1,9 @@
+Shared source update — legacy
+
+The selected source is a live checkout, not an isolated project pin.
+Affected: SampleReview (project), SamplePlanner (project), personal skills.
+Candidate: <current revision> → <frozen candidate revision>
+Native roles: <actual additions, changes and removals>
+Running agents may retain earlier instructions.
+
+Apply this shared update? [y/N]

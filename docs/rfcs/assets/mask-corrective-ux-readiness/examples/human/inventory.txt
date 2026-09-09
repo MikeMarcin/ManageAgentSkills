@@ -1,0 +1,12 @@
+SampleReview — project skills
+
+Source: legacy · ~/Documents/GitHub/AgentSkills
+Content: live local checkout, not version-pinned
+
+SKILL              CLAUDE    CODEX
+attended-review    Linked    Linked
+implement-rfc      Linked    Linked
+wizard             Linked    Linked
+
+3 skills · 6 managed links match their declarations.
+Workflow setup and host loading were not checked by this inventory.

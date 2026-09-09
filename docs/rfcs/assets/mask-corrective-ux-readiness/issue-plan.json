@@ -1,0 +1,259 @@
+{
+  "schema": "mask.corrective-pack.issue-plan.v1",
+  "provisional_ids": true,
+  "reservation_count": 12,
+  "snapshot_next_id": "MASK-0083",
+  "cards": [
+    {
+      "id": "MASK-0083",
+      "key": "import-and-public-regression-baseline",
+      "title": "Import and capture the actual broken public journeys",
+      "path": "docs/issues/20-ready/MASK-0083-import-and-public-regression-baseline.md",
+      "rfcs": [
+        "RFC-MASK-0018",
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC02",
+        "RFC-MASK-0018-AC08",
+        "RFC-MASK-0019-AC01",
+        "RFC-MASK-0019-AC07"
+      ],
+      "status": "Ready"
+    },
+    {
+      "id": "MASK-0084",
+      "key": "human-output-for-all-commands",
+      "title": "Implement real human output and actionable errors",
+      "path": "docs/issues/10-backlog/MASK-0084-human-output-for-all-commands.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0083"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC02",
+        "RFC-MASK-0018-AC03"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0085",
+      "key": "in-process-consent-and-authority",
+      "title": "Integrate consent without manual plan-hash copying",
+      "path": "docs/issues/10-backlog/MASK-0085-in-process-consent-and-authority.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0084"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC03",
+        "RFC-MASK-0018-AC04",
+        "RFC-MASK-0018-AC06"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0086",
+      "key": "complete-install-remove-list",
+      "title": "Deliver complete project and personal task commands",
+      "path": "docs/issues/10-backlog/MASK-0086-complete-install-remove-list.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0085"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC01",
+        "RFC-MASK-0018-AC02",
+        "RFC-MASK-0018-AC06"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0087",
+      "key": "one-command-safe-updates",
+      "title": "Make updates complete without hiding their impact",
+      "path": "docs/issues/10-backlog/MASK-0087-one-command-safe-updates.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0086"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC04",
+        "RFC-MASK-0018-AC05",
+        "RFC-MASK-0018-AC06"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0088",
+      "key": "declarative-native-role-artifacts",
+      "title": "Check and deploy declared native roles without rendering",
+      "path": "docs/issues/10-backlog/MASK-0088-declarative-native-role-artifacts.md",
+      "rfcs": [
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [
+        "MASK-0083"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0019-AC01",
+        "RFC-MASK-0019-AC02",
+        "RFC-MASK-0019-AC03",
+        "RFC-MASK-0019-AC06"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0089",
+      "key": "approved-staged-setup",
+      "title": "Run genuinely required setup with exact consent and recovery",
+      "path": "docs/issues/10-backlog/MASK-0089-approved-staged-setup.md",
+      "rfcs": [
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [
+        "MASK-0085",
+        "MASK-0088"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0019-AC04",
+        "RFC-MASK-0019-AC05"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0090",
+      "key": "ensure-launch-and-upstream-handoff",
+      "title": "Connect complete readiness to every public entrypoint",
+      "path": "docs/issues/10-backlog/MASK-0090-ensure-launch-and-upstream-handoff.md",
+      "rfcs": [
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [
+        "MASK-0086",
+        "MASK-0087",
+        "MASK-0089"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0019-AC01",
+        "RFC-MASK-0019-AC06",
+        "RFC-MASK-0019-AC08"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0091",
+      "key": "native-human-journeys-and-readme",
+      "title": "Qualify the ordinary CLI and replace the long getting-started guide",
+      "path": "docs/issues/10-backlog/MASK-0091-native-human-journeys-and-readme.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0084",
+        "MASK-0085",
+        "MASK-0086",
+        "MASK-0087"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0018-AC07",
+        "RFC-MASK-0018-AC08"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0092",
+      "key": "real-workflow-native-journeys",
+      "title": "Qualify missing-role repair and checked-in fresh-clone readiness",
+      "path": "docs/issues/10-backlog/MASK-0092-real-workflow-native-journeys.md",
+      "rfcs": [
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [
+        "MASK-0090",
+        "MASK-0091"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0019-AC02",
+        "RFC-MASK-0019-AC03",
+        "RFC-MASK-0019-AC04",
+        "RFC-MASK-0019-AC05",
+        "RFC-MASK-0019-AC06",
+        "RFC-MASK-0019-AC07",
+        "RFC-MASK-0019-AC08"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0093",
+      "key": "close-human-cli-correction",
+      "title": "Verify and close the task CLI and human-output correction",
+      "path": "docs/issues/10-backlog/MASK-0093-close-human-cli-correction.md",
+      "rfcs": [
+        "RFC-MASK-0018"
+      ],
+      "depends_on": [
+        "MASK-0091"
+      ],
+      "closeout_for": [
+        "RFC-MASK-0018"
+      ],
+      "criteria": [
+        "RFC-MASK-0018-AC01",
+        "RFC-MASK-0018-AC02",
+        "RFC-MASK-0018-AC03",
+        "RFC-MASK-0018-AC04",
+        "RFC-MASK-0018-AC05",
+        "RFC-MASK-0018-AC06",
+        "RFC-MASK-0018-AC07",
+        "RFC-MASK-0018-AC08"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0094",
+      "key": "close-workflow-readiness-correction",
+      "title": "Verify and close complete workflow readiness",
+      "path": "docs/issues/10-backlog/MASK-0094-close-workflow-readiness-correction.md",
+      "rfcs": [
+        "RFC-MASK-0019"
+      ],
+      "depends_on": [
+        "MASK-0092"
+      ],
+      "closeout_for": [
+        "RFC-MASK-0019"
+      ],
+      "criteria": [
+        "RFC-MASK-0019-AC01",
+        "RFC-MASK-0019-AC02",
+        "RFC-MASK-0019-AC03",
+        "RFC-MASK-0019-AC04",
+        "RFC-MASK-0019-AC05",
+        "RFC-MASK-0019-AC06",
+        "RFC-MASK-0019-AC07",
+        "RFC-MASK-0019-AC08"
+      ],
+      "status": "Backlog"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "schema": "mask.corrective-pack.baseline.v1",
+  "basis": "synthetic public-CLI reproduction against explicit supplied snapshot",
+  "program_sha256": "0b93ecc6499082565e7875cb3e48bd3e8dcf0e4186e0118449410a7ab696abe1",
+  "python": "3.13.5",
+  "platform": "linux",
+  "observations": {
+    "inventory_without_json_flag_parsed_as_json": true,
+    "inventory_link_rows": 6,
+    "ensure_succeeded": true,
+    "ensure_check_succeeded": true,
+    "required_role_outputs_absent": [
+      ".codex/agents/rfc-integrator.toml",
+      ".claude/agents/rfc-integrator.md"
+    ],
+    "package_setup_executed": false
+  },
+  "commands": [
+    {
+      "argv": [
+        "mask",
+        "init",
+        "--source",
+        "/fixture/AgentSkills",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "project",
+        "init",
+        "--project",
+        "/fixture/SampleReview",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "project",
+        "register",
+        "--project",
+        "/fixture/SampleReview",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "project",
+        "require",
+        "attended-review",
+        "implement-rfc",
+        "wizard",
+        "--project",
+        "/fixture/SampleReview",
+        "--apply",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "integration",
+        "approve",
+        "--project",
+        "/fixture/SampleReview",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "ensure",
+        "--project",
+        "/fixture/SampleReview",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": "ready_legacy_unpinned",
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "ensure",
+        "--project",
+        "/fixture/SampleReview",
+        "--check",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": "ready_legacy_unpinned",
+      "error": null
+    },
+    {
+      "argv": [
+        "mask",
+        "inventory",
+        "--project",
+        "/fixture/SampleReview"
+      ],
+      "exit_code": 0,
+      "stdout_is_json": true,
+      "ok": true,
+      "readiness": null,
+      "error": null
+    }
+  ],
+  "limits": [
+    "Synthetic source package, not a live SRV remeasurement.",
+    "Proposed workflow descriptor is passive/unknown to the original snapshot; original ensure validates links, not these declared role requirements.",
+    "This shows the old boundary and does not qualify the new implementation or native hosts.",
+    "No provider/model/network call or real consumer/configuration change. Temporary roots were removed."
+  ]
+}

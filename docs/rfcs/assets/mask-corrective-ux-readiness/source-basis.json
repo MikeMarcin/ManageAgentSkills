@@ -1,0 +1,225 @@
+{
+  "schema": "mask.corrective-pack.source-basis.v1",
+  "basis": "uploaded snapshots and direct user requirements, not a live repository inspection",
+  "inputs": [
+    {
+      "repository": "MASK",
+      "filename": "manage_agent_skills_project_source.md",
+      "sha256": "b88187f3445c572fbfac80b436f0370838e1e650060c70dbd379f89033060dd1",
+      "bytes": 1881499
+    },
+    {
+      "repository": "ASK",
+      "filename": "agent_skills_project_source(2).md",
+      "sha256": "092b1d58ad6c68d04b763526a45b75db543a2a6e49553099beafad551385aa4f",
+      "bytes": 2535468
+    },
+    {
+      "repository": "MASK",
+      "filename": "README.md",
+      "sha256": "7c78fc422806db246994c1562daed101bac35d368d9311da440bf64fb5b22c57",
+      "bytes": 30546
+    }
+  ],
+  "readme_matches_dump": true,
+  "selected_files": [
+    {
+      "repository": "MASK",
+      "path": "mask.py",
+      "lines": 702,
+      "reported_lines": 702,
+      "sha256": "0b93ecc6499082565e7875cb3e48bd3e8dcf0e4186e0118449410a7ab696abe1"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_ensure.py",
+      "lines": 405,
+      "reported_lines": 405,
+      "sha256": "b75b475d8951a551719fe72e9782d47317c8ad89af987336c407da2011f569da"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_fs.py",
+      "lines": 747,
+      "reported_lines": 747,
+      "sha256": "21c56cfb6ff1b43fea2c3fe0d44369c254c9983e05bf1da4528f19cff6fb9933"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_pinned.py",
+      "lines": 780,
+      "reported_lines": 780,
+      "sha256": "3728ec27d12b75826e344efa3a545695cd7b2e0583b8ff9247ada9535a93ff82"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_report.py",
+      "lines": 131,
+      "reported_lines": 131,
+      "sha256": "36041dceb21ba1d2c84443b545624ee447f3884cdff30317b0b835754904d970"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_packages.py",
+      "lines": 213,
+      "reported_lines": 213,
+      "sha256": "090565644667309b1b23145edd9b046c9c0aa2b86e2197201b1d8f9e54a021a3"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_adapters.py",
+      "lines": 95,
+      "reported_lines": 95,
+      "sha256": "13fb664b7a828b151274104e431b940ebc3ee11b25e4faa44a2b88f4f6074ff2"
+    },
+    {
+      "repository": "MASK",
+      "path": "mask_process.py",
+      "lines": 134,
+      "reported_lines": 134,
+      "sha256": "0d10267bf8a4bd738081241e5492e720e1b372fabab5c7f1d35f4fd5e0a8c305"
+    },
+    {
+      "repository": "MASK",
+      "path": "tests/support.py",
+      "lines": 62,
+      "reported_lines": 62,
+      "sha256": "a6f77de4046c2b03dae63a02102920fbe4878ca6be64bb160d79b2954fbd4c17"
+    },
+    {
+      "repository": "MASK",
+      "path": "tests/test_cli_protocol.py",
+      "lines": 45,
+      "reported_lines": 45,
+      "sha256": "efe43a165480a979360c05c820eb02b50b9cdf7dff44bbb6e416f88293f8667d"
+    },
+    {
+      "repository": "MASK",
+      "path": "tests/test_inventory.py",
+      "lines": 100,
+      "reported_lines": 100,
+      "sha256": "6723df1c6abd0c7e6ee27e7d5814344e37434820cde76894ca38b288bd78210c"
+    },
+    {
+      "repository": "MASK",
+      "path": "tests/test_ensure.py",
+      "lines": 163,
+      "reported_lines": 163,
+      "sha256": "c44f88aeccbc2055b6b20dc3af384b211380ffebb75b8cf303819e391f7d46c1"
+    },
+    {
+      "repository": "MASK",
+      "path": "docs/architecture/cli-contract.md",
+      "lines": 721,
+      "reported_lines": 721,
+      "sha256": "a983fbf7509164ccfe86b7a4d94860eead82093d02ec764195d3721492d6ad26"
+    },
+    {
+      "repository": "MASK",
+      "path": "docs/architecture/test-boundaries.md",
+      "lines": 22,
+      "reported_lines": 22,
+      "sha256": "f4dda70320ec439e6bd01c28492b0a2d63e44e3fa15cc0f16b704d8fe55e80a6"
+    },
+    {
+      "repository": "MASK",
+      "path": "docs/rfcs/README.md",
+      "lines": 35,
+      "reported_lines": 35,
+      "sha256": "139f2636a6bad732969def73b753d3cf500c317cde3bd4397e4dbc0d91ad6f74"
+    },
+    {
+      "repository": "MASK",
+      "path": "docs/issues/NEXT_ID",
+      "lines": 1,
+      "reported_lines": 1,
+      "sha256": "f7d803302aadaa3b18c1727873a3511cc47d95817c228c932549ebf059ea095a"
+    },
+    {
+      "repository": "MASK",
+      "path": "AGENTS.md",
+      "lines": 9,
+      "reported_lines": 9,
+      "sha256": "90f2085db098de947fe6a158ba435910cfeadb08933cfb93a1dead419651a644"
+    },
+    {
+      "repository": "MASK",
+      "path": ".mask/skill-config/implement-rfc/project.md",
+      "lines": 34,
+      "reported_lines": 34,
+      "sha256": "1ea503b68fa1f4e1456ecf26b6d7672caa6ca6a891ba0809c4f787dce0773e49"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/scripts/render_runtime_adapters.py",
+      "lines": 832,
+      "reported_lines": 832,
+      "sha256": "e5898f21e9ebf3933e4a2236e3125ca1d1b9590f05d889b15fef6fd42a3cef7d"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/scripts/validate_portable_agents.py",
+      "lines": 69,
+      "reported_lines": 69,
+      "sha256": "8a96814a24e8db27b3939396dfbc17dcdc9c865e9a811324cda82a876a6745ac"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/references/pack-lifecycle.md",
+      "lines": 143,
+      "reported_lines": 143,
+      "sha256": "a399cae235e0a8269b727b748408b85cb5645c26e4ec29cc0964130a8663aad7"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/references/role-adoption.md",
+      "lines": 116,
+      "reported_lines": 116,
+      "sha256": "07ef79fc47518543ddb135aacc864b4bf86f748e2783d7d9dd9f7ed171cce4ea"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/SKILL.md",
+      "lines": 98,
+      "reported_lines": 98,
+      "sha256": "60e009957c23af969bb498970d1cad4492446d24b10c05ead4cabdb037080cbd"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/config/roles.json",
+      "lines": 163,
+      "reported_lines": 163,
+      "sha256": "6790744e2740935c16af3ef37f5c2325004a1f2c7c6398dfe8fda3f40bc3dd5b"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/config/routing.json",
+      "lines": 93,
+      "reported_lines": 93,
+      "sha256": "3f583357a8f420cb7ec5e2ebd35c618e7b650d91fa7b50f28240c47b7cc433fb"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/implement-rfc/schemas/issue-card.schema.json",
+      "lines": 183,
+      "reported_lines": 183,
+      "sha256": "65f42d73b0ec9e030610a2bce99164e0aa9199e1a6dc022502679425a60cf76c"
+    },
+    {
+      "repository": "ASK",
+      "path": "docs/rfcs/assets/RFC-ASK-0010-qualification.md",
+      "lines": 64,
+      "reported_lines": 64,
+      "sha256": "28ebce3bca7b7525b3376603659ba62cd2d5707936f2350f742b2faecc289f3f"
+    },
+    {
+      "repository": "ASK",
+      "path": "skills/manage-agent-skills/SKILL.md",
+      "lines": 66,
+      "reported_lines": 66,
+      "sha256": "d0d834cdd4e68b9c19f90ca4552697a73abf5c9249743b3a1946b1a44dd3b5bc"
+    }
+  ],
+  "live_ids_reserved": false,
+  "production_changes_made": false
+}

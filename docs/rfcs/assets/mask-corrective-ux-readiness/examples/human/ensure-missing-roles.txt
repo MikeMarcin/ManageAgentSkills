@@ -1,0 +1,8 @@
+SampleReview — setup required
+
+Skill links match. implement-rfc's native roles do not:
+  Codex: rfc-integrator is missing; rfc-worker uses an older definition.
+  Claude: role definitions need updating.
+
+Required files are available in the selected skill package.
+No setup script is needed. Existing modified or tracked files will be preserved.

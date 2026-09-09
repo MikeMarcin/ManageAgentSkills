@@ -1,0 +1,367 @@
+{
+  "schema": "mask.corrective-pack.manifest.v1",
+  "pack_id": "mask-corrective-ux-readiness",
+  "status": "proposed",
+  "rfcs": [
+    "RFC-MASK-0018",
+    "RFC-MASK-0019"
+  ],
+  "provisional_issue_ids": [
+    "MASK-0083",
+    "MASK-0084",
+    "MASK-0085",
+    "MASK-0086",
+    "MASK-0087",
+    "MASK-0088",
+    "MASK-0089",
+    "MASK-0090",
+    "MASK-0091",
+    "MASK-0092",
+    "MASK-0093",
+    "MASK-0094"
+  ],
+  "production_changes_made": false,
+  "file_count": 68,
+  "files": [
+    {
+      "path": "ACCEPTANCE.md",
+      "bytes": 10884,
+      "sha256": "8e4dbe9e9c093a4f45523a7a3bc68bae1261bcf4ba5454cd092a22b345d45d02"
+    },
+    {
+      "path": "CHANGE_MAP.md",
+      "bytes": 2641,
+      "sha256": "cbac75985221da955cd585408c0b31c268d929f59b8ef0f8e2cd44e7608b11ee"
+    },
+    {
+      "path": "IMPLEMENTATION_ORDER.md",
+      "bytes": 1924,
+      "sha256": "38e2d68e68ba3facb607898359e9a0a019d48bec9527d75f7c80d75d436870dc"
+    },
+    {
+      "path": "IMPLEMENTATION_PROMPT.md",
+      "bytes": 3590,
+      "sha256": "35375f3f72b133048300f71da679ced5f822baa26c03c4f6f01ed0c669f66033"
+    },
+    {
+      "path": "IMPORT.md",
+      "bytes": 2642,
+      "sha256": "4c8b7f00e467bcad8c6be8a671fb4bb4b481d41fe7a97cd866c53b4851506fcc"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4321,
+      "sha256": "c24148876d842bbc6e3a8ff5a970e7caf80aac1fa9a66f27aca9f9c2949abf7d"
+    },
+    {
+      "path": "SOURCE_BASIS.md",
+      "bytes": 4843,
+      "sha256": "ebfca52471ffcdfaf09691059a62443448844d16a34c2a17f09472c59c92408e"
+    },
+    {
+      "path": "TRACEABILITY.md",
+      "bytes": 1897,
+      "sha256": "c3b421c5d8985d10fd5bd439b3dfeb264d2c54d6fbf2a0f1a0ab087baa95f9ab"
+    },
+    {
+      "path": "VALIDATION.md",
+      "bytes": 2780,
+      "sha256": "007c98bae4d4e74445771fa760150fae20bb74922faf59fcba0b077c12cc0726"
+    },
+    {
+      "path": "contracts/CLI.md",
+      "bytes": 13692,
+      "sha256": "29a012ce502c341770e1d920a2603aeb907079533a06d77dfc3a3ecad3593699"
+    },
+    {
+      "path": "contracts/SETUP_INTERFACE.md",
+      "bytes": 2824,
+      "sha256": "7f9dfb034eb23dcfa4f7213f7fcfcb22b8fc19f78732c5790380c9180328cebb"
+    },
+    {
+      "path": "contracts/WORKFLOW_READINESS.md",
+      "bytes": 16832,
+      "sha256": "04d78526846ec32d7d425e7ba431bbf0c38f1a3f5abba55544689bf0282ba813"
+    },
+    {
+      "path": "contracts/workflow-requirements.v1.schema.json",
+      "bytes": 5096,
+      "sha256": "488da7ca1f530f25bc8d515c7228c28872d34ed2fcc71e05e8f3795628bac34c"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0084-human-output-for-all-commands.md",
+      "bytes": 1859,
+      "sha256": "8aebccfd19b21cafc38d7a5b104ba449e1556550f0b8f7e774796a54856cdce7"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0085-in-process-consent-and-authority.md",
+      "bytes": 1906,
+      "sha256": "4c1cd0dcfe0c18d2f19f28090f37590ae25a20b8d9662b38838d11e5d7feab4b"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0086-complete-install-remove-list.md",
+      "bytes": 2019,
+      "sha256": "1fd090feb10f90ff41aab5936add47f66952997fd3282c1514238044a572f436"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0087-one-command-safe-updates.md",
+      "bytes": 1868,
+      "sha256": "0dcd3fef24fed3dfd6aa3e6aa6b9a629e937d75829d2f9f63952678f68959ee0"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0088-declarative-native-role-artifacts.md",
+      "bytes": 2016,
+      "sha256": "736d4b43c6ed937d583e97b25be180ddedcbbf6f1ee1ed8a0e82d3a8f740cd07"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0089-approved-staged-setup.md",
+      "bytes": 1949,
+      "sha256": "ba0bf71ff050ae96f3ca266d21e574a10330ff9f95b5e6c0e1b7fcc8fd963310"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0090-ensure-launch-and-upstream-handoff.md",
+      "bytes": 2039,
+      "sha256": "a9e6cffcb7e7f46beb74f28d2ca2eea6ad011ceaaf65d7aaf874ecd4eba7bd81"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0091-native-human-journeys-and-readme.md",
+      "bytes": 1941,
+      "sha256": "704cb93941ddb945566cae45025b2c7db5feaa0cd2cf0d301cace1da97a0e726"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0092-real-workflow-native-journeys.md",
+      "bytes": 2131,
+      "sha256": "5f445a005ca0e045526578e33736e5b0f7a783aa8dd26cbc1b1ea9385771cf8a"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0093-close-human-cli-correction.md",
+      "bytes": 2985,
+      "sha256": "df97a7cbb1c363be09dc75c6ab6b028ecc11d98b66a446d114f1bca9b04d71aa"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0094-close-workflow-readiness-correction.md",
+      "bytes": 3011,
+      "sha256": "6a74c6c9023b632bdfecd825d7e99b24532e598af0900c670769d9b1450331b3"
+    },
+    {
+      "path": "docs/issues/20-ready/MASK-0083-import-and-public-regression-baseline.md",
+      "bytes": 1958,
+      "sha256": "c3d6a877bb5cce843cf0296c6fa8a6556662be683c0619b29591afc6e9b7e036"
+    },
+    {
+      "path": "docs/rfcs/RFC-MASK-0018-task-oriented-cli-and-human-output.md",
+      "bytes": 6875,
+      "sha256": "c77137ded95aa7965b8b33dffc859a874a692b0a13c06ffe3abf0e18824cbc6c"
+    },
+    {
+      "path": "docs/rfcs/RFC-MASK-0019-complete-workflow-readiness.md",
+      "bytes": 7674,
+      "sha256": "9af7dc738fa1448de131941859580a1f5964f015348a6ea77d1a9a146bec908b"
+    },
+    {
+      "path": "examples/README.target.md",
+      "bytes": 3258,
+      "sha256": "0fcb281f461ec2821fb75f6f556419933ba705500ed0f12055814d7361d22ed2"
+    },
+    {
+      "path": "examples/human/collision.txt",
+      "bytes": 228,
+      "sha256": "d7a2e68eb41371177a3260b7bb3d7c9121f9691af404beb35e289eabaf76de06"
+    },
+    {
+      "path": "examples/human/ensure-declined.txt",
+      "bytes": 174,
+      "sha256": "e494ea5378c5bca16684bb3c4bb54e27af67b2d8b316b33191a3055f01152fa0"
+    },
+    {
+      "path": "examples/human/ensure-missing-roles.txt",
+      "bytes": 350,
+      "sha256": "287e3ed27fb95f4ceb17e119486d41b447a423cdfe8a152416490d7858699f12"
+    },
+    {
+      "path": "examples/human/ensure-ready.txt",
+      "bytes": 194,
+      "sha256": "d5ad0817bb45d772e68d8e423b3e6f555193b39e776cc9a34393761f9946e32a"
+    },
+    {
+      "path": "examples/human/ensure-setup-prompt.txt",
+      "bytes": 410,
+      "sha256": "81851fda9ad215af77ba7866890a9d8b19398f3d3b036fa086374b14465b4b95"
+    },
+    {
+      "path": "examples/human/inventory.txt",
+      "bytes": 402,
+      "sha256": "0375f13ec7e5bcc7e720656c5a942e36fffd9b843d878bbb7b3ee4523bf4e905"
+    },
+    {
+      "path": "examples/human/update-impact.txt",
+      "bytes": 378,
+      "sha256": "bfa00a5c519250d6eb320a346d6aee10d51f6cdf5b9e8ace4188925da0fbc0d7"
+    },
+    {
+      "path": "fixtures/README.md",
+      "bytes": 1232,
+      "sha256": "8034314f8289b1ccb4e072eb829d427e5a21d423939ef99ab93bf9b07c79b792"
+    },
+    {
+      "path": "fixtures/consumer/.mask/skill-config/implement-rfc/project.json",
+      "bytes": 88,
+      "sha256": "08504325d2fd3c29e7eea2a2e10731293b008a4d6beb146c4937b3fca68ab210"
+    },
+    {
+      "path": "fixtures/consumer/.mask/skill-config/implement-rfc/project.md",
+      "bytes": 70,
+      "sha256": "372d6cb4c00358caca6e91b23b4cd3c17bc0b2f5682ecc715b0af42968ada9d7"
+    },
+    {
+      "path": "fixtures/generated-package/SKILL.md",
+      "bytes": 180,
+      "sha256": "06c5dace88903a60e532195ee67162e61c2da096e44821499cae8a8e2a1d563d"
+    },
+    {
+      "path": "fixtures/generated-package/mask-workflow.json",
+      "bytes": 930,
+      "sha256": "d2834a5f676aada463b845622bb6dbca9a62906e567f17f70dc045896a45cf00"
+    },
+    {
+      "path": "fixtures/generated-package/scripts/prepare_fixture_roles.py",
+      "bytes": 1940,
+      "sha256": "7ad39d8b40089f0fc9bd88bc403ff4cd7fc285a4cd59771041bd403b423ab4e9"
+    },
+    {
+      "path": "fixtures/legacy-inventory.json",
+      "bytes": 6927,
+      "sha256": "26b33aa7c003a9657202298009b464dc05b21fd777c21d74bf5bd26f061c8f92"
+    },
+    {
+      "path": "fixtures/setup-request.example.json",
+      "bytes": 643,
+      "sha256": "1baa343406520d722067068eb14b856b961fb62382ac54de32dcac75868e5d60"
+    },
+    {
+      "path": "fixtures/static-package/SKILL.md",
+      "bytes": 188,
+      "sha256": "8893d7ad42c6a9293debc83111f7fa18aba09312cc21405095df8653ac86a9df"
+    },
+    {
+      "path": "fixtures/static-package/mask-workflow.json",
+      "bytes": 4155,
+      "sha256": "0174ba9cdfab6ca85c0a75bc4c7b86bba6a40b3ea9152c9b3b0731f69d4e3b24"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-integrator.md",
+      "bytes": 148,
+      "sha256": "153c23177d6f03cbe2af54b8d7865ad87f0154082fa2e37a222bcf3cdc467565"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-reviewer-critical.md",
+      "bytes": 155,
+      "sha256": "a206fc4b50f0ec96652849823dd91d153875741c21ad1bbea83b4356497badb7"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-reviewer.md",
+      "bytes": 146,
+      "sha256": "31bb37bc1ace51649a9802c2fa441ddb0d54b00fc2cb55ed8aad52c1c4e2cbf0"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-scout.md",
+      "bytes": 143,
+      "sha256": "3fa5ded354bf6b1822c25583faa81d9098c67c957fb1993401dcb2af62170262"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-test-runner.md",
+      "bytes": 149,
+      "sha256": "61670116505557cccc5b6308c5d3191c8fe0c414a146196af1437ebffd7a9ade"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-utility.md",
+      "bytes": 145,
+      "sha256": "a04662d7af38cc79730ed93a48739911c9d8d76e125b401a9ed910539355a2bf"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-worker-deep.md",
+      "bytes": 149,
+      "sha256": "90c1032284211610d05be852ae6111968121a2dcadc02ccbecd55bd3e7dc2e26"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/claude/rfc-worker.md",
+      "bytes": 144,
+      "sha256": "9798c4086401e55f60ee80e54260b2042672aabd8501997b9fb5d65daa4234c2"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-integrator.toml",
+      "bytes": 184,
+      "sha256": "e95ebf11551c6bbbbdd9673a88268ac33f7d3757ca39758ad965abab98c74d20"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-reviewer-critical.toml",
+      "bytes": 191,
+      "sha256": "7d3e56d541975b4168db5e1f6de763880ca18de0cd347acefacb13b22f8e6485"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-reviewer.toml",
+      "bytes": 182,
+      "sha256": "e96608b2aefa348f8f124dde8123e838b04a07061e6270787dd9f54022e1dda6"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-scout.toml",
+      "bytes": 179,
+      "sha256": "8e09ba75788078ed170c009ff980bd9713b153d25e2c08bf26da3cb1bf504405"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-test-runner.toml",
+      "bytes": 185,
+      "sha256": "fd540da3788e63b895b3bad53dd935314ab1c057e169ac71be1bac81b36a48db"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-utility.toml",
+      "bytes": 181,
+      "sha256": "7042d43181c3347caf7966f76dde66e2b68fd13525d22b4d64ea2fac32853bd8"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-worker-deep.toml",
+      "bytes": 185,
+      "sha256": "ebe253e98d7f39417d5da7d96a1a288ac3a2bfa87804f15df3d2a6fdb218e29a"
+    },
+    {
+      "path": "fixtures/static-package/runtime/roles/codex/rfc-worker.toml",
+      "bytes": 180,
+      "sha256": "0976199eba129efd67c9a1dd347cd26eb5bbb5008cd0c76aad05c050d9db3505"
+    },
+    {
+      "path": "fixtures/supplied-baseline-observation.json",
+      "bytes": 3366,
+      "sha256": "68dd8a92a7e7f2fc7eac22057e029be043c0e711283b434943714d0134e41b8b"
+    },
+    {
+      "path": "integration/AGENTSKILLS_HANDOFF.md",
+      "bytes": 4201,
+      "sha256": "8442ccf25dcd507dc09fa8a525b2e5aae9f0f06cd5f3e7cb917e1979d80dcae7"
+    },
+    {
+      "path": "issue-plan.json",
+      "bytes": 6900,
+      "sha256": "7572880557d41c86505298f3ad8dbe1e28379764838c7a778191be5c8ae919be"
+    },
+    {
+      "path": "source-basis.json",
+      "bytes": 6983,
+      "sha256": "deaa290c282910c123f70579ad6ed47891970e7d2ea4e8920c440bf3b88bb750"
+    },
+    {
+      "path": "tools/reproduce_supplied_baseline.py",
+      "bytes": 5399,
+      "sha256": "b3f4ba024ccebf0e9fcd3cddf7a49e582e53c9c21064dc12f6d52fe199f5803c"
+    },
+    {
+      "path": "tools/test_pack.py",
+      "bytes": 4202,
+      "sha256": "5f9c96ec6177e67bc6b10b134977da6bb9f0b3ccec776ba905b66b5e00b673a7"
+    },
+    {
+      "path": "tools/validate_pack.py",
+      "bytes": 10533,
+      "sha256": "2f61c75069a95c1da71c2356d9cf63e814bf7b3908910e64e4db62c06825fcb5"
+    }
+  ]
+}

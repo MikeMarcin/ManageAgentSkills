@@ -1,0 +1,5 @@
+Cannot install implement-rfc for Codex.
+
+A real directory already exists at .agents/skills/implement-rfc.
+MASK preserved it and made no deployment changes.
+Inspect that directory before choosing an explicit import or migration.

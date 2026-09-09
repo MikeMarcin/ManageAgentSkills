@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE ONLY. Do not run in a real host.
+name = "rfc-test-runner"
+model = "fixture-model-do-not-run"
+developer_instructions = "Fixture identity only. Do not execute tasks."

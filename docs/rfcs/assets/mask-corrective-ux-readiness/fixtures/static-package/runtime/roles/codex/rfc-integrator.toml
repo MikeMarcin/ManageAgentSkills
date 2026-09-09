@@ -1,0 +1,4 @@
+# SYNTHETIC FIXTURE ONLY. Do not run in a real host.
+name = "rfc-integrator"
+model = "fixture-model-do-not-run"
+developer_instructions = "Fixture identity only. Do not execute tasks."

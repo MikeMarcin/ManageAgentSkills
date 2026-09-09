@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "tool": "mask",
+  "tool_version": "0.2.0",
+  "command": "inventory",
+  "ok": true,
+  "dry_run": false,
+  "changed": false,
+  "would_change": false,
+  "transaction": "not_needed",
+  "data": {
+    "rows": [
+      {
+        "skill": "legacy/attended-review",
+        "name": "attended-review",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/attended-review",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "codex",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.agents/skills/attended-review",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/attended-review"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      },
+      {
+        "skill": "legacy/implement-rfc",
+        "name": "implement-rfc",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/implement-rfc",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "codex",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.agents/skills/implement-rfc",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/implement-rfc"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      },
+      {
+        "skill": "legacy/wizard",
+        "name": "wizard",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/wizard",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "codex",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.agents/skills/wizard",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/wizard"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      },
+      {
+        "skill": "legacy/attended-review",
+        "name": "attended-review",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/attended-review",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "claude",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.claude/skills/attended-review",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/attended-review"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      },
+      {
+        "skill": "legacy/implement-rfc",
+        "name": "implement-rfc",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/implement-rfc",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "claude",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.claude/skills/implement-rfc",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/implement-rfc"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      },
+      {
+        "skill": "legacy/wizard",
+        "name": "wizard",
+        "source": {
+          "alias": "legacy",
+          "root": "/fixture/AgentSkills",
+          "repository": null
+        },
+        "package_path": "skills/wizard",
+        "artifact": null,
+        "recorded_source_revision": "2e45a4eb68e1c89aaeee00bfd93327ccacac966b",
+        "content_mode": "legacy_unpinned",
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "agent": "claude",
+        "declared": true,
+        "declaration_basis": "live_declaration",
+        "origin": "local_declaration",
+        "owned": true,
+        "path": "/fixture/SampleReview/.claude/skills/wizard",
+        "actual": {
+          "type": "symlink",
+          "link_text": "/fixture/AgentSkills/skills/wizard"
+        },
+        "status": "managed_converged",
+        "compatibility": "unspecified",
+        "host_load": "not_verified",
+        "error": null
+      }
+    ],
+    "total_rows": 6,
+    "next_offset": null,
+    "consumers": [
+      {
+        "root": "/fixture/SampleReview",
+        "scope": "project",
+        "available": true,
+        "declaration_basis": "live_declaration",
+        "error": null
+      }
+    ],
+    "source_mode": "legacy",
+    "network": "none",
+    "scope": "selected_consumer",
+    "complete": true,
+    "work": {
+      "declarations_read": 1,
+      "declaration_bytes_read": 204,
+      "payload_files_read": 0,
+      "directories_enumerated": 0,
+      "leaves_inspected": 6
+    },
+    "limitations": [
+      "Legacy live-source content is not pinned.",
+      "Artifact, profile, fleet receipt and actual host-loading data are unavailable."
+    ]
+  },
+  "actions": [],
+  "warnings": [],
+  "error": null
+}

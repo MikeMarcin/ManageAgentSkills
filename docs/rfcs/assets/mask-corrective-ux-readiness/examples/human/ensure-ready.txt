@@ -1,0 +1,5 @@
+SampleReview — ready
+
+3 skills linked for Claude and Codex.
+implement-rfc: required native definitions and consumer inputs match.
+No setup scripts were needed. Host loading: not verified.

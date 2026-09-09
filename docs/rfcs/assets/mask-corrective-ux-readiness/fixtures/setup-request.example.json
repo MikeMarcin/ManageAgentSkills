@@ -1,0 +1,27 @@
+{
+  "schema": "mask.setup-request.v1",
+  "action": "prepare-roles",
+  "native_roles": [
+    {
+      "agent": "codex",
+      "name": "rfc-integrator"
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-integrator"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "project-config",
+      "path": ".mask/skill-config/implement-rfc/project.json",
+      "sha256": "08504325d2fd3c29e7eea2a2e10731293b008a4d6beb146c4937b3fca68ab210"
+    },
+    {
+      "id": "project-rules",
+      "path": ".mask/skill-config/implement-rfc/project.md",
+      "sha256": "372d6cb4c00358caca6e91b23b4cd3c17bc0b2f5682ecc715b0af42968ada9d7"
+    }
+  ],
+  "parameters": {}
+}

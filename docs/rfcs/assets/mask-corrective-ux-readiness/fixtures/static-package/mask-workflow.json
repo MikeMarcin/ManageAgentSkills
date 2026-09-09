@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "inputs": [
+    {
+      "id": "project-config",
+      "path": ".mask/skill-config/implement-rfc/project.json",
+      "kind": "json",
+      "required": true
+    },
+    {
+      "id": "project-rules",
+      "path": ".mask/skill-config/implement-rfc/project.md",
+      "kind": "text",
+      "required": true
+    }
+  ],
+  "native_roles": [
+    {
+      "agent": "codex",
+      "name": "rfc-integrator",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-integrator.toml",
+        "sha256": "e95ebf11551c6bbbbdd9673a88268ac33f7d3757ca39758ad965abab98c74d20"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-reviewer",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-reviewer.toml",
+        "sha256": "e96608b2aefa348f8f124dde8123e838b04a07061e6270787dd9f54022e1dda6"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-reviewer-critical",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-reviewer-critical.toml",
+        "sha256": "7d3e56d541975b4168db5e1f6de763880ca18de0cd347acefacb13b22f8e6485"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-scout",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-scout.toml",
+        "sha256": "8e09ba75788078ed170c009ff980bd9713b153d25e2c08bf26da3cb1bf504405"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-test-runner",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-test-runner.toml",
+        "sha256": "fd540da3788e63b895b3bad53dd935314ab1c057e169ac71be1bac81b36a48db"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-utility",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-utility.toml",
+        "sha256": "7042d43181c3347caf7966f76dde66e2b68fd13525d22b4d64ea2fac32853bd8"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-worker",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-worker.toml",
+        "sha256": "0976199eba129efd67c9a1dd347cd26eb5bbb5008cd0c76aad05c050d9db3505"
+      }
+    },
+    {
+      "agent": "codex",
+      "name": "rfc-worker-deep",
+      "asset": {
+        "path": "runtime/roles/codex/rfc-worker-deep.toml",
+        "sha256": "ebe253e98d7f39417d5da7d96a1a288ac3a2bfa87804f15df3d2a6fdb218e29a"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-integrator",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-integrator.md",
+        "sha256": "153c23177d6f03cbe2af54b8d7865ad87f0154082fa2e37a222bcf3cdc467565"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-reviewer",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-reviewer.md",
+        "sha256": "31bb37bc1ace51649a9802c2fa441ddb0d54b00fc2cb55ed8aad52c1c4e2cbf0"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-reviewer-critical",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-reviewer-critical.md",
+        "sha256": "a206fc4b50f0ec96652849823dd91d153875741c21ad1bbea83b4356497badb7"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-scout",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-scout.md",
+        "sha256": "3fa5ded354bf6b1822c25583faa81d9098c67c957fb1993401dcb2af62170262"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-test-runner",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-test-runner.md",
+        "sha256": "61670116505557cccc5b6308c5d3191c8fe0c414a146196af1437ebffd7a9ade"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-utility",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-utility.md",
+        "sha256": "a04662d7af38cc79730ed93a48739911c9d8d76e125b401a9ed910539355a2bf"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-worker",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-worker.md",
+        "sha256": "9798c4086401e55f60ee80e54260b2042672aabd8501997b9fb5d65daa4234c2"
+      }
+    },
+    {
+      "agent": "claude",
+      "name": "rfc-worker-deep",
+      "asset": {
+        "path": "runtime/roles/claude/rfc-worker-deep.md",
+        "sha256": "90c1032284211610d05be852ae6111968121a2dcadc02ccbecd55bd3e7dc2e26"
+      }
+    }
+  ]
+}

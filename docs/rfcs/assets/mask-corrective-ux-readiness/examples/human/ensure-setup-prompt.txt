@@ -1,0 +1,9 @@
+SampleReview — additional setup required
+
+implement-rfc needs consumer-specific native role definitions.
+Source: legacy/implement-rfc · selected content fingerprint: <actual digest>
+Run: <selected Python> -B <frozen package>/scripts/prepare_mask_roles.py
+Target: this project's Codex and Claude native roles
+This runs package code with your user permissions; it is not sandboxed.
+
+Run this setup? [y/N]
