@@ -28,7 +28,7 @@ class ConsentFixture(PublicFixture):
         (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n', encoding='utf-8')
 
     def links(self):
-        return sorted(str(path.relative_to(self.project)) for path in self.project.glob('.*/skills/*') if path.is_symlink())
+        return sorted(path.relative_to(self.project).as_posix() for path in self.project.glob('.*/skills/*') if path.is_symlink())
 
     def assert_untouched(self):
         self.assertEqual(self.links(), [])

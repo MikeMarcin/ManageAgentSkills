@@ -685,8 +685,9 @@ def help_text(parser, leaves, words):
 
 
 def main(argv=None):
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8')
+    for stream in (sys.stdout, sys.stderr):  # Human text and JSON are UTF-8 on every OS, piped or not.
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8')
     argv = list(sys.argv[1:] if argv is None else argv)
     before_separator = argv[:argv.index('--')] if '--' in argv else argv
     machine = '--json' in before_separator

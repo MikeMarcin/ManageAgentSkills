@@ -56,7 +56,10 @@ class PublicFixture(unittest.TestCase):
         return subprocess.run(['git', '-C', str(root), *args], capture_output=True, encoding='utf-8', check=True).stdout.strip()
 
     def environment(self, extra=None):
-        env = dict(os.environ, MASK_HOME=str(self.home), HOME=str(self.personal), PYTHONDONTWRITEBYTECODE='1', GIT_TERMINAL_PROMPT='0')
+        # HOME on POSIX and USERPROFILE on Windows are what Path.home() reads; both point at the fixture's personal home
+        # so no test can touch the real profile.
+        env = dict(os.environ, MASK_HOME=str(self.home), HOME=str(self.personal), USERPROFILE=str(self.personal),
+                   PYTHONDONTWRITEBYTECODE='1', GIT_TERMINAL_PROMPT='0')
         env.pop('MASK_USER_HOME', None)
         if extra:
             env.update(extra)

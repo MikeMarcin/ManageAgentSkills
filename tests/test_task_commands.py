@@ -11,7 +11,7 @@ from tests.public_support import PublicFixture
 
 
 def links(root):
-    return sorted(str(path.relative_to(root)) for path in root.rglob('*') if path.is_symlink())
+    return sorted(path.relative_to(root).as_posix() for path in root.rglob('*') if path.is_symlink())
 
 
 class FreshScopes(PublicFixture):

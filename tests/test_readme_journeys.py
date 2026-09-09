@@ -74,7 +74,7 @@ class ReadmeRecipes(PublicFixture):
         return process.returncode, transcript.decode('utf-8', 'replace')
 
     def links(self, root):
-        return sorted(str(path.relative_to(root)) for path in root.glob('.*/skills/*') if path.is_symlink())
+        return sorted(path.relative_to(root).as_posix() for path in root.glob('.*/skills/*') if path.is_symlink())
 
     def test_install_once_then_in_your_project(self):
         selected = self.mask('init', '--source', self.source)
