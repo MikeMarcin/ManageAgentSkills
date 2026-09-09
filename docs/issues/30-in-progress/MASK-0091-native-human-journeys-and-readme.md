@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0091"
 title: "Qualify the ordinary CLI and replace the long getting-started guide"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0084", "MASK-0085", "MASK-0086", "MASK-0087"]
 priority: "P1"
