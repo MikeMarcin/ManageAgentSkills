@@ -49,13 +49,17 @@ Planned cards: MASK-0083, MASK-0084, MASK-0085, MASK-0086, MASK-0087, MASK-0091.
 | Acceptance | Direct check / observation | Outcome | Implementation revision |
 |---|---|---|---|
 | RFC-MASK-0018-AC01 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0018-AC02 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0018-AC02 | Baseline only: `tests.test_public_baseline` retains envelope-dump failures for inventory/version/capabilities (MASK-0083) | Not run | Not recorded |
 | RFC-MASK-0018-AC03 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC04 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC05 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC06 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0018-AC07 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0018-AC08 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0018-AC08 | Baseline fixtures do not inject --json (MASK-0083); native macOS/Windows journeys not yet exercised | Not run | Not recorded |
 
 Closeout review runtime: Not recorded. Required native/upstream boundaries remain
 open until their actual evidence is linked. Do not invent a PASS to close the board.
+
+## Current continuation (corrective pack)
+
+Milestone M0 (MASK-0083) is Done: import, reconciliation and the public regression baseline exist; see `docs/development/corrective-baseline.md`. Usable result: `tests/public_support.py` provides raw/machine/human helpers and the three unprepared starting states; `tests/test_public_baseline.py` records seven failing expectations as `expectedFailure`. Invariants: never inject `--json` in the human helper; never pre-register, approve or render roles for the command under test; the linked-consumer state keeps its old role files. Next bounded milestone: MASK-0084 (human renderer for every registered command, readable errors, help/version, remove the indented-JSON fallback in `mask.py::main`), which should flip the three `HumanOutputBaseline` expected failures. MASK-0088 is the independent RFC-MASK-0019 start after MASK-0083. Open obligations: native Windows lane (ExampleWinHost station), real AgentSkills handoff (no ASK ID yet), host-loading observation. MASK-0094 links here rather than duplicating this record.

@@ -48,14 +48,18 @@ Planned cards: MASK-0083, MASK-0088, MASK-0089, MASK-0090, MASK-0092.
 
 | Acceptance | Direct check / observation | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0019-AC01 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0019-AC01 | Baseline only: `tests.test_public_baseline` retains W01 failures (ensure/ensure --check ready with rfc-integrator missing) (MASK-0083) | Not run | Not recorded |
 | RFC-MASK-0019-AC02 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0019-AC03 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0019-AC04 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0019-AC05 | Pending actual implementation evidence | Not run | Not recorded |
 | RFC-MASK-0019-AC06 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0019-AC07 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0019-AC07 | Baseline uses the synthetic static package only; real package and native lanes not exercised (MASK-0083) | Not run | Not recorded |
 | RFC-MASK-0019-AC08 | Pending actual implementation evidence | Not run | Not recorded |
 
 Closeout review runtime: Not recorded. Required native/upstream boundaries remain
 open until their actual evidence is linked. Do not invent a PASS to close the board.
+
+## Current continuation
+
+See the corrective-pack continuation on [MASK-0093](MASK-0093-close-human-cli-correction.md). Upstream AgentSkills handoff: no card or integration commit exists yet; MASK-0090 remains open until it does.
