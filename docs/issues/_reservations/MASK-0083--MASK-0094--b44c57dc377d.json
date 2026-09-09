@@ -1,0 +1,21 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0083",
+    "MASK-0084",
+    "MASK-0085",
+    "MASK-0086",
+    "MASK-0087",
+    "MASK-0088",
+    "MASK-0089",
+    "MASK-0090",
+    "MASK-0091",
+    "MASK-0092",
+    "MASK-0093",
+    "MASK-0094"
+  ],
+  "reserve_for": "mask-corrective-ux-readiness",
+  "purpose": "",
+  "created": "2026-09-09T14:50:57.429452+00:00",
+  "base": "49e3971e96e370b77cd2add66c8fc67fae80b6c8"
+}
