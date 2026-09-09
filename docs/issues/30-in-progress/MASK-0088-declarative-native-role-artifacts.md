@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0088"
 title: "Check and deploy declared native roles without rendering"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0083"]
 priority: "P1"
