@@ -65,6 +65,15 @@ is now restored by hand after the engine's own deployment, because the same
 engine that links also deploys declared static roles; nothing repairs that state
 before the command under test.
 
+MASK-0091 replaced the README everyday guide with the short task guide (advanced
+material moved under `docs/guides/`) and added `tests/test_readme_journeys.py`,
+which replays those recipes exactly as written (C21) through the launcher that
+`self install` wrote: `init --source`, `install implement-rfc`, `list`, `ensure`
+(pty yes completes, no declines, a pipe never asks), `install alpha --user`,
+`list --user`, `remove`, `update --dry-run` and `update` against a local bare
+remote. No `--json`, plan hash or pre-registration is involved. `self update` is
+not replayed because it would touch the real program checkout's remote.
+
 ## Not observed here
 
 Native Windows journeys, terminal prompt mechanics, host role loading and the

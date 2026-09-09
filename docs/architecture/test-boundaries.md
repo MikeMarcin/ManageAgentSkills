@@ -15,6 +15,7 @@ The test module names below are implementation targets used by task cards. The p
 | `tests.test_launcher` | Native launcher quoting, argument forwarding, exit propagation | Installation through package managers |
 | `tests.test_end_to_end` | Full direct CLI workflow on fixtures and shared context cutover | Successful native results on an OS not exercised |
 | `tests.test_public_baseline` | Public human/`--json`/raw invocations from unprepared starting states; retained pre-fix failures for RFC-MASK-0018/0019 (`expectedFailure` until each card lands) | Native terminal prompts, host role loading, the real AgentSkills package |
+| `tests.test_readme_journeys` | README everyday recipes replayed as written through the installed launcher and plain entrypoint (C21): install/list/ensure/remove/update, personal scope, pty yes/no for `ensure`, pipe never prompts | Native Windows console prompts (recorded separately), host role loading, `self update` against a live remote |
 
 Use `python -m unittest <module>` on the selected interpreter. All fixture roots, fake remotes and MASK_HOME values must be private temporary locations. Preserve/review the root before cleanup; test fixture cleanup is allowed for test-owned temporary directories, but MASK runtime never recursively deletes user paths.
 
