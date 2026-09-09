@@ -220,10 +220,12 @@ def ensure(args, output, home):
     inactive = []
     observations = []
     proposed_approval = copy.deepcopy(approval)
+    # Manual readiness may be granted for this one invocation (contract section 3); events and checks still need policy.
+    unauthorized = [project for project in projects if not authorized(project, approval)]
+    if unauthorized and (event != 'manual' or getattr(args, 'check', False)):
+        output['data']['readiness'] = 'approval_required'
+        c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(unauthorized[0]))
     for project in projects:
-        if not authorized(project, approval):
-            output['data']['readiness'] = 'approval_required'
-            c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(project))
         observation = workspace_observation(project)
         observations.append(observation)
         if observation['index'] and any(line.split('\t', 1)[0].split()[-1] != '0' for line in observation['index'].splitlines()):
@@ -259,8 +261,17 @@ def ensure(args, output, home):
         planned['actions'].append(dict(kind='integration.record', status='planned', path=str(home / 'integration.json')))
         planned['would_change'] = True
     fs.public_plan(planned, output)
-    output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none')
+    output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none', approval='not_approved' if unauthorized else 'approved')
     fs.ensure_applicable(planned)
+    if unauthorized and planned['would_change']:
+        import mask_consent as consent
+        proposal = consent.request('readiness', 'integration.approval_required', [str(project) for project in unauthorized], planned['actions'], planned['plan_hash'],
+                                   'Make this project ready now? Registration and skill links apply to this invocation only; automatic readiness still needs integration approval.')
+        if output['dry_run']:
+            output['data']['confirmation'] = proposal
+        else:
+            output['data']['readiness'] = 'confirmation_required'
+            consent.require(args, output, proposal)
     if getattr(args, 'check', False):
         if not planned['would_change']:
             fs.pinned.verify_artifacts(planned['intent']['after_state'], [str(root) for root in roots], home)
@@ -269,7 +280,7 @@ def ensure(args, output, home):
             c.fail('readiness.drift', 'Approved deployment requires reconciliation.', 7)
     elif not output['dry_run']:
         # Recheck mutable inputs under the same writer lock, with no second payload scan.
-        if policy(home) != approval or any(not authorized(project, approval) for project in projects):
+        if policy(home) != approval or any(not authorized(project, approval) for project in projects if project not in unauthorized):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
     final_records = c.consumer_records(planned['intent']['after_state'])

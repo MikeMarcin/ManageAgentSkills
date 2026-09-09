@@ -42,6 +42,8 @@ REMEDIATION = {
     'config.missing': "Select the skill source first: 'mask init --source DIR'.",
     'state.drift': "Review the reported drift, then reconcile with 'mask apply' or 'mask ensure'.",
     'integration.approval_required': "Approve the project once with 'mask integration approve --project ROOT', then rerun.",
+    'confirmation.required': "Answer the question in a terminal, add --yes for this ordinary one-time effect, or pass the reported --expect-plan-hash from automation.",
+    'confirmation.declined': 'Nothing was applied; rerun and answer yes when you want this proposal.',
     'state.busy': 'Another MASK operation holds the lock; retry when it finishes.',
     'state.pending': "Finish the interrupted operation with 'mask recover --inspect' before continuing.",
 }

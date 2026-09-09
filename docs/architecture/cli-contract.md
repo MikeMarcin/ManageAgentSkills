@@ -6,7 +6,7 @@ Current CLI contract through RFC-MASK-0007, with the implemented lock, artifact 
 
 `--json`, `--debug`, `--help`, `--version` and `--home PATH` are recognized without confusing operand values with flags. `--home` overrides `MASK_HOME`; otherwise use `~/.mask`. `--project` accepts one root; project register/unregister also allow one positional root. Conflicting selections refuse. Support common options before or after subcommands as demonstrated in docs. Respect `--` for operand separation and reject an ID beginning with `-`.
 
-All mutators accept `--dry-run`; project manifest mutators may accept `--apply`; mutators using a computed link/manifest plan accept `--expect-plan-hash HASH`. No prompts or generic `--force`. Debug diagnostics are stderr-only, bounded and redacted. Human rendering and JSON rendering share the same structured result object.
+All mutators accept `--dry-run` and `--yes`; project manifest mutators may accept `--apply`; mutators using a computed link/manifest plan accept `--expect-plan-hash HASH`. A direct task command authorizes its ordinary scoped effects without a question; genuinely significant new authority is asked for in-process (see Consent below). No generic `--force`. Debug diagnostics are stderr-only, bounded and redacted. Human rendering and JSON rendering share the same structured result object.
 
 ## Command inventory and effects
 
@@ -322,6 +322,29 @@ bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
 Current capabilities report readable state versions `[1, 2, 3]` and state version 3. The readiness and pinned extensions use journal v3 while preserving the v1/v2 readers.
 Legacy user declarations remain v1; pinned user selections use v2. The result envelope remains v1. The source-catalog extension reads machine v1/v2 and migrates explicitly to v2.
 
+## Consent (RFC-MASK-0018, MASK-0085)
+
+`mask_consent.py` is the single seam for significant authority. The engine
+builds one proposal (`kind`, `reason`, `scope`, `actions`, `plan_hash`) and calls
+`require`. Kinds are `readiness`, `source.trust`, `package.setup`, `overwrite`,
+`ref.rebind` and `scope.expand`; only `readiness` is ordinary. The proposal is
+authorized by, in order: in-process consent retained from the prompt, a matching
+`--expect-plan-hash`, or `--yes` for an ordinary kind. `--yes` never grants package
+scripts, new source identities, overwriting edited content, ref rebinding or
+cross-consumer expansion, and never persists integration approval.
+
+A prompt appears only for a manual invocation with stdin, stdout and stderr on a
+terminal and no `--json`/`--event`: the proposal and a default-no question go to
+stderr; EOF declines (`confirmation.declined`, exit 4); Ctrl-C is interruption
+(130). The dispatcher releases the writer lock before asking, then reacquires it,
+recomputes the proposal and refuses a changed plan hash (`plan.stale`, exit 4)
+before any effect. JSON, redirected streams and event hooks never wait: they
+return `confirmation.required` (exit 4) with the proposal under
+`data.confirmation` (`granted_by: null`), which is a proposed action, not a
+receipt. A granted proposal is echoed with `granted_by` set. `--dry-run` shows
+the proposal without asking. Plan hashes stay inside the program; humans copy
+nothing.
+
 ## Workspace readiness (unreleased RFC-MASK-0006 additions)
 
 `integration approve --project PATH [--linked-worktrees] [--inactive-branches]`
@@ -337,7 +360,10 @@ registers and reconciles an approved project under the ordinary writer lock.
 It reads the selected legacy source locally, validates selected packages, and
 performs no fetch or whole-source status scan (`source.dirty` is null). It does
 not require a caller-supplied plan hash. `--check` performs no writes and exits 7
-for drift. Busy writers fail immediately with exit 6; pending recovery exits 8.
+for drift. A manual `ensure` of a project without integration approval builds
+its proposal and asks for one-time consent (Consent below); events and `--check`
+still require recorded approval (`integration.approval_required`). An already
+usable unapproved project is a no-op reporting `approval: not_approved`. Busy writers fail immediately with exit 6; pending recovery exits 8.
 No-op runs preserve managed file bytes and registry generations. Filesystem
 readiness is `ready_legacy_unpinned`, separately from `host_load: not_verified`.
 

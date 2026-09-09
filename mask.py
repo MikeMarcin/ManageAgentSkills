@@ -19,6 +19,7 @@ ADAPTERS = adapters.paths()
 PROGRAM_ROOT = Path(__file__).resolve().parent
 
 
+import mask_consent as consent
 import mask_core as core
 import mask_fs as fs
 import mask_git as git_ops
@@ -112,6 +113,7 @@ GUARDED.update({'integration.enable', 'integration.disable'})
 GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
 GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'migrate', 'source.dev-link', 'source.publish'})
 GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear'})
+GUARDED.add('ensure')
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -156,6 +158,7 @@ def make_parser():
             argument(parser, name, shape)
         if mutates:
             argument(parser, 'dry-run', 'flag')
+            argument(parser, 'yes', 'flag')
         if command in GUARDED:
             argument(parser, 'expect-plan-hash', 'value')
         parser.set_defaults(command=command)
@@ -568,6 +571,20 @@ def local_dispatch(args, output, leaves):
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
 
 
+def locked_dispatch(args, output, leaves, home, preparation):
+    with core.writer_lock(home):
+        if args.command != 'recover' and core.kind(home / 'pending.json') != 'missing':
+            core.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
+        import mask_pinned
+        mask_pinned.recheck_preparation(preparation, home)
+        try:
+            local_dispatch(args, output, leaves)
+        finally:
+            if preparation is not None:
+                output['data']['preparation'] = preparation['effects']
+                output['data']['network'] = 'locked_fetch' if any(item['effects'].get('network_attempted') for item in preparation['effects']) else 'none'
+
+
 def dispatch_impl(args, output, leaves):
     if args.command == 'launch':
         if args.agent not in ADAPTERS:
@@ -609,16 +626,16 @@ def dispatch_impl(args, output, leaves):
         return mask_pinned.dev_dispatch(args, output, home)
     preparation = mask_pinned.prepare_dispatch(args, output, home) if mutates else None
     if mutates:
-        with core.writer_lock(home):
-            if args.command != 'recover' and core.kind(home / 'pending.json') != 'missing':
-                core.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
-            mask_pinned.recheck_preparation(preparation, home)
-            try:
-                local_dispatch(args, output, leaves)
-            finally:
-                if preparation is not None:
-                    output['data']['preparation'] = preparation['effects']
-                    output['data']['network'] = 'locked_fetch' if any(item['effects'].get('network_attempted') for item in preparation['effects']) else 'none'
+        try:
+            locked_dispatch(args, output, leaves, home, preparation)
+        except consent.ConsentRequired as pending:
+            # The writer lock is released here; a human answers, then the exact proposal is rechecked under the lock.
+            if not consent.ask(pending.request, present.render_confirmation(pending.request, output)):
+                core.fail('confirmation.declined', 'Declined; nothing was applied.', 4, reason=pending.request['reason'])
+            args.consented = pending.request['plan_hash']
+            output.clear()
+            output.update(result(args.command, getattr(args, 'dry_run', False)))
+            locked_dispatch(args, output, leaves, home, preparation)
     else:
         observed = args.command not in ('capabilities',)
         before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json', 'selection-policy.json')] if observed else []

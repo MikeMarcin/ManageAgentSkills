@@ -255,6 +255,11 @@ def render_ensure(data, output):
     lines.extend(actions(output))
     if data.get('readiness') == 'approval_required':
         lines.append("  approve the consumer with 'mask integration approve --project ROOT' before automatic readiness")
+    confirmation = data.get('confirmation')
+    if confirmation and confirmation.get('granted_by'):
+        lines.append(f"  one-time readiness granted by {clean(confirmation['granted_by'])}; automatic readiness still needs 'mask integration approve'")
+    elif confirmation:
+        lines.append("  would ask for one-time readiness consent; automatic readiness still needs 'mask integration approve'")
     return lines + plan_guard(data, output)
 
 
@@ -419,12 +424,24 @@ PRESERVED = {'not_started': 'nothing was changed', 'not_needed': 'nothing was ch
              'committed': 'the change had already been committed', 'partial': 'effects are partial; run mask recover --inspect'}
 
 
+def render_confirmation(proposal, output):
+    """The proposal a human answers or automation reviews: scope, planned actions, and the authority it does not grant."""
+    lines = [f"{output['command'].replace('.', ' ')}: confirmation needed ({clean(proposal.get('reason'))})"]
+    for root in proposal.get('scope', []):
+        lines.append(f"  scope: {clean(root)}")
+    lines.extend(actions(dict(actions=proposal.get('actions', []))))
+    lines.append('  grants: this invocation only; no package scripts, new sources, overwrites or persistent approval')
+    return '\n'.join(lines) + '\n'
+
+
 def render_error(output):
     """Text for stderr on a handled failure: what failed, what is preserved, what to do."""
     error = output['error']
     lines = [f"error: {clean(error['message'])}", f"  code: {clean(error['code'])}"]
     for key, value in (error.get('details') or {}).items():
         lines.append(f"  {clean(key).replace('_', ' ')}: {clean(value)}")
+    if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
+        lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
     lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
     for step in error.get('remediation', []):
         lines.append(f"  next: {clean(step.get('message'))}")
@@ -451,6 +468,6 @@ def compact_help(version, groups):
     pad = max(len(usage) for usage, _ in EVERYDAY)
     lines.extend(f'  {usage.ljust(pad)}  {text}' for usage, text in EVERYDAY)
     lines += ['', f"Command groups: {', '.join(groups)}",
-              'Options: --json (machine result), --dry-run (mutating commands), --home DIR, --debug, --version, --help',
+              'Options: --json (machine result), --dry-run and --yes (mutating commands), --home DIR, --debug, --version, --help',
               "Run 'mask COMMAND --help' for a command's arguments."]
     return '\n'.join(lines) + '\n'

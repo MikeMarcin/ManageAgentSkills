@@ -19,7 +19,10 @@ class EnsureTests(Fixture):
 
     def test_authority_registration_check_and_noop(self):
         before = self.snapshot()
-        self.assertEqual(self.call('ensure', code=4)['error']['code'], 'integration.approval_required')
+        refused = self.call('ensure', code=4)  # Manual JSON invocation: a typed proposal, never a prompt (MASK-0085).
+        self.assertEqual(refused['error']['code'], 'confirmation.required')
+        self.assertEqual(refused['data']['confirmation']['reason'], 'integration.approval_required')
+        self.assertEqual(self.call('ensure', '--event', 'startup', code=4)['error']['code'], 'integration.approval_required')
         self.assertEqual(before, self.snapshot())
         preview = self.approve('--dry-run')
         self.assertEqual(before, self.snapshot())
@@ -36,7 +39,12 @@ class EnsureTests(Fixture):
         self.call('ensure', '--check')
         self.assertEqual(before, self.snapshot())
         self.call('integration', 'revoke', '--project', self.project)
-        self.call('ensure', code=4)
+        before = self.snapshot()
+        self.call('ensure', '--event', 'startup', code=4)
+        noop = self.call('ensure')  # Already usable: no-op needs no consent, but automatic readiness is reported as not approved.
+        self.assertFalse(noop['changed'])
+        self.assertEqual(noop['data']['approval'], 'not_approved')
+        self.assertEqual(before, self.snapshot())
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
 
     def test_collision_and_replaced_parent_are_preserved(self):
@@ -67,7 +75,8 @@ class EnsureTests(Fixture):
         nested.mkdir()
         self.git(nested, 'init', '-b', 'main')
         self.approve()
-        self.assertEqual(self.call('ensure', cwd=nested, code=4)['error']['code'], 'integration.approval_required')
+        self.assertEqual(self.call('ensure', cwd=nested, code=4)['error']['code'], 'manifest.missing')
+        self.assertEqual(self.call('ensure', '--event', 'post-commit', cwd=nested, code=4)['error']['code'], 'integration.approval_required')
         ordinary = self.base / 'ordinary'
         ordinary.mkdir()
         (ordinary / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['beta'])))
@@ -141,12 +150,13 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         self.call('integration', 'revoke', '--project', clone, code=4)
         outside = self.base / 'outside'
         self.git(self.base, 'clone', str(self.project), str(outside))
-        self.call('ensure', '--project', outside, code=4)
+        self.assertEqual(self.call('ensure', '--project', outside, code=4)['error']['code'], 'confirmation.required')
+        self.assertEqual(self.call('ensure', '--project', outside, '--event', 'post-checkout', code=4)['error']['code'], 'integration.approval_required')
         self.git(clone, 'remote', 'set-url', 'origin', str(self.source))
-        self.call('ensure', '--project', clone, code=4)
+        self.assertEqual(self.call('ensure', '--project', clone)['data']['approval'], 'not_approved')
         self.git(clone, 'remote', 'set-url', 'origin', str(self.project))
         self.call('integration', 'revoke', '--repository', str(self.project), '--under', boundary)
-        self.call('ensure', '--project', clone, code=4)
+        self.assertEqual(self.call('ensure', '--project', clone, '--event', 'startup', code=4)['error']['code'], 'integration.approval_required')
 
     def test_replaced_clone_boundary_and_credential_identity_refuse(self):
         boundary = self.base / 'clones'
