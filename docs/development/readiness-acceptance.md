@@ -114,3 +114,47 @@ Consumed temporary roots:
 - `/tmp/mask-windows-acceptance-tddvb6ly`:
   SSH command helpers, transfer files, copied logs and consumed finish decisions;
   removed after recording their results here and in the Done cards.
+
+## Native Windows lane for setup and readiness entrypoints (RFC-MASK-0019)
+
+Run on September 9, 2026 over the existing `example-win-host` SSH connection to
+ExampleWinHost: Microsoft Windows 11 Home 10.0.26200, AMD64, Windows Python 3.14.7 at
+`C:\Users\example\AppData\Local\Python\pythoncore-3.14-64\python.exe`, Git
+2.55.0.windows.3 with the host's global `core.autocrlf=true`. The lane used a
+disposable clone of a transferred Git bundle under
+`%TEMP%\mask-m7b-lane\repo`; the registered station checkout
+`C:\code\git\ManageAgentSkills-win-example-win-host`, the owner's other checkouts and the
+real user profile were not touched (fixtures point `USERPROFILE`/`MASK_HOME`
+at temporary roots). No credentials, privileges or host settings changed.
+
+```powershell
+$env:PYTHONUTF8 = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'
+& 'C:\Users\example\AppData\Local\Python\pythoncore-3.14-64\python.exe' -B -m unittest -v tests.test_setup tests.test_readiness_entrypoints
+```
+
+At `98bca4d`: 26 tests in 118.310s, 19 passed, one failed, six skipped. All
+`tests.test_setup` non-terminal cases passed natively (JSON/check/dry-run/yes/event
+invocations run nothing; exact `--expect-plan-hash` plus `--allow-setup` runs,
+validates, publishes and rechecks; stale plan, timeout, overflow, invalid
+outputs, post-run input changes, crash after launch, crash during publication,
+tampered transaction id, refused journal, check-mode guard). The five
+`TerminalSetupTests` cases skip on Windows (POSIX pseudoterminal mechanics) and
+the `launch` fake-executable case skips; native Windows console consent and
+native `launch` refusal remain open. The one failure,
+`LegacyUpdate.test_update_adds_renames_and_converts_roles_from_the_candidate`,
+was a fixture defect: the author clone and the shared-source checkout received
+CRLF-converted role assets under `autocrlf`, so their declared fingerprints no
+longer matched (`workflow.invalid`, `runtime/roles/claude/rfc-explorer.md`).
+MASK refused rather than deploying converted bytes, which is the intended
+behavior; the fixture now publishes `* -text` in `.gitattributes` like a real
+package must, and the guide records that requirement.
+
+At `3a26149`, `tests.test_readiness_entrypoints` reran on the same host from the
+clean detached checkout: 6 tests in 28.951s, 5 passed, 1 skipped (`launch`).
+After the review-driven hardening of the stage/journal write order, both modules
+reran from a fresh disposable clone at `7ff6192`: 26 tests in 126.382s, 20 passed,
+6 skipped (the same POSIX-only cases), no failures. macOS reruns at `7ff6192` pass.
+One fixture root (`mask-public-*`, nearly empty) survived its TemporaryDirectory
+cleanup after the first Windows run and was removed by hand; the final run left
+none. The disposable clone, bundles, scripts and logs on ExampleWinHost were removed
+after these results were recorded.
