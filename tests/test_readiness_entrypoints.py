@@ -214,7 +214,8 @@ class LegacyUpdate(EntrypointFixture):
         self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
         self.git(self.source, 'push', '-q', '-u', 'origin', 'main')
         self.author = self.base / 'author'
-        self.git(self.base, 'clone', '-q', '--branch', 'main', str(self.remote), str(self.author))
+        # The author republishes fingerprints from its working tree; an autocrlf host must not rewrite those bytes on checkout.
+        self.git(self.base, 'clone', '-q', '-c', 'core.autocrlf=false', '--branch', 'main', str(self.remote), str(self.author))
         self.git(self.author, 'config', 'user.name', 'Fixture')
         self.git(self.author, 'config', 'user.email', 'fixture@example.invalid')
         self.upstream = self.author / 'skills/implement-rfc'
