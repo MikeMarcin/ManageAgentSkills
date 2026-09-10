@@ -12,87 +12,87 @@
     "project-rules": "1ea503b68fa1f4e1456ecf26b6d7672caa6ca6a891ba0809c4f787dce0773e49"
   },
   "parameters_sha256": "af5c532cc1f9691784b11a327bce2bbca2923eabfab1d9cc6db2fb4919cc170c",
-  "role_inputs_sha256": "9bb6fc5d17a49a3945d00268349c89a7bbbbdfc0aaff84568cb31e81ecdbf0c7",
+  "role_inputs_sha256": "62f2c88d9b97dc675fa7526df88a1d78f3238267d4756ea8b374a47d210a3000",
   "roles": [
     {
       "agent": "claude",
       "name": "rfc-integrator",
-      "sha256": "79d21c05eb1438c723f9c8045f06ec12f163be80c37faf0390a5dc9ead0eed45"
+      "sha256": "9a7ed3a5481d3455ae2958aed4fe7fa4284a80a474bd4ed120d5a32b7f330ff1"
     },
     {
       "agent": "claude",
       "name": "rfc-reviewer",
-      "sha256": "95e875e763cc99b35423ac8d652beea3ee4403c542251f4fa73b741a9cbcfb2b"
+      "sha256": "19eef7062d9e60f355b6cbf54756c069defa927db04f85a8213beeef4ee518a5"
     },
     {
       "agent": "claude",
       "name": "rfc-reviewer-critical",
-      "sha256": "ab93ed8c864bb27f8e67c69701b5a41af02c04a8bccdb0f5b588769248578205"
+      "sha256": "4d08e4565af35f26bc45e6be151b4cd1da962169ff93dc054ec4346a64f706b5"
     },
     {
       "agent": "claude",
       "name": "rfc-scout",
-      "sha256": "ba25eb00dea5ec0a57caa55f534550cbcfb46952bdb2b9812727d5575367c461"
+      "sha256": "20b1245841084fadab80adede019a45e414bf4d36e56ac89d6b1edea7b610913"
     },
     {
       "agent": "claude",
       "name": "rfc-test-runner",
-      "sha256": "4f54aac90bac5d531bed61418a724e0283a777eb3fd757850a7d9561aa36aad1"
+      "sha256": "4ad54a87108436b2a6f65e83193748ad2cba35da0ae7853de754029eed7dd3c1"
     },
     {
       "agent": "claude",
       "name": "rfc-utility",
-      "sha256": "813d9b3e51d200c3701ae7dd65aba248d2507b87bed1a11e5ee06ed7f34125a8"
+      "sha256": "8bbd9e35d68c9f937c797d96abd130f6301c2c42912a3a61c8b95737bcfc10c3"
     },
     {
       "agent": "claude",
       "name": "rfc-worker",
-      "sha256": "74a53ad0c61741cbc3cdf2bf006e84c65243c4128ca41d37f34ed40911699fb5"
+      "sha256": "66ed79936bc177febb71afb73af13b19683e62cc7946304584f4c23eba6a1544"
     },
     {
       "agent": "claude",
       "name": "rfc-worker-deep",
-      "sha256": "840c208a3291068df5d06b12aa7e84cbde0fc9e9df36933f7763d6983e8c9f69"
+      "sha256": "7cbbbd6d950301d00fcf602fd3f27132f7cbe4fb45c078fb33968d89c62cffd1"
     },
     {
       "agent": "codex",
       "name": "rfc-integrator",
-      "sha256": "ee20560c8a560a9965bd7740b4adb27a18238f940e4a67c8051069c7d700a70b"
+      "sha256": "25e851a51d8579e1bd8cb87c0a17b3705755361e92ef3a103157c65939d5ab0a"
     },
     {
       "agent": "codex",
       "name": "rfc-reviewer",
-      "sha256": "7b14f6d518c1d0090a9d4e7bcbd7273a8d465767a8561469cc7a5ab038805269"
+      "sha256": "09ff290f010f7ab97c7476f5094460699c7cdbf8ef0f718582d3dd47b4a989f9"
     },
     {
       "agent": "codex",
       "name": "rfc-reviewer-critical",
-      "sha256": "34d136a2e1b87679778aa04fea2d7c9d741014563bd8d2c4edb22906daaef78d"
+      "sha256": "68ed71790f035bb3c97a0d48dbb693190500c02b216386d23c8e1bde2bc50a9c"
     },
     {
       "agent": "codex",
       "name": "rfc-scout",
-      "sha256": "5f2ae0daac34b9520b626db3794a455065d3b021b9b8800c4923275fb6060685"
+      "sha256": "1fcff32893857020ac9abacf0628e5d214aaaf805f7368b92029aa2f322eff32"
     },
     {
       "agent": "codex",
       "name": "rfc-test-runner",
-      "sha256": "d3ffe55e27c6cdec30a80fd82166dadb4eb01a86f739c08ed7656aafd7024949"
+      "sha256": "165297067d5039059906dbe5ab3e923482514878dff19fdfb0cf9525e58d2864"
     },
     {
       "agent": "codex",
       "name": "rfc-utility",
-      "sha256": "27c27db21740e4caaa8e40d4be3edbc045529761e55d89d25dbe024ebcc2ef25"
+      "sha256": "3ea7a8e0a35a2c7657607a9e78fd48b1a5e1dda3fe17b9fa5fb417b2040a2aa7"
     },
     {
       "agent": "codex",
       "name": "rfc-worker",
-      "sha256": "8fc2009441776997e2c721aa42bccc7ce730998e4a5cc1b2312f79d12036ccb1"
+      "sha256": "b07fd3436c60d46721040ec66f6a83d16df02ff9bcece90a977e536538e9b9c7"
     },
     {
       "agent": "codex",
       "name": "rfc-worker-deep",
-      "sha256": "07e923b8f2507db6e86b5754239fb330e49f218ae4ca3689f856b2ea00e0ebd3"
+      "sha256": "eef9693bb163b796ace0b3651ab70216cabad7caac38bea7d96f6f0be4b942e8"
     }
   ],
   "schema": "mask.native-role-lock.v1",
