@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0093"
 title: "Verify and close the task CLI and human-output correction"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0091"]
 priority: "P1"
