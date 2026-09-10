@@ -83,7 +83,11 @@ mask.main(sys.argv[3:])
                      ('link', 'adopt', '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source)]:
             self.call(*args, code=2)
         caps = self.call('capabilities')['data']
-        self.assertEqual(caps['readable_versions']['state'], [1, 2])
+        # A bumped write schema must stay readable; asserting only a literal let state v3 drift unnoticed.
+        for name, version in caps['schemas'].items():
+            if name in caps['readable_versions']:
+                self.assertIn(version, caps['readable_versions'][name], name)
+        self.assertEqual(caps['readable_versions']['state'], [1, 2, 3])
         self.assertIn('user.require', {item['name'] for item in caps['commands']})
 
     def test_collision_preflights_both_scopes_and_manifest_edit(self):
