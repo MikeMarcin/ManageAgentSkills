@@ -168,6 +168,35 @@ class NoninteractiveSetupTests(SetupFixture):
         self.assertEqual(self.launches(), 0)
         self.assert_nothing_published()
 
+    def test_check_mode_binds_the_expected_plan_hash_like_dry_run(self):
+        self.machine('ensure', '--project', self.project)
+        for mode in ('--check', '--dry-run'):
+            with self.subTest(mode=mode):
+                result = self.machine('ensure', '--project', self.project, mode, '--expect-plan-hash', 'deadbeef', '--allow-setup', SUBJECT)
+                self.assertEqual(result['error']['code'], 'plan.stale', result.get('error'))
+                self.assertEqual(self.launches(), 0)
+        self.assert_nothing_published()
+
+    def test_refused_setup_journal_leaves_no_stage(self):
+        self.machine('ensure', '--project', self.project)  # Commits the links so the next preview is the frozen plan.
+        plan_hash = self.machine('ensure', '--project', self.project)['data']['plan_hash']
+        script = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import mask, mask_core, mask_fs
+def refuse(pending, home):
+    raise mask_core.MaskError('internal.invariant', 'injected journal refusal', 10)
+mask_fs.validate_pending = refuse
+raise SystemExit(mask.main(sys.argv[2:]))
+"""
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'ensure', '--project', str(self.project), '--json',
+                              '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT], capture_output=True, text=True, env=self.environment())
+        self.assertEqual(run.returncode, 10, run.stdout + run.stderr)
+        self.assertEqual(json.loads(run.stdout)['error']['code'], 'internal.invariant')
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.assertEqual(self.launches(), 0)
+        self.assert_nothing_published()
+
     def test_exact_plan_hash_with_named_action_runs_and_verifies(self):
         preview = self.machine('ensure', '--project', self.project)  # Commits the links; the setup proposal is reported.
         plan_hash = preview['data']['plan_hash']

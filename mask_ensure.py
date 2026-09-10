@@ -274,8 +274,8 @@ def ensure(args, output, home):
         planned['would_change'] = True
     fs.public_plan(planned, output)
     output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none', approval='not_approved' if unauthorized else 'approved')
-    # A reviewed guard binds this exact frozen plan (links, controls and setup identities), whether or not consent is needed.
-    fs.ensure_applicable(planned, None if getattr(args, 'check', False) else getattr(args, 'expect_plan_hash', None))
+    # A reviewed guard binds this exact frozen plan (links, controls and setup identities) in every mode, whether or not consent is needed.
+    fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
     if unauthorized and planned['would_change']:
         import mask_consent as consent
         proposal = consent.request('readiness', 'integration.approval_required', [str(project) for project in unauthorized], planned['actions'], planned['plan_hash'],

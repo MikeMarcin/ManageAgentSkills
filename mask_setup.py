@@ -312,11 +312,11 @@ def publish(output, home, replan, rows):
         c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
     transaction = str(uuid.uuid4())
     stage = home / STAGING / transaction
-    stage.mkdir(parents=True)
     pending = fs.make_pending(base, home)
     pending.update(transaction_id=transaction, setup=facts_for(rows))
-    fs.validate_pending(pending, home)
+    fs.validate_pending(pending, home)  # Validated before the stage exists, so a refused journal leaves nothing behind.
     launched = c.text_json(pending)
+    stage.mkdir(parents=True)
     c.atomic_text(home / 'pending.json', launched, None)
     fs.checkpoint('setup.launched')
     ran = False
