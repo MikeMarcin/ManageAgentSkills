@@ -158,3 +158,101 @@ One fixture root (`mask-public-*`, nearly empty) survived its TemporaryDirectory
 cleanup after the first Windows run and was removed by hand; the final run left
 none. The disposable clone, bundles, scripts and logs on ExampleWinHost were removed
 after these results were recorded.
+
+## Real implement-rfc package qualification (RFC-MASK-0019, MASK-0092)
+
+Run on September 9, 2026 against the real AgentSkills package at
+`154025bdd374a448a0aaa9742703d6459d64be2e` (ASK-0059 Done; descriptor
+`skills/implement-rfc/mask-workflow.json`, sha256
+`9575dc4fa8a69900236bd8d68634fdca5759124d91acf3cf8c22c6e83e4d70f1` as committed;
+16 generated roles, one `prepare-roles` action). The retained evidence driver is
+`scripts/qualify_real_package.py`: it runs only public MASK commands as
+subprocesses with a private `MASK_HOME`/`HOME`/`USERPROFILE`, clones AgentSkills
+into a disposable upstream plus a disposable source clone (the real checkout is
+never edited), and builds two consumers with real `project.json`/`project.md`
+(distinct `role_addenda`; the second also carries the optional
+`execution-selection` input). No helper renders a role; the upstream
+`generate_roles` is imported read-only at the very end to compare deployed bytes.
+
+| Lane | Host | MASK revision | Result |
+|---|---|---|---|
+| macOS | macOS 26.6.2 arm64, Python 3.14.7, Git 2.50.1 (Apple Git-155) | `c6431a1` (first run at `cd4bc55` with the route fix uncommitted) | 44/44 steps |
+| Windows | Windows 11 Home 10.0.26200 on ExampleWinHost over `example-win-host`, Windows Python 3.14.7, Git 2.55.0.windows.3 (`core.autocrlf=true`), disposable clone under `%TEMP%\mask-m8-lane` | `c5de2ca` | 44/44 steps |
+
+Steps, in order: `skill validate implement-rfc` (fingerprint
+`sha256:7ff27a61692d396346221f8d14e7f0618a39618f446be8df01cc26b215ebc116` on
+macOS); first `ensure` exit 4 `workflow.incomplete` with all 16 roles
+`setup_required`, links committed, no role files, no package code; upstream
+`workflow_preflight.py --mask mask.py` `incomplete` with 16 blockers; `doctor
+--check` exit 7; `launch --agent codex|claude` exit 4 with a fake host on PATH
+(POSIX script on macOS, a copy of `cmd.exe` as `codex.exe` on Windows) never
+invoked, in JSON and human mode; `--check`, `--dry-run` and `--event startup`
+with the exact `--expect-plan-hash` plus `--allow-setup
+legacy/implement-rfc:prepare-roles` grant report `not_run`; `--yes` alone
+`consent_required`; a closed-stdin human `ensure` exits 4 without a prompt and
+discloses "not sandboxed"; a wrong hash is `plan.stale`; a foreign action grant
+runs nothing; the exact grant runs the frozen entrypoint and publishes 16 roles
+plus `native-roles.lock.json` with the stage removed; every role then reports
+its configured route (`claude-fable-5-1`/`low`, `gpt-6-astra`/`low` for the
+integrator) with `host_load: not_verified`; the preflight is `ready`; no
+`__pycache__` appears under the consumer or source; the unchanged rerun is
+`ok`, `changed=false`, no setup proposal; `launch` then invokes the fake host
+(`data.host.exit_code` 0); the second consumer's request lists
+`execution-selection` with its sha256, its addendum appears only in its own
+roles and the two consumers' bytes and locks differ; `doctor --check` exits 0
+with both complete; the second consumer commits its roles and lock (with
+`.gitattributes -text` entries), and a fresh clone passes `ensure --check` and
+`ensure` as `repository-owned` with no setup proposal and tracked bytes
+unchanged, while `project unrequire` plus `ensure` on that clone removes links
+only; an edited role is reported `modified` and preserved (`doctor --check`
+exit 7); `project unrequire` plus `ensure` on the first consumer removes the 15
+unchanged managed roles and preserves the edited one with `native_role.released`;
+a committed change to `SKILL.md` (a declared package input) in the disposable
+upstream makes `source fetch` plus `update` exit 4 `workflow.incomplete` with the
+roles back to `setup_required` and nothing run, after which a fresh consented
+`ensure` completes again; the deployed bytes equal the upstream generator's
+output for that consumer.
+
+An earlier driver run used a consumer token that the package's own
+`project.json` schema rejects; MASK reported `setup.failed` (exit 5, script exit
+status 2, "nothing was published", stage discarded) and never retried, which is
+the real package's bounded failure path.
+
+Terminal consent journeys with the real package (a third consumer, `gamma`,
+prepared by the driver's `--console prepare` mode):
+
+- macOS pseudoterminal: `n` exits 4 with "declined; nothing ran" and no role
+  files; `y` runs, validates and publishes 16 roles and the lock in the same
+  invocation (exit 0) and the following `ensure --json` is `ok`, `changed=false`,
+  no setup, all roles `ok`.
+- Windows console, natively: the same `ensure` was typed into an interactive
+  PowerShell started from an SSH session with a pseudoterminal (Windows OpenSSH
+  ConPTY), so MASK saw a console on all three streams and asked `Run this setup?
+  [y/N]`; `n` exited 4 with nothing run, `y` exited 0 with 16 roles and the lock
+  published (`granted by prompt`), and the verification `ensure --json` was `ok`,
+  `changed=false`, no setup, all roles `ok`, staging empty.
+
+Findings fixed during qualification: a lock-vouched generated role reported an
+empty configured route after publication (`c5de2ca`); a plainly quoted Claude
+frontmatter scalar was reported with its quotes and the declined setup note read
+"declined; declined" (`c6431a1`, display only; the Windows lane and console
+journeys predate these two and show the earlier text).
+
+Limitations. Fresh-host discovery/loading of the deployed roles was not
+observed on either platform (`host_load: not_verified` throughout). The real
+package has only the `baseline` routing profile, so the "explicit route
+override" is limited to the optional `execution-selection` input being observed
+and bound; no non-baseline route was renderable. The static no-script path and
+the crash/journal recovery paths keep their synthetic-package evidence
+(MASK-0088/MASK-0089); the real package is generated-only. On the `autocrlf`
+Windows host the AgentSkills clone itself is checked out with CRLF (that
+repository carries no `.gitattributes`), so the descriptor digest and lock
+digests there differ from the macOS values; MASK stays consistent within a host
+and would report a lock made on the other host as stale rather than accept it,
+but a portable lock across mixed line-ending hosts needs the publisher to mark
+its package inputs `-text` (recorded for AgentSkills, not fixed here). The
+Windows fake host is `cmd.exe`, so only invocation versus refusal is observed.
+The ExampleWinHost lane directory, bundles and scripts were removed after the results
+were recorded; the registered station checkout (`3456e39`) and user profile were
+not touched. Two older `mask-native-*` temporary directories from earlier lanes
+remain in that `%TEMP%` and were not created by this run.

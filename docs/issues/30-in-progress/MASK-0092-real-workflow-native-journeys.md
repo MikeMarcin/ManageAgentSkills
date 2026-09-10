@@ -36,5 +36,26 @@ revision. No repeated unchanged full matrix or proof-of-proof bundle.
 
 ## Run record
 
-Not started. Claim the live remapped card before edits. No code implementation,
-native result, host loading, user approval, or quota improvement is asserted.
+Qualified September 9, 2026 inside integrated outcome M8 (dispatch D11, mandate
+revision 3; integrator rfc-integrator, claude-fable-5-1, effort low, implemented
+locally). Upstream: AgentSkills `154025bdd374a448a0aaa9742703d6459d64be2e`
+(ASK-0059); candidate advanced in a disposable upstream only. Evidence and the
+exact step list live in `docs/development/readiness-acceptance.md` ("Real
+implement-rfc package qualification"); the retained driver is
+`scripts/qualify_real_package.py`. macOS 26.6.2 at `c6431a1` and native Windows
+11 (ExampleWinHost, disposable clone, private roots) at `c5de2ca`: 44/44 public-CLI
+steps each, two consumers with distinct addenda and optional-input observation,
+missing roles to consented setup with no preparation shortcut, refusal paths,
+unchanged rerun no-op, fresh clone with checked-in roles/lock as
+repository-owned, tamper preserved, retirement with release, stale lock after a
+declared package input change through `update`, and byte equality with the
+upstream generator checked afterwards. Terminal consent (`n` then `y`) ran on a
+macOS pseudoterminal and natively in a Windows console over an SSH ConPTY
+session; native Windows `launch` refusal and invocation used `cmd.exe` as the
+fake host. Fixes: lock-vouched generated roles report their configured route
+(`c5de2ca`); quoted Claude scalars and the declined note (`c6431a1`); consumer
+guidance for `-text` attributes when checking generated roles in. Open: fresh
+host loading of deployed roles (`host_load: not_verified` on both platforms);
+only the `baseline` routing profile exists upstream, so no non-baseline route
+override was renderable; AgentSkills lacks `.gitattributes`, so locks are not
+portable between `autocrlf` and LF checkouts of the source (upstream follow-up).
