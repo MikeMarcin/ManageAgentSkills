@@ -1,14 +1,14 @@
 ---
 id: "RFC-MASK-0018"
 title: "Task-oriented CLI and human output"
-status: "Accepted"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-08"
 ---
 
 # RFC-MASK-0018: Task-oriented CLI and human output
 
-**Corrective proposal; not implemented or qualified by this pack.** Live import of packet `RFC-MASK-0018` (no renumber needed; live RFCs ended at RFC-MASK-0017). Retained packet: [assets/mask-corrective-ux-readiness/](assets/mask-corrective-ux-readiness/README.md); import record: [LIVE_IMPORT](assets/mask-corrective-ux-readiness.LIVE_IMPORT.md).
+**Auto-Verified at its public boundary (September 9, 2026).** Implemented by MASK-0083 to MASK-0087 and MASK-0091 from base `6d80121`; closeout with per-criterion evidence is [MASK-0093](../issues/60-done/MASK-0093-close-human-cli-correction.md), native lanes in [corrective-baseline.md](../development/corrective-baseline.md). Host loading of skills/roles is outside this RFC (RFC-MASK-0019). Live import of packet `RFC-MASK-0018` (no renumber needed; live RFCs ended at RFC-MASK-0017). Retained packet: [assets/mask-corrective-ux-readiness/](assets/mask-corrective-ux-readiness/README.md); import record: [LIVE_IMPORT](assets/mask-corrective-ux-readiness.LIVE_IMPORT.md).
 
 Amends applicable current behavior from RFC-MASK-0001, 0003, 0005, 0006 and the implemented reporting/selection slices. Historical RFCs and evidence
 remain unchanged; update current contracts when this implementation lands.

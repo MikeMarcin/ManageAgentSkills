@@ -2,12 +2,13 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0093"
 title: "Verify and close the task CLI and human-output correction"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0091"]
 priority: "P1"
 metadata: {"packet": "mask-corrective-ux-readiness", "provisional_id": false, "packet_key": "close-human-cli-correction"}
 closeout_for: ["RFC-MASK-0018"]
+acceptance: [{"criterion":"RFC-MASK-0018-AC01","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"tests.test_task_commands/test_public_baseline subprocess CLI on macOS and native Windows (ExampleWinHost) at a856510; install/remove from unregistered scopes, v2 rows retained, ambiguity refused"}},{"criterion":"RFC-MASK-0018-AC02","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"tests.test_human_output/test_task_commands: every RENDERERS command renders text, inventory 3 rows/6 links; rerun at 5695f97 (26 tests OK) plus Windows lane at a856510"}},{"criterion":"RFC-MASK-0018-AC03","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"--json one document for success/handled errors, -- operand data, identical effects; consent JSON refusal carries data.confirmation; Windows piped suites"}},{"criterion":"RFC-MASK-0018-AC04","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"tests.test_consent/test_ensure on POSIX pty and Windows ConPTY recorded session: asks once in-process, no-op never asks, JSON/redirect/--event never prompt, --yes cannot widen"}},{"criterion":"RFC-MASK-0018-AC05","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"tests.test_update_task/test_git_update/test_pinned_update against local bare remote: one update fetches/freezes/discloses/applies; dry-run/offline/guard never fetch; scope.expand disclosed and not --yes-grantable"}},{"criterion":"RFC-MASK-0018-AC06","outcome":"pass","revision":"7c023b831bcba85ffc4f7e9365514649b940b633","evidence":{"kind":"observation","detail":"plan.stale, confirmation.declined, SIGINT 130, lock free during prompt, target.collision, recovery.required exit 8, lock.busy exit 6, pty decline keeps fetch reported"}},{"criterion":"RFC-MASK-0018-AC07","outcome":"pass","revision":"6dcd5a4c57b590bb511e778aa4eae40830055735","evidence":{"kind":"observation","detail":"tests.test_readme_journeys replays README recipes as written via installed launcher, no --json/hash/registration; mkdir step restored at 6dcd5a4; rerun at 5695f97"}},{"criterion":"RFC-MASK-0018-AC08","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"macOS 26.6.2 pty/launcher journeys and Windows 11 (ExampleWinHost) mask.cmd launcher plus recorded ConPTY yes/no confirmation at a856510; helpers never inject --json; host loading not verified (RFC-MASK-0019)"}}]
 ---
 
 # MASK-0093: Verify and close the task CLI and human-output correction
@@ -37,8 +38,18 @@ revision. No repeated unchanged full matrix or proof-of-proof bundle.
 
 ## Run record
 
-Not started. Claim the live remapped card before edits. No code implementation,
-native result, host loading, user approval, or quota improvement is asserted.
+Closed September 9, 2026 (dispatch D8, mandate revision 2) as the second half of
+integrated outcome M6. Planned cards MASK-0083, 0084, 0085, 0086, 0087 and 0091
+are Done; every row below carries direct evidence and its implementation
+revision. Scoped diff `6d80121..5695f97` (program modules `mask_present.py`,
+`mask_consent.py`, `mask_task.py`, `mask_git.update`, README/guides, public
+tests) was reviewed against the eight criteria; the focused README/human-output/
+baseline suites were rerun at `5695f97` (26 tests, OK) and unchanged evidence was
+reused otherwise. `tests.test_human_output` proves no non-JSON command falls back
+to envelope serialization (`RENDERERS` coverage, no fallback in `mask.main`).
+AC08 has both native lanes, so RFC-MASK-0018 is Auto-Verified. Host loading and
+the real AgentSkills package remain not verified (RFC-MASK-0019, MASK-0094).
+Known unrelated failure retained: `tests.test_user_scope.test_scope_selection_and_parser`.
 
 ## Durable closeout anchor
 
