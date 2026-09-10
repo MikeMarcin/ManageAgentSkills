@@ -62,4 +62,4 @@ open until their actual evidence is linked. Do not invent a PASS to close the bo
 
 ## Current continuation
 
-See the corrective-pack continuation on [MASK-0093](MASK-0093-close-human-cli-correction.md). Upstream AgentSkills handoff: no card or integration commit exists yet; MASK-0090 remains open until it does.
+See the corrective-pack continuation on [MASK-0093](../20-ready/MASK-0093-close-human-cli-correction.md). Upstream AgentSkills handoff: no card or integration commit exists yet; MASK-0090 remains open until it does.
