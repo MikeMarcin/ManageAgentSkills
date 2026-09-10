@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0090"
 title: "Connect complete readiness to every public entrypoint"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0086", "MASK-0087", "MASK-0089"]
 priority: "P1"
