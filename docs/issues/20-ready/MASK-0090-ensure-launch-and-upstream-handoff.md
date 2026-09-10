@@ -2,12 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0090"
 title: "Connect complete readiness to every public entrypoint"
-status: "Blocked"
+status: "Ready"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0086", "MASK-0087", "MASK-0089"]
+external_depends_on: ["AgentSkills:ASK-0059"]
 priority: "P1"
 metadata: {"packet": "mask-corrective-ux-readiness", "provisional_id": false, "packet_key": "ensure-launch-and-upstream-handoff"}
-blocked_by: "agentskills-handoff"
 ---
 
 # MASK-0090: Connect complete readiness to every public entrypoint
@@ -65,15 +65,36 @@ tests.test_readme_journeys` (97 tests, OK); structure gate 0 violations.
 Full discovery at `3bbac77`: 343 tests, 4 skipped, 1 failure = the known
 pre-existing `tests.test_user_scope.test_scope_selection_and_parser`.
 
-Open (blocks Done): the upstream AgentSkills handoff. AgentSkills `2e45a4e`
-ships no `mask-workflow.json`, no `workflow_readiness_v1` preflight and no
-staged preparation entrypoint for `implement-rfc`; no ASK card or integration
-commit exists, so `external_depends_on` stays empty rather than carrying an
-invented ID. The MASK side consumes any conforming descriptor (static assets,
-checked-in lock or declared setup) without a renderer or repository-name
-exception. This card stays Blocked (`agentskills-handoff`) until that handoff
-is authorized and recorded; the real-package qualification (MASK-0092) and the
-RFC-MASK-0019 closeout (MASK-0094) wait behind it. Limitations: `list`/
-`inventory` stay observational (`unexamined`); `doctor` for a pinned consumer
-without a local package directory counts `unexamined` as incomplete; Windows
-lanes for the new final status and setup are open (MASK-0092).
+At `3bbac77` the upstream handoff did not exist (AgentSkills `2e45a4e` shipped
+no descriptor, preflight or staging entrypoint), so this card was Blocked
+(`agentskills-handoff`) without an invented ASK ID. The MASK side consumes any
+conforming descriptor (static assets, checked-in lock or declared setup) without
+a renderer or repository-name exception. Limitations: `list`/`inventory` stay
+observational (`unexamined`); `doctor` for a pinned consumer without a local
+package directory counts `unexamined` as incomplete.
+
+Upstream handoff (recorded September 9, 2026, dispatch D11, mandate revision 3;
+the user authorized the AgentSkills work separately): `external_depends_on`
+`AgentSkills:ASK-0059`, Done in that repository at completion commit
+`154025bdd374a448a0aaa9742703d6459d64be2e` ("Finish ASK-0059"; implementation
+commits `4bd053c`, `0f8b3cd`; governing RFC `RFC-ASK-0011`, Auto-Verified there).
+It ships `skills/implement-rfc/mask-workflow.json` (sha256
+`9575dc4fa8a69900236bd8d68634fdca5759124d91acf3cf8c22c6e83e4d70f1`; 16 generated
+roles = the 8 current roles x codex/claude, setup action `prepare-roles`,
+entrypoint `scripts/prepare_mask_roles.py`, required inputs `project-config` and
+`project-rules`, optional `execution-selection`), the startup preflight
+`scripts/workflow_preflight.py`, and `generate_roles` in
+`render_runtime_adapters.py`. Local handoff check (macOS, this MASK as a
+subprocess, private `MASK_HOME`/`HOME`, disposable clone of AgentSkills at
+`154025b` as the source, disposable consumer with real `project.json`/
+`project.md`): `skill validate implement-rfc` valid with fingerprint
+`sha256:7ff27a61692d396346221f8d14e7f0618a39618f446be8df01cc26b215ebc116`; first
+`ensure` exit 4 `workflow.incomplete` with all 16 roles `setup_required`, links
+committed, no role files and no package code run; `doctor --check` exit 7;
+`launch --agent codex|claude` exit 4 with a fake host on PATH never started;
+upstream `workflow_preflight.py --mask mask.py` reports `incomplete` with 16
+blockers before setup and `ready` (`host_load: not_verified`) after the
+consented setup. Real-package journeys continue on MASK-0092. Inherited upstream
+limitations: no Windows/Linux lane there, no fresh-host loading evidence
+(`host_load=not_verified`), local review only, staged setup is ordinary user
+process execution.
