@@ -253,6 +253,7 @@ def render_ensure(data, output):
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
     lines.extend(workflow_lines(data))
+    lines.extend(setup_lines(data))
     lines.extend(actions(output))
     if data.get('readiness') == 'approval_required':
         lines.append("  approve the consumer with 'mask integration approve --project ROOT' before automatic readiness")
@@ -284,12 +285,52 @@ def workflow_lines(data):
     return lines
 
 
+SETUP_NOTES = {
+    'consent_required': "needs your yes in a terminal, or --expect-plan-hash HASH with --allow-setup {subject} from automation",
+    'not_run': 'check, dry-run and event invocations never run package code',
+    'declined': 'declined; nothing ran',
+    'granted': 'approved; not run',
+    'published': 'ran, validated and published',
+    'partial': 'ran; some outputs were preserved instead of published',
+    'blocked': 'cannot run',
+}
+
+
+def setup_lines(data):
+    """Declared setup actions: what would run, under which authority, and what happened (never a copy/paste command)."""
+    lines = []
+    setup = data.get('setup') or {}
+    for row in setup.get('actions', []) or []:
+        subject = clean(row.get('subject') or f"{row.get('coordinate')}:{row.get('action')}")
+        note = SETUP_NOTES.get(row.get('state'), '').format(subject=subject)
+        detail = row.get('detail') if row.get('state') not in SETUP_NOTES or row.get('state') in ('blocked', 'partial') else None
+        lines.append(f"  setup {subject}: {clean(row.get('state'))}" + (f"; {note}" if note else '') + (f" ({clean(detail)})" if detail else ''))
+        if row.get('granted_by'):
+            lines[-1] += f" [granted by {clean(row['granted_by'])}]"
+    return lines
+
+
+def setup_proposal_lines(proposal):
+    """The exact disclosure a human answers (contract section 5): skill, source, script, interpreter, targets, no sandbox."""
+    lines = []
+    for action in proposal.get('actions', []) or []:
+        lines.append(f"  {clean(action.get('skill'))} needs consumer-specific native role setup.")
+        lines.append(f"  Source: {clean(action.get('coordinate'))} (content fingerprint {clean(action.get('fingerprint'))})")
+        lines.append(f"  Run: Python {clean(action.get('path'))}")
+        lines.append(f"  Interpreter: {clean(action.get('interpreter'))}")
+        lines.append(f"  Target: {clean(action.get('root'))} role files {clean(action.get('native_roles'))}")
+    lines.append('  This runs package code with your user permissions; it is not sandboxed.')
+    return lines
+
+
 def render_recover(data, output):
     if not data.get('pending'):
         return ['recover: nothing pending']
     pending = data['pending']
     lines = [f"recover: pending {clean(pending.get('operation') or pending.get('kind'))} ({clean(data.get('recovery_mode', 'inspect'))})"]
     lines.extend(fields(pending, [('generation', 'generation'), ('phase', 'phase'), ('scope', 'scope')]))
+    if data.get('setup'):
+        lines.append(f"  setup {clean(data['setup'].get('skill'))}: phase {clean(data['setup'].get('phase'))}; package script side effects are {clean(data['setup'].get('script_effects'))} and are not rolled back")
     lines.extend(actions(output))
     if data.get('retained_directories'):
         lines.append(f"  retained directories: {clean(data['retained_directories'])}")
@@ -517,6 +558,8 @@ PRESERVED = {'not_started': 'nothing was changed', 'not_needed': 'nothing was ch
 def render_confirmation(proposal, output):
     """The proposal a human answers or automation reviews: scope, planned actions, and the authority it does not grant."""
     lines = [f"{output['command'].replace('.', ' ')}: confirmation needed ({clean(proposal.get('reason'))})"]
+    if proposal.get('kind') == 'package.setup':
+        return '\n'.join(lines + setup_proposal_lines(proposal)) + '\n'
     for root in proposal.get('scope', []):
         lines.append(f"  scope: {clean(root)}")
     lines.extend(actions(dict(actions=proposal.get('actions', []))))
@@ -532,6 +575,13 @@ def render_error(output):
         lines.append(f"  {clean(key).replace('_', ' ')}: {clean(value)}")
     if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
         lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
+    data = output.get('data', {})
+    lines.extend(setup_lines(data))
+    setup = data.get('setup') or {}
+    if setup.get('confirmation') and any(row.get('state') == 'consent_required' for row in setup.get('actions', [])):
+        lines.extend(setup_proposal_lines(setup['confirmation']))
+    if setup.get('confirmation') and output['dry_run'] and data.get('plan_hash'):
+        lines.append(f"  plan hash: {data['plan_hash']}")
     lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
     if output.get('changed'):
         lines.extend(actions(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.

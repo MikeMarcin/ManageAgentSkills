@@ -75,7 +75,7 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
-    'ensure': (True, True, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag')]),
+    'ensure': (True, True, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat')]),
     'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag'), ('allow-locked-fetch', 'repeat')]),
     'integration.revoke': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value')]),
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
@@ -229,6 +229,8 @@ def validate_arguments(args):
         raise MaskError('invocation.invalid', 'An explicit compatibility dimension is required.', 2)
     if command in required_sets and not any(getattr(args, key, None) for key in required_sets[command]):
         raise MaskError('invocation.invalid', 'An explicit operand or mode is required.', 2)
+    if any(not consent.GRANT_RE.fullmatch(entry) for entry in getattr(args, 'allow_setup', None) or []):
+        raise MaskError('invocation.invalid', 'Each --allow-setup entry names one exact SOURCE/ID:ACTION; nothing else grants setup.', 2)
 
 
 def machine_home(args):
@@ -636,16 +638,24 @@ def dispatch_impl(args, output, leaves):
         return mask_pinned.dev_dispatch(args, output, home)
     preparation = mask_pinned.prepare_dispatch(args, output, home) if mutates else None
     if mutates:
-        try:
-            locked_dispatch(args, output, leaves, home, preparation)
-        except consent.ConsentRequired as pending:
-            # The writer lock is released here; a human answers, then the exact proposal is rechecked under the lock.
-            if not consent.ask(pending.request, present.render_confirmation(pending.request, output)):
-                core.fail('confirmation.declined', 'Declined; nothing was applied.', 4, reason=pending.request['reason'])
-            args.consented = pending.request['plan_hash']
-            output.clear()
-            output.update(result(args.command, getattr(args, 'dry_run', False)))
-            locked_dispatch(args, output, leaves, home, preparation)
+        while True:
+            try:
+                locked_dispatch(args, output, leaves, home, preparation)
+                break
+            except consent.ConsentRequired as pending:
+                # The writer lock is released here; a human answers, then the exact proposal is rechecked under the lock.
+                kind = pending.request['kind']
+                consented, declined = getattr(args, 'consented', None) or {}, getattr(args, 'declined', None) or set()
+                if kind in consented or kind in declined:
+                    core.fail('internal.invariant', 'An answered consent kind was asked again.', 10, kind=kind)
+                if consent.ask(pending.request, present.render_confirmation(pending.request, output)):
+                    args.consented = {**consented, kind: pending.request['plan_hash']}
+                elif kind in consent.CONTINUES_ON_DECLINE:
+                    args.declined = declined | {kind}
+                else:
+                    core.fail('confirmation.declined', 'Declined; nothing was applied.', 4, reason=pending.request['reason'])
+                output.clear()
+                output.update(result(args.command, getattr(args, 'dry_run', False)))
     else:
         observed = args.command not in ('capabilities',)
         before = [core.read_text(home / name, 'state', missing=True) for name in ('config.json', 'state.json', 'pending.json', 'user.json', 'integration.json', 'integrations.json', 'selection-policy.json')] if observed else []

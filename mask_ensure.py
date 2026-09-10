@@ -251,18 +251,31 @@ def ensure(args, output, home):
         roots.append(user_root)
         observations.append(workspace_observation(user_root, scope='user', home=home))
     register = [str(project) for project in projects if str(project) not in state['projects']]
-    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root,
-                      operation='ensure.deactivate' if inactive else 'ensure', source_status=False, inactive=inactive)
+    import mask_setup as setup
+    operation = 'ensure.deactivate' if inactive else 'ensure'
+
+    def replan(staged=None):
+        """A fresh plan over the current registry with unchanged control observations, for setup publication and the final recheck."""
+        current = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, staged_roles=staged)
+        policy_text = c.read_text(home / 'integration.json', 'integration', missing=True)
+        fresh['intent']['controls'] = dict(workspaces=observations, policy_before=policy_text, policy_after=policy_text)
+        return fresh
+
+    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive)
     policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
     policy_after = c.text_json(proposed_approval) if proposed_approval != approval else policy_before
     planned['intent']['controls'] = dict(workspaces=observations, policy_before=policy_before, policy_after=policy_after)
-    planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], controls=planned['intent']['controls']))
+    # Declared setup actions (RFC-MASK-0019 section 5): their frozen identities bind the reviewed plan hash.
+    setups = setup.proposals(planned)
+    planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], controls=planned['intent']['controls'], **(dict(setup=[row['fingerprint'] for row in setups if 'fingerprint' in row]) if setups else {})))
     if policy_after != policy_before:
         planned['actions'].append(dict(kind='integration.record', status='planned', path=str(home / 'integration.json')))
         planned['would_change'] = True
     fs.public_plan(planned, output)
     output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none', approval='not_approved' if unauthorized else 'approved')
-    fs.ensure_applicable(planned)
+    # A reviewed guard binds this exact frozen plan (links, controls and setup identities), whether or not consent is needed.
+    fs.ensure_applicable(planned, None if getattr(args, 'check', False) else getattr(args, 'expect_plan_hash', None))
     if unauthorized and planned['would_change']:
         import mask_consent as consent
         proposal = consent.request('readiness', 'integration.approval_required', [str(project) for project in unauthorized], planned['actions'], planned['plan_hash'],
@@ -272,7 +285,10 @@ def ensure(args, output, home):
         else:
             output['data']['readiness'] = 'confirmation_required'
             consent.require(args, output, proposal)
-    # Declared workflow prerequisites (RFC-MASK-0019): links alone are not complete readiness.
+    # Declared workflow prerequisites (RFC-MASK-0019): links alone are not complete readiness. Setup consent is
+    # settled before any write; a decline continues without it (links still apply, readiness stays incomplete).
+    if setups:
+        setup.authorize(args, output, planned, setups)
     incomplete = [entry for entry in planned.get('workflow_readiness', []) if not entry['complete']]
     if getattr(args, 'check', False):
         if not planned['would_change']:
@@ -285,15 +301,23 @@ def ensure(args, output, home):
         if policy(home) != approval or any(not authorized(project, approval) for project in projects if project not in unauthorized):
             c.fail('plan.stale', 'Readiness authority changed before execution.', 4)
         fs.execute(planned, home, output)
+        granted = [row for row in setups if row['state'] == 'granted']
+        if granted:
+            # Approved setup runs after the link transaction; only a final recheck may report the roles complete.
+            setup.execute(output, home, replan, granted)
+            final = replan()
+            output['data']['workflow_readiness'] = final['workflow_readiness']
+            incomplete = [entry for entry in final['workflow_readiness'] if not entry['complete']]
     final_records = c.consumer_records(planned['intent']['after_state'])
-    workflows = {entry['root']: entry for entry in planned.get('workflow_readiness', [])}
+    workflows = {entry['root']: entry for entry in output['data'].get('workflow_readiness', [])}
     output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned',
                                               workflow='not_declared' if not workflows.get(str(selected), {}).get('skills') or all(item['workflow'] == 'not_declared' for item in workflows[str(selected)]['skills']) else 'complete' if workflows[str(selected)]['complete'] else 'unexamined' if all(item['workflow'] in ('not_declared', 'unexamined') for item in workflows[str(selected)]['skills']) else 'incomplete') for selected in roots]
     output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_legacy_unpinned'
     if incomplete:
         # Links may already be committed above; the task still did not reach complete readiness.
         output['data']['readiness'] = 'workflow_incomplete'
-        c.fail('workflow.incomplete', 'Declared native roles or consumer inputs are incomplete; nothing was overwritten and no package code ran.', 4, **workflow_details(incomplete, deployable=False))
+        ran = any(row['state'] in ('published', 'partial') for row in setups)
+        c.fail('workflow.incomplete', 'Declared native roles or consumer inputs are incomplete; nothing was overwritten' + ('.' if ran else ' and no package code ran.'), 4, **workflow_details(incomplete, deployable=False))
 
 
 def workflow_details(entries, *, deployable=True):

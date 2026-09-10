@@ -30,10 +30,37 @@ the consumer (optionally vouched for by
 `.mask/skill-config/<skill>/native-roles.lock.json`) pass as repository-owned
 and are never adopted, rewritten or deleted. Modified, unknown or colliding
 files are preserved and reported, and `ensure` exits 4 with `workflow.incomplete`
-until every applicable role and input matches. No package script runs; approved
-setup for generated roles is a separate, later contract. The result field
+until every applicable role and input matches. The result field
 `workflow_readiness` lists each role's state, ownership and configured route;
 host loading stays `not_verified`.
+
+A package may instead declare a Python setup action that generates a role from
+the consumer inputs. MASK offers it only when a selected generated role has no
+coherent lock, and only under explicit consent: a manual `ensure` on a terminal
+shows the skill and source with its content fingerprint, the exact interpreter
+and script, the consumer and role files, and that execution is ordinary user
+process execution (not a sandbox), then asks `Run this setup? [y/N]`. Yes runs
+the frozen package copy with `--repo-root`, `--output-root` and `--request-file`
+(an inert JSON request), bounded by the declared timeout and 64 KiB per stream;
+the staged `AGENT/NAME.ext` files are validated, the portable
+`native-roles.lock.json` is computed and both are published through the same
+journaled engine, after which readiness is rechecked. No or EOF keeps the links
+and reports `workflow.incomplete`. `--json`, `--check`, `--dry-run`, `--yes`,
+`--event` hooks and redirected streams never prompt and never run package code.
+Unattended runs pass the previewed hash with the named action:
+
+```sh
+mask ensure --project /absolute/path/to/project --dry-run --json      # review data.plan_hash and data.setup
+mask ensure --project /absolute/path/to/project --expect-plan-hash RETURNED_HASH --allow-setup legacy/implement-rfc:prepare-roles --json
+```
+
+A changed package, descriptor, consumer input or interpreter after the preview is
+`plan.stale`; a timeout, unsuccessful exit or output overflow stops the owned
+process tree and reports `setup.failed` (nothing published, stage discarded);
+extra, linked, escaping or unsupported outputs are `setup.outputs_invalid`. A
+crash after launch leaves a journal that `mask recover --complete` refuses
+(`setup.unverified`) and `--rollback` discards; MASK never reruns package code
+from a journal and never claims to undo a script's own side effects.
 
 To run readiness before starting an installed host:
 

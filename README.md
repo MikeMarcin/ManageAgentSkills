@@ -40,9 +40,14 @@ an unapproved project (each invocation; `mask integration approve` in the
 [readiness guide](docs/guides/readiness-and-integrations.md) makes that automatic)
 and reports what is still missing: required consumer facts (for
 `implement-rfc`, `.mask/skill-config/implement-rfc/`) are named, never copied from
-another project. When package setup code would be required, MASK stops with an
-explicit incomplete result; approved setup is a later contract, not something that
-runs silently.
+another project. When a package declares Python setup for a generated role and no
+checked-in lock vouches for it, a manual `ensure` in a terminal shows exactly what
+would run (source, content fingerprint, interpreter, script, target; not sandboxed)
+and asks `Run this setup? [y/N]`. Yes runs it, validates the staged outputs and
+publishes them in the same command; no leaves the links in place and the result
+incomplete. `--json`, `--check`, `--dry-run`, `--yes`, events and redirected
+streams never run package code; automation passes the previewed
+`--expect-plan-hash` together with `--allow-setup SOURCE/ID:ACTION`.
 
 ## Everyday commands
 

@@ -225,6 +225,25 @@ def observe_inputs(root, desc):
     return rows
 
 
+def parse_lock(value):
+    """Validate the portable lock shape (``mask.native-role-lock.v1``); optional fields carry setup provenance."""
+    c.fields(value, ('schema_version', 'contract_sha256', 'inputs', 'roles'), ('schema', 'coordinate', 'action', 'role_inputs_sha256', 'parameters_sha256', 'input_paths'), family='workflow')
+    if not isinstance(value['inputs'], dict) or not isinstance(value['roles'], list) or any(item is not None and (not isinstance(item, str) or not HEX_RE.fullmatch(item)) for item in value['inputs'].values()):
+        c.fail('workflow.invalid', 'Invalid lock shape.', 4)
+    for key in ('schema', 'coordinate', 'action', 'role_inputs_sha256', 'parameters_sha256'):
+        if key in value and (not isinstance(value[key], str) or key.endswith('sha256') and not HEX_RE.fullmatch(value[key])):
+            c.fail('workflow.invalid', 'Invalid lock provenance field.', 4, field=key)
+    if 'input_paths' in value and (not isinstance(value['input_paths'], dict) or any(not isinstance(item, str) for item in value['input_paths'].values())):
+        c.fail('workflow.invalid', 'Invalid lock input paths.', 4)
+    rows = {}
+    for row in value['roles']:
+        c.fields(row, ('agent', 'name', 'sha256'), family='workflow')
+        if row['agent'] not in adapters.BY_ID or not isinstance(row['sha256'], str) or not HEX_RE.fullmatch(row['sha256']):
+            c.fail('workflow.invalid', 'Invalid lock role row.', 4)
+        rows[(row['agent'], identifier(row['name'], 'role'))] = row['sha256']
+    return dict(contract=value['contract_sha256'], inputs=value['inputs'], roles=rows, role_inputs=value.get('role_inputs_sha256'))
+
+
 def read_lock(root, desc):
     """The consumer-checked-in portable lock, or a reason it cannot vouch for generated roles."""
     path = Path(root) / lock_relative(desc['skill'])
@@ -232,35 +251,34 @@ def read_lock(root, desc):
     if c.kind(path) == 'missing':
         return None, 'missing'
     try:
-        value = c.read_json(path, 'workflow')
-        c.fields(value, ('schema_version', 'contract_sha256', 'inputs', 'roles'), family='workflow')
-        if not isinstance(value['inputs'], dict) or not isinstance(value['roles'], list):
-            raise c.MaskError('workflow.invalid', 'Invalid lock shape.', 4)
-        rows = {}
-        for row in value['roles']:
-            c.fields(row, ('agent', 'name', 'sha256'), family='workflow')
-            if row['agent'] not in adapters.BY_ID or not isinstance(row['sha256'], str) or not HEX_RE.fullmatch(row['sha256']):
-                raise c.MaskError('workflow.invalid', 'Invalid lock role row.', 4)
-            rows[(row['agent'], identifier(row['name'], 'role'))] = row['sha256']
+        return parse_lock(c.read_json(path, 'workflow')), 'read'
     except c.MaskError:
         return None, 'invalid'
-    return dict(contract=value['contract_sha256'], inputs=value['inputs'], roles=rows), 'read'
+
+
+def role_inputs(desc):
+    """Digest of every setup action's declared package inputs; a change invalidates a prepared lock."""
+    return c.digest({name: {path: c.digest(desc['view'].read(path, desc['skill']) or b'') for path in action['package_inputs']}
+                     for name, action in sorted(desc['setup'].items())}).removeprefix('sha256:')
 
 
 def lock_coherent(lock, desc, inputs):
-    if lock is None or lock['contract'] != desc['digest']:
+    if lock is None or lock['contract'] != desc['digest'] or lock['role_inputs'] not in (None, role_inputs(desc)):
         return False
     return all(lock['inputs'].get(row['id']) == row['sha256'] for row in inputs if row['required'] or row['state'] == 'ok')
 
 
-def requirements(root, scope, record, bindings, targets):
+def requirements(root, scope, record, bindings, targets, *, coordinates=None, staged=None):
     """Compute declared roles for the selected bindings and observe every destination without changing it.
 
     ``bindings`` maps skill -> set of selected agents; ``targets`` maps skill -> PackageView
-    (None when the exact package bytes are not available locally yet).
+    (None when the exact package bytes are not available locally yet); ``coordinates`` maps
+    skill -> SOURCE/ID; ``staged`` maps (skill, agent, name) -> validated setup output bytes
+    that are published like assets (``mask_setup``).
     Returns per-skill readiness rows, journal-ready writes and the next ownership map.
     """
     root = Path(root)
+    coordinates, staged = coordinates or {}, staged or {}
     owned = dict((record or {}).get('native_roles', {}))
     contributions, reports = {}, []
     for skill in sorted(bindings):
@@ -275,7 +293,8 @@ def requirements(root, scope, record, bindings, targets):
         inputs = observe_inputs(root, desc)
         lock, lock_state = read_lock(root, desc)
         coherent = lock_coherent(lock, desc, inputs)
-        report = dict(skill=skill, workflow='declared', contract=dict(descriptor=DESCRIPTOR, sha256=desc['digest'], lock=lock_state if not coherent else 'coherent'), inputs=inputs, roles=[], complete=True)
+        report = dict(skill=skill, workflow='declared', contract=dict(descriptor=DESCRIPTOR, sha256=desc['digest'], lock=lock_state if not coherent else 'coherent'),
+                      package=dict(coordinate=coordinates.get(skill), root=str(desc['view'].root) if desc['view'].root is not None else None), inputs=inputs, roles=[], complete=True)
         if any(row['state'] in ('missing', 'invalid') for row in inputs):
             report['complete'] = False
         for (agent, name), role in sorted(desc['roles'].items()):
@@ -288,8 +307,12 @@ def requirements(root, scope, record, bindings, targets):
                     row['expected_sha256'] = sha256(data)
                     contributions.setdefault(row['path'], []).append((skill, data, row))
                 else:
+                    data = staged.get((skill, agent, name))
                     row.update(setup=role['setup'], expected_sha256=lock['roles'].get((agent, name)) if coherent else None)
-                    contributions.setdefault(row['path'], []).append((skill, None, row))
+                    if data is not None:
+                        row['route'] = native(agent, name, data, skill)
+                        row['expected_sha256'] = sha256(data)
+                    contributions.setdefault(row['path'], []).append((skill, data, row))
             report['roles'].append(row)
         reports.append(report)
     writes, next_owned, released = [], {}, []
@@ -309,11 +332,13 @@ def requirements(root, scope, record, bindings, targets):
             elif len(expectations) > 1:
                 row.update(state='collision', detail='another selected skill requires different content at this destination; both producers are reported')
             elif expected is None:
-                row.update(state='setup_required', detail='no checked-in lock vouches for this generated role; approved setup is not part of this release')
+                row.update(state='setup_required', detail='no coherent checked-in lock vouches for this generated role; approved setup can produce it')
                 if actual is not None:
                     row['ownership'] = 'repository-owned' if holder is None else 'package-managed'
             elif actual == expected:
                 row.update(state='ok', ownership='package-managed' if holder and holder['sha256'] == actual else 'repository-owned')
+            elif content is None and actual is None:
+                row.update(state='setup_required', detail='the checked-in lock names this generated role but no file exists; approved setup can produce it')
             elif content is None:
                 row.update(state='modified', detail='content differs from the checked-in lock; it is preserved')
             elif actual is None:

@@ -33,7 +33,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None):
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
     dev_proposals = dev_proposals or {}
@@ -157,14 +157,15 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     links.append(entry)
                     actions.append(dict(kind='link.create' if after_raw else 'link.remove', status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
             # Declared native roles follow the selected bindings; observation never touches the destinations.
-            bindings, targets = {}, {}
+            bindings, targets, coordinates = {}, {}, {}
             for link in next_record['links'].values():
                 bindings.setdefault(link['skill'], set()).add(link['target'])
                 if link['skill'] not in targets:
                     location = pinned.target(link, config, home)
                     view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'resolution' in link and 'dev' not in link else None
                     targets[link['skill']] = workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
-            roles = workflow.requirements(root, scope, record, bindings, targets)
+                    coordinates[link['skill']] = resolve.coordinate(link['resolution']) if 'resolution' in link else legacy_alias(config) + '/' + link['skill']
+            roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key))
             if roles['owned']:
                 next_record['native_roles'] = roles['owned']
             else:
@@ -226,6 +227,11 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if development or operation == 'source.dev-link':
         result['intent']['development'] = development
     return result
+
+
+def legacy_alias(config):
+    """The source-qualified alias of the shared legacy checkout (``mask_task`` uses the same rule)."""
+    return config['legacy_source'] if config['schema_version'] == 2 else 'legacy'
 
 
 def scope_shadowing(state, config, home, selected):
@@ -331,7 +337,7 @@ def validate_pending(pending, home):
     import mask_selection as selection
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles'), 'recovery', versions=(1, 2, 3))
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup'), 'recovery', versions=(1, 2, 3))
     if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
@@ -402,6 +408,9 @@ def validate_pending(pending, home):
         if not isinstance(pending['native_roles'], list) or not pending['native_roles'] or any(not isinstance(item, dict) for item in pending['native_roles']):
             c.fail('recovery.conflict', 'Typed native role journal entries must be a nonempty list.', 8)
         workflow.validate_pending_roles(pending, before, after)
+    if 'setup' in pending:
+        from mask_setup import validate_journal
+        validate_journal(pending)
     if not selected <= before_records.keys() | after_records.keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
     if 'launcher' in pending:
@@ -509,6 +518,9 @@ def check_current(pending, home):
         if c.read_text(pinned.file_path(entry, home), missing=True) not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A typed pending control was edited.', 8)
     workflow.check_roles(pending)
+    if 'setup' in pending:
+        from mask_setup import check_journal
+        check_journal(pending)
     actual = c.read_text(home / 'state.json', 'state', missing=True)
     if actual not in (pending['before_state_text'], pending['after_state_text']):
         c.fail('recovery.conflict', 'Registry changed after the pending operation.', 8)
@@ -596,6 +608,11 @@ def restore(pending, home, side, *, inject=False):
         workflow.set_role(entry, side)
         if inject:
             checkpoint('native_role')
+    if 'setup' in pending:
+        from mask_setup import restore_journal
+        restore_journal(pending, side)
+        if inject:
+            checkpoint('native_role_lock')
     if side == 'after' and 'pinned' in pending:
         for root, record in c.consumer_records(pending['after_state']).items():
             if root not in pending['selected'] or not pinned.is_pinned(record):
@@ -644,6 +661,9 @@ def clear_pending(home, pending, side='after'):
     if c.read_json(path, 'recovery') != pending:
         c.fail('recovery.conflict', 'Pending journal changed before cleanup.', 8)
     path.unlink()
+    if 'setup' in pending:
+        from mask_setup import discard_stage
+        discard_stage(home, pending)
 
 
 def execute(planned, home, output, *, pending=None):
@@ -705,9 +725,14 @@ def recover(home, output, mode):
     pending = c.parse_json(raw, 'recovery')
     validate_pending(pending, home)
     output['data'] = dict(pending=pending, recovery_mode=mode)
+    if 'setup' in pending:
+        # Package script side effects are never inspected or undone; only MASK's own staged/published files are.
+        output['data']['setup'] = dict(phase=pending['setup']['phase'], skill=pending['setup']['skill'], script_effects='unknown')
     if mode == 'inspect':
         return
     check_current(pending, home)
+    if mode == 'complete' and pending.get('setup', {}).get('phase') == 'launched':
+        c.fail('setup.unverified', 'Package setup was launched but never validated; MASK does not rerun package code from a journal.', 8)
     if pending.get('git'):
         from mask_git import recover_git
         recover_git(pending, home, output, mode)

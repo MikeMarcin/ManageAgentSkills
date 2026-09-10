@@ -11,10 +11,13 @@ command under test.
 import json
 import os
 from pathlib import Path
+import select
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
@@ -89,6 +92,51 @@ class PublicFixture(unittest.TestCase):
         except ValueError:
             return False
         return isinstance(data, dict) and {'ok', 'schema_version', 'data'} <= set(data)
+
+    def terminal(self, *args, answer=None, before_answer=None, interrupt=False, timeout=60):
+        """Run the CLI on a POSIX pseudoterminal and answer each ``[y/N]`` prompt in turn.
+
+        ``answer`` is one reply or a list of replies (bytes); ``before_answer`` runs once,
+        before the first reply. Returns the exit code and the transcript.
+        """
+        import pty
+        replies = list(answer) if isinstance(answer, list) else [answer]
+        master, slave = pty.openpty()
+        process = subprocess.Popen([sys.executable, '-B', str(ENTRY), *map(str, args)], stdin=slave, stdout=slave, stderr=slave,
+                                   cwd=str(self.project), env=self.environment(), close_fds=True)
+        os.close(slave)
+        transcript = b''
+        answered = 0
+        deadline = time.monotonic() + timeout
+        try:
+            while time.monotonic() < deadline:
+                ready, _, _ = select.select([master], [], [], 0.2)
+                if ready:
+                    try:
+                        chunk = os.read(master, 4096)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    transcript += chunk
+                if answered < len(replies) and transcript.count(b'[y/N]') > answered:
+                    if answered == 0 and before_answer is not None:
+                        before_answer()
+                    if interrupt:
+                        process.send_signal(signal.SIGINT)
+                    else:
+                        os.write(master, replies[answered])
+                    answered += 1
+                if process.poll() is not None and not ready:
+                    break
+            process.wait(timeout=10)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            os.close(master)
+        self.assertEqual(answered, len(replies), transcript.decode('utf-8', 'replace'))
+        return process.returncode, transcript.decode('utf-8', 'replace')
 
     def linked_consumer_with_stale_roles(self):
         """Already-linked consumer of implement-rfc whose native roles predate the package.

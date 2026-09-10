@@ -10,16 +10,12 @@ test; ``--json`` is injected only by the ``machine`` helper.
 import argparse
 import json
 import os
-import select
-import signal
 import subprocess
-import sys
-import time
 import unittest
 
 import mask_consent as consent
 import mask_core as core
-from tests.public_support import ENTRY, PublicFixture
+from tests.public_support import PublicFixture
 
 
 class ConsentFixture(PublicFixture):
@@ -111,10 +107,16 @@ class ConsentSeamTests(unittest.TestCase):
     def test_yes_grants_only_ordinary_kinds(self):
         proposal = consent.request('package.setup', 'setup.required', ['/x'], [], 'sha256:1', 'Run setup?')
         self.assertIsNone(consent.granted_by(argparse.Namespace(yes=True), proposal))
-        self.assertEqual(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:1'), proposal), 'expect-plan-hash')
+        # A package script is a NAMED kind: the exact plan hash alone grants nothing; it needs every subject named as well.
+        self.assertIsNone(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:1'), proposal))
+        named = consent.request('package.setup', 'setup.required', ['/x'], [], 'sha256:1', 'Run setup?', subjects=['src/skill:prepare'])
+        self.assertIsNone(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:1', allow_setup=['src/other:prepare', 'bad entry']), named))
+        self.assertEqual(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:1', allow_setup=['src/skill:prepare']), named), 'allow-setup')
+        self.assertIsNone(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:other', allow_setup=['src/skill:prepare']), named))
+        self.assertEqual(consent.granted_by(argparse.Namespace(expect_plan_hash='sha256:2'), consent.request('readiness', 'r', [], [], 'sha256:2', 'q')), 'expect-plan-hash')
         self.assertEqual(consent.granted_by(argparse.Namespace(yes=True), consent.request('readiness', 'r', [], [], 'sha256:2', 'q')), 'yes')
         with self.assertRaises(core.MaskError) as refused:
-            consent.granted_by(argparse.Namespace(consented='sha256:old'), proposal)
+            consent.granted_by(argparse.Namespace(consented={'package.setup': 'sha256:old'}), proposal)
         self.assertEqual(refused.exception.code, 'plan.stale')
         with self.assertRaises(core.MaskError) as unknown:
             consent.request('anything', 'r', [], [], 'sha256:3', 'q')
@@ -132,45 +134,6 @@ class ConsentSeamTests(unittest.TestCase):
 @unittest.skipUnless(os.name == 'posix', 'POSIX pseudoterminal prompt mechanics; native Windows console journeys are recorded separately')
 class TerminalConsentTests(ConsentFixture):
     """Automated prompt mechanics on a pseudoterminal (macOS lane here; not native Windows qualification)."""
-
-    def terminal(self, *args, answer=None, before_answer=None, interrupt=False):
-        import pty
-        master, slave = pty.openpty()
-        process = subprocess.Popen([sys.executable, '-B', str(ENTRY), *map(str, args)], stdin=slave, stdout=slave, stderr=slave,
-                                   cwd=str(self.project), env=self.environment(), close_fds=True)
-        os.close(slave)
-        transcript = b''
-        answered = False
-        deadline = time.monotonic() + 60
-        try:
-            while time.monotonic() < deadline:
-                ready, _, _ = select.select([master], [], [], 0.2)
-                if ready:
-                    try:
-                        chunk = os.read(master, 4096)
-                    except OSError:
-                        break
-                    if not chunk:
-                        break
-                    transcript += chunk
-                if not answered and b'[y/N]' in transcript:
-                    answered = True
-                    if before_answer is not None:
-                        before_answer()
-                    if interrupt:
-                        process.send_signal(signal.SIGINT)
-                    else:
-                        os.write(master, answer)
-                if process.poll() is not None and not ready:
-                    break
-            process.wait(timeout=10)
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-            os.close(master)
-        self.assertTrue(answered, transcript.decode('utf-8', 'replace'))
-        return process.returncode, transcript.decode('utf-8', 'replace')
 
     def test_yes_completes_the_operation_in_the_same_invocation(self):
         code, text = self.terminal('ensure', '--project', self.project, answer=b'y\n')

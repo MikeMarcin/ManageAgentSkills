@@ -9,16 +9,22 @@ proposal and refuses a stale hash before any effect (see ``mask.dispatch_impl``)
 Kinds name the authority being asked for. ``--yes`` grants only ORDINARY kinds;
 package scripts, new source identities, overwriting edited content, ref rebinding
 and cross-consumer expansion are never granted by ``--yes``. ``--expect-plan-hash``
-grants exactly the frozen proposal it was produced for.
+grants exactly the frozen proposal it was produced for; NAMED kinds additionally
+need every subject named by an exact ``--allow-setup SOURCE/ID:ACTION`` entry.
 """
 from __future__ import annotations
 
+import re
 import sys
 
 import mask_core as c
 
 ORDINARY = {'readiness'}
 SIGNIFICANT = {'readiness', 'source.trust', 'package.setup', 'overwrite', 'ref.rebind', 'scope.expand'}
+NAMED = {'package.setup'}
+# Declining these leaves the rest of the task to proceed without that authority instead of aborting it.
+CONTINUES_ON_DECLINE = {'package.setup'}
+GRANT_RE = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*')
 
 
 class ConsentRequired(Exception):
@@ -29,10 +35,13 @@ class ConsentRequired(Exception):
         self.request = request
 
 
-def request(kind, reason, scope, actions, plan_hash, question):
+def request(kind, reason, scope, actions, plan_hash, question, subjects=()):
     if kind not in SIGNIFICANT:
         c.fail('internal.invariant', 'Unknown consent kind.', 10, kind=kind)
-    return dict(kind=kind, reason=reason, scope=list(scope), actions=list(actions), plan_hash=plan_hash, question=question, granted_by=None)
+    proposal = dict(kind=kind, reason=reason, scope=list(scope), actions=list(actions), plan_hash=plan_hash, question=question, granted_by=None)
+    if kind in NAMED:
+        proposal['subjects'] = list(subjects)
+    return proposal
 
 
 def interactive(args):
@@ -45,15 +54,24 @@ def interactive(args):
         return False
 
 
+def named_grants(args):
+    """Well-formed ``--allow-setup`` entries; a malformed entry names nothing."""
+    return {entry for entry in getattr(args, 'allow_setup', None) or [] if isinstance(entry, str) and GRANT_RE.fullmatch(entry)}
+
+
 def granted_by(args, proposal):
     """How this exact proposal is already authorized, or None."""
-    consented = getattr(args, 'consented', None)
-    if consented is not None:
-        if consented != proposal['plan_hash']:
+    consented = getattr(args, 'consented', None) or {}
+    if proposal['kind'] in consented:
+        if consented[proposal['kind']] != proposal['plan_hash']:
             c.fail('plan.stale', 'The proposal changed after consent; nothing was applied.', 4)
         return 'prompt'
     if getattr(args, 'expect_plan_hash', None) == proposal['plan_hash']:
-        return 'expect-plan-hash'
+        if proposal['kind'] not in NAMED:
+            return 'expect-plan-hash'
+        if proposal['subjects'] and set(proposal['subjects']) <= named_grants(args):
+            return 'allow-setup'
+        return None
     if getattr(args, 'yes', False) and proposal['kind'] in ORDINARY:
         return 'yes'
     return None

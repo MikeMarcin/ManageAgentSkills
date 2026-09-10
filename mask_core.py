@@ -37,7 +37,10 @@ REMEDIATION = {
     'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
     'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",
     'plan.stale': 'Preview again and pass the newly reported --expect-plan-hash.',
-    'workflow.incomplete': 'Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock (approved setup is not available yet).',
+    'workflow.incomplete': 'Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock or approved setup (answer yes in a terminal, or pass the reported --expect-plan-hash with --allow-setup SOURCE/ID:ACTION).',
+    'setup.failed': 'The package setup process failed or was stopped; nothing was published and its stage was discarded. Fix or report the package before approving setup again; MASK never reruns it on its own.',
+    'setup.outputs_invalid': 'The setup stage produced outputs MASK cannot publish; nothing reached the consumer. Fix the package generator, then approve setup again.',
+    'setup.unverified': "Setup execution never reached validation, so its completion is unknown; run 'mask recover --rollback' to discard the stage, then rerun 'mask ensure' and approve setup again. MASK does not rerun package code from a journal.",
     'workflow.invalid': 'The package workflow descriptor or a role asset is invalid; fix the package (MASK never runs package code to repair it).',
     'workflow.role_invalid': 'The native role content uses unsupported or mismatched fields; correct the package asset or role file.',
     'project.not_registered': "Register the project first: 'mask project register PATH'.",
@@ -287,37 +290,24 @@ HOOK_EVENTS = ('applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commi
                'p4-pre-submit', 'post-index-change')
 
 
-def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,
-        max_output=16 * 1024 * 1024, monitor=None):
-    selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
-                 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
-                 'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
-    environment = {key: value for key, value in os.environ.items() if key not in selectors and not key.startswith(('GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_'))}
-    environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
-                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1',
-                       GIT_NO_REPLACE_OBJECTS='1', GIT_NO_LAZY_FETCH='1')
-    if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
-        environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
+def contained_run(command, environment, *, timeout, max_output, max_error=65536, monitor=None, family='git', name='Git', cwd=None):
+    """Run one owned process tree (POSIX process group or Windows Job) with bounded wall time and output.
+
+    Returns ``(returncode, stdout, stderr)``. Timeout, output overflow, read failure or
+    interruption terminates the whole tree before raising; an unconfirmed termination is
+    ``recovery.required``. Error codes are ``<family>.timeout`` and so on.
+    """
     options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-    if inspect_hooks and (not args or args[0] not in ('config', 'rev-parse')):
-        fail('internal.invariant', 'Hook-path inspection is restricted to observational Git commands.', 10)
-    hook_options = [] if inspect_hooks else ['-c', 'core.hooksPath=' + os.devnull]
-    # Older Git ignores these settings; capable Git disables every known event.
-    # An environment token alone cannot suppress third-party configured hooks.
-    if not inspect_hooks:
-        for event in HOOK_EVENTS:
-            hook_options.extend(('-c', f'hook.{event}.enabled=false'))
-    command = ['git', *hook_options, '-c', 'core.fsmonitor=false', '-C', str(root), *args]
     job = None
     if os.name == 'nt':
         from mask_process import WindowsJob, CREATE_SUSPENDED
         try:
             job = WindowsJob()
         except OSError:
-            fail('git.containment_unavailable', 'Windows Job Object containment is unavailable; Git was not started.', 4)
+            fail(family + '.containment_unavailable', f'Windows Job Object containment is unavailable; {name} was not started.', 4)
         options['creationflags'] |= CREATE_SUSPENDED
     try:
-        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, **options)
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, cwd=cwd, **options)
     except BaseException:
         if job is not None:
             job.close()
@@ -332,13 +322,13 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
                     process.kill()
                 process.wait(timeout=10)
             except (OSError, subprocess.TimeoutExpired):
-                fail('recovery.required', 'Git containment setup failed and process termination could not be confirmed.', 8, indeterminate=True)
+                fail('recovery.required', f'{name} containment setup failed and process termination could not be confirmed.', 8, indeterminate=True)
             finally:
                 process.stdout.close()
                 process.stderr.close()
             if isinstance(error, KeyboardInterrupt):
                 raise
-            fail('git.containment_unavailable', 'Git could not join and resume in its Windows Job Object; the suspended process was terminated.', 4)
+            fail(family + '.containment_unavailable', f'{name} could not join and resume in its Windows Job Object; the suspended process was terminated.', 4)
     # Drain both pipes concurrently into bounded buffers. communicate() allocates
     # the complete output before its caller can inspect a size limit.
     buffers = [bytearray(), bytearray()]
@@ -363,16 +353,16 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
                 read_failed.set()
     readers = [threading.Thread(target=drain, args=(stream, buffer, limit), daemon=True)
                for stream, buffer, limit in ((process.stdout, buffers[0], max_output),
-                                              (process.stderr, buffers[1], 65536))]
+                                              (process.stderr, buffers[1], max_error))]
     for reader in readers:
         reader.start()
     try:
         deadline = time.monotonic() + timeout
         while True:
             if read_failed.is_set():
-                fail('git.output_failed', 'Git output could not be read completely.', 5)
+                fail(family + '.output_failed', f'{name} output could not be read completely.', 5)
             if exceeded.is_set():
-                fail('git.output_limit', 'Git exceeded its bounded output allowance.', 5)
+                fail(family + '.output_limit', f'{name} exceeded its bounded output allowance.', 5)
             if monitor is not None:
                 monitor()
             if process.poll() is not None and not any(reader.is_alive() for reader in readers):
@@ -381,14 +371,14 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
                 raise subprocess.TimeoutExpired(command, timeout)
             exceeded.wait(0.01)
         if read_failed.is_set():
-            fail('git.output_failed', 'Git output could not be read completely.', 5)
+            fail(family + '.output_failed', f'{name} output could not be read completely.', 5)
         if exceeded.is_set():
-            fail('git.output_limit', 'Git exceeded its bounded output allowance.', 5)
+            fail(family + '.output_limit', f'{name} exceeded its bounded output allowance.', 5)
         if job is not None:
             try:
                 job.stop()
             except OSError:
-                fail('recovery.required', 'Windows Git job cleanup could not be confirmed.', 8, indeterminate=True)
+                fail('recovery.required', f'Windows {name} job cleanup could not be confirmed.', 8, indeterminate=True)
         stdout, stderr = map(bytes, buffers)
     except (subprocess.TimeoutExpired, KeyboardInterrupt, MaskError) as error:
         confirmed = False
@@ -419,18 +409,42 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
         except (OSError, subprocess.TimeoutExpired):
             confirmed = False
         if not confirmed:
-            fail('recovery.required', 'Git process-tree termination could not be confirmed; inspect before retrying.', 8, indeterminate=True)
+            fail('recovery.required', f'{name} process-tree termination could not be confirmed; inspect before retrying.', 8, indeterminate=True)
         if isinstance(error, (KeyboardInterrupt, MaskError)):
             raise
-        fail('git.timeout', 'Git exceeded its timeout; its process tree was terminated and reaped.', 5)
+        fail(family + '.timeout', f'{name} exceeded its timeout; its process tree was terminated and reaped.', 5)
     finally:
         if job is not None:
             job.close()
-    if process.returncode and not optional:
+    return process.returncode, stdout, stderr
+
+
+def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,
+        max_output=16 * 1024 * 1024, monitor=None):
+    selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
+                 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
+                 'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
+    environment = {key: value for key, value in os.environ.items() if key not in selectors and not key.startswith(('GIT_CONFIG_KEY_', 'GIT_CONFIG_VALUE_'))}
+    environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
+                       GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1',
+                       GIT_NO_REPLACE_OBJECTS='1', GIT_NO_LAZY_FETCH='1')
+    if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
+        environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
+    if inspect_hooks and (not args or args[0] not in ('config', 'rev-parse')):
+        fail('internal.invariant', 'Hook-path inspection is restricted to observational Git commands.', 10)
+    hook_options = [] if inspect_hooks else ['-c', 'core.hooksPath=' + os.devnull]
+    # Older Git ignores these settings; capable Git disables every known event.
+    # An environment token alone cannot suppress third-party configured hooks.
+    if not inspect_hooks:
+        for event in HOOK_EVENTS:
+            hook_options.extend(('-c', f'hook.{event}.enabled=false'))
+    command = ['git', *hook_options, '-c', 'core.fsmonitor=false', '-C', str(root), *args]
+    returncode, stdout, stderr = contained_run(command, environment, timeout=timeout, max_output=max_output, monitor=monitor)
+    if returncode and not optional:
         lower = stderr.lower()
         auth = any(token in lower for token in (b'authentication failed', b'could not read username', b'permission denied (publickey)'))
         fail('git.auth_required' if auth else 'git.failed', 'Noninteractive Git authentication failed.' if auth else 'Git operation failed.', 5, operation=args[0] if args else '')
-    if process.returncode:
+    if returncode:
         return None
     return stdout if binary else stdout.decode('utf-8', errors='replace').strip()
 
