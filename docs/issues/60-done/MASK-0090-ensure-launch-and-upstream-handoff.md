@@ -2,12 +2,13 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0090"
 title: "Connect complete readiness to every public entrypoint"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0086", "MASK-0087", "MASK-0089"]
 external_depends_on: ["AgentSkills:ASK-0059"]
 priority: "P1"
 metadata: {"packet": "mask-corrective-ux-readiness", "provisional_id": false, "packet_key": "ensure-launch-and-upstream-handoff"}
+acceptance: [{"criterion":"RFC-MASK-0019-AC01","outcome":"pass","revision":"3bbac77","evidence":{"kind":"observation","detail":"MASK side: tests.test_readiness_entrypoints (macOS, subprocess CLI) at 3bbac77; install/remove/update/doctor/launch share mask_ensure.final_status. Real package (AgentSkills 154025b, macOS, disposable roots, tree cd4bc55 carrying the uncommitted MASK-0092 route-reporting fix that does not touch these paths): first ensure exit 4 workflow.incomplete with 16 setup_required, links committed, no code run; doctor --check exit 7; launch --agent codex|claude exit 4 with a fake host on PATH never started; ensure --check/--dry-run/--event with the exact grant state not_run."}},{"criterion":"RFC-MASK-0019-AC06","outcome":"pass","revision":"3bbac77","evidence":{"kind":"observation","detail":"Roles follow the selected candidate (update planner uses frozen candidate bytes) and effective agents; consent binds package/descriptor/inputs/interpreter; host_load stays not_verified separately from the configured route. Real package: the second consumer's optional execution-selection input is observed (sha256 present) and its consent request lists it; route fidelity for lock-vouched generated roles is completed on MASK-0092."}},{"criterion":"RFC-MASK-0019-AC08","outcome":"pass","revision":"cad619c","evidence":{"kind":"observation","detail":"Upstream handoff recorded canonically: external_depends_on AgentSkills:ASK-0059, completion commit 154025bdd374a448a0aaa9742703d6459d64be2e, descriptor sha256 9575dc4f..., entrypoint and preflight named; local handoff check on macOS: skill validate implement-rfc valid (fingerprint sha256:7ff27a61...), upstream workflow_preflight.py against this mask.py reports incomplete (16 blockers) before setup and ready with host_load not_verified after; AgentSkills repository only read and cloned, never edited."}}]
 ---
 
 # MASK-0090: Connect complete readiness to every public entrypoint
