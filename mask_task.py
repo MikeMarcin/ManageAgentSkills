@@ -294,6 +294,9 @@ def mutate(args, output, home):
                 c.fail('plan.stale', 'The declaration, lock, registry or workspace changed during preparation; nothing was applied.', 4)
             fs.execute(planned, home, output)
             committed = output['transaction'] == 'committed'
+        # Links are committed above; declared roles or inputs still unmet make the task nonzero (setup consent lives on ensure).
+        import mask_ensure as readiness
+        readiness.final_status(output)
     finally:
         for control, content in created.items():
             if not committed and c.read_text(control, 'manifest', missing=True) == content:

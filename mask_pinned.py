@@ -644,6 +644,9 @@ def transition_dispatch(args, output, home):
         if snapshot(home, observed_consumers) != before or migration and authoring_snapshot(config) != source:
             c.fail('plan.stale', 'Source, consumer controls, generation or identity changed during preparation.', 4)
         fs.execute(planned, home, output)
+    if args.command == 'update':
+        import mask_ensure as readiness
+        readiness.final_status(output)
     return True
 
 

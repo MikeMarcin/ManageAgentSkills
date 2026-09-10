@@ -387,7 +387,8 @@ def host_hook(home, agent):
         run = run_readiness(command)
         data = c.parse_json(run.stdout)
         ready = run.returncode == 0
-        message = 'MASK filesystem readiness is complete; host loading is not verified.' if ready else 'MASK readiness is blocked. Inspect mask ensure --check before continuing.'
+        code = data.get('error', {}).get('code', 'readiness.blocked') if not ready else None
+        message = 'MASK filesystem readiness is complete; host loading is not verified.' if ready else f'MASK readiness is blocked ({code}). Inspect mask ensure --check before continuing.'
     except (OSError, c.MaskError, subprocess.TimeoutExpired):
         ready = False
         message = 'MASK readiness could not finish. Inspect pending recovery before continuing.'
@@ -397,6 +398,10 @@ def host_hook(home, agent):
         specific['reloadSkills'] = ready
     elif not ready and adapters.BY_ID[agent].stop_on_failure:
         output.update({'continue': False, 'stopReason': message})
+    if not ready and not adapters.BY_ID[agent].stop_on_failure:
+        # A provider's startup hook cannot stop this host: say so instead of implying a gate (contract section 1).
+        specific['additionalContext'] += " This hook is warning-only; strict prelaunch enforcement is 'mask launch'."
+
     print(json.dumps(output))
     return 0
 

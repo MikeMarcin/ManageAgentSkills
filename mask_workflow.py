@@ -58,9 +58,9 @@ def lock_relative(skill):
 class PackageView:
     """Read-only access to exact package bytes: a materialized directory or a validated in-memory payload."""
 
-    def __init__(self, root=None, payload=None):
+    def __init__(self, root=None, payload=None, files=None):
         self.root = Path(root) if root is not None else None
-        self.files = {item.path: item.data for item in payload.files} if payload is not None else None
+        self.files = {item.path: item.data for item in payload.files} if payload is not None else dict(files) if files is not None else None
 
     def read(self, relative, skill):
         if self.files is not None:

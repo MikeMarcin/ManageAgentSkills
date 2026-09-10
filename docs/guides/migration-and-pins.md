@@ -89,7 +89,10 @@ Disjoint agents/scopes are allowed. Public profile storage remains separate work
 project/personal discovery paths, startup configuration paths, reserved names,
 package hazards and recorded readiness evidence. macOS/Windows readiness evidence
 is distinct from first-prompt host loading, which remains unverified. Linux
-behavior remains best-effort; no executable detection changes the agent set.
+behavior remains best-effort; no executable detection changes the agent set. The
+`workflow` entry (`readiness: workflow_readiness_v1`, `native_roles`,
+`staged_setup`, the entrypoints that share the verdict) is what an upstream
+startup preflight must require before accepting a workflow-ready result.
 
 A plan rejects different source coordinates named `alpha` when both require, for
 example, the same project's Codex `alpha` path. It reports both coordinates,

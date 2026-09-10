@@ -134,7 +134,8 @@ def candidate_packages(root, revision, identifiers):
             if 'SKILL.md' not in files:
                 c.fail('source.candidate_invalid', 'Candidate package has no SKILL.md.', 4)
             facts = c.metadata(files['SKILL.md'].decode('utf-8'), identifier)
-            packages[identifier] = dict(id=identifier, description=facts['description'], fingerprint=c.digest({name: c.digest(value) for name, value in files.items()}))
+            # The exact candidate bytes let the planner evaluate declared roles from the selected candidate, not the current checkout.
+            packages[identifier] = dict(id=identifier, description=facts['description'], fingerprint=c.digest({name: c.digest(value) for name, value in files.items()}), files=files)
         return packages
     except (c.MaskError, UnicodeError) as error:
         if isinstance(error, c.MaskError) and error.code == 'source.candidate_invalid':
@@ -230,7 +231,11 @@ def update(config, state, home, output, args):
             output['data']['confirmation'] = proposal
         else:
             consent.require(args, output, proposal)
-    if output['dry_run'] or not planned['would_change']:
+    if output['dry_run']:
+        return
+    import mask_ensure as readiness
+    if not planned['would_change']:
+        readiness.final_status(output)
         return
     rechecked = checkout_preconditions(root, remote, branch, 'AgentSkills', timeout, approved_repository=sources.approved_legacy(config))
     if rechecked['revision'] != observed['revision'] or fs.plan(config, state, roots, candidate=view, operation='update', home=home)['plan_hash'] != planned['plan_hash']:
@@ -250,6 +255,7 @@ def update(config, state, home, output, args):
         c.fail('recovery.required', 'Checked-out skill contents failed validation; inspect pending update.', 8)
     fs.execute(planned, home, output, pending=pending)
     output['changed'] = output['changed'] or advanced
+    readiness.final_status(output)
 
 
 def recover_git(pending, home, output, mode):

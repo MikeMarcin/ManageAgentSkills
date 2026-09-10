@@ -112,6 +112,9 @@ def render_capabilities(data, output):
     lines = [f"mask {output['tool_version']} capabilities: {len(commands)} commands, protocol result schema {(data.get('schemas') or {}).get('result', 1)}",
              f"  program: {clean(data.get('program_root'))}", f"  python: {clean(data.get('python_minimum'))}+",
              f"  targets: {clean(data.get('targets'))}", f"  scopes: {clean(data.get('scopes'))}"]
+    workflow = data.get('workflow') or {}
+    if workflow:
+        lines.append(f"  workflow: {clean(workflow.get('readiness'))} on {clean(workflow.get('entrypoints'))}; native roles {'typed' if workflow.get('native_roles') else 'unsupported'}; staged setup {'by approval' if workflow.get('staged_setup') else 'unsupported'}; host loading {clean(workflow.get('host_load'))}")
     rows = [dict(name=item['name'], effect='mutates' if item['effect'] == 'managed_mutation' else 'observes',
                  network='network' if item['network'] else '-', guard='plan hash' if item['plan_guard'] else '-') for item in commands]
     lines.extend(table(rows, [('COMMAND', 'name'), ('EFFECT', 'effect'), ('NETWORK', 'network'), ('GUARD', 'guard')]))
@@ -240,8 +243,9 @@ def render_doctor(data, output):
     lines.extend(fields(data, [('symlinks', 'symlink_capability'), ('host loading', 'host_load')]))
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
+    lines.extend(workflow_lines(data, verb='would be deployed by'))
     if output['would_change']:
-        lines.append("  links differ from the declaration; run 'mask apply' or 'mask ensure' to reconcile")
+        lines.append("  links or roles differ from the declaration; run 'mask apply' or 'mask ensure' to reconcile")
     return lines
 
 
@@ -265,7 +269,7 @@ def render_ensure(data, output):
     return lines + plan_guard(data, output)
 
 
-def workflow_lines(data):
+def workflow_lines(data, verb='will be deployed from'):
     """Declared native roles and consumer inputs per consumer: what matches, what is preserved, what will be deployed."""
     lines = []
     for entry in data.get('workflow_readiness', []) or []:
@@ -280,7 +284,7 @@ def workflow_lines(data):
                 state = row.get('state')
                 if state in ('ok', 'not_applicable'):
                     continue
-                note = {'missing': 'will be deployed from the package', 'stale': 'managed copy will be updated from the package'}.get(state) or row.get('detail') or 'preserved'
+                note = {'missing': f'{verb} the package', 'stale': f'managed copy {verb} the package'}.get(state) or row.get('detail') or 'preserved'
                 lines.append(f"    {clean(row.get('agent'))}/{clean(row.get('name'))}: {clean(state)}; {clean(note)}")
     return lines
 
@@ -393,6 +397,7 @@ def render_update(data, output):
         lines.extend(f"    {clean(root)}" for root in affected)
         if scope.get('pinned_unaffected'):
             lines.append(f"  pinned scopes unaffected: {len(scope['pinned_unaffected'])}; update them with --project/--user/--all --skill")
+    lines.extend(workflow_lines(data))
     return lines + change()(data, output)[1:] if 'projects' in data else lines + actions(output) + plan_guard(data, output)
 
 
@@ -469,6 +474,7 @@ def render_task(data, output):
         lines.append(f"  selected now: {clean(data['skills'])}")
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
+    lines.extend(workflow_lines(data))
     lines.extend(actions(output))
     if not output.get('actions') and not data.get('blockers'):
         lines.append('  nothing to do: the selection and links already match')

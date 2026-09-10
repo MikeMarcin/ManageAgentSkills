@@ -6,8 +6,9 @@ the command under test (ACCEPTANCE.md C01-C05, plus the per-binding, edited-file
 and other-scope cases named by the card).
 """
 import json
+import shutil
 
-from tests.public_support import PublicFixture
+from tests.public_support import PublicFixture, CONSUMER_CONTEXT
 
 
 def links(root):
@@ -101,6 +102,7 @@ class PinnedScopes(PublicFixture):
     def test_v2_install_and_remove_retain_unrelated_pins_and_overrides(self):
         declaration, lock = self.pinned_project()
         before = {row['id']: row for row in lock['packages']}
+        shutil.copytree(CONSUMER_CONTEXT, self.project / '.mask')  # implement-rfc declares consumer inputs; since MASK-0090 install cannot succeed without them.
         run = self.human('install', 'implement-rfc', '--agent', 'claude')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertNotIn('selection.command_unsupported', run.stderr)

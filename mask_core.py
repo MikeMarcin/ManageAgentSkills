@@ -37,7 +37,7 @@ REMEDIATION = {
     'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
     'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",
     'plan.stale': 'Preview again and pass the newly reported --expect-plan-hash.',
-    'workflow.incomplete': 'Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock or approved setup (answer yes in a terminal, or pass the reported --expect-plan-hash with --allow-setup SOURCE/ID:ACTION).',
+    'workflow.incomplete': "Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock or approved setup. Run 'mask ensure --project ROOT' (or --user) to deploy or set them up: install, update, doctor and launch never run setup (answer yes in a terminal, or pass the reported --expect-plan-hash with --allow-setup SOURCE/ID:ACTION).",
     'setup.failed': 'The package setup process failed or was stopped; nothing was published and its stage was discarded. Fix or report the package before approving setup again; MASK never reruns it on its own.',
     'setup.outputs_invalid': 'The setup stage produced outputs MASK cannot publish; nothing reached the consumer. Fix the package generator, then approve setup again.',
     'setup.unverified': "Setup execution never reached validation, so its completion is unknown; run 'mask recover --rollback' to discard the stage, then rerun 'mask ensure' and approve setup again. MASK does not rerun package code from a journal.",

@@ -163,7 +163,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 if link['skill'] not in targets:
                     location = pinned.target(link, config, home)
                     view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'resolution' in link and 'dev' not in link else None
-                    targets[link['skill']] = workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
+                    frozen = (candidate['packages'].get(link['skill'], {}).get('files') if candidate and 'resolution' not in link else None)
+                    targets[link['skill']] = workflow.PackageView(files=frozen) if frozen is not None else workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
                     coordinates[link['skill']] = resolve.coordinate(link['resolution']) if 'resolution' in link else legacy_alias(config) + '/' + link['skill']
             roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key))
             if roles['owned']:

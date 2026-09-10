@@ -309,21 +309,59 @@ def ensure(args, output, home):
             output['data']['workflow_readiness'] = final['workflow_readiness']
             incomplete = [entry for entry in final['workflow_readiness'] if not entry['complete']]
     final_records = c.consumer_records(planned['intent']['after_state'])
-    workflows = {entry['root']: entry for entry in output['data'].get('workflow_readiness', [])}
+    workflows = scope_workflows(output['data'])
     output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned',
-                                              workflow='not_declared' if not workflows.get(str(selected), {}).get('skills') or all(item['workflow'] == 'not_declared' for item in workflows[str(selected)]['skills']) else 'complete' if workflows[str(selected)]['complete'] else 'unexamined' if all(item['workflow'] in ('not_declared', 'unexamined') for item in workflows[str(selected)]['skills']) else 'incomplete') for selected in roots]
+                                              workflow=workflows.get(str(selected), 'not_declared')) for selected in roots]
     output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_legacy_unpinned'
     if incomplete:
         # Links may already be committed above; the task still did not reach complete readiness.
         output['data']['readiness'] = 'workflow_incomplete'
-        ran = any(row['state'] in ('published', 'partial') for row in setups)
-        c.fail('workflow.incomplete', 'Declared native roles or consumer inputs are incomplete; nothing was overwritten' + ('.' if ran else ' and no package code ran.'), 4, **workflow_details(incomplete, deployable=False))
+        final_status(output, ran=any(row['state'] in ('published', 'partial') for row in setups))
 
 
 def workflow_details(entries, *, deployable=True):
     import mask_workflow as workflow
     rows = [row for entry in entries for row in workflow.summarize(entry['skills'], deployable=deployable)]
     return dict(workflow=rows) if rows else {}
+
+
+def workflow_state(entry):
+    """One word for a scope's declared prerequisites: not_declared, unexamined, complete or incomplete."""
+    skills = (entry or {}).get('skills') or []
+    if not skills or all(item['workflow'] == 'not_declared' for item in skills):
+        return 'not_declared'
+    if entry['complete']:
+        return 'complete'
+    if all(item['workflow'] in ('not_declared', 'unexamined') for item in skills):
+        return 'unexamined'
+    return 'incomplete'
+
+
+def scope_workflows(data):
+    """Per-root workflow state from a planned or executed result (``workflow_readiness`` rows)."""
+    return {entry['root']: workflow_state(entry) for entry in data.get('workflow_readiness') or []}
+
+
+def final_status(output, *, ran=False):
+    """The one prerequisite verdict every public task shares (RFC-MASK-0019 contract section 7).
+
+    ``ensure``, ``install``/``remove``, ``update`` and ``launch`` (through ensure) call this after
+    their link transaction: a declared role or consumer input that is still missing, stale,
+    setup_required, modified, colliding or unexamined makes the task exit 4 with
+    ``workflow.incomplete``. The committed links and phases stay truthful; nothing here runs
+    package code or overwrites a file. ``doctor`` shares ``observe`` instead of failing.
+    """
+    data = output['data']
+    data['workflow'] = scope_workflows(data)
+    incomplete = [entry for entry in data.get('workflow_readiness') or [] if not entry['complete']]
+    if incomplete:
+        c.fail('workflow.incomplete', 'Declared native roles or consumer inputs are incomplete; nothing was overwritten' + ('.' if ran else ' and no package code ran.'), 4, **workflow_details(incomplete, deployable=False))
+
+
+def observe(planned):
+    """Observational prerequisite facts for ``doctor``: every declared role or input that is not satisfied, including what a reconcile would deploy."""
+    entries = [entry for entry in planned.get('workflow_readiness') or [] if not entry['complete'] or any(row['state'] not in ('ok', 'not_applicable') for skill in entry['skills'] for row in skill['roles'])]
+    return workflow_details(entries, deployable=True).get('workflow', [])
 
 
 def dispatch(args, output, home):

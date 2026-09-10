@@ -35,7 +35,9 @@ mask ensure
 declaration and registration when they are missing, and links the skill for every
 selected agent in the same command. Run it from the project or use `--project PATH`.
 Packages that declare native agent roles have them copied exactly with the links;
-roles you keep checked in are used as they are. `install` needs no confirmation. `ensure` asks before it changes anything in
+roles you keep checked in are used as they are. When a declared role or consumer
+input is still missing, `install` keeps the links and exits 4 naming it, the same
+verdict `ensure`, `update`, `doctor --check` and `launch` share. `install` needs no confirmation. `ensure` asks before it changes anything in
 an unapproved project (each invocation; `mask integration approve` in the
 [readiness guide](docs/guides/readiness-and-integrations.md) makes that automatic)
 and reports what is still missing: required consumer facts (for

@@ -34,6 +34,24 @@ until every applicable role and input matches. The result field
 `workflow_readiness` lists each role's state, ownership and configured route;
 host loading stays `not_verified`.
 
+Every public entrypoint shares that one prerequisite verdict. `install`, `remove`
+and `update` (shared source or pinned) report `workflow_readiness` and a per-scope
+`workflow` summary after their link transaction commits; a declared role or input
+that is still unmet makes them exit 4 with `workflow.incomplete` while the links
+stay committed and the phases stay truthful. They never run setup: run
+`mask ensure` for the consent path. `update` evaluates roles from the selected
+candidate, so an added, renamed or re-routed role is deployed, retired or reported
+from the candidate bytes, and an edited legacy-name file is preserved. `doctor`
+observes the same roles and inputs without deploying or running package code,
+lists them under `issues` (`workflow.incomplete`) and in the human text, and
+`doctor --check` exits 7 `state.drift` while any is unmet. `launch` runs the
+strict prelaunch through `ensure --event startup` and never starts the host behind
+an unmet prerequisite; a provider startup hook that cannot stop its host says it
+is warning-only. `list` and `inventory` stay cheap and label workflow state as not
+checked. `mask capabilities --json` advertises the contract as
+`workflow.readiness = workflow_readiness_v1` with typed native roles and approved
+staged setup; an older MASK without it still reports link-only readiness.
+
 A package may instead declare a Python setup action that generates a role from
 the consumer inputs. MASK offers it only when a selected generated role has no
 coherent lock, and only under explicit consent: a manual `ensure` on a terminal

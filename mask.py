@@ -184,7 +184,8 @@ def capabilities(leaves):
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT))
+                pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
+                workflow=dict(readiness='workflow_readiness_v1', native_roles=True, staged_setup=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {
@@ -277,6 +278,11 @@ def diagnostics(args, output, home):
     except MaskError as error:
         issues.append(error.as_dict())
     drift = bool(planned['would_change'])
+    # Declared prerequisites are observed with the links (RFC-MASK-0019 AC01); no package code runs and nothing is deployed here.
+    output['data']['workflow'] = ensure_ops.scope_workflows(planned)
+    unmet = ensure_ops.observe(planned)
+    if unmet:
+        issues.append(MaskError('workflow.incomplete', 'Declared native roles or consumer inputs are not satisfied.', 7, details=dict(workflow=unmet)).as_dict())
     for root in roots:
         if not root.is_dir() or core.consumer_scope(state, root) == 'user':
             continue
@@ -288,7 +294,7 @@ def diagnostics(args, output, home):
     output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift,
                           host_load='not_verified', symlink_capability='unknown' if os.name == 'nt' else 'available')
     if getattr(args, 'check', False) and (issues or drift):
-        core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7)
+        core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7, **(dict(workflow=unmet) if unmet else {}))
 
 
 def reconciliation(args, output, home):

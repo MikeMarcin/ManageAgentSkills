@@ -82,9 +82,15 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(selected.returncode, 0, selected.stderr)
         self.assertFalse(self.parses_as_result_envelope(selected.stdout))
 
+        # The package declares consumer inputs this fresh project does not have yet: the links and
+        # static roles are committed, but install cannot report success (MASK-0090); it names them.
         installed = self.mask('install', 'implement-rfc')
-        self.assertEqual(installed.returncode, 0, installed.stderr)
-        self.assertIn('declaration: created for this scope', installed.stdout)
+        self.assertEqual(installed.returncode, 4, installed.stdout + installed.stderr)
+        self.assertIn('workflow.incomplete', installed.stderr)
+        self.assertIn('.mask/skill-config/implement-rfc/project.json', installed.stderr)
+        self.assertIn('the change had already been committed', installed.stderr)
+        self.assertIn('mask ensure', installed.stderr)
+        self.assertEqual(installed.stdout, '')
         self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])
         self.assertTrue((self.project / '.codex/agents/rfc-integrator.toml').is_file())
         self.assertTrue((self.project / '.claude/agents/rfc-integrator.md').is_file())
@@ -95,8 +101,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertIn('implement-rfc', listed.stdout)
         self.assertIn('linked', listed.stdout)
 
-        # The package declares consumer inputs this fresh project does not have yet:
-        # ensure names them and stops; no package code runs and nothing is overwritten.
+        # ensure shares the same verdict: it names the inputs and stops; no package code runs and nothing is overwritten.
         ensured = self.mask('ensure')
         self.assertEqual(ensured.returncode, 4, ensured.stdout + ensured.stderr)
         self.assertIn('workflow.incomplete', ensured.stderr)
