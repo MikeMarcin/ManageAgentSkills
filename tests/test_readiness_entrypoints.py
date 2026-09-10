@@ -208,14 +208,16 @@ class LegacyUpdate(EntrypointFixture):
         value = json.loads((package / 'mask-workflow.json').read_text(encoding='utf-8'))
         value['native_roles'] = [role for role in value['native_roles'] if role['name'] != 'rfc-integrator']
         (package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        # Fingerprinted role assets must reach every checkout byte-exact; a publisher disables line-ending normalization.
+        (self.source / '.gitattributes').write_text('* -text\n', encoding='utf-8')
+        self.git(self.source, 'add', '.gitattributes')
         self.git(self.source, 'commit', '-q', '-am', 'legacy descriptor without the integrator')
         self.remote = self.base / 'AgentSkills.git'
         self.git(self.base, 'init', '-q', '--bare', str(self.remote))
         self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
         self.git(self.source, 'push', '-q', '-u', 'origin', 'main')
         self.author = self.base / 'author'
-        # The author republishes fingerprints from its working tree; an autocrlf host must not rewrite those bytes on checkout.
-        self.git(self.base, 'clone', '-q', '-c', 'core.autocrlf=false', '--branch', 'main', str(self.remote), str(self.author))
+        self.git(self.base, 'clone', '-q', '--branch', 'main', str(self.remote), str(self.author))
         self.git(self.author, 'config', 'user.name', 'Fixture')
         self.git(self.author, 'config', 'user.email', 'fixture@example.invalid')
         self.upstream = self.author / 'skills/implement-rfc'
@@ -282,7 +284,7 @@ class LegacyUpdate(EntrypointFixture):
         shutil.copytree(GENERATED / 'scripts', self.upstream / 'scripts')
         converted = self.publish('generate the integrator')
         outcome = self.call('update', code=4)
-        self.assertEqual(outcome['error']['code'], 'workflow.incomplete')
+        self.assertEqual(outcome['error']['code'], 'workflow.incomplete', outcome['error'])
         self.assertEqual(outcome['data']['source_after'], converted)
         self.assertEqual(outcome['data']['workflow'], {str(self.project): 'incomplete'})
         self.assertIn('implement-rfc codex/rfc-integrator: setup_required', outcome['error']['details']['workflow'])

@@ -25,7 +25,10 @@ A package may declare workflow prerequisites in a passive `mask-workflow.json`
 beside `SKILL.md`: bounded consumer inputs and the native role files each
 selected agent needs (`.codex/agents/<name>.toml`, `.claude/agents/<name>.md`).
 `ensure` checks them with the links. Static role assets shipped by the package
-are copied exactly through the same journaled engine; roles already committed in
+are copied exactly through the same journaled engine (a package whose assets
+carry fingerprints must disable Git line-ending normalization for them, for
+example `* -text` in `.gitattributes`, or a checkout on an `autocrlf` host is
+refused as `workflow.invalid` rather than deployed with converted bytes); roles already committed in
 the consumer (optionally vouched for by
 `.mask/skill-config/<skill>/native-roles.lock.json`) pass as repository-owned
 and are never adopted, rewritten or deleted. Modified, unknown or colliding
