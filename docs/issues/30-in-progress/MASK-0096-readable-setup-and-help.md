@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0096"
 title: "Stop futile setup retries and explain CLI tasks and failures"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0018", "RFC-MASK-0019"]
 depends_on: []
 priority: "P1"
