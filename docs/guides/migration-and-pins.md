@@ -105,6 +105,7 @@ in conflicts or requiring their content. Public profile storage is still RFC10.
 
 `plan`, `apply`, and project/user `show` expose `shadowing` and
 `target.scope_shadowing` warnings for user/project discovery names. Observed owned
-links and prospective overlaps are distinguished. Both scopes remain independent;
-MASK does not assert which one the host loads. Full pinned where-used inventory
+links and prospective overlaps are distinguished, and an overlap whose scopes
+resolve to one directory is reported as `same_target` without a warning. Both
+scopes remain independent; MASK does not assert which one the host loads. Full pinned where-used inventory
 remains a separate reporting slice.

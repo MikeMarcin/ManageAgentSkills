@@ -238,12 +238,23 @@ def collect_outputs(work, row):
     return outputs
 
 
-def lock_text(facts, report, outputs):
+def vouchable(report):
+    """Generated roles whose destination holds the bytes MASK expects once this transaction publishes.
+
+    A transaction stages only the roles that still need setup, so the lock is derived from the whole
+    rechecked report rather than from this run's outputs: roles an earlier transaction published stay
+    vouched, and a preserved destination is left out instead of being recorded as if it were deployed.
+    """
+    return [row for row in report['roles']
+            if row['producer'] == 'setup' and row['state'] in ('ok', 'missing', 'stale') and row.get('expected_sha256')]
+
+
+def lock_text(facts, report):
     value = dict(schema_version=1, schema=LOCK_SCHEMA, coordinate=facts['coordinate'], contract_sha256=facts['descriptor_sha256'],
                  role_inputs_sha256=facts['role_inputs_sha256'],
                  parameters_sha256=c.digest({action['action']: action['parameters'] for action in facts['actions']}).removeprefix('sha256:'),
                  inputs={row['id']: row['sha256'] for row in report['inputs']}, input_paths={row['id']: row['path'] for row in report['inputs']},
-                 roles=[dict(agent=agent, name=name, sha256=workflow.sha256(data)) for (agent, name), data in sorted(outputs.items())])
+                 roles=[dict(agent=row['agent'], name=row['name'], sha256=row['expected_sha256']) for row in vouchable(report)])
     return c.text_json(value)
 
 
@@ -341,7 +352,7 @@ def publish(output, home, replan, rows):
         c.parents_safe(root, lock_path)
         if c.kind(lock_path) not in ('missing', 'file'):
             c.fail('setup.outputs_invalid', 'The consumer lock path is occupied by a link or special entry; it is preserved.', 4, path=str(lock_path))
-        lock = dict(relative=lock_relative, before=c.read_text(lock_path, 'workflow', missing=True), after=lock_text(pending['setup'], report, outputs))
+        lock = dict(relative=lock_relative, before=c.read_text(lock_path, 'workflow', missing=True), after=lock_text(pending['setup'], report))
         after['actions'].append(dict(kind='native_role_lock.write', status='planned', path=str(lock_path), skill=skill))
         after['would_change'] = True
         staged_pending = fs.make_pending(after, home)

@@ -322,6 +322,27 @@ class SetupFailureTests(SetupFixture):
         self.assertEqual((self.project / '.codex/agents/rfc-integrator.toml').read_text(encoding='utf-8'), 'name = "rfc-integrator"\nmodel = "fixture-model-do-not-run"\n')
         self.assertTrue(self.lock.exists())
         self.assertFalse((self.home / 'pending.json').exists())
+        # The lock vouches only for the role that actually published; recording the preserved
+        # destination would make every later run report a mismatch the operator cannot resolve.
+        lock = json.loads(self.lock.read_text(encoding='utf-8'))
+        self.assertEqual([(row['agent'], row['name']) for row in lock['roles']], [('codex', 'rfc-integrator')])
+        rerun = self.approve()
+        self.assertEqual(rerun['error']['code'], 'workflow.incomplete')
+        preserved = self.roles_of(rerun)[('claude', 'rfc-integrator')]
+        self.assertEqual(preserved['state'], 'setup_required')
+        self.assertIn('unmanaged file occupies this destination', preserved['detail'])
+        self.assertEqual(self.roles_of(rerun)[('codex', 'rfc-integrator')]['state'], 'ok')
+        self.assertEqual([(row['agent'], row['name']) for row in json.loads(self.lock.read_text(encoding='utf-8'))['roles']], [('codex', 'rfc-integrator')])
+
+    def test_deleted_managed_role_is_released_as_deleted_not_preserved(self):
+        self.assert_published(self.approve())
+        (self.project / '.codex/agents/rfc-integrator.toml').unlink()
+        result = self.machine('ensure', '--project', self.project, '--check')
+        self.assertEqual(result['error']['code'], 'readiness.drift')
+        released = [row for row in result['warnings'] if row['code'] == 'native_role.released']
+        self.assertEqual([row['reason'] for row in released], ['deleted outside MASK'])
+        self.assertIn('was deleted outside MASK', released[0]['message'])
+        self.assertNotIn('preserved', released[0]['message'])
 
 
     def test_post_run_changes_report_that_the_script_ran(self):

@@ -113,7 +113,7 @@ class PublicConflictTests(Fixture):
         self.assertEqual(before, self.snapshot())
         self.assertFalse(self.call('apply')['changed'])
 
-    def test_public_scope_shadowing_warns_without_precedence_or_suppression(self):
+    def test_public_scope_shadowing_reports_every_overlap_without_precedence_or_suppression(self):
         self.call('project', 'register', '--apply')
         personal = self.base / 'personal'
         personal.mkdir()
@@ -131,7 +131,29 @@ class PublicConflictTests(Fixture):
             self.assertEqual(row['project']['status'], 'observed')
             self.assertIsNotNone(row['user']['coordinate'])
             self.assertIsNotNone(row['project']['payload_digest'])
-        self.assertIn('target.scope_shadowing', {row['code'] for row in result['warnings']})
+        # Both scopes resolve each name to one directory, so the overlap stays observable but
+        # cannot change which bytes a host would load and raises no warning.
+        self.assertTrue(all(row['same_target'] for row in result['data']['shadowing']))
+        self.assertNotIn('target.scope_shadowing', {row['code'] for row in result['warnings']})
         self.assertEqual(len(self.call('project', 'show')['data']['shadowing']), 2)
         self.assertTrue((personal / '.agents/skills/alpha').is_symlink())
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
+
+    def test_public_scope_shadowing_warns_when_the_scopes_resolve_to_different_targets(self):
+        self.call('project', 'register', '--apply')
+        personal = self.base / 'personal'
+        personal.mkdir()
+        # Pinned targets are content-addressed, so the two sources must differ to resolve apart.
+        second = self.base / 'second source'
+        (second / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Divergent fixture skill\n---\n\nOther instructions.\n')
+        self.git(second, 'add', '-A')
+        self.git(second, 'commit', '-q', '-m', 'diverge alpha')
+        self.call('source', 'fetch', 'other')
+        # The project takes codex/alpha from 'legacy'; the personal scope takes the same name from 'other'.
+        (self.home / 'user.json').write_text(json.dumps(dict(self.declaration, skills=[dict(source='other', id='alpha', agents=['codex'])])))
+        self.call('lock', '--user')
+        result = self.call('user', 'register', '--user-home', personal, '--apply')
+        rows = result['data']['shadowing']
+        self.assertEqual([(row['agent'], row['name'], row['same_target']) for row in rows], [('codex', 'alpha', False)])
+        self.assertEqual(rows[0]['host_precedence'], 'not_assumed')
+        self.assertIn('target.scope_shadowing', {row['code'] for row in result['warnings']})

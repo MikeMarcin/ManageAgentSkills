@@ -337,6 +337,9 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
                 row.update(state='setup_required', detail='no coherent checked-in lock vouches for this generated role; approved setup can produce it')
                 if actual is not None:
                     row['ownership'] = 'repository-owned' if holder is None else 'package-managed'
+                    if holder is None:
+                        # Setup already refuses to overwrite this file, so naming the lock alone would loop the operator.
+                        row['detail'] = 'an unmanaged file occupies this destination; it is preserved, and approved setup can publish only once it is removed'
             elif actual == expected:
                 row.update(state='ok', ownership='package-managed' if holder and holder['sha256'] == actual else 'repository-owned')
                 if content is None:
@@ -363,7 +366,8 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
         elif holder is not None and first['state'] == 'modified':
             next_owned[relative] = holder  # An edited managed output is preserved and stays visibly managed-but-modified.
         elif holder is not None:
-            released.append(dict(path=str(leaf), skill=holder['skill'], agent=holder['agent'], name=holder['name'], reason='replaced outside MASK'))
+            released.append(dict(path=str(leaf), skill=holder['skill'], agent=holder['agent'], name=holder['name'],
+                                 reason='deleted outside MASK' if actual is None else 'replaced outside MASK'))
     for relative, holder in sorted(owned.items()):
         if relative in contributions:
             continue
@@ -373,7 +377,8 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
         if data is not None and sha256(data) == holder['sha256']:
             writes.append(dict(root=str(root), relative=relative, skill=holder['skill'], agent=holder['agent'], name=holder['name'], before=data.decode('utf-8'), after=None))
         else:
-            released.append(dict(path=str(leaf), skill=holder['skill'], agent=holder['agent'], name=holder['name'], reason='changed before retirement'))
+            released.append(dict(path=str(leaf), skill=holder['skill'], agent=holder['agent'], name=holder['name'],
+                                 reason='deleted before retirement' if data is None else 'changed before retirement'))
     for report in reports:
         if any(row['state'] not in ('ok', 'not_applicable', 'missing', 'stale') for row in report['roles']):
             report['complete'] = False

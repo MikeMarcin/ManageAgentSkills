@@ -259,24 +259,35 @@ def scope_shadowing(state, config, home, selected):
                             coordinate=resolve.coordinate(row) if row else None,
                             payload_digest=row['payload_digest'] if row else None,
                             status='observed' if observed else 'planned')
-                edges.setdefault((link['target'], link['skill']), []).append(edge)
+                edges.setdefault((link['target'], link['skill']), []).append((str(target), edge))
         except c.MaskError:
             # An unavailable unrelated consumer is not evidence of an actual overlap.
             continue
     result = []
     for (agent, name), rows in sorted(edges.items()):
-        users = [row for row in rows if row['scope'] == 'user']
-        projects = [row for row in rows if row['scope'] == 'project']
-        for personal in users:
-            for project in projects:
+        users = [row for row in rows if row[1]['scope'] == 'user']
+        projects = [row for row in rows if row[1]['scope'] == 'project']
+        for personal_target, personal in users:
+            for project_target, project in projects:
                 if personal['root'] in selected or project['root'] in selected:
+                    # An overlap whose scopes resolve to one directory stays observable, but precedence
+                    # cannot change which bytes a host would load, so it raises no warning.
                     result.append(dict(agent=agent, name=name, user=personal, project=project,
+                                       same_target=personal_target == project_target,
                                        host_precedence='not_assumed', host_load='not_verified'))
     return result
 
 
+def released_message(reason):
+    """A deleted managed role is gone, so it must not be reported as preserved."""
+    if reason.startswith('deleted'):
+        return 'A managed native role file was deleted outside MASK; it is no longer managed.'
+    return 'A managed native role file changed outside MASK; it is preserved and no longer managed.'
+
+
 def shadow_warnings(rows):
-    return [dict(code='target.scope_shadowing', message='User and project discovery names overlap; host precedence is not assumed.', **row) for row in rows]
+    return [dict(code='target.scope_shadowing', message='User and project discovery names overlap; host precedence is not assumed.', **row)
+            for row in rows if not row['same_target']]
 
 
 def public_plan(planned, output):
@@ -285,7 +296,7 @@ def public_plan(planned, output):
     output['would_change'] = planned['would_change']
     output['warnings'].extend(shadow_warnings(planned.get('shadowing', [])))
     for item in planned.get('released_roles', []):
-        output['warnings'].append(dict(code='native_role.released', message='A managed native role file changed outside MASK; it is preserved and no longer managed.', **item))
+        output['warnings'].append(dict(code='native_role.released', message=released_message(item['reason']), **item))
     for row in planned.get('outcomes', []):
         if row['status'] == 'overridden':
             output['warnings'].append(dict(code='compatibility.local_override', message=row['reason'], coordinate=row['coordinate'], root=row['root'], agent=row['agent']))

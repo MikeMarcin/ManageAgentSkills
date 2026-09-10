@@ -790,10 +790,13 @@ Unknown future agent names remain valid publisher restrictions while unsupported
 consumer agent requests are rejected.
 
 Planner/show `shadowing` rows report matched user/project names, scope, agent,
-coordinate/digest when pinned, and observed-versus-planned link status. An observed
-row means the recorded symlink and directory target are present, not that host
-loading or unrelated payload integrity was attested. Corresponding warnings use
-`target.scope_shadowing`; host precedence remains `not_assumed`. These diagnostic
-observations never suppress a deployment or change unrelated scope ownership.
+coordinate/digest when pinned, `same_target`, and observed-versus-planned link
+status. An observed row means the recorded symlink and directory target are
+present, not that host loading or unrelated payload integrity was attested. Every
+overlap is reported; `same_target` marks the pair whose scopes resolve to one
+directory, where precedence cannot change which bytes a host would load, and only
+a pair without it raises the `target.scope_shadowing` warning. Host precedence
+remains `not_assumed`. These diagnostic observations never suppress a deployment
+or change unrelated scope ownership.
 Full pinned inventory/where-used remains RFC11; public profiles/bundles remain
 RFC10. Native integrated adapter acceptance remains MASK-0040.

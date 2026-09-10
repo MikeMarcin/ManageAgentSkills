@@ -91,7 +91,9 @@ def change(title=None, spec=()):
         for blocker in data.get('blockers', []) or []:
             lines.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
         if data.get('shadowing'):
-            lines.append(f"  shadowing: {len(data['shadowing'])} scope overlap(s); see warnings")
+            warned = [row for row in data['shadowing'] if not row.get('same_target')]
+            lines.append(f"  shadowing: {len(data['shadowing'])} scope overlap(s)"
+                         + ('; see warnings' if warned else '; every overlap resolves to one target'))
         lines.extend(actions(output))
         if not output.get('actions') and not data.get('blockers') and ('projects' in data or 'users' in data):
             lines.append('  links already match the declaration')
