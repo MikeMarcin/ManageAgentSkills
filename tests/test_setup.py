@@ -287,7 +287,57 @@ class SetupFailureTests(SetupFixture):
         self.assertFalse((self.home / 'pending.json').exists())
 
 
+    def test_post_run_changes_report_that_the_script_ran(self):
+        # (a) The script edits a declared consumer input: the after-run recheck must not claim nothing ran.
+        self.write_script(before="    (args.repo_root / '.mask/skill-config/implement-rfc/project.md').write_text('edited by the script\\n')\n")
+        self.commit('input-mutating script')
+        result = self.approve()
+        self.assertEqual(result['error']['code'], 'setup.failed', result['error'])
+        row = self.setup_rows(result)[0]
+        self.assertEqual((row['state'], row['reason']), ('failed', 'post-run'))
+        self.assertIn('side effects outside the stage are unknown', row['detail'])
+        self.assertNotIn('nothing ran', row['detail'])
+        self.assertEqual(self.launches(), 1)
+        self.assert_nothing_published()
+        # (b) W12: the script replaces a role directory with a file; the run is classified, not an internal crash.
+        self.write_script(before="    (args.repo_root / '.claude').mkdir(exist_ok=True); (args.repo_root / '.claude' / 'agents').write_text('not a directory')\n")
+        self.commit('parent-replacing script')
+        result = self.approve()
+        self.assertEqual(result['error']['code'], 'setup.failed', result['error'])
+        row = self.setup_rows(result)[0]
+        self.assertEqual((row['state'], row['reason']), ('failed', 'post-run'))
+        self.assertEqual((self.project / '.claude/agents').read_text(encoding='utf-8'), 'not a directory', 'the observed object is preserved')
+        self.assertEqual(self.launches(), 2)
+        self.assertFalse(self.lock.exists())
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.assertFalse((self.home / 'staging').exists())
+
+    def test_shipped_bytecode_never_replaces_the_reviewed_source(self):
+        import py_compile
+        cache = self.package / 'scripts/__pycache__'
+        cache.mkdir()
+        rogue = self.base / 'helper.py'
+        rogue.write_text(HELPER.replace('fixture-model-do-not-run', 'bytecode-model-do-not-run'), encoding='utf-8')
+        py_compile.compile(str(rogue), cfile=str(cache / f'helper.cpython-{sys.version_info[0]}{sys.version_info[1]}.pyc'), invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+        self.commit('rogue bytecode')
+        result = self.approve()
+        self.assertTrue(result['ok'], result)
+        shutil.rmtree(cache)  # The planted cache is the package's own; MASK wrote none of its own.
+        self.assert_published(result)
+        self.assertNotIn('bytecode-model', (self.project / '.claude/agents/rfc-integrator.md').read_text(encoding='utf-8'))
+
+
 class SetupRecoveryTests(SetupFixture):
+    def test_tampered_transaction_id_cannot_direct_stage_cleanup(self):
+        pending = self.crash_at('setup.exited')
+        pending['transaction_id'] = '..'
+        (self.home / 'pending.json').write_text(json.dumps(pending), encoding='utf-8')
+        before = sorted(path.name for path in self.home.iterdir())
+        for mode in ('--inspect', '--rollback', '--complete'):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.machine('recover', mode)['error']['code'], 'recovery.conflict')
+        self.assertEqual(sorted(path.name for path in self.home.iterdir()), before, 'nothing outside the stage was removed')
+
     def crash_at(self, label):
         plan_hash = self.machine('ensure', '--project', self.project, '--dry-run')['data']['plan_hash']
         script = """

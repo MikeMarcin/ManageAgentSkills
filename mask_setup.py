@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import sys
 import uuid
@@ -38,6 +39,8 @@ EXCERPT_CHARS = 4096
 SNAPSHOT_FILES = 4096
 SNAPSHOT_BYTES = 32 * 1024 * 1024
 PHASES = ('launched', 'staged')
+UUID_RE = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+UNKNOWN_EFFECTS = 'the script ran; nothing was published and script side effects outside the stage are unknown'
 # Everything a consent hash binds for one action: a change in any of these is a stale proposal.
 FROZEN = ('root', 'scope', 'skill', 'coordinate', 'action', 'entrypoint', 'timeout_seconds', 'native_roles', 'inputs',
           'parameters', 'package_sha256', 'descriptor_sha256', 'role_inputs_sha256', 'interpreter')
@@ -57,6 +60,8 @@ def package_files(root):
         nonlocal total
         for entry in sorted(directory.iterdir()):
             observed = c.kind(entry)
+            if entry.name == '__pycache__' or entry.suffix in ('.pyc', '.pyo'):
+                continue  # Bytecode never enters the frozen snapshot; only the reviewed source runs.
             if observed == 'directory':
                 walk(entry)
             elif observed == 'file':
@@ -175,7 +180,7 @@ def run_action(work, snapshot_root, root, row):
     if c.kind(entrypoint) != 'file':
         c.fail('workflow.invalid', 'The setup entrypoint is not a regular file in the frozen package.', 4, path=row['entrypoint'])
     command = [sys.executable, '-B', str(entrypoint), '--repo-root', str(root), '--output-root', str(out), '--request-file', str(request)]
-    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE='1', PYTHONPYCACHEPREFIX=str(work / 'pycache'))
     try:
         code, stdout, stderr = c.contained_run(command, environment, timeout=row['timeout_seconds'], max_output=STREAM_BYTES, max_error=STREAM_BYTES,
                                                family='setup', name='Package setup', cwd=str(work))
@@ -222,9 +227,9 @@ def collect_outputs(work, row):
     outputs = {}
     for agent, directory in entries(out, expected, True).items():
         for name, path in entries(directory, expected[agent], False).items():
-            data = path.read_bytes()
-            if len(data) > workflow.ASSET_BYTES:
+            if path.stat().st_size > workflow.ASSET_BYTES:
                 refuse('A staged role exceeds the role size bound.', path)
+            data = path.read_bytes()
             try:
                 workflow.native(agent, expected[agent][name], data, row['skill'])
             except c.MaskError as error:
@@ -259,20 +264,34 @@ def skill_report(planned, root, skill):
     c.fail('plan.stale', 'The selected skill no longer declares a workflow for this consumer.', 4, skill=skill)
 
 
-def recheck(planned, rows):
-    """The frozen identity must still hold; otherwise nothing runs or publishes."""
+def recheck(planned, rows, *, ran=False):
+    """The frozen identity must still hold; otherwise nothing (more) runs or publishes.
+
+    Before execution a mismatch is a stale plan. After execution the script's own effects are
+    unknown, so the rows say so instead of claiming nothing ran.
+    """
     root, skill = rows[0]['root'], rows[0]['skill']
-    entry = next(item for item in planned['workflow_readiness'] if item['root'] == root)
+    entry = next((item for item in planned.get('workflow_readiness', []) if item['root'] == root), None)
+    if entry is None:
+        stale(rows, ran, 'the consumer can no longer be planned (a blocker such as a replaced role directory was observed)')
     report = skill_report(planned, root, skill)
     desc = workflow.descriptor(workflow.PackageView(root=Path(report['package']['root'])), skill) if report['package']['root'] else None
     package_sha256 = snapshot(Path(report['package']['root'])) if report['package']['root'] else None
     for row in rows:
         fresh = describe(entry, report, desc, row['action'], [(role['agent'], role['name']) for role in row['native_roles']], package_sha256) if desc and row['action'] in desc['setup'] else None
         if fresh is None or fresh['fingerprint'] != row['fingerprint']:
-            for item in rows:
-                item.update(state='stale', detail='the package, descriptor, consumer inputs or interpreter changed after consent; nothing ran')
-            c.fail('plan.stale', 'Setup inputs changed after consent; nothing ran and nothing was published.', 4, action=row['subject'])
+            stale(rows, ran, 'the package, descriptor, consumer inputs or interpreter changed')
     return report
+
+
+def stale(rows, ran, what):
+    if ran:
+        for item in rows:
+            item.update(state='failed', reason='post-run', detail=f'{what} while the script ran; {UNKNOWN_EFFECTS}')
+        c.fail('setup.failed', f'Setup inputs changed while the script ran ({what}); nothing was published and script side effects outside the stage are unknown.', 5, action=rows[0]['subject'], reason='post-run')
+    for item in rows:
+        item.update(state='stale', detail=f'{what} after consent; nothing ran')
+    c.fail('plan.stale', 'Setup inputs changed after consent; nothing ran and nothing was published.', 4, action=rows[0]['subject'])
 
 
 def execute(output, home, replan, rows):
@@ -300,17 +319,19 @@ def publish(output, home, replan, rows):
     launched = c.text_json(pending)
     c.atomic_text(home / 'pending.json', launched, None)
     fs.checkpoint('setup.launched')
+    ran = False
     try:
         package_root = stage / 'package'
         if snapshot(Path(report['package']['root']), package_root) != rows[0]['package_sha256']:
             c.fail('plan.stale', 'Package bytes changed while freezing the setup snapshot; nothing ran.', 4)
         outputs = {}
         for index, row in enumerate(rows):
+            ran = True
             outputs.update(run_action(stage / f'action-{index}', package_root, root, row))
             fs.checkpoint('setup.exited')
         staged = {(skill, agent, name): data for (agent, name), data in outputs.items()}
         after = replan(staged={str(root): staged})
-        report = recheck(after, rows)
+        report = recheck(after, rows, ran=True)
         lock_relative = workflow.lock_relative(skill)
         lock_path = root / lock_relative
         c.parents_safe(root, lock_path)
@@ -339,6 +360,11 @@ def publish(output, home, replan, rows):
         if isinstance(error, KeyboardInterrupt):
             for row in rows:
                 row.update(state='failed', reason='interrupted', detail='the owned process tree was stopped; script side effects outside the stage are unknown')
+        elif ran:
+            # Any other failure after launch: the rows must not keep claiming the script never ran.
+            for row in rows:
+                if row['state'] in ('granted', 'proposed'):
+                    row.update(state='failed', reason='post-run', detail=UNKNOWN_EFFECTS)
         raise
 
 
@@ -346,6 +372,8 @@ def publish(output, home, replan, rows):
 
 def validate_journal(pending):
     facts = pending['setup']
+    if not isinstance(pending['transaction_id'], str) or not UUID_RE.fullmatch(pending['transaction_id']):
+        c.fail('recovery.conflict', 'Unsafe pending setup transaction id.', 8)
     c.fields(facts, ('phase', 'root', 'scope', 'skill', 'coordinate', 'package_sha256', 'descriptor_sha256', 'role_inputs_sha256', 'interpreter', 'granted_by', 'actions'), ('lock',), family='recovery')
     c.skill_id(facts['skill'])
     if (facts['phase'] not in PHASES or pending['operation'] != 'ensure' or facts['root'] not in pending['selected'] or facts['scope'] not in ('project', 'user')
@@ -423,8 +451,9 @@ def restore_journal(pending, side):
 
 def discard_stage(home, pending):
     """Remove the task-private stage; consumer directories are never touched here."""
-    stage = home / STAGING / pending['transaction_id']
-    if stage.parent == home / STAGING and c.kind(stage) == 'directory':
+    staging = home / STAGING
+    stage = staging / pending['transaction_id']
+    if UUID_RE.fullmatch(pending['transaction_id']) and stage.resolve().parent == staging.resolve() and c.kind(stage) == 'directory':
         shutil.rmtree(stage, ignore_errors=True)
         try:
             stage.parent.rmdir()
