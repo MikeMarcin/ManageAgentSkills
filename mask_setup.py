@@ -317,7 +317,11 @@ def publish(output, home, replan, rows):
     fs.validate_pending(pending, home)  # Validated before the stage exists, so a refused journal leaves nothing behind.
     launched = c.text_json(pending)
     stage.mkdir(parents=True)
-    c.atomic_text(home / 'pending.json', launched, None)
+    try:
+        c.atomic_text(home / 'pending.json', launched, None)
+    except BaseException:
+        discard_stage(home, pending)  # No journal was written; the empty stage must not outlive this call.
+        raise
     fs.checkpoint('setup.launched')
     ran = False
     try:
