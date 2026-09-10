@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0092"
 title: "Qualify missing-role repair and checked-in fresh-clone readiness"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0019"]
 depends_on: ["MASK-0090", "MASK-0091"]
 priority: "P1"
