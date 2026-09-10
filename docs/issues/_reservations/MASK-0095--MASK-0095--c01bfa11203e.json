@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0095"
+  ],
+  "reserve_for": "mask-reporting-and-scope-correction",
+  "purpose": "",
+  "created": "2026-09-10T15:22:24.783776+00:00",
+  "base": "bb4e064732ff292d0739cda1f95509fd34969ba5"
+}
