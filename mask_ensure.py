@@ -187,6 +187,9 @@ def integration(args, output, home):
 
 def ensure(args, output, home):
     event = getattr(args, 'event', 'manual')
+    repair = getattr(args, 'repair', False)
+    if repair and event != 'manual':
+        c.fail('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
     if event not in EVENTS:
         c.fail('invocation.invalid', 'Unsupported readiness event.', 2)
     output['data'] = dict(readiness='blocked', host_load='not_verified', event=event)
@@ -233,7 +236,7 @@ def ensure(args, output, home):
     proposed_approval = copy.deepcopy(approval)
     # Manual readiness may be granted for this one invocation (contract section 3); events and checks still need policy.
     unauthorized = [project for project in projects if not authorized(project, approval)]
-    if unauthorized and (event != 'manual' or getattr(args, 'check', False)):
+    if unauthorized and (event != 'manual' or getattr(args, 'check', False)) and not repair:
         output['data']['readiness'] = 'approval_required'
         c.fail('integration.approval_required', 'Approve this physical project before automatic readiness.', 4, root=str(unauthorized[0]))
     for project in projects:
@@ -269,26 +272,26 @@ def ensure(args, output, home):
     def replan(staged=None):
         """A fresh plan over the current registry with unchanged control observations, for setup publication and the final recheck."""
         current = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
-        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, staged_roles=staged)
+        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, staged_roles=staged, repair_roles=repair)
         policy_text = c.read_text(home / 'integration.json', 'integration', missing=True)
         fresh['intent']['controls'] = dict(workspaces=observations, policy_before=policy_text, policy_after=policy_text)
         return fresh
 
-    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive)
+    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, repair_roles=repair)
     policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
     policy_after = c.text_json(proposed_approval) if proposed_approval != approval else policy_before
     planned['intent']['controls'] = dict(workspaces=observations, policy_before=policy_before, policy_after=policy_after)
     # Declared setup actions (RFC-MASK-0019 section 5): their frozen identities bind the reviewed plan hash.
-    setups = setup.proposals(planned)
+    setups = setup.proposals(planned, repair=repair)
     planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], controls=planned['intent']['controls'], **(dict(setup=[row['fingerprint'] for row in setups if 'fingerprint' in row]) if setups else {})))
     if policy_after != policy_before:
         planned['actions'].append(dict(kind='integration.record', status='planned', path=str(home / 'integration.json')))
         planned['would_change'] = True
     fs.public_plan(planned, output)
-    output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none', approval='not_approved' if unauthorized else 'approved')
+    output['data'].update(readiness='blocked', host_load='not_verified', event=event, network='none', approval='not_approved' if unauthorized else 'approved', repair=repair)
     # A reviewed guard binds this exact frozen plan (links, controls and setup identities) in every mode, whether or not consent is needed.
     fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-    if unauthorized and planned['would_change']:
+    if unauthorized and planned['would_change'] and not repair:
         import mask_consent as consent
         proposal = consent.request('readiness', 'integration.approval_required', [str(project) for project in unauthorized], planned['actions'], planned['plan_hash'],
                                    'Make this project ready now? Registration and skill links apply to this invocation only; automatic readiness still needs integration approval.')

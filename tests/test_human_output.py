@@ -14,10 +14,35 @@ from tests.public_support import PublicFixture, PACK
 
 
 class RendererRegistry(unittest.TestCase):
+    def test_workflow_failures_group_files_by_consumer_without_flat_duplicate_list(self):
+        output = mask.result('update')
+        output['error'] = dict(code='workflow.incomplete', message='Incomplete',
+                               details={'workflow': ['implement-rfc codex/rfc-integrator: setup_required'] * 2},
+                               remediation=[{'message': 'Run ensure --project ROOT again'}])
+        output['data']['workflow_readiness'] = [
+            dict(root=root, scope='project', complete=False, skills=[dict(skill='implement-rfc', workflow='declared', complete=False,
+                 roles=[dict(agent='codex', name='rfc-integrator', path='.codex/agents/rfc-integrator.toml',
+                             state='setup_required', observed_sha256='existing', ownership='repository-owned', detail='Existing file is preserved')])])
+            for root in ('/projects/one', '/projects/two')]
+        text = present.render_error(output)
+        self.assertIn('project: /projects/one', text)
+        self.assertIn('project: /projects/two', text)
+        self.assertEqual(text.count('.codex/agents/rfc-integrator.toml'), 2)
+        self.assertNotIn('implement-rfc codex/rfc-integrator: setup_required', text)
+        self.assertNotIn('--project ROOT', text)
+        self.assertIn('no deployment changes were', text)
+
     def test_every_registered_command_has_an_intentional_renderer(self):
         missing = sorted(set(mask.COMMANDS) - set(present.RENDERERS))
         self.assertEqual(missing, [])
         self.assertLessEqual({'help', 'version'}, set(present.RENDERERS))
+
+    def test_every_command_and_argument_has_a_help_description(self):
+        _, leaves = mask.make_parser()
+        for command, parser in leaves.items():
+            with self.subTest(command=command):
+                self.assertTrue(parser.description)
+                self.assertEqual([action.dest for action in parser._actions if not action.help], [])
 
     def test_renderers_tolerate_minimal_results_and_never_emit_json(self):
         for command in mask.COMMANDS:
@@ -45,6 +70,24 @@ class RendererRegistry(unittest.TestCase):
 
 
 class HumanTerminal(PublicFixture):
+    def test_task_help_explains_scope_options_and_examples(self):
+        for command, expected in (
+            ('ensure', ('Examples:', '--allow-setup', 'SOURCE/ID:ACTION', 'Normal ensure', 'mask ensure --user', 'mask ensure --all --repair')),
+            ('update', ('Examples:', 'ALL registered consumers', 'independently pinned', 'mask self update')),
+            ('install', ('Examples:', 'Other selections are kept', 'mask install wizard --user')),
+        ):
+            with self.subTest(command=command):
+                run = self.human(command, '--help')
+                self.assertEqual(run.returncode, 0, run.stderr)
+                for phrase in expected:
+                    self.assertIn(phrase, ' '.join(run.stdout.split()))
+                machine = self.machine(command, '--help')
+                self.assertEqual(machine['data']['help'], run.stdout)
+        root = self.human('--help').stdout
+        self.assertIn('Start here:', root)
+        self.assertIn('Bare update changes the shared source', root)
+        self.assertIn('mask update --help', root)
+
     def test_no_operand_shows_everyday_help_and_exits_zero(self):
         run = self.human()
         self.assertEqual(run.returncode, 0, run.stderr)
@@ -57,7 +100,7 @@ class HumanTerminal(PublicFixture):
         self.assertEqual((run.returncode, run.stdout), (0, f'mask {mask.VERSION}\n'))
 
     def test_group_and_leaf_help_are_text(self):
-        for args, expected, code in ((('project',), 'subcommands: init', 2), (('project', '--help'), 'subcommands: init', 0), (('inventory', '--help'), 'usage: mask inventory', 0)):
+        for args, expected, code in ((('project',), 'subcommands: init', 2), (('project', '--help'), 'subcommands:', 0), (('inventory', '--help'), 'usage: mask inventory', 0)):
             with self.subTest(args=args):
                 run = self.human(*args)
                 self.assertEqual(run.returncode, code)

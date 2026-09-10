@@ -630,7 +630,43 @@
               "string",
               "null"
             ]
+          },
+          "repair": {
+            "const": true,
+            "description": "Explicit ensure repair; backup observed before bytes before replacement. Runtime restricts this to non-null before/after role transitions."
           }
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "description": "Frozen declared setup provenance and optional staged lock transition; runtime validates exact fields and never replays package code.",
+      "required": [
+        "phase",
+        "root",
+        "scope",
+        "skill",
+        "coordinate",
+        "package_sha256",
+        "descriptor_sha256",
+        "role_inputs_sha256",
+        "interpreter",
+        "granted_by",
+        "actions"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "launched",
+            "staged"
+          ]
+        },
+        "granted_by": {
+          "enum": [
+            "prompt",
+            "allow-setup",
+            "repair"
+          ]
         }
       }
     }

@@ -70,7 +70,7 @@ def restore_launcher(pending, side):
 
 def validate_program(root, candidate):
     entries = {name: (mode, kind, oid) for mode, kind, oid, name in g.tree(root, candidate)}
-    for name in ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_workflow.py', 'mask_setup.py'):
+    for name in ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py'):
         if name not in entries or entries[name][0] not in ('100644', '100755') or entries[name][1] != 'blob':
             c.fail('source.candidate_invalid', 'Program candidate is missing a regular runtime module.', 4)
     try:

@@ -133,6 +133,34 @@ class SetupFixture(PublicFixture):
 
 
 class NoninteractiveSetupTests(SetupFixture):
+    def test_existing_unmanaged_roles_block_setup_before_prompt_or_execution(self):
+        originals = {
+            '.claude/agents/rfc-integrator.md': '# repository role\n',
+            '.codex/agents/rfc-integrator.toml': 'name = "rfc-integrator"\nmodel = "custom"\n',
+        }
+        for relative, content in originals.items():
+            path = self.project / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding='utf-8')
+        for _ in range(2):
+            preview = self.machine('ensure', '--project', self.project, '--dry-run')
+            run = self.machine('ensure', '--project', self.project, '--expect-plan-hash', preview['data']['plan_hash'], '--allow-setup', SUBJECT)
+            self.assertEqual(run['error']['code'], 'workflow.incomplete')
+            self.assertEqual(self.setup_rows(run)[0]['state'], 'blocked')
+            self.assertEqual(set(self.setup_rows(run)[0]['paths']), set(originals))
+            self.assertNotIn('confirmation', run['data']['setup'])
+            self.assertEqual(self.launches(), 0)
+            self.assertFalse(self.lock.exists())
+        human = self.human('ensure', '--project', self.project)
+        self.assertEqual(human.returncode, 4)
+        self.assertIn(str(self.project), human.stderr)
+        self.assertIn('2 role file(s)', human.stderr)
+        self.assertIn('Repeating setup or adding --yes will not overwrite', human.stderr)
+        self.assertNotIn('Run this setup?', human.stderr)
+        for relative, content in originals.items():
+            self.assertEqual((self.project / relative).read_text(encoding='utf-8'), content)
+            self.assertIn(relative, human.stderr)
+
     def test_json_reports_the_proposal_commits_links_and_runs_nothing(self):
         result = self.machine('ensure', '--project', self.project)
         self.assertEqual(result['error']['code'], 'workflow.incomplete')
@@ -173,7 +201,8 @@ class NoninteractiveSetupTests(SetupFixture):
                 self.assert_nothing_published()
         human = self.human('ensure', '--project', self.project, stdin=subprocess.DEVNULL)
         self.assertEqual(human.returncode, 4, human.stderr)
-        self.assertIn('setup legacy/implement-rfc:prepare-roles: consent_required', human.stderr)
+        self.assertIn('setup legacy/implement-rfc:prepare-roles in ', human.stderr)
+        self.assertIn(': consent_required', human.stderr)
         self.assertIn('not sandboxed', human.stderr)
         self.assertNotIn('[y/N]', human.stderr)
         self.assertEqual(self.launches(), 0)
@@ -340,6 +369,8 @@ class SetupFailureTests(SetupFixture):
         self.assertEqual(preserved['state'], 'setup_required')
         self.assertIn('unmanaged file occupies this destination', preserved['detail'])
         self.assertEqual(self.roles_of(rerun)[('codex', 'rfc-integrator')]['state'], 'ok')
+        self.assertEqual(self.launches(), 1, 'A preserved file must not prompt another futile setup run')
+        self.assertEqual(self.setup_rows(rerun)[0]['state'], 'blocked')
         self.assertEqual([(row['agent'], row['name']) for row in json.loads(self.lock.read_text(encoding='utf-8'))['roles']], [('codex', 'rfc-integrator')])
 
     def test_deleted_managed_role_is_released_as_deleted_not_preserved(self):
@@ -479,8 +510,9 @@ class TerminalSetupTests(SetupFixture):
         self.assertIn('This runs package code with your user permissions; it is not sandboxed.', text)
         self.assertIn('Run this setup? [y/N]', text)
         self.assertNotIn('sha256:', text)
-        self.assertIn('setup legacy/implement-rfc:prepare-roles: published', text)
-        self.assertIn('implement-rfc workflow: complete', text)
+        self.assertIn('setup legacy/implement-rfc:prepare-roles in ', text)
+        self.assertIn(': published', text)
+        self.assertIn('implement-rfc: ready', text)
         self.assertNotIn('python3 ', text.split('Run this setup?')[1], 'no copy/paste command instruction')
         self.assertEqual(self.launches(), 1)
         self.assert_published()
@@ -492,7 +524,8 @@ class TerminalSetupTests(SetupFixture):
                 code, text = self.terminal('ensure', '--project', self.project, answer=answer)
                 self.assertEqual(code, 4, text)
                 self.assertIn('workflow.incomplete', text)
-                self.assertIn('setup legacy/implement-rfc:prepare-roles: declined', text)
+                self.assertIn('setup legacy/implement-rfc:prepare-roles in ', text)
+                self.assertIn(': declined', text)
                 self.assertEqual(len(self.links()), 2)
                 self.assertEqual(self.launches(), 0)
                 self.assert_nothing_published()

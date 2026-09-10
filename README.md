@@ -47,9 +47,30 @@ checked-in lock vouches for it, a manual `ensure` in a terminal shows exactly wh
 would run (source, content fingerprint, interpreter, script, target; not sandboxed)
 and asks `Run this setup? [y/N]`. Yes runs it, validates the staged outputs and
 publishes them in the same command; no leaves the links in place and the result
-incomplete. `--json`, `--check`, `--dry-run`, `--yes`, events and redirected
-streams never run package code; automation passes the previewed
-`--expect-plan-hash` together with `--allow-setup SOURCE/ID:ACTION`.
+incomplete. Checks, dry runs and events never run package code. JSON and
+redirected streams never prompt, and `--yes` alone never authorizes setup.
+Automation can pass the previewed `--expect-plan-hash` together with
+`--allow-setup SOURCE/ID:ACTION`, or explicitly choose the repair mode below.
+
+## Make everything work
+
+```sh
+mask ensure --all --repair
+```
+
+This explicitly authorizes setup for the skills already selected in every
+registered project and your personal scope. It runs without prompts, backs up
+existing role files before replacing them, and checks each scope again. `--yolo`
+is an alias for `--repair`. Use `--project DIR` or `--user` instead of `--all` to
+repair just one scope; add `--dry-run` to preview without changing files or
+running setup.
+
+Backups and a manifest of their original paths remain under
+`MASK_HOME/backups/` (normally `~/.mask/backups/`). One broken project does not
+stop the others; an interrupted transaction requiring recovery does. The result
+names any missing consumer inputs, unsafe paths, unavailable sources or other
+conditions it cannot fix. Repair does not invent project configuration or grant
+persistent startup approval. Restart active agents to load changed roles.
 
 ## Everyday commands
 
@@ -60,6 +81,7 @@ streams never run package code; automation passes the previewed
 | Show this project's skills | `mask list` |
 | Show personal skills | `mask list --user` |
 | Check or reconcile declared setup | `mask ensure` |
+| Repair every registered project and personal scope | `mask ensure --all --repair` |
 | Remove a selection here | `mask remove ID` |
 | Update the shared skill source | `mask update` |
 | Update this pinned project | `mask update --project .` |
@@ -76,6 +98,11 @@ Use `--json` for structured machine output; without it MASK prints human text an
 never asks a question when stdin or stdout is not a terminal. Declining a required
 confirmation leaves an explicit incomplete result, not a false success. Colliding
 or modified files are preserved and reported with the next safe action.
+If setup is blocked by existing agent role files, repeating `ensure` cannot
+replace them. The error lists their project and paths; follow the
+[role-file recovery guide](docs/guides/recovery.md#when-ensure-preserves-existing-role-files)
+to restore a matching lock or review the files. `mask ensure --help` and
+`mask update --help` explain setup, scope, and examples.
 
 ## Reference
 

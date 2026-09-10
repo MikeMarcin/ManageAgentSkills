@@ -134,7 +134,7 @@ class PinnedScopes(PublicFixture):
         run = self.human('remove', 'beta')
         self.assertEqual(run.returncode, 4, run.stdout)
         self.assertIn('target.collision', run.stderr)
-        self.assertIn('nothing was changed', run.stderr)
+        self.assertIn('no deployment changes were applied', run.stderr)
         self.assertEqual((leaf / 'mine.md').read_text(encoding='utf-8'), 'edited\n')
         self.assertIn('beta', [row['id'] for row in self.rows().values()])
         self.assertTrue((self.project / '.agents/skills/beta').is_symlink())

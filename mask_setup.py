@@ -104,14 +104,14 @@ def describe(entry, report, desc, action_id, roles, package_sha256):
     return row
 
 
-def proposals(planned):
+def proposals(planned, *, repair=False):
     """Setup actions that would complete the planned readiness: one row per (consumer, skill, action)."""
     rows = []
     for entry in planned.get('workflow_readiness', []):
         for report in entry['skills']:
             wanted = {}
             for role in report['roles'] if report['workflow'] == 'declared' else []:
-                if role['state'] == 'setup_required' and role['producer'] == 'setup':
+                if role['state'] in (('setup_required', 'modified') if repair else ('setup_required',)) and role['producer'] == 'setup':
                     wanted.setdefault(role['setup'], []).append((role['agent'], role['name']))
             if not wanted:
                 continue
@@ -124,7 +124,16 @@ def proposals(planned):
             desc = workflow.descriptor(workflow.PackageView(root=package_root), report['skill'])
             package_sha256 = snapshot(package_root)
             for action_id, roles in sorted(wanted.items()):
-                rows.append(describe(entry, report, desc, action_id, roles, package_sha256))
+                row = describe(entry, report, desc, action_id, roles, package_sha256)
+                occupied = [role['path'] for role in report['roles']
+                            if (role['agent'], role['name']) in roles and role.get('observed_sha256')
+                            and role.get('ownership') != 'package-managed']
+                if occupied and not repair:
+                    # Consent to run a generator cannot authorize replacing repository files.
+                    # Refuse before prompting instead of running an action that loops back here.
+                    row.update(state='blocked', paths=occupied,
+                               detail='existing role files are not managed by MASK; restore a matching native-role lock or review these files before setup')
+                rows.append(row)
     return rows
 
 
@@ -152,7 +161,7 @@ def authorize(args, output, planned, rows):
         for row in live:
             row.update(state='declined', detail='setup was declined; nothing ran and the roles stay incomplete')
         return
-    how = consent.granted_by(args, proposal)
+    how = 'repair' if getattr(args, 'repair', False) else consent.granted_by(args, proposal)
     if how is None and consent.interactive(args):
         raise consent.ConsentRequired(proposal)
     proposal['granted_by'] = how
@@ -319,6 +328,7 @@ def publish(output, home, replan, rows):
     skill = rows[0]['skill']
     base = replan()
     report = recheck(base, rows)
+    observed_roles = {(role['agent'], role['name']): role.get('observed_sha256') for role in report['roles']}
     if c.kind(home / 'pending.json') != 'missing':
         c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
     transaction = str(uuid.uuid4())
@@ -347,6 +357,11 @@ def publish(output, home, replan, rows):
         staged = {(skill, agent, name): data for (agent, name), data in outputs.items()}
         after = replan(staged={str(root): staged})
         report = recheck(after, rows, ran=True)
+        if rows[0].get('granted_by') == 'repair':
+            for role in report['roles']:
+                key = (role['agent'], role['name'])
+                if key in outputs and role.get('observed_sha256') != observed_roles.get(key):
+                    stale(rows, True, 'a role destination changed during setup')
         lock_relative = workflow.lock_relative(skill)
         lock_path = root / lock_relative
         c.parents_safe(root, lock_path)
@@ -395,7 +410,7 @@ def validate_journal(pending):
             or not isinstance(facts['coordinate'], str) or not consent.GRANT_RE.fullmatch(facts['coordinate'] + ':x') or not facts['coordinate'].endswith('/' + facts['skill'])
             or any(not isinstance(facts[key], str) for key in ('package_sha256', 'descriptor_sha256', 'role_inputs_sha256'))
             or not isinstance(facts['interpreter'], dict) or set(facts['interpreter']) != {'executable', 'version'} or any(not isinstance(item, str) for item in facts['interpreter'].values())
-            or facts['granted_by'] not in ('prompt', 'allow-setup')
+            or facts['granted_by'] not in ('prompt', 'allow-setup', 'repair')
             or not isinstance(facts['actions'], list) or not 1 <= len(facts['actions']) <= workflow.LIMITS['setup']):
         c.fail('recovery.conflict', 'Unsafe pending setup facts.', 8)
     for action in facts['actions']:

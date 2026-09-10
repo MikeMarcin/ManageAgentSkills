@@ -270,7 +270,7 @@ def lock_coherent(lock, desc, inputs):
     return all(lock['inputs'].get(row['id']) == row['sha256'] for row in inputs if row['required'] or row['state'] == 'ok')
 
 
-def requirements(root, scope, record, bindings, targets, *, coordinates=None, staged=None):
+def requirements(root, scope, record, bindings, targets, *, coordinates=None, staged=None, repair=False):
     """Compute declared roles for the selected bindings and observe every destination without changing it.
 
     ``bindings`` maps skill -> set of selected agents; ``targets`` maps skill -> PackageView
@@ -339,7 +339,7 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
                     row['ownership'] = 'repository-owned' if holder is None else 'package-managed'
                     if holder is None:
                         # Setup already refuses to overwrite this file, so naming the lock alone would loop the operator.
-                        row['detail'] = 'an unmanaged file occupies this destination; it is preserved, and approved setup can publish only once it is removed'
+                        row['detail'] = 'an unmanaged file occupies this destination; preserved. Restore a matching native-role lock or review the file before setup; rerunning ensure cannot replace it'
             elif actual == expected:
                 row.update(state='ok', ownership='package-managed' if holder and holder['sha256'] == actual else 'repository-owned')
                 if content is None:
@@ -354,6 +354,8 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
                 row.update(state='missing', action='create')
             elif holder and holder['sha256'] == actual:
                 row.update(state='stale', action='update', ownership='package-managed')
+            elif repair:
+                row.update(state='stale', action='update', detail='will back up and replace this role file (--repair)')
             else:
                 row.update(state='modified', ownership='package-managed' if holder else None, detail='content differs from the package asset and is not an unchanged managed output; it is preserved')
         first = rows[0][2]
@@ -361,6 +363,8 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
             next_owned[relative] = dict(skill=first['skill'], agent=first['agent'], name=first['name'], sha256=first['expected_sha256'])
             writes.append(dict(root=str(root), relative=relative, skill=first['skill'], agent=first['agent'], name=first['name'],
                                before=data.decode('utf-8') if data is not None else None, after=rows[0][1].decode('utf-8')))
+            if repair and data is not None:
+                writes[-1]['repair'] = True
         elif holder is not None and holder['sha256'] == actual:
             next_owned[relative] = holder  # An unchanged managed output keeps its record, whatever the package now wants.
         elif holder is not None and first['state'] == 'modified':
@@ -399,7 +403,9 @@ def validate_pending_roles(pending, before, after):
     """Typed native-role journal entries must agree with both ownership sides."""
     seen = set()
     for entry in pending['native_roles']:
-        c.fields(entry, ('root', 'relative', 'skill', 'agent', 'name', 'before', 'after'), family='recovery')
+        c.fields(entry, ('root', 'relative', 'skill', 'agent', 'name', 'before', 'after'), ('repair',), family='recovery')
+        if 'repair' in entry and (entry['repair'] is not True or pending['operation'] != 'ensure' or entry['before'] is None or entry['after'] is None):
+            c.fail('recovery.conflict', 'Unsafe repair transition.', 8)
         if entry['root'] not in pending['selected'] or entry['agent'] not in adapters.BY_ID or not isinstance(entry['name'], str) or not c.ID_RE.fullmatch(entry['name']):
             c.fail('recovery.conflict', 'Unsafe pending native role entry.', 8)
         c.skill_id(entry['skill'])
@@ -416,7 +422,11 @@ def validate_pending_roles(pending, before, after):
                 if side == 'after' and holder is not None:
                     c.fail('recovery.conflict', 'Pending native role removal disagrees with ownership.', 8)
                 continue
-            if not isinstance(text, str) or len(text.encode('utf-8', 'surrogateescape')) > ASSET_BYTES or holder is None or holder['sha256'] != sha256(text.encode('utf-8')):
+            if not isinstance(text, str) or len(text.encode('utf-8', 'surrogateescape')) > ASSET_BYTES:
+                c.fail('recovery.conflict', 'Pending native role bytes exceed the supported text bounds.', 8)
+            if side == 'before' and entry.get('repair'):
+                continue  # Explicit repair preserves these observed bytes in a durable backup before replacing them.
+            if holder is None or holder['sha256'] != sha256(text.encode('utf-8')):
                 c.fail('recovery.conflict', 'Pending native role bytes disagree with ownership state.', 8)
         if entry['after'] is not None:
             native(entry['agent'], entry['name'], entry['after'].encode('utf-8'))

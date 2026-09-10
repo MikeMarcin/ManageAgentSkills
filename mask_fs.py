@@ -33,7 +33,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False):
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
     dev_proposals = dev_proposals or {}
@@ -166,7 +166,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     frozen = (candidate['packages'].get(link['skill'], {}).get('files') if candidate and 'resolution' not in link else None)
                     targets[link['skill']] = workflow.PackageView(files=frozen) if frozen is not None else workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
                     coordinates[link['skill']] = resolve.coordinate(link['resolution']) if 'resolution' in link else legacy_alias(config) + '/' + link['skill']
-            roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key))
+            roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles)
             if roles['owned']:
                 next_record['native_roles'] = roles['owned']
             else:
@@ -574,6 +574,9 @@ def set_link(entry, side, *, inject=False):
 
 def restore(pending, home, side, *, inject=False):
     check_current(pending, home)
+    if side == 'after':
+        from mask_repair import save_backups
+        save_backups(pending, home)
     if 'launcher' in pending:
         from mask_install import restore_launcher
         restore_launcher(pending, side)
@@ -684,6 +687,10 @@ def execute(planned, home, output, *, pending=None):
         return
     pending = pending or make_pending(planned, home)
     validate_pending(pending, home)
+    from mask_repair import backup_records
+    backups = backup_records(pending, home)
+    if backups:
+        output['data'].setdefault('backups', []).extend(backups)
     if c.kind(home / 'pending.json') == 'missing':
         c.atomic_text(home / 'pending.json', c.text_json(pending), None)
     checkpoint('intent')
@@ -727,6 +734,9 @@ def execute(planned, home, output, *, pending=None):
         if isinstance(error, (c.MaskError, KeyboardInterrupt)):
             raise error
         c.fail('filesystem.failed', 'Filesystem operation failed; core effects were rolled back.', 5)
+    finally:
+        from mask_repair import backup_status
+        backup_status(backups)
 
 
 def recover(home, output, mode):

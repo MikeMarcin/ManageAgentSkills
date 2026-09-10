@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 import shutil
 import subprocess
+import textwrap
 
 VERSION = '0.2.0'
 PROTOCOL_VERSION = 1
@@ -75,7 +76,7 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
-    'ensure': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat')]),
+    'ensure': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag')]),
     'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag'), ('allow-locked-fetch', 'repeat')]),
     'integration.revoke': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value')]),
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
@@ -124,6 +125,8 @@ COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'fl
 
 def argument(parser, name, shape):
     kwargs = {'default': argparse.SUPPRESS}
+    if name in present.OPTION_HELP:
+        kwargs['help'] = present.OPTION_HELP[name]
     positional = shape in {'pos', 'optional', 'many', 'some', 'remainder'}
     if shape == 'remainder':
         kwargs['nargs'] = argparse.REMAINDER
@@ -137,7 +140,10 @@ def argument(parser, name, shape):
         kwargs['required'] = True
     elif shape in {'optional', 'many', 'some'}:
         kwargs['nargs'] = {'optional': '?', 'many': '+', 'some': '*'}[shape]
-    parser.add_argument(name if positional else '--' + name, **kwargs)
+    options = [name] if positional else ['--' + name]
+    if name == 'repair':
+        options.append('--yolo')
+    parser.add_argument(*options, **kwargs)
 
 
 def make_parser():
@@ -157,9 +163,17 @@ def make_parser():
             parent = groups[parts[0]]
         else:
             parent = sub
-        parser = parent.add_parser(parts[-1], add_help=False, allow_abbrev=False)
+        description, examples = present.COMMAND_HELP.get(command, (None, None))
+        parser = parent.add_parser(parts[-1], add_help=False, allow_abbrev=False,
+                                   description=textwrap.fill(description, width=78) if description else None,
+                                   epilog='Examples:\n  ' + examples.replace('\n', '\n  ') if examples else None,
+                                   formatter_class=argparse.RawDescriptionHelpFormatter)
         for name, shape in COMMON + arguments:
             argument(parser, name, shape)
+        if command == 'skill.validate':
+            parser._option_string_actions['--all'].help = 'Validate every available skill'
+        if command in ('project.set-agents', 'user.set-agents'):
+            parser._option_string_actions['--all'].help = 'Select all supported agents for this skill'
         if mutates:
             argument(parser, 'dry-run', 'flag')
             argument(parser, 'yes', 'flag')
@@ -185,7 +199,7 @@ def capabilities(leaves):
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
-                workflow=dict(readiness='workflow_readiness_v1', native_roles=True, staged_setup=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
+                workflow=dict(readiness='workflow_readiness_v1', native_roles=True, staged_setup=True, repair_with_backups=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {
@@ -217,6 +231,8 @@ CONFLICTS['source.fetch'] = {'name': ['locked'], 'locked': ['name'], 'project': 
 
 def validate_arguments(args):
     command = args.command
+    if command == 'ensure' and getattr(args, 'repair', False) and getattr(args, 'event', 'manual') != 'manual':
+        raise MaskError('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
     for key, conflicts in CONFLICTS.get(command, {}).items():
         if getattr(args, key, None) and any(getattr(args, other, None) for other in conflicts):
             raise MaskError('invocation.invalid', f'{key} conflicts with {", ".join(conflicts)}', 2)
@@ -629,6 +645,11 @@ def dispatch_impl(args, output, leaves):
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
     mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))
     home = machine_home(args)
+    if args.command == 'ensure' and getattr(args, 'repair', False) and getattr(args, 'all', False):
+        if getattr(args, 'event', 'manual') != 'manual':
+            core.fail('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
+        from mask_repair import ensure_all
+        return ensure_all(args, output, home, lambda selected, child, _: dispatch(selected, child, leaves))
     if args.command == 'source.fetch' and getattr(args, 'locked', False):
         if core.kind(home / 'pending.json') != 'missing':
             core.fail('recovery.required', 'Recover pending consumer effects before exact preparation.', 8)
@@ -694,7 +715,12 @@ def help_text(parser, leaves, words):
         return leaves[selected].format_help()
     if words and words[0] in groups:
         members = [name.split('.')[1] for name in COMMANDS if name.startswith(words[0] + '.')]
-        return f"usage: mask {words[0]} SUBCOMMAND [OPTIONS]\nsubcommands: {', '.join(members)}\nRun 'mask {words[0]} SUBCOMMAND --help' for arguments.\n"
+        lines = [f"usage: mask {words[0]} SUBCOMMAND [OPTIONS]", 'subcommands:']
+        for member in members:
+            description = present.COMMAND_HELP.get(f'{words[0]}.{member}', ('', ''))[0]
+            lines.append(f'  {member:16} {description}'.rstrip())
+        lines.append(f"Run 'mask {words[0]} SUBCOMMAND --help' for arguments and examples.")
+        return '\n'.join(lines) + '\n'
     if words and words[0] in leaves:
         return leaves[words[0]].format_help()
     return present.compact_help(VERSION, groups)

@@ -390,11 +390,13 @@ def prepare_dispatch(args, output, home):
             c.fail('migration.required', 'Existing legacy ownership requires explicit migration.', 4)
         if command == 'apply' and record is None:
             c.fail(scope + '.not_registered', 'Register this consumer explicitly before apply.', 4)
-        if command == 'ensure' and scope == 'project' and not readiness.authorized(root, policy):
+        if command == 'ensure' and scope == 'project' and not readiness.authorized(root, policy) and not getattr(args, 'repair', False):
             c.fail('integration.approval_required', 'Approve the physical project before readiness.', 4)
         declaration, resolved = r.read_exact_lock(root, scope, home, config, verify=False)
         simple_targets(declaration)
         allowed = policy['approvals'].get(str(root), {}).get('allow_locked_fetch', []) if command == 'ensure' and scope == 'project' and not getattr(args, 'offline', False) else []
+        if command == 'ensure' and getattr(args, 'repair', False) and not getattr(args, 'offline', False):
+            allowed = {row['source'] for row in resolved['packages']}
         import mask_selection as selection
         applicable = set(selection.applicable_coordinates(declaration))
         for row in resolved['packages']:

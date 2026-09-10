@@ -33,6 +33,7 @@ class MaskError(Exception):
 
 
 REMEDIATION = {
+    'repair.incomplete': 'The other scopes were still attempted. Resolve the specific remaining errors above and rerun mask ensure --all --repair. Backups are retained at the reported paths.',
     None: 'Inspect the reported inputs and retry only after resolving the condition.',
     'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
     'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",

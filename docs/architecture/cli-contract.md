@@ -392,6 +392,38 @@ nothing.
 
 ## Workspace readiness (unreleased RFC-MASK-0006 additions)
 
+### Explicit repair (September 10 correction)
+
+`ensure [--project DIR|--user|--all] --repair` (`--yolo` alias) is explicit
+one-invocation authority to run declared setup and replace regular native role
+files after backing up their exact observed bytes. This owner-requested mode
+amends the earlier preservation-only contract; normal ensure and `--yes` keep
+their existing authority. Repair works without prompts, including with `--json`.
+It is forbidden for events; `--check` and `--dry-run` never execute setup or
+write backups. It does not persist integration approval. Pinned consumers may
+fetch their exact locks from already approved sources unless `--offline` is set.
+
+Role changes carry an explicit `repair: true` on typed native-role journal
+entries. Only ensure may carry it; both before and after bytes are required,
+paths remain adapter-derived, and after bytes must agree with validated role
+content and ownership. Before replacing any role, save exact original bytes
+and a path manifest under `MASK_HOME/backups/TRANSACTION/`. Backups are
+idempotent, refuse changed destinations, and survive success or rollback.
+Generated-role locks being replaced by repair are backed up too. Concurrent
+role edits during setup refuse publication. Recovery restores the recorded
+transaction side without rerunning scripts. Older readers reject the extension
+rather than treating it as ordinary overwrite authority.
+
+`--all --repair` processes each registered project and the personal scope
+independently, including preparation and the writer lock. `data.repair_results`
+contains each root, readiness and error; `data.backups` reports original paths,
+backup paths and saved status. Ordinary scope failures do not stop later scopes;
+pending recovery stops further mutation. An incomplete run exits 4 with
+`repair.incomplete`. `--all --repair` intentionally authorizes fresh per-scope
+plans and rejects a single `--expect-plan-hash`; select one scope to use a guard.
+Missing consumer facts, unsafe paths, skill-link collisions and invalid sources
+remain errors, never guessed configuration, directory deletion or new grants.
+
 `integration approve --project PATH [--linked-worktrees] [--inactive-branches]`
 records physical-root authority in `MASK_HOME/integration.json`. Approval is
 separate from installing an integration and from ordinary explicit registration.

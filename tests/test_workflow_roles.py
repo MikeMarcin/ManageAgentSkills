@@ -99,7 +99,10 @@ class StaticRoles(WorkflowFixture):
         run = subprocess.run([sys.executable, '-B', str(ENTRY), 'ensure', '--check', '--project', str(self.project)], capture_output=True, encoding='utf-8',
                              env=dict(os.environ, MASK_HOME=str(self.home), PYTHONDONTWRITEBYTECODE='1'), stdin=subprocess.DEVNULL)
         self.assertEqual(run.returncode, 7)
-        self.assertIn('codex/rfc-integrator: missing', run.stderr)
+        self.assertIn('.codex/agents/rfc-integrator.toml', run.stderr)
+        self.assertIn('role file(s): missing', run.stderr)
+        self.assertIn('implement-rfc: needs deployment', run.stderr)
+        self.assertNotIn('implement-rfc: ready', run.stderr)
         self.assertNotIn('{', run.stdout + run.stderr)
 
     def test_selected_targets_bound_the_requirement_set(self):
