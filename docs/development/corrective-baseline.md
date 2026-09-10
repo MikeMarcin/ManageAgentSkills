@@ -74,9 +74,56 @@ which replays those recipes exactly as written (C21) through the launcher that
 remote. No `--json`, plan hash or pre-registration is involved. `self update` is
 not replayed because it would touch the real program checkout's remote.
 
+## Native lanes for RFC-MASK-0018 (MASK-0091)
+
+Candidate `a85651002f3dbf2b9a94c45a2c0e6564771b4b09`, September 9, 2026.
+Independent review (rfc-reviewer, claude-fable-5-1, effort high) of that candidate
+found one AC07 failure: the README's first command refused on a home without
+`~/.local` because the old `mkdir -p "$HOME/.local/bin"` line had been dropped.
+`6dcd5a4c57b590bb511e778aa4eae40830055735` restores it, replays the README from
+a fresh home in `tests/test_readme_journeys.py`, states `ensure` consent as
+per-invocation, gives the Windows installation recipe in text form and corrects
+the `update` scope sentence (`affected` includes the selected scope). The literal
+chain (`mkdir -p`, `self install`, `init`, `install alpha`, `list`) was rerun from
+an empty `HOME` on macOS at that revision; the Windows evidence below is from
+`a856510` and was not rerun for these text/test-only corrections.
+
+macOS 26.6.2 / arm64, Python 3.14.7: `python3 -B -m unittest
+tests.test_readme_journeys tests.test_task_commands tests.test_consent
+tests.test_public_baseline tests.test_human_output` (47 tests, OK). The README
+recipes ran through the launcher `self install` wrote; the `ensure` yes/no/pipe
+journey ran on a POSIX pseudoterminal.
+
+Windows 11 Home 10.0.26200 (ExampleWinHost), Windows Python 3.14.7, Git 2.55.0.windows.3,
+disposable clone of the candidate under `C:\code\git\mask-m6-disposable`
+(removed afterwards): `py -3 -B -m unittest tests.test_readme_journeys
+tests.test_task_commands tests.test_human_output tests.test_public_baseline
+tests.test_launcher` (37 tests, OK, 1 pty skip) and `tests.test_consent.PipedConsentTests
+tests.test_consent.ConsentSeamTests` plus the non-terminal `tests.test_update_task`
+classes (15 tests, OK, 1 skip). The `mask.cmd` launcher ran `init`, `install`,
+`list`, `ensure`, `remove` natively. The console confirmation was a recorded
+bounded interaction in an OpenSSH ConPTY session (Git bash prompt, then
+`powershell -NoProfile -File console.ps1`): `mask ensure` on an unapproved project
+with one missing link printed the proposal and `[y/N]`; `y` created the link, exit
+0, no `integration.json`; on a reset fixture `n` gave `confirmation.declined`, exit
+4, no link. Nothing was written to the real profile; `MASK_HOME` was a temporary
+directory.
+
+Two defects found on the first Windows run and fixed in the candidate: the public
+fixture set only `HOME`, so `install --user` wrote to the real `%USERPROFILE%`
+(four dangling fixture links were removed by hand; `USERPROFILE` is now fixed
+to the fixture home), and `text=auto` CRLF normalization changed the static
+package's role bytes so every `implement-rfc` install refused `workflow.invalid`
+(fixture paths are now `-text`). The second finding is a real requirement for any
+package that declares role fingerprints: its repository must pin those assets to
+exact bytes (`-text` or `eol=lf`), which belongs in the AgentSkills handoff
+(MASK-0090). `stderr` is now reconfigured to UTF-8 like `stdout`, so human error
+text with non-ASCII paths survives Windows pipes. Known cosmetic limitation:
+Windows human output shows planned link targets with the `\\?\` extended-length
+prefix. Host loading of any skill or role remains not verified on either OS.
+
 ## Not observed here
 
-Native Windows journeys, terminal prompt mechanics, host role loading and the
-real AgentSkills package (RFC-MASK-0018-AC08, RFC-MASK-0019-AC07) are not
-exercised by this baseline; the synthetic static package uses model
+Host role loading and the real AgentSkills package (RFC-MASK-0019-AC07) are not
+exercised; the synthetic static package uses model
 `fixture-model-do-not-run` and is never installed into a real host.

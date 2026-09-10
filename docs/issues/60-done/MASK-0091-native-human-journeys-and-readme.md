@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0091"
 title: "Qualify the ordinary CLI and replace the long getting-started guide"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0018"]
 depends_on: ["MASK-0084", "MASK-0085", "MASK-0086", "MASK-0087"]
 priority: "P1"
 metadata: {"packet": "mask-corrective-ux-readiness", "provisional_id": false, "packet_key": "native-human-journeys-and-readme"}
+acceptance: [{"criterion":"RFC-MASK-0018-AC07","outcome":"pass","revision":"6dcd5a4c57b590bb511e778aa4eae40830055735","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_readme_journeys (macOS, 4 tests OK; Windows via py -3, 3 OK + pty skip): the short README's everyday recipes run as written through the launcher `self install` wrote and the plain entrypoint, with no --json, plan hash, registration chore or helper script; docs/guides/* keep the advanced material. Independent review found the dropped mkdir -p line (fixed in 6dcd5a4; literal chain rerun from an empty HOME)"}},{"criterion":"RFC-MASK-0018-AC08","outcome":"pass","revision":"a85651002f3dbf2b9a94c45a2c0e6564771b4b09","evidence":{"kind":"observation","detail":"macOS 26.6.2/Python 3.14.7 and Windows 11 10.0.26200/Windows Python 3.14.7 (ExampleWinHost, disposable clone) ran the public task/human-output/baseline/launcher suites; Windows console yes/no confirmation recorded as a bounded ConPTY interaction (exit 0 with link, exit 4 declined without link); macOS pty yes/no/pipe; see docs/development/corrective-baseline.md 'Native lanes'. Helpers never inject --json or prepare the behavior under test. Host loading remains not verified"}}]
 ---
 
 # MASK-0091: Qualify the ordinary CLI and replace the long getting-started guide
