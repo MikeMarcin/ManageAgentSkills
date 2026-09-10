@@ -347,7 +347,8 @@ def render_update(data, output):
     scope = data.get('scope')
     if isinstance(scope, dict):
         affected = scope.get('affected', [])
-        lines.append(f"  shared source: affects {len(affected)} legacy scope(s)" + (' (all registered)' if scope.get('selected') == affected else ' beyond the selected scope'))
+        others = [root for root in affected if root not in scope.get('selected', [])]
+        lines.append(f"  shared source: affects {len(affected)} legacy scope(s)" + (' (all registered)' if not others else f' including {len(others)} other than the selected scope'))
         lines.extend(f"    {clean(root)}" for root in affected)
         if scope.get('pinned_unaffected'):
             lines.append(f"  pinned scopes unaffected: {len(scope['pinned_unaffected'])}; update them with --project/--user/--all --skill")

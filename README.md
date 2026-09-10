@@ -11,12 +11,14 @@ existing directory-symlink support. MASK does not change privileges or install
 Python or Git. From the checkouts' parent directory on macOS or Linux:
 
 ```sh
+mkdir -p "$HOME/.local/bin"
 python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
 "$HOME/.local/bin/mask" init --source "$PWD/AgentSkills"
 ```
 
 Add that bin directory to PATH, or keep using the printed absolute launcher path.
-Windows uses the same Python entrypoint and a `mask.cmd` launcher; the
+`self install` writes only into an existing parent directory. Windows uses the
+same Python entrypoint and a `mask.cmd` launcher; the
 [installation reference](docs/guides/installation.md) gives the native PowerShell
 example. Installing the program and selecting a skill source are separate steps.
 Existing checkouts and Git authentication are reused.
@@ -33,8 +35,10 @@ mask ensure
 declaration and registration when they are missing, and links the skill for every
 selected agent in the same command. Run it from the project or use `--project PATH`.
 Packages that declare native agent roles have them copied exactly with the links;
-roles you keep checked in are used as they are. `ensure` asks once for readiness
-approval, then reports what is still missing: required consumer facts (for
+roles you keep checked in are used as they are. `install` needs no confirmation. `ensure` asks before it changes anything in
+an unapproved project (each invocation; `mask integration approve` in the
+[readiness guide](docs/guides/readiness-and-integrations.md) makes that automatic)
+and reports what is still missing: required consumer facts (for
 `implement-rfc`, `.mask/skill-config/implement-rfc/`) are named, never copied from
 another project. When package setup code would be required, MASK stops with an
 explicit incomplete result; approved setup is a later contract, not something that
@@ -84,7 +88,7 @@ working installation.
 > roles are unreleased additions; the program version remains `0.2.0`. No daemon,
 > fleet enrollment, provider account or package-manager subscription is required.
 > Declarations are versioned; machine ownership and approvals are local. Native
-> macOS evidence exists for the everyday commands; see the
+> macOS and Windows evidence exists for the everyday commands; see the
 > [current acceptance records](docs/development/readiness-acceptance.md) and the
 > [corrective baseline](docs/development/corrective-baseline.md) for exactly which
 > native and host-loading behaviors have been verified. Linux remains best-effort.

@@ -39,9 +39,9 @@ On Windows, use PowerShell with a known supported Python installation. For examp
 ```powershell
 $maskBin = Join-Path $env:LOCALAPPDATA 'Programs\MASK'
 New-Item -ItemType Directory -Force -Path $maskBin | Out-Null
-py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin --json
-& "$maskBin\mask.cmd" init --source 'C:\work\AgentSkills' --json
-& "$maskBin\mask.cmd" capabilities --json
+py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin
+& "$maskBin\mask.cmd" init --source 'C:\work\AgentSkills'
+& "$maskBin\mask.cmd" skill list
 ```
 
 The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status --json` reports the program, interpreter and launcher discovery. Installing the launcher and selecting the skill source are separate operations.

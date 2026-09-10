@@ -28,7 +28,8 @@ class ReadmeRecipes(PublicFixture):
 
     def setUp(self):
         super().setUp()
-        self.bin = self.base / 'bin'
+        self.bin = self.personal / '.local/bin'  # README: mkdir -p "$HOME/.local/bin" precedes self install on a fresh home.
+        self.bin.mkdir(parents=True)
         installed = self.human('self', 'install', '--bin-dir', self.bin)
         self.assertEqual(installed.returncode, 0, installed.stderr)
         self.launcher = self.bin / ('mask.cmd' if os.name == 'nt' else 'mask')
