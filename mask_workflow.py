@@ -337,6 +337,10 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
                     row['ownership'] = 'repository-owned' if holder is None else 'package-managed'
             elif actual == expected:
                 row.update(state='ok', ownership='package-managed' if holder and holder['sha256'] == actual else 'repository-owned')
+                if content is None:
+                    # A lock-vouched generated role: its bytes were validated when published, so the same passive parse
+                    # reports the configured route instead of an empty one.
+                    row['route'] = native(row['agent'], row['name'], data, skill)
             elif content is None and actual is None:
                 row.update(state='setup_required', detail='the checked-in lock names this generated role but no file exists; approved setup can produce it')
             elif content is None:

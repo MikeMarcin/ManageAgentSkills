@@ -103,6 +103,9 @@ class SetupFixture(PublicFixture):
     def roles(self):
         return sorted(path.relative_to(self.project).as_posix() for path in self.project.glob('.*/agents/*'))
 
+    def roles_of(self, result):
+        return {(row['agent'], row['name']): row for entry in result['data']['workflow_readiness'] for skill in entry['skills'] for row in skill['roles']}
+
     def links(self):
         return sorted(path.relative_to(self.project).as_posix() for path in self.project.glob('.*/skills/*') if path.is_symlink())
 
@@ -229,6 +232,11 @@ raise SystemExit(mask.main(sys.argv[2:]))
         self.assertFalse(again['changed'])
         self.assertNotIn('setup', again['data'])
         self.assertEqual(self.launches(), 1)
+        # The lock-vouched generated role reports its configured route, still separate from host loading.
+        for role in self.roles_of(again).values():
+            self.assertEqual(role['state'], 'ok')
+            self.assertEqual(role['route']['model'], 'fixture-model-do-not-run', role)
+            self.assertEqual(role['host_load'], 'not_verified')
         # W09: a changed imported helper invalidates the prepared lock; nothing runs without fresh consent.
         (self.package / 'scripts/helper.py').write_text(HELPER + '\n# changed\n', encoding='utf-8')
         self.commit('helper changed')
