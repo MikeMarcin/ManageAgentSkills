@@ -147,6 +147,14 @@ class NoninteractiveSetupTests(SetupFixture):
         self.assertEqual(self.launches(), 0)
         self.assert_nothing_published()
 
+    def test_all_scope_reaches_the_setup_proposal_like_an_explicit_project(self):
+        result = self.machine('ensure', '--all')
+        self.assertEqual(result['error']['code'], 'workflow.incomplete')
+        self.assertEqual([(row['state'], row['subject'], row['root']) for row in self.setup_rows(result)],
+                         [('consent_required', SUBJECT, str(self.project))])
+        self.assertEqual(self.launches(), 0)
+        self.assert_nothing_published()
+
     def test_check_dry_run_yes_and_events_never_run_package_code(self):
         self.machine('ensure', '--project', self.project)  # Commits the links so every preview below shares one frozen plan.
         plan_hash = self.machine('ensure', '--project', self.project, '--dry-run')['data']['plan_hash']

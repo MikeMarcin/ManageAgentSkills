@@ -75,7 +75,7 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
-    'ensure': (True, True, [('project', 'value'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat')]),
+    'ensure': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat')]),
     'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag'), ('allow-locked-fetch', 'repeat')]),
     'integration.revoke': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value')]),
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
@@ -201,7 +201,7 @@ CONFLICTS = {
 }
 for action in ('set', 'set-targets'):
     CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
-for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update'):
+for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update', 'ensure'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 for command in ('install', 'remove', 'list'):

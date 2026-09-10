@@ -400,8 +400,13 @@ Both commands support dry-run and a plan guard. `integration inspect --project P
 reports approval, the registration identity used for retirement, owned adapter
 configuration, and unverified host loading. `integration approve --repository ID --under ROOT` authorizes future repository roots beneath an existing physical clone directory. The directory identity and exact credential-free origin identity must match; outside or replaced boundaries refuse. Use the matching `integration revoke --repository ID --under ROOT` to remove that policy.
 
-`ensure [--project PATH] [--event EVENT] [--check] [--offline] [--dry-run]`
+`ensure [--project PATH|--user|--all] [--event EVENT] [--check] [--offline] [--dry-run]`
 registers and reconciles an approved project under the ordinary writer lock.
+`--user` selects the registered personal consumer and `--all` every registered
+consumer, in place of working-directory detection; both are mutually exclusive
+with `--project` and skip the nested Git-event discovery an implicit selection
+uses. Each selected project still needs its own readiness authority, and setup
+consent still names one exact action per skill and consumer.
 It reads the selected legacy source locally, validates selected packages, and
 performs no fetch or whole-source status scan (`source.dirty` is null). It does
 not require a caller-supplied plan hash. `--check` performs no writes and exits 7

@@ -195,17 +195,28 @@ def ensure(args, output, home):
     config = c.config(c.read_json(home / 'config.json'))
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     selection = getattr(args, 'project', None)
-    try:
-        root = c.project_root(selection)
-    except c.MaskError as error:
-        if selection is None and error.code == 'project.not_found' and event == 'startup' and state.get('user'):
-            root = None
-        elif selection is None and error.code == 'manifest.missing':
-            root = c.project_root(initializing=True)
-        else:
-            raise
-    projects = [root] if root is not None else []
-    if selection is None and event.startswith('post-'):
+    scope_user, scope_all = getattr(args, 'user', False), getattr(args, 'all', False)
+    if scope_user or scope_all:
+        # An explicit scope selection replaces working-directory detection; nested event discovery
+        # only ever narrowed an implicit selection, so it has nothing to add here.
+        if scope_user and not state.get('user'):
+            c.fail('user.not_registered', 'User scope is not registered.', 4)
+        root = None
+        projects = [] if scope_user else [Path(key) for key in sorted(state['projects'])]
+        for project in projects:
+            c.registered_root(project, state['projects'][str(project)])
+    else:
+        try:
+            root = c.project_root(selection)
+        except c.MaskError as error:
+            if selection is None and error.code == 'project.not_found' and event == 'startup' and state.get('user'):
+                root = None
+            elif selection is None and error.code == 'manifest.missing':
+                root = c.project_root(initializing=True)
+            else:
+                raise
+        projects = [root] if root is not None else []
+    if selection is None and not (scope_user or scope_all) and event.startswith('post-'):
         boundary = c.project_root(initializing=True)
         common = common_directory(boundary)
         for key, record in state['projects'].items():
@@ -246,7 +257,8 @@ def ensure(args, output, home):
                     if tracked_lock is not None and tracked_lock == observation['lock'].strip():
                         entry['tracked']['lock_digest'] = c.digest(observation['lock'].encode('utf-8'))
     roots = list(projects)
-    user_root = Path(state['user']['root']) if event == 'startup' and state.get('user') else None
+    # The personal consumer is selected explicitly, or preflighted by startup; --all covers every consumer.
+    user_root = Path(state['user']['root']) if (scope_user or scope_all or event == 'startup') and state.get('user') else None
     if user_root is not None:
         roots.append(user_root)
         observations.append(workspace_observation(user_root, scope='user', home=home))

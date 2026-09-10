@@ -171,3 +171,33 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         result = self.call('integration', 'approve', '--repository', 'https://user:secret@example.invalid/org/repo', '--under', boundary, code=3)
         self.assertNotIn('secret', json.dumps(result))
         self.call('integration', 'approve', '--repository', str(self.source), '--project', self.project, '--under', boundary, code=2)
+
+    def register_user(self, personal):
+        self.call('user', 'init')
+        self.call('user', 'require', 'alpha')
+        return self.call('user', 'register', '--user-home', personal, '--apply')
+
+    def test_explicit_scope_selects_the_personal_consumer_or_every_consumer(self):
+        self.assertEqual(self.call('ensure', '--user', code=4)['error']['code'], 'user.not_registered')
+        personal = self.base / 'personal'
+        personal.mkdir()
+        self.register_user(personal)
+        # --user reconciles the personal consumer alone, from inside an unrelated project directory.
+        result = self.call('ensure', '--user')
+        self.assertEqual([row['root'] for row in result['data']['scope_readiness']], [str(personal)])
+        self.assertTrue((personal / '.agents/skills/alpha').is_symlink())
+        self.assertFalse((self.project / '.agents/skills/alpha').exists())
+        # --all covers every registered consumer, and each project still needs its own authority.
+        self.call('project', 'register', self.project)
+        refused = self.call('ensure', '--all', code=4)
+        self.assertEqual(refused['error']['code'], 'confirmation.required')
+        self.assertEqual(refused['data']['confirmation']['reason'], 'integration.approval_required')
+        preview = self.approve('--dry-run')
+        self.approve('--expect-plan-hash', preview['data']['plan_hash'])
+        result = self.call('ensure', '--all')
+        self.assertEqual(sorted(row['root'] for row in result['data']['scope_readiness']), sorted([str(personal), str(self.project)]))
+        self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
+        self.assertFalse(self.call('ensure', '--all')['changed'])
+        # An explicit selection is exclusive and never falls back to the working directory.
+        for conflict in (('--all', '--user'), ('--all', '--project', str(self.project)), ('--user', '--project', str(self.project))):
+            self.assertEqual(self.call('ensure', *conflict, code=2)['error']['code'], 'invocation.invalid')
