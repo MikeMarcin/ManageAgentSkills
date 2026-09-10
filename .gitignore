@@ -1,7 +1,5 @@
 /.agents/skills/implement-rfc
-/.agents/skills/manage-agent-skills
 /.claude/skills/implement-rfc
-/.claude/skills/manage-agent-skills
 /.mask/generated/
 /.mask/bootstrap-retired/
 __pycache__/
