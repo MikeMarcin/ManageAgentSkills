@@ -31,7 +31,11 @@ example `* -text` in `.gitattributes`, or a checkout on an `autocrlf` host is
 refused as `workflow.invalid` rather than deployed with converted bytes); roles already committed in
 the consumer (optionally vouched for by
 `.mask/skill-config/<skill>/native-roles.lock.json`) pass as repository-owned
-and are never adopted, rewritten or deleted. Modified, unknown or colliding
+and are never adopted, rewritten or deleted. Commit them as exact bytes: on an
+`autocrlf` host a checkout that converts their line endings is reported as
+`modified` and preserved, so a consumer that checks generated roles in should
+exclude them from normalization (for example `.codex/agents/** -text`,
+`.claude/agents/** -text` and the lock file in `.gitattributes`). Modified, unknown or colliding
 files are preserved and reported, and `ensure` exits 4 with `workflow.incomplete`
 until every applicable role and input matches. The result field
 `workflow_readiness` lists each role's state, ownership and configured route;

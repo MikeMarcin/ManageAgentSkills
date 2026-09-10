@@ -192,6 +192,8 @@ def native(agent, name, data, skill=None):
             value = value.strip()
             if not value or value[0] in '|>!&*[{':
                 refuse('Native role frontmatter values must be single-line scalars.', field=key)
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+                value = value[1:-1]  # a plainly quoted scalar reports its content, not its quotes
             values[key] = value
     else:
         refuse('No built-in native role adapter for this agent.')

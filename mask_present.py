@@ -292,7 +292,7 @@ def workflow_lines(data, verb='will be deployed from'):
 SETUP_NOTES = {
     'consent_required': "needs your yes in a terminal, or --expect-plan-hash HASH with --allow-setup {subject} from automation",
     'not_run': 'check, dry-run and event invocations never run package code',
-    'declined': 'declined; nothing ran',
+    'declined': 'nothing ran',
     'granted': 'approved; not run',
     'published': 'ran, validated and published',
     'partial': 'ran; some outputs were preserved instead of published',
