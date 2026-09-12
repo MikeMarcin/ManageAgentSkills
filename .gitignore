@@ -8,9 +8,12 @@ __pycache__/
 /.claude/skills/attended-review
 /.agents/skills/wizard
 /.claude/skills/wizard
+/.agents/skills/writing-for-agents
+/.claude/skills/writing-for-agents
 /.mask/attended-review/
 /.mask/sessions/
 /.claude/agents/rfc-*.md
 /.codex/agents/rfc-*.toml
+/.mask/skill-config/*/native-roles.lock.json
 /.remote-station.json
 .DS_Store

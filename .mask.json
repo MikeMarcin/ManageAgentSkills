@@ -3,7 +3,8 @@
   "skills": [
     "attended-review",
     "implement-rfc",
-    "wizard"
+    "wizard",
+    "writing-for-agents"
   ],
   "targets": [
     "claude",
