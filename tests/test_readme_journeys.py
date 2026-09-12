@@ -88,7 +88,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(installed.returncode, 4, installed.stdout + installed.stderr)
         self.assertIn('workflow.incomplete', installed.stderr)
         self.assertIn('.mask/skill-config/implement-rfc/project.json', installed.stderr)
-        self.assertIn('the change had already been committed', installed.stderr)
+        self.assertIn('deployment changes were saved', installed.stderr)
         self.assertIn('mask ensure', installed.stderr)
         self.assertEqual(installed.stdout, '')
         self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])

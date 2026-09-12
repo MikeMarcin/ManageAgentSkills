@@ -1,7 +1,6 @@
 # Shared workflow adoption — 2026-09-05
 
-Approved design and full Q&A: [plan](unified-rfc-workflow-plan-and-interview.md).
-Implementation is tracked in AgentSkills RFC-ASK-0003 (ASK-0008–ASK-0014).
+Implementation and design are tracked in AgentSkills RFC-ASK-0003 (ASK-0008–ASK-0014).
 
 This checkout now uses canonical v2 external context and versioned multi-RFC
 cards (18 cards, 4 RFCs). Markdown bodies and actual RFC/card status are

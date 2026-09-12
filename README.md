@@ -2,7 +2,7 @@
 
 Manage your agent skills in a project or your personal environment.
 
-MASK links skills from one local [AgentSkills](https://github.com/MikeMarcin/AgentSkills) checkout into the directories Claude Code and Codex read. Projects keep their selection in a versioned `.mask.json`; personal selections live in `MASK_HOME/user.json`. Both repositories remain private.
+MASK links skills from one local [AgentSkills](https://github.com/MikeMarcin/AgentSkills) checkout into the directories Claude Code and Codex read. Projects keep their selection in a versioned `.mask.json`; personal selections live in `MASK_HOME/user.json`.
 
 ## Install once
 
