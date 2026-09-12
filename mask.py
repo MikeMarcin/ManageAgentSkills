@@ -30,6 +30,7 @@ import mask_integration as integration_ops
 import mask_report as report_ops
 import mask_present as present
 import mask_sources as sources_ops
+import mask_workflow as workflow
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
@@ -199,7 +200,7 @@ def capabilities(leaves):
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
-                workflow=dict(readiness='workflow_readiness_v1', native_roles=True, staged_setup=True, repair_with_backups=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
+                workflow=dict(readiness='workflow_readiness_v1', native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {

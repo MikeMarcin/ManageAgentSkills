@@ -285,6 +285,12 @@ def workflow_lines(data, verb='will be deployed from'):
             pending_roles = any(row.get('state') not in ('ok', 'not_applicable') for row in skill.get('roles') or [])
             status = 'needs deployment' if skill.get('complete') and pending_roles else 'ready' if skill.get('complete') else 'needs attention'
             lines.append(f"    {clean(skill.get('skill'))}: {status} (host loading: not verified)")
+            for row in skill.get('retired_files', []):
+                if row['state'] != 'absent':
+                    note = {'present': 'retired; use ensure --repair to back up and remove', 'remove_planned': 'will back up and remove',
+                            'in_use': 'fallback lock preserved until a canonical lock is published', 'unsafe': 'unsafe retired entry; preserved',
+                            'active_input': 'still declared as a consumer input; preserved'}.get(row['state'], row['state'])
+                    lines.append(f"      {clean(row['path'])}: {note}")
             for row in skill.get('inputs', []) or []:
                 if row.get('state') not in ('ok', 'absent'):
                     lines.append(f"      input {clean(row.get('path'))}: {clean(row.get('state'))}")

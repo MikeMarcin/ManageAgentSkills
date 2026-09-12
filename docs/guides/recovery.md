@@ -24,8 +24,9 @@ root, such as `.codex/agents/rfc-integrator.toml`, identify the files to inspect
 mean the file is missing or that its contents are necessarily wrong.
 
 If version control contains a matching set, restore the role files together with
-`.mask/skill-config/SKILL-ID/native-roles.lock.json` and the consumer inputs it
-verifies. A lock for different package content or different inputs will not
+`.mask/generated/SKILL-ID/native-roles.lock.json` (MASK also reads the retired
+`.mask/skill-config/SKILL-ID/` location when the canonical one is absent) and the
+consumer inputs it verifies. A lock for different package content or different inputs will not
 validate the files. Do not hand-edit hashes or MASK's machine ownership state.
 
 Otherwise, compare the existing files with the intended role definitions. Back

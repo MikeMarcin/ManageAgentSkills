@@ -321,6 +321,13 @@ def ensure(args, output, home):
             # Approved setup runs after the link transaction; only a final recheck may report the roles complete.
             setup.execute(output, home, replan, granted)
             final = replan()
+            if repair and final['intent'].get('retired_files'):
+                # A formerly active fallback can retire only after the replacement lock was published.
+                from mask_repair import check_retired_snapshot
+                check_retired_snapshot(planned, final)
+                output['actions'].extend(final['actions'])
+                fs.execute(final, home, output)
+                final = replan()
             output['data']['workflow_readiness'] = final['workflow_readiness']
             incomplete = [entry for entry in final['workflow_readiness'] if not entry['complete']]
     final_records = c.consumer_records(planned['intent']['after_state'])

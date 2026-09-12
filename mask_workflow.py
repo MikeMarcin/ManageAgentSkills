@@ -52,7 +52,29 @@ def identifier(value, what):
 
 
 def lock_relative(skill):
+    """Canonical lock location: regenerable machine-local state beside the skill's other generated files."""
+    return f'.mask/generated/{skill}/{LOCK_NAME}'
+
+
+def legacy_lock_relative(skill):
+    """Retired location beside the committed consumer inputs; still read so an upgrade keeps vouching."""
     return f'.mask/skill-config/{skill}/{LOCK_NAME}'
+
+
+def paths(skill='{skill}'):
+    """Consumer-relative public locations; the placeholder form is advertised by capabilities."""
+    return dict(native_role_lock=lock_relative(skill), retired_native_role_locks=[legacy_lock_relative(skill)])
+
+
+def retired_path(value, skill):
+    parts = relative_path(value)
+    try:
+        packages.portable_path(value)
+    except c.MaskError:
+        c.fail('workflow.invalid', 'Retired paths must use portable file names.', 4, path=value)
+    if len(parts) < 4 or parts[:3] not in (['.mask', 'generated', skill], ['.mask', 'skill-config', skill]) or value == lock_relative(skill):
+        c.fail('workflow.invalid', 'Retired paths must be inside this skill\'s MASK configuration/generated directory, excluding its current lock.', 4, path=value)
+    return value
 
 
 class PackageView:
@@ -88,7 +110,7 @@ def descriptor(view, skill):
         value = c.parse_json(data.decode('utf-8'), 'workflow')
     except UnicodeError:
         c.fail('workflow.invalid', 'The workflow descriptor must be UTF-8 JSON.', 4, skill=skill)
-    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup',), family='workflow')
+    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks'), family='workflow')
     inputs, ids, paths = [], set(), set()
     if not isinstance(value['inputs'], list) or len(value['inputs']) > LIMITS['inputs']:
         c.fail('workflow.invalid', 'Descriptor inputs must be a bounded list.', 4)
@@ -140,7 +162,22 @@ def descriptor(view, skill):
         elif role['setup'] not in setup:
             c.fail('workflow.invalid', 'Native role references an undeclared setup action.', 4, name=role['name'])
         roles[key] = dict(role)
-    return dict(skill=skill, view=view, digest=sha256(data), inputs=inputs, roles=roles, setup=setup)
+    retired = value.get('retired_paths', [])
+    if not isinstance(retired, list) or len(retired) > 32 or any(not isinstance(item, str) for item in retired) or len(set(retired)) != len(retired):
+        c.fail('workflow.invalid', 'Retired paths must be a unique bounded list.', 4)
+    for path in retired:
+        retired_path(path, skill)
+        if path in paths or any(path.startswith(item + '/') or item.startswith(path + '/') for item in paths):
+            c.fail('workflow.invalid', 'An active input cannot be retired.', 4, path=path)
+    compatible = value.get('compatible_locks', [])
+    if not isinstance(compatible, list) or len(compatible) > 32:
+        c.fail('workflow.invalid', 'Compatible locks must be a bounded list.', 4)
+    for entry in compatible:
+        c.fields(entry, ('contract_sha256', 'role_inputs_sha256'), family='workflow')
+        if any(not isinstance(item, str) or not HEX_RE.fullmatch(item) for item in entry.values()):
+            c.fail('workflow.invalid', 'Compatible locks require exact lowercase SHA-256 pairs.', 4)
+    return dict(skill=skill, view=view, digest=sha256(data), inputs=inputs, roles=roles, setup=setup,
+                retired_paths=retired, compatible_locks=compatible)
 
 
 def asset(desc, role):
@@ -247,15 +284,22 @@ def parse_lock(value):
 
 
 def read_lock(root, desc):
-    """The consumer-checked-in portable lock, or a reason it cannot vouch for generated roles."""
-    path = Path(root) / lock_relative(desc['skill'])
-    c.parents_safe(Path(root), path)
-    if c.kind(path) == 'missing':
-        return None, 'missing'
-    try:
-        return parse_lock(c.read_json(path, 'workflow')), 'read'
-    except c.MaskError:
-        return None, 'invalid'
+    """The portable lock that vouches for generated roles, or a reason it cannot, with the location it came from.
+
+    The retired location is read only when the canonical one is absent, so a consumer that
+    committed a lock before the move keeps vouching until it moves or drops the file.
+    """
+    root = Path(root)
+    for relative in (lock_relative(desc['skill']), legacy_lock_relative(desc['skill'])):
+        path = root / relative
+        c.parents_safe(root, path)
+        if c.kind(path) == 'missing':
+            continue
+        try:
+            return parse_lock(c.read_json(path, 'workflow')), 'read', relative
+        except c.MaskError:
+            return None, 'invalid', relative
+    return None, 'missing', None
 
 
 def role_inputs(desc):
@@ -265,7 +309,11 @@ def role_inputs(desc):
 
 
 def lock_coherent(lock, desc, inputs):
-    if lock is None or lock['contract'] != desc['digest'] or lock['role_inputs'] not in (None, role_inputs(desc)):
+    if lock is None:
+        return False
+    current = lock['contract'] == desc['digest'] and lock['role_inputs'] in (None, role_inputs(desc))
+    compatible = dict(contract_sha256=lock['contract'], role_inputs_sha256=lock['role_inputs']) in desc.get('compatible_locks', [])
+    if not (current or compatible):
         return False
     return all(lock['inputs'].get(row['id']) == row['sha256'] for row in inputs if row['required'] or row['state'] == 'ok')
 
@@ -293,10 +341,11 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
             reports.append(dict(skill=skill, workflow='not_declared', contract=None, inputs=[], roles=[], complete=True))
             continue
         inputs = observe_inputs(root, desc)
-        lock, lock_state = read_lock(root, desc)
+        lock, lock_state, lock_path = read_lock(root, desc)
         coherent = lock_coherent(lock, desc, inputs)
-        report = dict(skill=skill, workflow='declared', contract=dict(descriptor=DESCRIPTOR, sha256=desc['digest'], lock=lock_state if not coherent else 'coherent'),
-                      package=dict(coordinate=coordinates.get(skill), root=str(desc['view'].root) if desc['view'].root is not None else None), inputs=inputs, roles=[], complete=True)
+        report = dict(skill=skill, workflow='declared', contract=dict(descriptor=DESCRIPTOR, sha256=desc['digest'], lock=lock_state if not coherent else 'coherent', lock_path=lock_path),
+                      package=dict(coordinate=coordinates.get(skill), root=str(desc['view'].root) if desc['view'].root is not None else None), inputs=inputs, roles=[], complete=True,
+                      retired_paths=sorted(set(desc['retired_paths'] + ([legacy_lock_relative(skill)] if desc['setup'] else []))))
         if any(row['state'] in ('missing', 'invalid') for row in inputs):
             report['complete'] = False
         for (agent, name), role in sorted(desc['roles'].items()):

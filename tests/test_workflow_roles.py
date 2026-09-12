@@ -47,6 +47,13 @@ class WorkflowFixture(Fixture):
                     return {(row['agent'], row['name']): row for row in item['roles']}
         return {}
 
+    def contract(self, data, skill='implement-rfc'):
+        for entry in data['data']['workflow_readiness']:
+            for item in entry['skills']:
+                if item['skill'] == skill:
+                    return item['contract']
+        return {}
+
     def owned(self):
         return json.loads((self.home / 'state.json').read_text(encoding='utf-8'))['projects'][str(self.project)].get('native_roles', {})
 
@@ -256,12 +263,14 @@ class CheckedInGeneratedRoles(WorkflowFixture):
         self.roles_dir['claude'].mkdir(parents=True)
         (self.roles_dir['codex'] / 'rfc-integrator.toml').write_text('name = "rfc-integrator"\nmodel = "fixture-model-do-not-run"\n', encoding='utf-8')
         (self.roles_dir['claude'] / 'rfc-integrator.md').write_text('---\nname: rfc-integrator\nmodel: fixture-model-do-not-run\n---\n\nFixture.\n', encoding='utf-8')
-        self.lock = self.project / '.mask/skill-config/implement-rfc/native-roles.lock.json'
+        self.lock = self.project / '.mask/generated/implement-rfc/native-roles.lock.json'
         self.write_lock()
 
-    def write_lock(self):
+    def write_lock(self, path=None):
+        path = path or self.lock
+        path.parent.mkdir(parents=True, exist_ok=True)
         descriptor = (self.source / 'skills/implement-rfc/mask-workflow.json').read_bytes()
-        self.lock.write_text(json.dumps(dict(
+        path.write_text(json.dumps(dict(
             schema_version=1, contract_sha256=sha256(descriptor),
             inputs={'project-config': sha256((self.project / '.mask/skill-config/implement-rfc/project.json').read_bytes()),
                     'project-rules': sha256((self.project / '.mask/skill-config/implement-rfc/project.md').read_bytes())},
@@ -295,6 +304,25 @@ class CheckedInGeneratedRoles(WorkflowFixture):
         missing = self.call('ensure', code=4)
         self.assertEqual({row['state'] for row in self.roles(missing).values()}, {'setup_required'})
         self.assertEqual(self.call('ensure', '--check', code=4)['error']['code'], 'workflow.incomplete')
+
+    def test_retired_lock_location_still_vouches_and_the_canonical_one_wins(self):
+        legacy = self.project / '.mask/skill-config/implement-rfc/native-roles.lock.json'
+        self.lock.unlink()
+        self.write_lock(legacy)
+        result = self.call('ensure')
+        roles = self.roles(result)
+        self.assertEqual({row['state'] for row in roles.values()}, {'ok'})
+        self.assertEqual(self.contract(result)['lock_path'], '.mask/skill-config/implement-rfc/native-roles.lock.json')
+        # The canonical location is authoritative when both exist: a stale retired file cannot override it.
+        self.write_lock()
+        self.assertEqual(self.contract(self.call('ensure'))['lock_path'], '.mask/generated/implement-rfc/native-roles.lock.json')
+        legacy.write_text('not a lock\n', encoding='utf-8')
+        self.assertEqual(self.contract(self.call('ensure'))['lock_path'], '.mask/generated/implement-rfc/native-roles.lock.json')
+        # With no canonical lock, an unreadable retired file is reported at the path it was read from.
+        self.lock.unlink()
+        invalid = self.call('ensure', code=4)
+        self.assertEqual(self.contract(invalid)['lock'], 'invalid')
+        self.assertEqual(self.contract(invalid)['lock_path'], '.mask/skill-config/implement-rfc/native-roles.lock.json')
 
     def test_missing_required_input_is_one_actionable_requirement(self):
         (self.project / '.mask/skill-config/implement-rfc/project.md').unlink()

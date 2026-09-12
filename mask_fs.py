@@ -43,7 +43,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     import mask_selection as selection
     policy_value = selection.policy(selection_policy) if selection_policy is not None else selection.read_policy(home)[0] if home is not None else selection.policy()
     typed_files, uses_pinned = [], selection_policy is not None
-    role_files, workflow_reports, released_roles = [], [], []
+    role_files, workflow_reports, released_roles, retired_files = [], [], [], []
     outcomes = []
     revision, dirty = None, None
     for root in sorted(roots, key=str):
@@ -167,6 +167,10 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     targets[link['skill']] = workflow.PackageView(files=frozen) if frozen is not None else workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
                     coordinates[link['skill']] = resolve.coordinate(link['resolution']) if 'resolution' in link else legacy_alias(config) + '/' + link['skill']
             roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles)
+            from mask_repair import retired_files as plan_retired
+            retired = plan_retired(root, roles['reports'], repair_roles)
+            retired_files.extend(retired)
+            actions.extend(dict(kind='retired_file.remove', status='planned', path=str(root / entry['relative']), skill=entry['skill']) for entry in retired)
             if roles['owned']:
                 next_record['native_roles'] = roles['owned']
             else:
@@ -207,6 +211,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if role_files:
         # Only planned role effects bind the hash; an observation that merely differs in detail must not stale a reviewed plan.
         payload['native_roles'] = role_files
+    if retired_files:
+        payload['retired_files'] = retired_files
     development = pinned.development_observations(state, after, [str(root) for root in roots], config) if uses_pinned else []
     if development:
         payload['development'] = development
@@ -225,6 +231,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
         result.update(workflow_readiness=workflow_reports, released_roles=released_roles)
     if role_files:
         result['intent']['native_roles'] = role_files
+    if retired_files:
+        result['intent']['retired_files'] = retired_files
     if development or operation == 'source.dev-link':
         result['intent']['development'] = development
     return result
@@ -335,7 +343,7 @@ def make_pending(planned, home):
     import uuid
     intent = copy.deepcopy(planned['intent'])
     version = max(intent['before_state']['schema_version'], intent['after_state']['schema_version'])
-    if 'controls' in intent or 'selection_change' in intent or 'native_roles' in intent:
+    if any(key in intent for key in ('controls', 'selection_change', 'native_roles', 'retired_files')):
         version = 3
     intent.update(schema_version=version, transaction_id=str(uuid.uuid4()), phase='prepared',
                   base_generation=intent['before_state']['generation'],
@@ -349,7 +357,7 @@ def validate_pending(pending, home):
     import mask_selection as selection
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup'), 'recovery', versions=(1, 2, 3))
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
     if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
@@ -367,7 +375,7 @@ def validate_pending(pending, home):
         from mask_git import validate_git_intent
         validate_git_intent(pending['git'], pending['config'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
-    if pending['schema_version'] != (3 if 'controls' in pending or 'selection_change' in pending or 'native_roles' in pending else max(before['schema_version'], after['schema_version'])):
+    if pending['schema_version'] != (3 if any(key in pending for key in ('controls', 'selection_change', 'native_roles', 'retired_files')) else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
     if before['schema_version'] != after['schema_version'] and not (pending['operation'] in ('user.register', 'install') and before['schema_version'] == 1 and after['schema_version'] == 2 and before.get('user') is None and after.get('user') is not None) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
         c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
@@ -423,6 +431,9 @@ def validate_pending(pending, home):
     if 'setup' in pending:
         from mask_setup import validate_journal
         validate_journal(pending)
+    if 'retired_files' in pending:
+        from mask_repair import validate_retired
+        validate_retired(pending)
     if not selected <= before_records.keys() | after_records.keys():
         c.fail('recovery.conflict', 'Pending project is absent from recorded registry.', 8)
     if 'launcher' in pending:
@@ -530,6 +541,8 @@ def check_current(pending, home):
         if c.read_text(pinned.file_path(entry, home), missing=True) not in (entry['before'], entry['after']):
             c.fail('recovery.conflict', 'A typed pending control was edited.', 8)
     workflow.check_roles(pending)
+    from mask_repair import check_retired
+    check_retired(pending)
     if 'setup' in pending:
         from mask_setup import check_journal
         check_journal(pending)
@@ -628,6 +641,10 @@ def restore(pending, home, side, *, inject=False):
         restore_journal(pending, side)
         if inject:
             checkpoint('native_role_lock')
+    from mask_repair import restore_retired
+    restore_retired(pending, side)
+    if inject and pending.get('retired_files'):
+        checkpoint('retired_file')
     if side == 'after' and 'pinned' in pending:
         for root, record in c.consumer_records(pending['after_state']).items():
             if root not in pending['selected'] or not pinned.is_pinned(record):
@@ -705,6 +722,10 @@ def execute(planned, home, output, *, pending=None):
                 for row in report['roles']:
                     if row.get('action') in ('create', 'update'):
                         row.update(state='ok', ownership='package-managed', observed_sha256=row['expected_sha256'], deployed=True)
+                removed = {(item['root'], item['relative']) for item in pending.get('retired_files', [])}
+                for row in report.get('retired_files', []):
+                    if (entry['root'], row['path']) in removed:
+                        row.update(state='removed')
         for outcome in output['data'].get('outcomes', []):
             if outcome['status'] not in ('selected', 'overridden'):
                 continue

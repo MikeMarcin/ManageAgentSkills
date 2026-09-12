@@ -669,6 +669,40 @@
           ]
         }
       }
+    },
+    "retired_files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "description": "Explicit ensure repair only; bounded retired text files in the selected skill namespace, backed up before removal. Runtime validates roots and paths.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root",
+          "skill",
+          "relative",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "relative": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "null"
+          }
+        }
+      }
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

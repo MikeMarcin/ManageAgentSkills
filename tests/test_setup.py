@@ -81,7 +81,7 @@ class SetupFixture(PublicFixture):
         self.assertTrue(self.machine('project', 'register', '--project', self.project)['ok'])
         self.assertTrue(self.machine('project', 'require', 'implement-rfc', '--project', self.project)['ok'])
         self.assertTrue(self.machine('integration', 'approve', '--project', self.project)['ok'])
-        self.lock = self.project / '.mask/skill-config/implement-rfc/native-roles.lock.json'
+        self.lock = self.project / '.mask/generated/implement-rfc/native-roles.lock.json'
 
     def write_script(self, before='', after='', timeout=None):
         (self.package / 'scripts/prepare_fixture_roles.py').write_text(SCRIPT.format(sentinel=str(self.sentinel), before=before, after=after), encoding='utf-8')
@@ -477,7 +477,7 @@ mask.main(sys.argv[3:])
     def test_crash_during_publication_completes_from_the_journal_without_rerunning(self):
         pending = self.crash_at('native_role')
         self.assertEqual(pending['setup']['phase'], 'staged')
-        self.assertEqual(pending['setup']['lock']['relative'], '.mask/skill-config/implement-rfc/native-roles.lock.json')
+        self.assertEqual(pending['setup']['lock']['relative'], '.mask/generated/implement-rfc/native-roles.lock.json')
         self.assertEqual(len(pending['native_roles']), 2)
         self.assertEqual(self.launches(), 1)
         self.assertEqual(self.machine('ensure', '--project', self.project)['error']['code'], 'recovery.required')

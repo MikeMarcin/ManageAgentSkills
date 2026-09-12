@@ -170,7 +170,7 @@ def authorize(args, output, planned, rows):
 
 
 def request_text(row):
-    return c.text_json(dict(schema=REQUEST_SCHEMA, action=row['action'], native_roles=row['native_roles'], inputs=row['inputs'], parameters=row['parameters']))
+    return c.text_json(dict(schema=REQUEST_SCHEMA, action=row['action'], native_roles=row['native_roles'], inputs=row['inputs'], parameters=row['parameters'], paths=workflow.paths(row['skill'])))
 
 
 def excerpt(data):
@@ -357,6 +357,8 @@ def publish(output, home, replan, rows):
         staged = {(skill, agent, name): data for (agent, name), data in outputs.items()}
         after = replan(staged={str(root): staged})
         report = recheck(after, rows, ran=True)
+        from mask_repair import check_retired_snapshot
+        check_retired_snapshot(base, after)
         if rows[0].get('granted_by') == 'repair':
             for role in report['roles']:
                 key = (role['agent'], role['name'])
@@ -438,7 +440,8 @@ def validate_journal(pending):
         c.fail('recovery.conflict', 'A staged setup journal needs its lock transition.', 8)
     lock = facts['lock']
     c.fields(lock, ('relative', 'before', 'after'), family='recovery')
-    if lock['relative'] != workflow.lock_relative(facts['skill']) or not isinstance(lock['after'], str) or lock['before'] is not None and not isinstance(lock['before'], str):
+    # A journal written before the lock moved out of .mask/skill-config still names the retired path.
+    if lock['relative'] not in (workflow.lock_relative(facts['skill']), workflow.legacy_lock_relative(facts['skill'])) or not isinstance(lock['after'], str) or lock['before'] is not None and not isinstance(lock['before'], str):
         c.fail('recovery.conflict', 'Unsafe pending setup lock.', 8)
     try:
         workflow.parse_lock(c.parse_json(lock['after'], 'workflow'))

@@ -30,16 +30,53 @@ carry fingerprints must disable Git line-ending normalization for them, for
 example `* -text` in `.gitattributes`, or a checkout on an `autocrlf` host is
 refused as `workflow.invalid` rather than deployed with converted bytes); roles already committed in
 the consumer (optionally vouched for by
-`.mask/skill-config/<skill>/native-roles.lock.json`) pass as repository-owned
-and are never adopted, rewritten or deleted. Commit them as exact bytes: on an
-`autocrlf` host a checkout that converts their line endings is reported as
-`modified` and preserved, so a consumer that checks generated roles in should
+`.mask/generated/<skill>/native-roles.lock.json`) pass as repository-owned
+and are never adopted, rewritten or deleted. That lock is regenerable machine-local
+state and lives beside the skill's other generated files, where the conventional
+`/.mask/generated/` ignore rule already covers it; MASK still reads a lock at the
+retired `.mask/skill-config/<skill>/native-roles.lock.json` when the canonical one is
+absent, so an upgraded consumer keeps vouching until it moves or drops that file.
+Committing the lock is therefore a deliberate choice: a consumer that wants a fresh
+clone to pass without running setup must un-ignore the canonical path and commit it
+with the role files as exact bytes. On an `autocrlf` host a checkout that converts
+their line endings is reported as `modified` and preserved, so such a consumer should
 exclude them from normalization (for example `.codex/agents/** -text`,
 `.claude/agents/** -text` and the lock file in `.gitattributes`). Modified, unknown or colliding
 files are preserved and reported, and `ensure` exits 4 with `workflow.incomplete`
 until every applicable role and input matches. The result field
 `workflow_readiness` lists each role's state, ownership and configured route;
 host loading stays `not_verified`.
+
+Setup requests (`mask.setup-request.v1`) include `paths.native_role_lock` and
+`paths.retired_native_role_locks`, relative to the consumer root. Standalone
+tools read the same keys under `data.workflow.paths` in `mask capabilities
+--json`, substituting their skill ID for `{skill}`. These are observational
+locations, not permission for a setup script to publish outside its stage.
+Packages must consume these fields instead of hardcoding MASK's internal layout.
+
+Descriptors may declare `retired_paths`, a unique list of at most 32 relative
+file paths inside `.mask/skill-config/<skill>/` or `.mask/generated/<skill>/`.
+Active inputs and the current native-role lock cannot be retired. MASK also
+reports its own retired lock location without requiring a package edit.
+`workflow_readiness[].skills[].retired_files` reports absent, present, unsafe,
+or still-in-use entries. These advisory observations do not invalidate readiness.
+Normal commands never remove them. Manual `ensure --repair` backs up and journals
+removal of regular UTF-8 files up to 1 MiB once the workflow can be reconciled;
+directories, links, linked parents, binary/oversized files and an active fallback
+lock are preserved. After successful setup publishes a new canonical lock, repair
+can remove the old one in the same invocation. Backups survive rollback; recovery
+never reruns setup. This is an explicit repair exception to preserving repository-
+owned files, including files tracked in Git; directories are never removed.
+
+A package can vouch for a byte-identical setup refactor with `compatible_locks`:
+up to 32 objects containing exact prior `contract_sha256` and
+`role_inputs_sha256` values. Both are required because adding this declaration
+also changes the descriptor hash. An exact pair can retain an old lock without
+running code or rewriting it. Consumer inputs and every role's on-disk SHA-256
+are still checked against that lock. This is a package-author assertion of output
+equivalence, not an automatic inference; verify equivalent outputs before adding
+a pair. Unlisted input changes still require setup, and malformed declarations
+are rejected. Setup consent continues to fingerprint the complete current package.
 
 Every public entrypoint shares that one prerequisite verdict. `install`, `remove`
 and `update` (shared source or pinned) report `workflow_readiness` and a per-scope

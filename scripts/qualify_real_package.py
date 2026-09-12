@@ -132,7 +132,7 @@ def console(args):
     env = dict(os.environ, **facts['env'], PYTHONDONTWRITEBYTECODE='1', PYTHONUTF8='1')
     run = subprocess.run([sys.executable, '-B', facts['mask'], 'ensure', '--project', str(gamma), '--json'], capture_output=True, encoding='utf-8', env=env, stdin=subprocess.DEVNULL, timeout=300)
     data = json.loads(run.stdout)
-    lock = gamma / '.mask/skill-config/implement-rfc/native-roles.lock.json'
+    lock = gamma / '.mask/generated/implement-rfc/native-roles.lock.json'
     view = dict(exit=run.returncode, ok=data['ok'], changed=data.get('changed'), files=role_files(gamma), lock=lock.is_file(), setup=[r['state'] for r in setup_rows(data)],
                 states=sorted({r['state'] for r in roles_of(data).values()}), staging=[p.name for p in (Path(facts['env']['MASK_HOME']) / 'staging').glob('*')] if (Path(facts['env']['MASK_HOME']) / 'staging').exists() else [])
     print(json.dumps(view, indent=2))
@@ -246,7 +246,7 @@ def main():
     record['disclosure'] = dry['data'].get('setup', {}).get('confirmation')
     run, data = lab.run('ensure', '--project', alpha, '--expect-plan-hash', plan_hash, '--allow-setup', ACTION)
     roles = roles_of(data)
-    lock = alpha / '.mask/skill-config/implement-rfc/native-roles.lock.json'
+    lock = alpha / '.mask/generated/implement-rfc/native-roles.lock.json'
     step('alpha consented setup: ok, 16 roles ok, lock published, staging empty',
          run.returncode == 0 and data['ok'] and len(role_files(alpha)) == 16 and all(r['state'] == 'ok' for r in roles.values()) and lock.is_file()
          and not any((lab.home / 'staging').glob('*')),
@@ -287,14 +287,14 @@ def main():
     step('addenda confined to their consumer', 'ALPHA-ONLY' in alpha_text and 'BETA-ONLY' not in alpha_text and 'BETA-ONLY' in beta_text and 'ALPHA-ONLY' not in beta_text)
     step('alpha and beta role bytes differ (consumer-specific generation)', alpha_text != beta_text)
     alpha_lock = json.loads(lock.read_text(encoding='utf-8'))
-    beta_lock = json.loads((beta / '.mask/skill-config/implement-rfc/native-roles.lock.json').read_text(encoding='utf-8'))
+    beta_lock = json.loads((beta / '.mask/generated/implement-rfc/native-roles.lock.json').read_text(encoding='utf-8'))
     record['lock_keys'] = sorted(alpha_lock)
     step('locks bind the descriptor digest and differ per consumer', alpha_lock != beta_lock)
 
     # AC02: fresh clone with checked-in roles and lock is complete, repository-owned, no setup, tracked bytes unchanged.
     # A consumer that checks in exact role bytes must keep Git from normalizing their line endings on autocrlf hosts.
-    (beta / '.gitattributes').write_text('.codex/agents/** -text\n.claude/agents/** -text\n.mask/skill-config/implement-rfc/native-roles.lock.json -text\n', encoding='utf-8')
-    git(beta, 'add', '.gitattributes', '.codex/agents', '.claude/agents', '.mask/skill-config/implement-rfc/native-roles.lock.json')
+    (beta / '.gitattributes').write_text('.codex/agents/** -text\n.claude/agents/** -text\n.mask/generated/implement-rfc/native-roles.lock.json -text\n', encoding='utf-8')
+    git(beta, 'add', '.gitattributes', '.codex/agents', '.claude/agents', '.mask/generated/implement-rfc/native-roles.lock.json')
     git(beta, 'commit', '-q', '-m', 'check in generated roles and lock')
     clone = lab.work / 'beta clone'
     git(lab.work, 'clone', '-q', str(beta), str(clone))

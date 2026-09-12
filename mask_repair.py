@@ -12,13 +12,93 @@ from pathlib import Path
 import re
 
 import mask_core as c
+import mask_workflow as workflow
 
 UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+
+
+def retired_files(root, reports, repair=False):
+    """Observe bounded retired files. Only explicit repair produces deletion intents."""
+    writes = []
+    active_inputs = [row['path'] for report in reports for row in report['inputs']]
+    for report in reports:
+        retired = report.pop('retired_paths', [])
+        if not retired:
+            continue
+        report['retired_files'] = []
+        for relative in retired:
+            row = dict(path=relative, state='absent')
+            report['retired_files'].append(row)
+            if any(relative == item or relative.startswith(item + '/') or item.startswith(relative + '/') for item in active_inputs):
+                row['state'] = 'active_input'
+                continue
+            path = Path(root) / relative
+            try:
+                c.parents_safe(Path(root), path)
+                kind = c.kind(path)
+                if kind == 'missing':
+                    continue
+                row['state'] = 'unsafe'
+                if kind != 'file' or path.stat().st_size > workflow.ASSET_BYTES:
+                    continue
+                text = path.read_bytes().decode('utf-8')
+            except (c.MaskError, UnicodeError):
+                continue
+            row.update(state='present', sha256=workflow.sha256(text.encode('utf-8')))
+            if relative == workflow.legacy_lock_relative(report['skill']) and c.kind(Path(root) / workflow.lock_relative(report['skill'])) == 'missing':
+                row['state'] = 'in_use'
+            elif repair and report['complete']:
+                row['state'] = 'remove_planned'
+                writes.append(dict(root=str(root), skill=report['skill'], relative=relative, before=text, after=None))
+    return writes
+
+
+def validate_retired(pending):
+    entries = pending['retired_files']
+    if pending['operation'] != 'ensure' or not isinstance(entries, list) or not entries or len(entries) > 4096:
+        c.fail('recovery.conflict', 'Unsafe retired-file repair journal.', 8)
+    seen = set()
+    for entry in entries:
+        c.fields(entry, ('root', 'skill', 'relative', 'before', 'after'), family='recovery')
+        c.skill_id(entry['skill'])
+        try:
+            workflow.retired_path(entry['relative'], entry['skill'])
+        except c.MaskError:
+            c.fail('recovery.conflict', 'Unsafe retired-file repair path.', 8)
+        key = (entry['root'], entry['relative'])
+        record = c.consumer_records(pending['after_state']).get(entry['root'], {})
+        if (entry['root'] not in pending['selected'] or key in seen or entry['after'] is not None
+                or not isinstance(entry['before'], str) or len(entry['before'].encode('utf-8')) > workflow.ASSET_BYTES
+                or not any(link['skill'] == entry['skill'] for link in record.get('links', {}).values())):
+            c.fail('recovery.conflict', 'Invalid retired-file repair transition.', 8)
+        seen.add(key)
+
+
+def check_retired(pending):
+    for entry in pending.get('retired_files', []):
+        if workflow.current_text(entry) not in (entry['before'], None):
+            c.fail('recovery.conflict', 'A retired file changed after repair planning.', 8, path=entry['relative'])
+
+
+def check_retired_snapshot(before, after):
+    """Setup must not turn concurrent changes into newly authorized cleanup bytes."""
+    observed = {(entry['root'], row['path']): row.get('sha256')
+                for entry in before.get('workflow_readiness', []) for report in entry['skills']
+                for row in report.get('retired_files', [])}
+    for entry in after['intent'].get('retired_files', []):
+        if observed.get((entry['root'], entry['relative'])) != workflow.sha256(entry['before'].encode('utf-8')):
+            c.fail('plan.stale', 'A retired file changed during setup; cleanup was preserved. Setup may already have published roles.', 4, path=entry['relative'])
+
+
+def restore_retired(pending, side):
+    for entry in pending.get('retired_files', []):
+        workflow.set_role(entry, side)
 
 
 def backup_files(pending, home):
     files = [(entry['root'], entry['relative'], entry['before'])
              for entry in pending.get('native_roles', []) if entry.get('repair')]
+    files.extend((entry['root'], entry['relative'], entry['before']) for entry in pending.get('retired_files', []))
     setup = pending.get('setup') or {}
     lock = setup.get('lock') or {}
     if setup.get('granted_by') == 'repair' and lock.get('before') is not None and lock['before'] != lock['after']:
