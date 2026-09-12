@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0097"
 title: "Publish workflow paths and repair retired generated files"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0019"]
 depends_on: []
 ---
