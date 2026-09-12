@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0097"
+  ],
+  "reserve_for": "workflow-deployment-contracts",
+  "purpose": "",
+  "created": "2026-09-12T15:27:59.044695+00:00",
+  "base": "832380e051884634045a16d934f89b866da05a95"
+}
