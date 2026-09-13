@@ -1,0 +1,24 @@
+{
+  "approved": true,
+  "decision": "done",
+  "records": [
+    {
+      "criterion": "Two complete passive project and personal scope contracts validate independently without a skill-specific exception",
+      "outcome": "pass",
+      "revision": "78cc57cdac4ea493a3e0ba38ca0e51218af7991a",
+      "evidence": {"kind": "artifact", "detail": "docs/rfcs/MASK-0098.readiness.json"}
+    },
+    {
+      "criterion": "Personal setup and preflight use canonical roles and bound source/tracker facts, with missing or stale prerequisites not ready",
+      "outcome": "pass",
+      "revision": "78cc57cdac4ea493a3e0ba38ca0e51218af7991a",
+      "evidence": {"kind": "artifact", "detail": "docs/rfcs/MASK-0098.readiness.json"}
+    },
+    {
+      "criterion": "Project behavior, managed ownership, collision refusal, exact setup consent and live no-approval state remain intact",
+      "outcome": "pass",
+      "revision": "78cc57cdac4ea493a3e0ba38ca0e51218af7991a",
+      "evidence": {"kind": "artifact", "detail": "docs/rfcs/MASK-0098.readiness.json"}
+    }
+  ]
+}

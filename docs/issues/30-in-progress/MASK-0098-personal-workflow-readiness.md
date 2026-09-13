@@ -26,4 +26,4 @@ Contributes to: RFC-MASK-0020-AC01, RFC-MASK-0020-AC02, RFC-MASK-0020-AC03.
 
 ## Verification and execution record
 
-Not started. No program or native acceptance asserted.
+Program `78cc57cdac4ea493a3e0ba38ca0e51218af7991a` implements complete project/user scope contracts and scope-specific setup requests without a skill-specific branch. AgentSkills source `9b47f12861c33f1f02b3aa4aaa7d848e37c2b094` supplies the canonical personal descriptor and preflight. [Direct readiness evidence](../../rfcs/MASK-0098.readiness.json) records five focused tests, the 379-test MASK suite (four skipped), a fresh committed-revision cross-repository CLI run, and the unchanged live `integration.approval_required` check. File readiness is qualified; native Codex and Claude Code loading remains a separate AgentSkills acceptance.

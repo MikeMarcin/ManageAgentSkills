@@ -1,0 +1,20 @@
+{
+  "run_id": "personal-mode-20260913",
+  "dispatch_id": "pm-003",
+  "card": "MASK-0098",
+  "program_revision": "78cc57cdac4ea493a3e0ba38ca0e51218af7991a",
+  "agent_skills_revision": "9b47f12861c33f1f02b3aa4aaa7d848e37c2b094",
+  "observed": [
+    "The passive descriptor accepts a complete scopes.user contract without a skill-specific branch; top-level project inputs and roles remain the project contract. Both contracts validate even when one is selected, and user locks have a distinct digest.",
+    "Fresh committed-revision public CLI in disposable HOME: init selected AgentSkills, install --user returned expected workflow.incomplete pending setup, reviewed-hash ensure --user with exact setup consent returned success, and AgentSkills personal preflight reported 16 ready role rows with host_load not_verified and a clean source checkout.",
+    "Project setup with a remembered personal binding still selects explicit project scope. Stale or missing personal roles, invalid descriptors, collisions and unapproved setup refuse in focused public tests.",
+    "The live ManageAgentSkills checkout still reports integration.approval_required from ensure --project --check --json (exit 4, transaction not_started, changed false). No persistent approval was granted."
+  ],
+  "checks": [
+    {"command": "python3 -m unittest discover -s tests -p test_workflow_scopes.py", "result": "5 passed"},
+    {"command": "python3 -m unittest discover -s tests", "result": "379 tests, 375 passed, 4 skipped; exit 0"},
+    {"command": "python3 scripts/verify_documentation.py --root .", "result": "20 RFCs, 99 cards, 0 structural violations"}
+  ],
+  "transient_diagnostic": "An earlier evolving-tree 51-test run had one JSONDecodeError parsing empty subprocess output. Its original child exit, stderr and exact cause were not retained, so no cause is asserted. A bounded same-order fixed-snapshot reproduction passed 51/51, logging 293 child commands; the previously failing dry-run returned exit 4 with valid 7827-byte JSON and empty stderr. The later full fixed-snapshot suite passed 379 tests with 4 skipped.",
+  "native_loading": "not verified by MASK; actual Codex and Claude Code personal role loading remains on AgentSkills ASK-0081"
+}
