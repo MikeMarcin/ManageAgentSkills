@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0100", "MASK-0101", "MASK-0102"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "help-docs-and-capabilities-truth"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"help-docs-and-capabilities-truth","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0103: Make help, docs and capabilities describe only the tap model

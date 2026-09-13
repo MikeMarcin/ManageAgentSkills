@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "machine-v3-and-tap-bootstrap"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"machine-v3-and-tap-bootstrap","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0099: Add config v3, tap-add bootstrap and tap-first fixtures

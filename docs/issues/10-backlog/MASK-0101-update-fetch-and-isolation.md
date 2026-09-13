@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0099"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "update-fetch-and-isolation"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"update-fetch-and-isolation","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0101: Fetch every referenced tap and update all consumers in one journal

@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0102", "MASK-0103"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "owner-machine-migration-dogfood"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"owner-machine-migration-dogfood","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0105: Migrate the owner's real machine and personal scope (attended)

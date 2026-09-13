@@ -1,14 +1,17 @@
 ---
 id: "RFC-MASK-0020"
 title: "Tap-only deployment, fetching updates and doctor migration"
-status: "Proposed"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-12"
+metadata: {"milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0020: Tap-only deployment, fetching updates and doctor migration
 
 **Corrective proposal; not implemented or qualified by this pack.** Live import of packet `RFC-MASK-0020` (no renumber needed; live RFCs ended at RFC-MASK-0019). Retained packet: [assets/mask-corrective-managed-taps/](assets/mask-corrective-managed-taps/README.md); import record: [LIVE_IMPORT](assets/mask-corrective-managed-taps.LIVE_IMPORT.md).
+
+**Accepted for implementation (September 12, 2026)** by the owner's `/implement-rfc RFC-MASK-0020` direction; implementing from RFC_BASE_SHA `b92372f` under the adopted plan [plans/tap-only-deployment](plans/tap-only-deployment/milestone-plan.json). Current frontier and per-criterion evidence: closeout [MASK-0106](../issues/10-backlog/MASK-0106-close-tap-only-deployment.md). Nothing is qualified until that closeout records it.
 
 Amends applicable current behavior from RFC-MASK-0003 (`init --source`, shared
 checkout `update`), RFC-MASK-0007 (a v2 catalog that still requires a legacy

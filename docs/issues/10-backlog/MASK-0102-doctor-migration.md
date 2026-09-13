@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098", "MASK-0100"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "doctor-migration"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"doctor-migration","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0102: Detect and migrate legacy machines and consumers through doctor

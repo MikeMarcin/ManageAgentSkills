@@ -1,0 +1,149 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "tap-only-deployment",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0020"
+    ],
+    "issues": [
+      "MASK-0098",
+      "MASK-0099",
+      "MASK-0100",
+      "MASK-0101",
+      "MASK-0102",
+      "MASK-0103",
+      "MASK-0104",
+      "MASK-0105",
+      "MASK-0106"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "baseline",
+      "outcome": "The live-checkout defect is recorded as evidence and a schema-true legacy machine fixture exists for later migration tests.",
+      "work": [
+        {
+          "issue": "MASK-0098"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "The closeout card carries the real pre-implementation revision.",
+        "A baseline test proves the current parsers accept the legacy fixture bytes and that a legacy install links into the clone."
+      ],
+      "boundary": "Evidence and fixtures only; no product behavior changes."
+    },
+    {
+      "id": "bootstrap",
+      "outcome": "A machine bootstraps from one tap and every test fixture starts that way.",
+      "work": [
+        {
+          "issue": "MASK-0099"
+        }
+      ],
+      "depends_on": [
+        "baseline"
+      ],
+      "exit_criteria": [
+        "tap add on an empty MASK_HOME followed by install deploys a v2 consumer from the store with no checkout on disk.",
+        "The full suite passes on the tap-first fixtures while legacy code still exists."
+      ],
+      "boundary": "Config v3 accepted, init without --source, tap-add bootstrap, fixture cutover; no legacy deletion yet."
+    },
+    {
+      "id": "engine",
+      "outcome": "The live-checkout engine is gone and update fetches every referenced tap.",
+      "work": [
+        {
+          "issue": "MASK-0100"
+        },
+        {
+          "issue": "MASK-0101"
+        }
+      ],
+      "depends_on": [
+        "bootstrap"
+      ],
+      "exit_criteria": [
+        "No link producer can target a Git checkout except source dev-link.",
+        "Retired commands are absent from capabilities and exit 2; legacy configuration exits 4 migration.required.",
+        "update fetches each tap once, isolates failed taps and applies one journal."
+      ],
+      "boundary": "Engine retirement and the new update module; docs and migration follow."
+    },
+    {
+      "id": "migration",
+      "outcome": "doctor detects and migrates v1 and v2 machines, projects and personal scopes with recovery.",
+      "work": [
+        {
+          "issue": "MASK-0102"
+        }
+      ],
+      "depends_on": [
+        "engine"
+      ],
+      "exit_criteria": [
+        "The fixture crash matrix recovers with rollback or complete at every checkpoint.",
+        "A machine with an empty registry migrates its configuration only."
+      ],
+      "boundary": "Detection, mapping, journal and refusals from contracts/MIGRATION.md; no real machine is migrated here."
+    },
+    {
+      "id": "truth",
+      "outcome": "Help, documentation and capabilities describe only the tap model.",
+      "work": [
+        {
+          "issue": "MASK-0103"
+        }
+      ],
+      "depends_on": [
+        "engine",
+        "migration"
+      ],
+      "exit_criteria": [
+        "README recipes replay verbatim through the public CLI.",
+        "The retired-spelling documentation test passes."
+      ],
+      "boundary": "Presentation and documents; no engine changes."
+    },
+    {
+      "id": "qualification",
+      "outcome": "The real AgentSkills package and the owner's machine are exercised natively through taps.",
+      "work": [
+        {
+          "issue": "MASK-0104"
+        },
+        {
+          "issue": "MASK-0105"
+        }
+      ],
+      "depends_on": [
+        "truth"
+      ],
+      "exit_criteria": [
+        "The qualifier passes on native Windows 11 and macOS including push-then-update and the legacy lab.",
+        "The owner's v1 machine is migrated by doctor with the transcript recorded and the clone untouched."
+      ],
+      "boundary": "Evidence gathering; defects return to their owning cards."
+    },
+    {
+      "id": "closeout",
+      "outcome": "RFC-MASK-0020 is closed with direct evidence for every criterion.",
+      "work": [
+        {
+          "issue": "MASK-0106"
+        }
+      ],
+      "depends_on": [
+        "qualification"
+      ],
+      "exit_criteria": [
+        "Every acceptance row names a real command or observation, outcome and revision.",
+        "The structure gate reports zero violations and the full suite passes on both platforms."
+      ],
+      "boundary": "Closeout bookkeeping only."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}

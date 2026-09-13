@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0099"]
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "retire-live-checkout-engine"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"retire-live-checkout-engine","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0100: Remove legacy paths, commands and add the migration gate

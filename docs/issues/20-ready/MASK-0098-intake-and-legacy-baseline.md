@@ -6,7 +6,7 @@ status: "Ready"
 rfcs: ["RFC-MASK-0020"]
 depends_on: []
 priority: "P1"
-metadata: {"packet": "mask-corrective-managed-taps", "provisional_id": false, "packet_key": "intake-and-legacy-baseline"}
+metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"intake-and-legacy-baseline","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
 # MASK-0098: Record baseline and build the legacy machine fixture
