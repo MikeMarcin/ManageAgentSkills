@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0099"
 title: "Add config v3, tap-add bootstrap and tap-first fixtures"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098"]
 priority: "P1"
