@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0098"
 title: "Implement scope-specific personal workflow readiness"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: []
 metadata: {"criterion_coverage":["RFC-MASK-0020-AC01","RFC-MASK-0020-AC02","RFC-MASK-0020-AC03"]}
