@@ -16,7 +16,30 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d2` record (milestone `bootstrap` accepted).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
+**Dispatch `d3` checkpoint (milestone `engine` in progress).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`, mandate revision `1`. The mandate and permissions are unchanged from d2 below.
+
+- **Binding** (`coordinator_handoff.py assign --target RFC-MASK-0020 --milestone engine`, accepted `baseline` and `bootstrap`):
+  - definition `sha256:e41ecb8e391879ede6dbc0126096ab78d5e8d489dfdb9bb6f48980538036a517`
+  - obligations `sha256:ca9ace464b531dd11759bc20c98e3fed090a0e15ae26d3bb9b0ec13db457c20f` (MASK-0100 `sha256:74490bb6…`, MASK-0101 `sha256:45fa1db7…`)
+  - prerequisite `sha256:6e3b48d4ed539c1028f2f5db223f859fd9b69b4324ad8b66feb22dbab1a46101`
+  - The assignment is `d3-assignment.json` in the ignored run directory.
+- **Claims:** MASK-0100 at `f038340` and MASK-0101 at `66fb4e2`, both from `0658a40`.
+- **Slices in flight:**
+  - Retirement of the product engine (MASK-0100), in the main tree.
+  - `mask_update.py` (MASK-0101), in an isolated worktree.
+  - Inventory over pinned records (MASK-0100), in an isolated worktree.
+  - Porting the legacy-marked tests follows integration of those three slices.
+- **Design decisions recorded for this milestone:**
+  - The `migrate --to-pinned` machinery is deleted, not kept dormant. MASK-0102 ports it from `0658a40`: `mask_pinned` `authoring_snapshot`, `migrated_selection`, `validate_migration`, `check_migration` and the migrate branch of `transition_dispatch`; `mask_sources.migrated_config`; and `tests/test_pin_migration.py`.
+  - A pending legacy or `migrate` journal is refused with `recovery.conflict`.
+  - The update journal keeps `operation: update`, as `contracts/CLI.md` requires.
+- **Open human decisions** from d2, unanswered and not needed by this milestone:
+  - `source publish` under `core.autocrlf=true`
+  - offline cold single-tap bare ID: `source.unresolved` versus B04 `lock.resolution_required`
+  - proposed out-of-scope follow-up cards
+- **Next step:** integrate the three slices, port the legacy tests, run a critical review and the full suite, then finish both cards.
+
+**Dispatch `d2` record (milestone `bootstrap` accepted; its next milestone `engine` is being executed by d3).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
 
 - **Accepted milestone `bootstrap`:** MASK-0099 is Done at `eb2eff8`. The implementation is `01b2ae3` plus the review fix `94d4f1c`. MASK-0100 and MASK-0101 were promoted to Ready at `5ea6f13`.
   - Exit 1: `tests.test_tap_bootstrap` passes 6 tests. On an empty `MASK_HOME`, `tap add` followed by `install` deploys v2 consumers from the store, with one bare cache and no checkout anywhere on disk. Negative controls: the pre-implementation product fails 5 of 5, and a retained author checkout fails the no-checkout assertion.
