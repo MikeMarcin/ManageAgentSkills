@@ -135,19 +135,28 @@ class TargetingTests(Fixture):
         self.assertFalse(any(row['status'] == 'deployed' for row in result['data']['outcomes']))
 
 
-class LegacyPolicyTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 set-targets beside selection policy)."""
+class PolicyRegistryTests(Fixture):
+    """Selection policy on an empty registry and beside registered pinned consumers' explicit agents (ported from the v1 set-targets case)."""
 
-    def test_empty_registry_policy_and_legacy_targets_remain_explicit(self):
-        self.legacy_init()
+    def test_empty_registry_policy_and_required_agents_remain_explicit(self):
+        self.init()
         self.call('selection-policy', 'set', '--agent', 'codex')
         self.assertEqual(c.read_json(self.home / 'selection-policy.json')['enabled_agents'], ['codex'])
         self.call('selection-policy', 'clear')
-        self.declare()
-        self.call('project', 'set-targets', 'codex')
-        self.call('project', 'register', '--apply')
-        self.call('selection-policy', 'set', '--agent', 'codex')
-        before = self.snapshot()
-        self.call('selection-policy', 'set', '--agent', 'claude', code=4)
-        self.assertEqual(before, self.snapshot())
-        self.assertEqual(c.read_json(self.project / '.mask.json')['targets'], ['codex'])
+        self.assertFalse((self.home / 'selection-policy.json').exists())
+        # The project requires codex through a per-binding agent list; the personal scope requires claude through default_agents.
+        self.install(ALPHA, agents=['codex'])
+        self.install(TAP + '/beta', user=True)
+        self.call('user', 'set-targets', 'claude', '--apply')
+        self.call('selection-policy', 'set', '--agent', 'claude', '--agent', 'codex')
+        for enabled, coordinate, required in (('claude', ALPHA, 'codex'), ('codex', TAP + '/beta', 'claude')):
+            with self.subTest(enabled=enabled):
+                before = self.snapshot()
+                refused = self.call('selection-policy', 'set', '--agent', enabled, code=4)['error']
+                self.assertEqual(refused['code'], 'compatibility.unsupported')
+                self.assertEqual([(row['coordinate'], row['agent'], row['reason']) for row in refused['details']['outcomes']],
+                                 [(coordinate, required, 'agent_disabled_by_policy')])
+                self.assertEqual(before, self.snapshot())
+        self.assertEqual(c.read_json(self.project / '.mask.json')['skills'][0]['agents'], ['codex'])
+        self.assertEqual(c.read_json(self.home / 'user.json')['default_agents'], ['claude'])
+        self.assertFalse((self.home / 'selection-policy.json').exists(), 'enabling every agent is the default policy, so nothing was written')

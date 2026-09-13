@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import mask
@@ -17,21 +18,11 @@ from tests.support import Fixture, ENTRY, TAP
 
 
 class PinnedTests(Fixture):
-    # Legacy live-checkout starting state until MASK-0100/0102 retires this behavior: mode-less
-    # records beside pinned consumers exist only on a migrated v1/v2 machine, never on a tap-first one.
-    LEGACY = {'test_personal_scope_preserves_legacy_records_and_state3', 'test_saved_journal_legacy_records_beside_pinned_stay_unextended'}
-
     def setUp(self):
         super().setUp()
-        if self._testMethodName in self.LEGACY:
-            self.legacy_init()
-            self.call('source','migrate')
-            self.call('source','fetch','legacy')
-            self.declaration=dict(schema_version=2,sources={'legacy':dict(repository=self.source.as_uri(),ref='refs/heads/main')},skills=[dict(source='legacy',id='alpha')])
-        else:
-            self.init()
-            self.call('source','fetch',TAP)
-            self.declaration=dict(schema_version=2,sources=self.binding(),skills=[dict(source=TAP,id='alpha')])
+        self.init()
+        self.call('source','fetch',TAP)
+        self.declaration=dict(schema_version=2,sources=self.binding(),skills=[dict(source=TAP,id='alpha')])
         (self.project/'.mask.json').write_text(json.dumps(self.declaration))
         self.lock=self.call('lock')['data']['lock']
         self.row=self.lock['packages'][0]
@@ -79,14 +70,27 @@ mask.main(sys.argv[3:])
         self.assertTrue(self.call('doctor','--project',self.project,'--check')['data']['healthy'])
         self.assertEqual(self.call('project','show')['data']['mode'],'pinned')
         inventory=self.call('inventory')['data']
-        self.assertFalse(inventory['complete'])
+        self.assertTrue(inventory['complete'])
         self.assertEqual(inventory['consumers'][0]['mode'],'pinned')
+        self.assertTrue(inventory['rows'])
+        self.assertEqual({row['status'] for row in inventory['rows']},{'managed_converged'})
+
+    def legacy_record(self,name,skills):
+        """A mode-less consumer record beside pinned ones, written straight into state with its v1 declaration and links; no legacy command runs."""
+        from tests.legacy_support import create_links,legacy_record,write_json
+        root=self.base/name;root.mkdir()
+        declaration,record=legacy_record(SimpleNamespace(clone=self.source),root,skills)
+        write_json(root/'.mask.json',declaration)
+        create_links(root,record)
+        state=c.read_json(self.home/'state.json',default=c.empty_state())
+        state['projects'][str(root)]=record
+        write_json(self.home/'state.json',state)
+        return root,record
 
     def test_personal_scope_preserves_legacy_records_and_state3(self):
-        legacy=self.base/'legacy-project';legacy.mkdir()
-        (legacy/'.mask.json').write_text(json.dumps(dict(schema_version=1,skills=['beta'])))
-        self.call('project','register','--project',legacy,'--apply')
-        original=c.read_json(self.home/'state.json')['projects'][str(legacy)]
+        from tests.legacy_support import snapshot
+        legacy,original=self.legacy_record('legacy-project',['beta'])
+        files=snapshot(self.base,legacy)
         self.register(True)
         user=self.base/'user-home';user.mkdir()
         (self.home/'user.json').write_text(json.dumps(self.declaration))
@@ -94,10 +98,13 @@ mask.main(sys.argv[3:])
         self.call('user','register','--user-home',user,'--apply')
         state=c.state(c.read_json(self.home/'state.json'))
         self.assertEqual(state['schema_version'],3)
-        self.assertEqual(state['projects'][str(legacy)],original)
+        self.assertEqual(c.text_json(state['projects'][str(legacy)]),c.text_json(original))
         self.assertEqual(state['user']['mode'],'pinned')
         self.call('user','unregister')
-        self.assertEqual(c.read_json(self.home/'state.json')['schema_version'],3)
+        state=c.read_json(self.home/'state.json')
+        self.assertEqual(state['schema_version'],3)
+        self.assertEqual(c.text_json(state['projects'][str(legacy)]),c.text_json(original))
+        self.assertEqual(snapshot(self.base,legacy),files)
         self.assertTrue((self.project/'.agents/skills/alpha').is_symlink())
 
     def test_readiness_exact_authority_and_no_inferred_network(self):
@@ -210,7 +217,14 @@ mask.main(sys.argv[3:])
         target=store.location(self.home,self.row['payload_digest'],'alpha')[1]
         leaf=self.project/'.agents/skills/alpha';leaf.parent.mkdir(parents=True)
         raw=os.path.relpath(target,leaf.parent);leaf.symlink_to(raw,target_is_directory=True)
-        self.call('link','adopt','--project',self.project,'--skill','alpha','--target','codex','--expect-source',target)
+        adopt=('link','adopt','--project',self.project,'--skill','alpha','--target','codex','--expect-source',target)
+        before=self.snapshot()
+        preview=self.call(*adopt,'--dry-run')
+        self.assertEqual(before,self.snapshot())
+        self.assertEqual(self.call(*adopt,'--expect-plan-hash','sha256:'+'0'*64,code=4)['error']['code'],'plan.stale')
+        self.assertEqual(before,self.snapshot())
+        self.call(*adopt,'--expect-plan-hash',preview['data']['plan_hash'])
+        self.assertEqual(os.readlink(leaf),raw)
         self.call('apply')
         self.assertEqual(os.readlink(leaf),raw)
 
@@ -391,19 +405,29 @@ mask.main(sys.argv[3:])
         self.assertNotIn('pinned',abandon)
         fs.validate_pending(abandon,self.home)
 
-    def test_saved_journal_legacy_records_beside_pinned_stay_unextended(self):
-        # Split from test_saved_journal_cannot_strip_pinned_extension: the legacy half needs a live-checkout record.
+    def test_saved_journal_selecting_a_legacy_record_is_retired(self):
+        # Split from test_saved_journal_cannot_strip_pinned_extension. A journal over mode-less ownership records a retired
+        # live-checkout transition: inspection reports it, and neither completion nor rollback replays it.
         self.register()
-        legacy=self.base/'legacy-selected';legacy.mkdir()
-        (legacy/'.mask.json').write_text(c.text_json(dict(schema_version=1,skills=['beta'])))
-        self.call('project','register','--project',legacy)
+        legacy,record=self.legacy_record('legacy-selected',['beta'])
         state=c.state(c.read_json(self.home/'state.json'))
-        legacy_journal=fs.make_pending(fs.plan(self.config,state,[legacy],home=self.home),self.home)
-        self.assertEqual(legacy_journal['schema_version'],3)
-        self.assertNotIn('pinned',legacy_journal)
-        fs.validate_pending(legacy_journal,self.home)
+        planned=fs.plan(self.config,state,[legacy],home=self.home)
+        self.assertEqual(planned['blockers'][0]['code'],'migration.required')
+        journal=fs.make_pending(planned,self.home)
+        with self.assertRaises(c.MaskError) as error:fs.validate_pending(journal,self.home)
+        self.assertEqual((error.exception.code,error.exception.details.get('retired')),('recovery.conflict','legacy_ownership'))
+        (self.home/'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
+        before=self.snapshot()
+        self.assertEqual(self.call('recover','--inspect')['data']['retired'],'legacy_ownership')
+        for mode in ('--complete','--rollback'):
+            refused=self.call('recover',mode,code=8)['error']
+            self.assertEqual((refused['code'],refused['details'].get('retired')),('recovery.conflict','legacy_ownership'))
+        self.assertEqual(before,self.snapshot())
+        (self.home/'pending.json').unlink()
         self.call('self','install','--bin-dir',self.base/'bin')
-        self.assertEqual(c.read_json(self.home/'state.json')['schema_version'],3)
+        state=c.read_json(self.home/'state.json')
+        self.assertEqual(state['schema_version'],3)
+        self.assertEqual(state['projects'][str(legacy)],record)
 
     def test_retarget_unlink_crash_and_transient_create_failure_recover(self):
         self.register(True)

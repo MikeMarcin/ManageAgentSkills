@@ -7,9 +7,7 @@ terminal invocation whose output is the thing under test. Starting states are
 prepared only up to the one-time source prerequisite, which is ``tap add`` of a
 local bare upstream on an empty MASK_HOME (RFC-MASK-0020); no helper registers a
 consumer, approves readiness, renders roles or applies a change on behalf of the
-command under test. A subclass that exercises retired live-checkout behavior sets
-``bootstrap = PublicFixture.legacy_bootstrap`` to start from the schema-true v1
-bytes instead.
+command under test.
 """
 import json
 import os
@@ -21,7 +19,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from types import SimpleNamespace
 import unittest
 
 from tests.support import TAP
@@ -68,13 +65,6 @@ class PublicFixture(unittest.TestCase):
     def bootstrap(self):
         """The one-time source prerequisite: approve the fixture upstream as a tap on an empty MASK_HOME."""
         self.assertTrue(self.machine('tap', 'add', TAP, self.upstream)['ok'])
-
-    def legacy_bootstrap(self):
-        """A v1 live-checkout machine over ``self.source``: the files the retired ``init --source`` wrote, including its writer lock."""
-        from tests.legacy_support import legacy_state, v1_config, write_json
-        write_json(self.home / 'config.json', v1_config(SimpleNamespace(clone=self.source)))
-        write_json(self.home / 'state.json', legacy_state())
-        (self.home / 'operation.lock').write_bytes(b'\0' if os.name == 'nt' else b'')
 
     def publish(self, message='fixture change', *, force=False):
         """Commit the author's skill edits and push them to the tap upstream; MASK sees them only after a fetch."""

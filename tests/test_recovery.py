@@ -1,10 +1,9 @@
 import json
-import os
-from pathlib import Path
 import subprocess
 import sys
+
+import mask_core as c
 from tests.support import Fixture, ENTRY
-from tests.test_manifest_registry import declare_pinned
 
 
 class CrashFixture(Fixture):
@@ -24,7 +23,7 @@ mask.main(sys.argv[3:])
 class RecoveryTests(CrashFixture):
     """Tap-first: crash, rollback, doctor and busy-lock behavior on a registered, not yet applied v2 consumer."""
     def setUp(self):
-        super().setUp(); self.init(); declare_pinned(self); self.call('project', 'register', self.project)
+        super().setUp(); self.init(); self.declare_pinned(); self.call('project', 'register', self.project)
 
     def test_crash_complete_and_inspect_are_explicit(self):
         self.crash('link')
@@ -74,33 +73,21 @@ with mask_core.writer_lock(Path(sys.argv[2])):
             process.communicate('')
         self.call('apply')
 
-
-class LegacyRecoveryTests(CrashFixture):
-    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 require crash, clone-path adoption)."""
-    def setUp(self):
-        super().setUp(); self.legacy_init(); self.declare(); self.call('project', 'register', self.project)
-
-    def test_restart_after_manifest_and_state(self):
-        for label in ('manifest', 'state'):
+    def test_restart_after_declaration_lock_and_state(self):
+        # Each typed control checkpoint of a journaled install: declaration, lock, then state.
+        for label in ('manifest', 'lock', 'state'):
             with self.subTest(label=label):
-                self.crash(label, 'project', 'require', 'beta', '--apply')
+                self.crash(label, 'install', 'beta')
                 self.call('recover', '--complete')
-                self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
-                self.call('project', 'unrequire', 'beta', '--apply')
+                self.assertEqual([row['id'] for row in c.read_json(self.project / '.mask.json')['skills']], ['alpha', 'beta'])
+                self.assertEqual([row['id'] for row in c.read_json(self.project / '.mask.lock.json')['packages']], ['alpha', 'beta'])
+                self.assertTrue((self.project / '.agents/skills/beta').is_symlink())
+                self.assertFalse(self.call('apply')['changed'])
+                self.call('remove', 'beta', '--project', self.project)
 
-    def test_adopt_exact_link_without_replacing_it(self):
-        leaf = self.project / '.agents/skills/alpha'; leaf.parent.mkdir(parents=True)
-        relative = os.path.relpath(self.source / 'skills/alpha', leaf.parent)
-        leaf.symlink_to(relative, target_is_directory=True)
-        before = os.readlink(leaf)
-        preview = self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--dry-run')
-        self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--expect-plan-hash', preview['data']['plan_hash'])
-        self.assertEqual(before, os.readlink(leaf))
-        self.call('apply'); self.assertEqual(before, os.readlink(leaf))
-
-    def test_mid_apply_external_manifest_edit_is_preserved(self):
+    def test_mid_apply_external_declaration_edit_is_preserved(self):
         script = """
-import sys,json
+import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import mask,mask_fs
@@ -109,12 +96,15 @@ def checkpoint(label):
     global edited
     if label == 'link' and not edited:
         edited = True
-        Path(sys.argv[3], '.mask.json').write_text('{"schema_version":1,"skills":[]}')
+        Path(sys.argv[3], '.mask.json').write_text('{"schema_version":2,"sources":{},"skills":[]}')
 mask_fs.checkpoint = checkpoint
-raise SystemExit(mask.main(['project','require','beta','--apply','--home',sys.argv[2],'--project',sys.argv[3],'--json']))
+raise SystemExit(mask.main(['install','beta','--home',sys.argv[2],'--project',sys.argv[3],'--json']))
 """
-        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True, encoding='utf-8')
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True, encoding='utf-8', env=self.environment())
         self.assertEqual(run.returncode, 8, run.stdout + run.stderr)
         self.assertEqual(json.loads((self.project / '.mask.json').read_text())['skills'], [])
         self.assertTrue((self.home / 'pending.json').exists())
+        before = self.snapshot()
         self.call('recover', '--complete', code=8)
+        self.call('recover', '--rollback', code=8)
+        self.assertEqual(before, self.snapshot())

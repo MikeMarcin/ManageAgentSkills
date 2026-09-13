@@ -4,7 +4,6 @@ import sys
 from unittest.mock import patch
 
 import mask_core as c
-import mask_fs as fs
 from tests.support import Fixture, ENTRY, TAP
 
 
@@ -13,18 +12,16 @@ class EnsureTests(Fixture):
         super().setUp()
         self.init()
         self.call('source', 'fetch', TAP)
-        self.declare_pinned()
+        self.declare_hydrated()
 
-    def declare_pinned(self, skills=('alpha',), root=None):
-        """A v2 declaration of the fixture tap, its lock and its hydrated store artifacts; nothing is registered or linked.
+    def declare_hydrated(self, skills=('alpha',), root=None):
+        """The shared v2 declaration and lock of the fixture tap plus its hydrated store artifacts; nothing is registered or linked.
 
-        Hydration is part of the starting state (the legacy checkout already held the packages), so a refused
-        readiness call cannot pass off unlocked artifact preparation as a consumer effect.
+        Hydration is part of the starting state, so a refused readiness call cannot pass off unlocked artifact
+        preparation as a consumer effect. setUp has already fetched the tap.
         """
-        root = root or self.project
-        (root / '.mask.json').write_text(json.dumps(dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id=identifier) for identifier in skills])) + '\n')
-        locked = self.call('lock', '--project', root)
-        self.call('source', 'fetch', '--locked', '--offline', '--project', root)
+        locked = self.declare_pinned(skills, root, fetch=False)
+        self.call('source', 'fetch', '--locked', '--offline', '--project', root or self.project)
         return locked
 
     def approve(self, *options):
@@ -92,7 +89,7 @@ class EnsureTests(Fixture):
         self.assertEqual(self.call('ensure', '--event', 'post-commit', cwd=nested, code=4)['error']['code'], 'integration.approval_required')
         ordinary = self.base / 'ordinary'
         ordinary.mkdir()
-        self.declare_pinned(['beta'], root=ordinary)
+        self.declare_hydrated(['beta'], root=ordinary)
         self.call('integration', 'approve', '--project', ordinary)
         self.call('ensure', '--project', ordinary)
         self.assertTrue((ordinary / '.agents/skills/beta').is_symlink())
@@ -110,7 +107,7 @@ class EnsureTests(Fixture):
         moved = self.base / 'original'
         self.project.rename(moved)
         self.project.mkdir()
-        self.declare_pinned()
+        self.declare_hydrated()
         self.call('ensure', '--project', self.project, code=4)
 
     def test_pending_and_busy_refuse(self):
@@ -169,7 +166,7 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         boundary.mkdir()
         clone = boundary / 'new'
         self.git(self.base, 'clone', str(self.source), str(clone))
-        self.declare_pinned(root=clone)
+        self.declare_hydrated(root=clone)
         self.call('ensure', '--project', clone, code=4)
         result = self.call('integration', 'approve', '--repository', 'https://user:secret@example.invalid/org/repo', '--under', boundary, code=3)
         self.assertNotIn('secret', json.dumps(result))
@@ -203,27 +200,23 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         for conflict in (('--all', '--user'), ('--all', '--project', str(self.project)), ('--user', '--project', str(self.project))):
             self.assertEqual(self.call('ensure', *conflict, code=2)['error']['code'], 'invocation.invalid')
 
-
-class LegacyCheckoutPlanningTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100/0101/0102 retires this behavior.
-
-    The planner scans only the selected packages of the live checkout and never runs ``git status`` there.
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.legacy_init()
-        self.declare()
-
-    def approve(self, *options):
-        return self.call('integration', 'approve', '--project', self.project, *options)
-
-    def test_selected_package_only_and_no_source_status_scan(self):
+    def test_readiness_reads_only_the_selected_packages(self):
+        # The tap offers alpha and beta; readiness for this alpha consumer verifies, resolves and materializes alpha alone,
+        # and never runs git status (the retired live-checkout scan).
+        import mask
+        import mask_resolve as r
+        import mask_store as store
         self.approve()
-        config = c.config(c.read_json(self.home / 'config.json'))
-        state = c.state(c.read_json(self.home / 'state.json'))
-        with patch.object(c, 'package', wraps=c.package) as packages, patch.object(c, 'git', wraps=c.git) as git:
-            planned = fs.plan(config, state, [self.project], register=[str(self.project)], home=self.home, source_status=False)
-        self.assertFalse(planned['blockers'])
-        self.assertEqual([call.args[1] for call in packages.call_args_list], ['alpha'])
-        self.assertFalse(any(call.args[1] == 'status' for call in git.call_args_list))
+        parser, leaves = mask.make_parser()
+        args = parser.parse_args(['ensure', '--offline', '--project', str(self.project), '--home', str(self.home)])
+        output = mask.result('ensure')
+        with patch.object(store, 'verify_tree', wraps=store.verify_tree) as trees, patch.object(store, 'materialize', wraps=store.materialize) as materialized, \
+                patch.object(r, 'verify_resolution', wraps=r.verify_resolution) as resolutions, patch.object(c, 'git', wraps=c.git) as git:
+            mask.dispatch(args, output, leaves)
+        self.assertEqual(output['data']['readiness'], 'ready_pinned')
+        self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
+        packages = [value['id'] for mock in (trees, materialized, resolutions) for call in mock.call_args_list
+                    for value in (*call.args, *call.kwargs.values()) if isinstance(value, dict) and 'payload_digest' in value]
+        self.assertIn('alpha', packages)
+        self.assertEqual(set(packages), {'alpha'})
+        self.assertFalse(any(len(call.args) > 1 and call.args[1] == 'status' for call in git.call_args_list))

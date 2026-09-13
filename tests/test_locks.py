@@ -199,7 +199,7 @@ class LockTests(Fixture):
         self.call('ensure', '--offline')
         self.assertFalse(self.call('apply')['changed'])
         self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'selection.command_unsupported')
-        # The v1 half (a v1 declaration still accepts project require) moved to LegacyLockTests.
+        # The v1 half is retired: RetiredLockInputTests.test_v1_declaration_refuses_project_require.
 
     def test_tampered_identity_path_format_digests_and_metadata_refuse(self):
         self.fetch()
@@ -303,29 +303,29 @@ class LockTests(Fixture):
         self.target.write_text(json.dumps(bad))
         self.assertEqual(self.locked(code=4)['error']['code'], 'lock.resolution_required')
         self.target.write_text(json.dumps(refreshed))
-        # The legacy-state half (a mode-less record cannot carry a v2 selection) moved to LegacyLockTests.
+        # The legacy-state half is RetiredLockInputTests.test_legacy_record_cannot_carry_a_v2_selection.
 
 
-class LegacyLockTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 declarations and mode-less records)."""
+class RetiredLockInputTests(Fixture):
+    """Retired live-checkout inputs beside locks: a v1 declaration refuses, and a mode-less record never carries a v2 selection."""
 
-    def setUp(self):
-        super().setUp()
-        self.legacy_init()
-
-    def test_v1_declaration_still_accepts_project_require(self):
-        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations.
-        self.declare(['alpha'])
-        self.call('project', 'require', 'beta')
-        self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
+    def test_v1_declaration_refuses_project_require(self):
+        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations; v1 string mutation is retired (RFC-MASK-0020).
+        self.init()
+        (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n')
+        before = self.snapshot()
+        self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'migration.required')
+        self.assertEqual(before, self.snapshot())
+        self.assertFalse((self.project / '.mask.lock.json').exists())
 
     def test_legacy_record_cannot_carry_a_v2_selection(self):
-        # Split from LockTests.test_frozen_index_missing_object_and_legacy_state_isolation.
-        declaration = dict(schema_version=2, sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main')}, skills=[dict(source='legacy', id='alpha'), dict(source='legacy', id='beta', when={'platforms': ['windows']})])
-        self.declare(['beta'])
-        self.call('project', 'register')
-        state = c.read_json(self.home / 'state.json')
-        record = state['projects'][str(self.project)]
+        # Split from LockTests.test_frozen_index_missing_object_and_legacy_state_isolation: a direct state-parser check with no machine.
+        from types import SimpleNamespace
+        from tests.legacy_support import legacy_record, legacy_state
+        _, record = legacy_record(SimpleNamespace(clone=self.source), self.project, ['beta'])
+        state = legacy_state([record])
+        self.assertEqual(c.state(copy.deepcopy(state)), state)
+        declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha'), dict(source=TAP, id='beta', when={'platforms': ['windows']})])
         record['last_manifest'] = declaration
         record['last_manifest_digest'] = c.digest(declaration)
         with self.assertRaises(c.MaskError):

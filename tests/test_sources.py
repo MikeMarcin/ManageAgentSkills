@@ -7,6 +7,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 
 import mask_core as c
@@ -15,7 +16,10 @@ from tests.support import TAP, Fixture, ENTRY
 
 
 class SourcesTests(Fixture):
-    """Tap tests start from ``init`` (the fixture tap); the ``legacy_init`` methods use the checkout's ``origin`` as their legacy binding."""
+    """Tap tests start from ``init`` (the fixture tap); ``self.remote`` is a second bare copy that the checkout names as its ``origin``.
+
+    ``source migrate`` and its guards are retired (RFC-MASK-0020 AC05); tests/test_retired_paths.py covers their refusal.
+    """
 
     def setUp(self):
         super().setUp()
@@ -23,31 +27,6 @@ class SourcesTests(Fixture):
         self.remote.parent.mkdir()
         self.git(self.base, 'clone', '--bare', str(self.source), str(self.remote))
         self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
-
-    def test_migration_preserves_declarations_links_and_noncanonical_config(self):
-        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
-        self.legacy_init()
-        self.declare()
-        self.call('project', 'register', self.project, '--apply')
-        state = (self.home / 'state.json').read_bytes()
-        before = self.snapshot(self.project)
-        path = self.home / 'config.json'
-        path.write_text(json.dumps(json.loads(path.read_text()), indent=3) + '\n\n')
-        initial = self.snapshot()
-        preview = self.call('source', 'migrate', '--dry-run')
-        self.assertEqual(initial, self.snapshot())
-        self.assertTrue(preview['would_change'])
-        actual = self.call('source', 'migrate', '--expect-plan-hash', preview['data']['plan_hash'])
-        self.assertTrue(actual['changed'])
-        self.assertEqual(state, (self.home / 'state.json').read_bytes())
-        self.assertEqual(before, self.snapshot(self.project))
-        self.assertFalse(self.call('source', 'migrate')['changed'])
-        # init writes only an empty v3 catalog, so it leaves a migrated machine untouched by refusing.
-        migrated = path.read_bytes()
-        self.assertEqual(self.call('init', code=4)['error']['code'], 'config.already_initialized')
-        self.assertEqual(migrated, path.read_bytes())
-        self.assertFalse(self.call('apply', '--project', self.project)['changed'])
-        self.assertEqual(self.call('tap', 'remove', 'legacy', code=4)['error']['code'], 'source.referenced')
 
     def test_independent_taps_fetch_and_removal_are_catalog_only(self):
         self.init()
@@ -62,6 +41,8 @@ class SourcesTests(Fixture):
         self.assertFalse(self.call('tap', 'add', 'public', other)['changed'])
         self.assertEqual(self.call('tap', 'add', 'public', self.remote, code=4)['error']['code'], 'source.alias_conflict')
         before = self.snapshot()
+        self.assertEqual(self.call('tap', 'add', 'extra', self.remote, '--expect-plan-hash', 'stale', code=4)['error']['code'], 'plan.stale')
+        self.assertEqual(before, self.snapshot())
         for name in (TAP, 'public'):
             observed = self.call('source', 'show', name)
             self.assertTrue(observed['data']['resolution_required'])
@@ -81,17 +62,48 @@ class SourcesTests(Fixture):
         self.assertFalse((self.project / '.agents').exists())
 
     def test_full_identity_and_transport_rewrite_refuse_before_fetch(self):
-        # Legacy live-checkout starting state until MASK-0100/0101 retires this behavior: the legacy binding follows the checkout remote.
-        self.legacy_init()
-        self.call('source', 'migrate')
+        # A user-level Git URL rewrite points the approved tap transport at another repository. Every fetching command
+        # refuses at the endpoint check, before any git fetch process runs; test_cache_local_url_rewrite_refuses_before_fetch
+        # covers only a cache-local rewrite under source fetch NAME.
+        self.init()
+        self.install(TAP + '/alpha')
+        self.install(TAP + '/beta', user=True)
         other = self.base / 'other' / 'AgentSkills.git'
         other.parent.mkdir()
-        self.git(self.base, 'clone', '--bare', str(self.source), str(other))
-        self.git(self.source, 'remote', 'set-url', 'origin', str(other))
-        for command in (('source', 'fetch'), ('update', '--dry-run')):
-            self.assertEqual(self.call(*command, code=4)['error']['code'], 'source.identity_mismatch')
-        self.git(self.source, 'remote', 'set-url', 'origin', str(self.remote))
-        self.call('source', 'fetch', 'legacy')
+        self.git(self.base, 'clone', '--bare', str(self.upstream), str(other))
+        entry = json.loads((self.home / 'config.json').read_text(encoding='utf-8'))['sources'][TAP]
+        rewrite = self.base / 'rewrite.gitconfig'
+        self.git(self.base, 'config', '--file', str(rewrite), 'url.' + str(other) + '.insteadOf', entry['transport'])
+        (self.source / 'skills/alpha/notes').write_text('never fetched while rewritten')
+        head = self.publish('upstream moves')
+        traces = tempfile.TemporaryDirectory(prefix='mask-trace-')
+        self.addCleanup(traces.cleanup)
+        before = self.snapshot()
+
+        def rewritten(*args, code=4):
+            # Git writes one trace2 event file per process; a fetch process would report cmd_name "fetch".
+            trace = Path(tempfile.mkdtemp(dir=traces.name))
+            result = self.call(*args, code=code, env={'GIT_CONFIG_GLOBAL': str(rewrite), 'GIT_TRACE2_EVENT': str(trace)})
+            names = [json.loads(line).get('name') for path in trace.iterdir() for line in path.read_text(encoding='utf-8').splitlines() if '"cmd_name"' in line]
+            self.assertNotIn('fetch', names, args)
+            return result
+
+        for args in (('source', 'fetch'), ('source', 'fetch', TAP), ('update', '--project', self.project)):
+            self.assertEqual(rewritten(*args)['error']['code'], 'source.identity_mismatch', args)
+        # The unscoped update isolates the refused tap: both consumers on it are blocked by the same refusal and nothing applies.
+        result = rewritten('update')
+        self.assertEqual((result['error']['code'], sorted(result['error']['details']['blocked']), result['changed']),
+                         ('update.incomplete', sorted([str(self.personal), str(self.project)]), False))
+        self.assertEqual({row['status']: row['error']['code'] for row in result['data']['consumers']}, {'blocked': 'source.identity_mismatch'})
+        self.assertEqual(result['data']['fetches'][TAP]['error']['code'], 'source.identity_mismatch')
+        self.assertEqual(before, self.snapshot())
+        self.assertNotEqual(subprocess.run(['git', '-C', entry['cache'], 'cat-file', '-e', head + '^{commit}'], capture_output=True).returncode, 0)
+        self.assertEqual(self.call('source', 'fetch', TAP)['data']['cached_revision'], head)
+        # Removing the approval is catalog-only; it refuses while a registered consumer still references the tap.
+        before = self.snapshot()
+        refused = self.call('tap', 'remove', TAP, code=4)['error']
+        self.assertEqual(refused['code'], 'source.referenced')
+        self.assertEqual(before, self.snapshot())
 
     def test_cache_local_url_rewrite_refuses_before_fetch(self):
         self.init()
@@ -120,15 +132,6 @@ class SourcesTests(Fixture):
         self.call('source', 'fetch', 'collision', code=4)
         self.assertEqual((root / 'unrelated').read_text(), 'keep')
 
-    def test_migration_and_plan_guards_are_explicit(self):
-        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
-        self.legacy_init()
-        self.assertTrue(self.call('source', 'list')['data']['migration_required'])
-        self.assertEqual(self.call('tap', 'add', 'extra', self.remote, code=4)['error']['code'], 'source.migration_required')
-        self.call('source', 'migrate')
-        self.call('tap', 'add', 'extra', self.remote, '--expect-plan-hash', 'stale', code=4)
-        self.assertEqual(set(self.call('source', 'list')['data']['sources']), {'legacy'})
-
     def test_repository_normalization_keeps_authority_boundaries(self):
         self.assertEqual(sources.repository('HTTPS://EXAMPLE.test:443/Org/Repo.git'), 'https://example.test/Org/Repo.git')
         self.assertEqual(sources.repository('git@example.test:Org/Repo.git'), 'ssh://git@example.test/~/Org/Repo.git')
@@ -140,20 +143,18 @@ class SourcesTests(Fixture):
             with self.assertRaises(c.MaskError):
                 sources.repository(value)
 
-    def test_capabilities_and_recovery_retain_config_v2(self):
-        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
-        self.legacy_init()
-        self.call('source', 'migrate')
+    def test_capabilities_and_recovery_retain_config_v3(self):
+        self.init()
         config = (self.home / 'config.json').read_bytes()
         caps = self.call('capabilities')['data']
-        # Machine config v3 is readable beside v1 and v2 (RFC-MASK-0020, MASK-0099).
-        self.assertEqual(caps['readable_versions']['machine'], [1, 2, 3])
+        # Machine config v3 is written; v1 and v2 stay readable for migration only (RFC-MASK-0020, MASK-0099).
+        self.assertEqual((caps['schemas']['machine'], caps['readable_versions']['machine'], caps['deployment_model']), (3, [1, 2, 3], 'taps'))
         commands = {item['name']: item for item in caps['commands']}
         self.assertFalse(commands['tap.add']['network'])
         self.assertTrue(commands['tap.add']['plan_guard'])
         self.assertTrue(commands['source.fetch']['network'])
-        self.declare()
-        self.call('project', 'register', self.project)
+        self.install(TAP + '/alpha')
+        self.call('project', 'set-agents', TAP + '/alpha', 'codex')  # Declaration only: the pinned apply below removes the claude link.
         script = """
 import os,sys
 sys.path.insert(0,sys.argv[1])
@@ -161,12 +162,14 @@ import mask,mask_fs
 mask_fs.checkpoint = lambda label: os._exit(99) if label == 'link' else None
 mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
 """
-        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.project), str(self.home)], capture_output=True)
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.project), str(self.home)], capture_output=True, env=self.environment())
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
-        self.assertEqual(self.call('source', 'migrate', code=8)['error']['code'], 'recovery.required')
+        for args in (('install', TAP + '/beta'), ('update',), ('source', 'fetch', TAP)):
+            self.assertEqual(self.call(*args, code=8)['error']['code'], 'recovery.required', args)
         self.call('recover', '--complete')
         self.assertEqual(config, (self.home / 'config.json').read_bytes())
         self.assertFalse(self.call('apply')['changed'])
+        self.assertEqual(sorted(path.relative_to(self.project).as_posix() for path in self.project.rglob('*') if path.is_symlink()), ['.agents/skills/alpha'])
 
     def test_scp_to_absolute_rewrite_refuses_without_a_second_ssh_connection(self):
         self.init()

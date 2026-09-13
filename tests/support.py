@@ -91,6 +91,23 @@ class Fixture(unittest.TestCase):
         """The v2 declaration source binding of the fixture tap."""
         return {TAP: dict(repository=self.upstream.as_uri(), packages='skills')}
 
+    def declare_pinned(self, skills=('alpha',), root=None, fetch=True):
+        """Write a v2 declaration of the fixture tap and lock it from the fetched cache; nothing is registered, hydrated or linked.
+
+        ``fetch`` first fetches the tap when the declaration selects anything; pass ``False`` when the cache is already current.
+        """
+        root = root or self.project
+        declaration = dict(schema_version=2, sources=self.binding() if skills else {}, skills=[dict(source=TAP, id=identifier) for identifier in skills])
+        (root / '.mask.json').write_text(json.dumps(declaration) + '\n')
+        if fetch and skills:
+            self.call('source', 'fetch', TAP)
+        return self.call('lock', '--project', root)
+
+    def authoring_init(self):
+        """Bootstrap the fixture tap with ``self.source`` as its approved authoring checkout; its origin names the tap identity."""
+        self.git(self.source, 'remote', 'add', 'origin', str(self.upstream))
+        return self.call('tap', 'add', TAP, self.upstream, '--checkout', self.source)
+
     def legacy_init(self):
         """A v1 live-checkout machine over ``self.source``: the files the retired ``init --source`` wrote.
 

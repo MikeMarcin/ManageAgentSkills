@@ -21,7 +21,7 @@ def verify(program):
             path = source / 'skills' / name; path.mkdir(parents=True)
             (path / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture instructions\n---\n\nExample.\n', encoding='utf-8')
         git(source, 'add', 'skills'); git(source, 'commit', '-m', 'fixture')
-        git(base, 'init', '--bare', remote); git(source, 'remote', 'add', 'origin', remote); git(source, 'push', '-u', 'origin', 'main')
+        git(base, 'init', '--bare', '-b', 'main', remote); git(source, 'remote', 'add', 'origin', remote); git(source, 'push', '-u', 'origin', 'main')
         git(project, 'init', '-b', 'main')
         env = dict(os.environ, MASK_HOME=str(home), PYTHONDONTWRITEBYTECODE='1')
         def call(*args, code=0):
@@ -30,45 +30,53 @@ def verify(program):
             assert not run.stderr
             data = json.loads(run.stdout); assert data['ok'] == (code == 0)
             return data
+        def links():
+            return sorted(path.relative_to(project).as_posix() for path in project.rglob('*') if path.is_symlink())
         capabilities = call('capabilities')['data']
-        assert capabilities
-        # Legacy live-checkout starting state until MASK-0100/0101 retires this behavior: the v1 bytes the removed init --source wrote.
-        from types import SimpleNamespace
-        from tests.legacy_support import legacy_state, v1_config, write_json
-        write_json(home / 'config.json', v1_config(SimpleNamespace(clone=source)))
-        write_json(home / 'state.json', legacy_state())
-        call('config', 'show'); call('source', 'status')
+        assert capabilities['deployment_model'] == 'taps' and capabilities['schemas']['machine'] == 3
+        # Tap-first bootstrap (RFC-MASK-0020): approving the local bare upstream creates machine config v3 and state.
+        call('tap', 'add', 'agentskills', remote)
+        call('config', 'show'); call('source', 'fetch')
         call('project', 'init', '--project', project); call('project', 'register', project)
-        preview = call('project', 'require', 'alpha', '--project', project, '--apply', '--dry-run')
-        call('project', 'require', 'alpha', '--project', project, '--apply', '--expect-plan-hash', preview['data']['plan_hash'])
-        assert not call('project', 'require', 'alpha', '--project', project, '--apply')['changed']
-        call('project', 'require', 'beta', '--project', project)
-        preview = call('plan', '--project', project)
-        support = source / 'skills/alpha/support.txt'; support.write_text('changed')
-        assert call('apply', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'] == 'plan.stale'
-        preview = call('plan', '--project', project)
+        preview = call('install', 'alpha', '--project', project, '--dry-run')
+        call('install', 'alpha', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'])
+        assert not call('install', 'alpha', '--project', project)['would_change']
+        assert links() == ['.agents/skills/alpha', '.claude/skills/alpha']
+        # A reviewed install preview goes stale once the tap cache moves under it.
+        preview = call('install', 'beta', '--project', project, '--dry-run')
+        support = source / 'skills/beta/support.txt'; support.write_text('changed')
+        git(source, 'add', 'skills'); git(source, 'commit', '-m', 'support'); git(source, 'push', 'origin', 'main')
+        call('source', 'fetch')
+        assert call('install', 'beta', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'] == 'plan.stale'
         leaf = project / '.agents/skills/beta'; leaf.mkdir(); (leaf / 'preserve').write_text('user content')
-        assert call('apply', '--project', project, code=4)['error']['code'] == 'target.collision'
+        assert call('install', 'beta', '--project', project, code=4)['error']['code'] == 'target.collision'
         assert (leaf / 'preserve').read_text() == 'user content'
+        assert 'beta' not in [row['id'] for row in json.loads((project / '.mask.json').read_text(encoding='utf-8'))['skills']]
         (leaf / 'preserve').unlink(); leaf.rmdir()  # Only our explicit test fixture.
-        preview = call('plan', '--project', project)
-        call('apply', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'])
+        preview = call('install', 'beta', '--project', project, '--dry-run')
+        call('install', 'beta', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'])
         call('doctor', '--project', project, '--check')
-        call('project', 'unrequire', 'beta', '--project', project)
         # A separate crashed process proves that public recovery resumes journal intent.
         injection = "import sys,os;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label:os._exit(99) if label=='intent' else None;mask.main(sys.argv[2:])"
-        run = subprocess.run([sys.executable, '-B', '-c', injection, str(program), 'apply', '--project', str(project), '--json'], env=env, capture_output=True)
+        run = subprocess.run([sys.executable, '-B', '-c', injection, str(program), 'remove', 'beta', '--project', str(project), '--json'], cwd=project, env=env, capture_output=True)
         assert run.returncode == 99
-        assert call('recover', '--inspect')['data']['pending']
+        assert call('recover', '--inspect')['data']['pending']['operation'] == 'remove'
         call('recover', '--complete'); assert not call('apply', '--project', project)['changed']
-        support.unlink()
+        assert links() == ['.agents/skills/alpha', '.claude/skills/alpha']
+        removed = call('remove', 'beta', '--project', project)
+        assert not removed['changed'] and [warning['code'] for warning in removed['warnings']] == ['selection.not_selected']
         author = base / 'author'; git(base, 'clone', '--branch', 'main', remote, author)
         git(author, 'config', 'user.name', 'Fixture'); git(author, 'config', 'user.email', 'fixture@example.invalid')
         with (author / 'skills/alpha/SKILL.md').open('a') as handle: handle.write('\nUpstream change.\n')
         git(author, 'add', 'skills'); git(author, 'commit', '-m', 'upstream'); git(author, 'push', 'origin', 'main')
-        call('source', 'fetch'); preview = call('update', '--dry-run')
-        assert preview['data']['requires_fetch']
-        call('update', '--expect-plan-hash', preview['data']['plan_hash'])
+        head = git(author, 'rev-parse', 'HEAD')
+        # A dry run reviews only the fetched cache: the upstream push stays unseen until update fetches it.
+        preview = call('update', '--dry-run')
+        assert preview['data']['network'] == 'none' and not preview['data']['fetches']['agentskills']['attempted']
+        assert head not in [change['after_commit'] for row in preview['data']['consumers'] for change in row['changes']]
+        updated = call('update')
+        assert updated['data']['network'] == 'fetch' and updated['changed']
+        assert [row['commit'] for row in json.loads((project / '.mask.lock.json').read_text(encoding='utf-8'))['packages']] == [head]
         assert not call('update')['changed']
         call('project', 'show', '--project', project); call('project', 'set-targets', '--project', project, '--inherit')
         call('project', 'unregister', project)

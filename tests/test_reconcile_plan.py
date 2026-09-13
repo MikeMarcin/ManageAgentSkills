@@ -2,24 +2,39 @@ import os
 import json
 import subprocess
 import unittest
-from pathlib import Path
-from tests.support import Fixture
-from tests.test_manifest_registry import declare_pinned
+
+import mask_core as c
+import mask_resolve as r
+import mask_store as store
+from tests.support import TAP, Fixture
 
 
 class PlannerTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 planner)."""
+    """Tap-first: a registered, not yet applied v2 consumer of the fixture tap."""
     def setUp(self):
-        super().setUp(); self.legacy_init(); self.declare(); self.call('project', 'register', self.project)
+        super().setUp(); self.init(); self.declare_pinned(); self.call('project', 'register', self.project)
 
-    def test_pure_plan_supporting_bytes_and_unmanaged_links(self):
+    def test_pure_plan_control_change_and_unmanaged_links(self):
         before = self.snapshot()
         preview = self.call('plan')
         self.assertTrue(preview['data']['applicable']); self.assertTrue(preview['would_change'])
         self.assertFalse(preview['changed']); self.assertEqual(before, self.snapshot())
-        path = self.source / 'skills/alpha/ref.txt'; path.write_text('new')
+        # Upstream bytes reach a plan only through the lock: a fetched new commit leaves the plan unchanged.
+        (self.source / 'skills/alpha/ref.txt').write_text('new')
+        self.publish('upstream change')
+        self.call('source', 'fetch', TAP)
+        self.assertEqual(preview['data']['plan_hash'], self.call('plan')['data']['plan_hash'])
+        # A changed control changes the plan: alpha for codex only, with its coherent lock.
+        declaration = c.read_json(self.project / '.mask.json')
+        declaration['skills'][0]['agents'] = ['codex']
+        lock = c.read_json(self.project / '.mask.lock.json')
+        (self.project / '.mask.json').write_text(json.dumps(declaration) + '\n')
+        (self.project / '.mask.lock.json').write_text(c.text_json(dict(lock, selection_digest=r.selection_digest(declaration))))
         self.assertNotEqual(preview['data']['plan_hash'], self.call('plan')['data']['plan_hash'])
-        target = self.project / '.agents/skills/alpha'; target.parent.mkdir(parents=True); target.symlink_to(self.source / 'skills/alpha', target_is_directory=True)
+        # Even a link to the exact locked store payload is unmanaged without an ownership record.
+        self.call('source', 'fetch', '--locked', '--offline')
+        target = self.project / '.agents/skills/alpha'; target.parent.mkdir(parents=True)
+        target.symlink_to(store.location(self.home, lock['packages'][0]['payload_digest'], 'alpha')[1], target_is_directory=True)
         plan = self.call('plan'); self.assertFalse(plan['data']['applicable'])
         self.assertEqual(plan['data']['blockers'][0]['code'], 'target.unmanaged_link')
         self.assertTrue(target.is_symlink())
@@ -30,15 +45,11 @@ class PlannerTests(Fixture):
         self.assertFalse(plan['data']['applicable'])
         self.assertEqual(plan['data']['blockers'][0]['code'], 'project.unavailable')
         path = self.home / 'state.json'; data = json.loads(path.read_text(encoding='utf-8'))
-        data['projects'][str(self.project)]['links']['../../outside'] = dict(skill='alpha', target='codex', link_text='/wrong')
-        path.write_text(json.dumps(data))
+        (record,) = data['projects'].values()
+        # A resolution-valid pinned link record under an escaping path.
+        record['links']['../../outside'] = dict(skill='alpha', target='codex', link_text='/wrong', resolution=record['last_lock']['packages'][0])
+        path.write_text(json.dumps(data), encoding='utf-8')
         self.assertEqual(self.call('plan', '--all', cwd=self.base, code=3)['error']['code'], 'state.invalid')
-
-
-class PinnedPlannerTests(Fixture):
-    """Tap-first: a registered, not yet applied v2 consumer of the fixture tap."""
-    def setUp(self):
-        super().setUp(); self.init(); declare_pinned(self); self.call('project', 'register', self.project)
 
     def test_collision_and_linked_parent(self):
         target = self.project / '.claude/skills/alpha'; target.mkdir(parents=True)
