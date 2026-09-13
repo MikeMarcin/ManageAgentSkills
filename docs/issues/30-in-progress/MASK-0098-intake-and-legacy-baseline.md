@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0098"
 title: "Record baseline and build the legacy machine fixture"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: []
 priority: "P1"
