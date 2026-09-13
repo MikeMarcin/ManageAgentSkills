@@ -1,0 +1,184 @@
+{
+  "schema": "mask.corrective-pack.issue-plan.v1",
+  "provisional_ids": true,
+  "reservation_count": 9,
+  "snapshot_next_id": "MASK-0098",
+  "cards": [
+    {
+      "id": "MASK-0098",
+      "key": "intake-and-legacy-baseline",
+      "title": "Record baseline and build the legacy machine fixture",
+      "path": "docs/issues/20-ready/MASK-0098-intake-and-legacy-baseline.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC04",
+        "RFC-MASK-0020-AC08"
+      ],
+      "status": "Ready"
+    },
+    {
+      "id": "MASK-0099",
+      "key": "machine-v3-and-tap-bootstrap",
+      "title": "Add config v3, tap-add bootstrap and tap-first fixtures",
+      "path": "docs/issues/10-backlog/MASK-0099-machine-v3-and-tap-bootstrap.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0098"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC01",
+        "RFC-MASK-0020-AC05"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0100",
+      "key": "retire-live-checkout-engine",
+      "title": "Remove legacy paths, commands and add the migration gate",
+      "path": "docs/issues/10-backlog/MASK-0100-retire-live-checkout-engine.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0099"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC02",
+        "RFC-MASK-0020-AC05"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0101",
+      "key": "update-fetch-and-isolation",
+      "title": "Fetch every referenced tap and update all consumers in one journal",
+      "path": "docs/issues/10-backlog/MASK-0101-update-fetch-and-isolation.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0099"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC03"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0102",
+      "key": "doctor-migration",
+      "title": "Detect and migrate legacy machines and consumers through doctor",
+      "path": "docs/issues/10-backlog/MASK-0102-doctor-migration.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0098",
+        "MASK-0100"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC04",
+        "RFC-MASK-0020-AC05"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0103",
+      "key": "help-docs-and-capabilities-truth",
+      "title": "Make help, docs and capabilities describe only the tap model",
+      "path": "docs/issues/10-backlog/MASK-0103-help-docs-and-capabilities-truth.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0100",
+        "MASK-0101",
+        "MASK-0102"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC05",
+        "RFC-MASK-0020-AC06"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0104",
+      "key": "real-package-qualifier-on-taps",
+      "title": "Requalify the real AgentSkills package and legacy lab natively",
+      "path": "docs/issues/10-backlog/MASK-0104-real-package-qualifier-on-taps.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0101",
+        "MASK-0102",
+        "MASK-0103"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC01",
+        "RFC-MASK-0020-AC03",
+        "RFC-MASK-0020-AC04",
+        "RFC-MASK-0020-AC07"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0105",
+      "key": "owner-machine-migration-dogfood",
+      "title": "Migrate the owner's real machine and personal scope (attended)",
+      "path": "docs/issues/10-backlog/MASK-0105-owner-machine-migration-dogfood.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0102",
+        "MASK-0103"
+      ],
+      "closeout_for": [],
+      "criteria": [
+        "RFC-MASK-0020-AC04",
+        "RFC-MASK-0020-AC07"
+      ],
+      "status": "Backlog"
+    },
+    {
+      "id": "MASK-0106",
+      "key": "close-tap-only-deployment",
+      "title": "Verify and close tap-only deployment",
+      "path": "docs/issues/10-backlog/MASK-0106-close-tap-only-deployment.md",
+      "rfcs": [
+        "RFC-MASK-0020"
+      ],
+      "depends_on": [
+        "MASK-0104",
+        "MASK-0105"
+      ],
+      "closeout_for": [
+        "RFC-MASK-0020"
+      ],
+      "criteria": [
+        "RFC-MASK-0020-AC01",
+        "RFC-MASK-0020-AC02",
+        "RFC-MASK-0020-AC03",
+        "RFC-MASK-0020-AC04",
+        "RFC-MASK-0020-AC05",
+        "RFC-MASK-0020-AC06",
+        "RFC-MASK-0020-AC07",
+        "RFC-MASK-0020-AC08"
+      ],
+      "status": "Backlog"
+    }
+  ]
+}

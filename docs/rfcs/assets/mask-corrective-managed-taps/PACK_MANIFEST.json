@@ -1,0 +1,144 @@
+{
+  "schema": "mask.corrective-pack.manifest.v1",
+  "pack_id": "mask-corrective-managed-taps",
+  "status": "proposed",
+  "rfcs": [
+    "RFC-MASK-0020"
+  ],
+  "provisional_issue_ids": [
+    "MASK-0098",
+    "MASK-0099",
+    "MASK-0100",
+    "MASK-0101",
+    "MASK-0102",
+    "MASK-0103",
+    "MASK-0104",
+    "MASK-0105",
+    "MASK-0106"
+  ],
+  "milestone_plan": "milestone-plan.json",
+  "production_changes_made": false,
+  "file_count": 24,
+  "files": [
+    {
+      "path": "ACCEPTANCE.md",
+      "bytes": 7679,
+      "sha256": "052debe473db0515d93445ff2f7a138b1f04983948810a44c438ca906569a1b9"
+    },
+    {
+      "path": "CHANGE_MAP.md",
+      "bytes": 4573,
+      "sha256": "f21138ef17cd9ef652fdeb5bf90cfa15a9a68a1b66ed6d97b360e4943a7e0df3"
+    },
+    {
+      "path": "contracts/CLI.md",
+      "bytes": 8192,
+      "sha256": "212aae9d04617b99a252def539431aefabbf817b8917f156b15f982507c48c50"
+    },
+    {
+      "path": "contracts/machine-v3.schema.json",
+      "bytes": 2213,
+      "sha256": "e80909910d69e8a6e857acd65de6cda6f774d11c6abe40b5b38ef1afb9f6b1f7"
+    },
+    {
+      "path": "contracts/MIGRATION.md",
+      "bytes": 7362,
+      "sha256": "7614f6bafb13f414bb2b9c740436bf661be1313fda12482995b3d16f7c3a76b2"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0099-machine-v3-and-tap-bootstrap.md",
+      "bytes": 2293,
+      "sha256": "4b23001828ce8d6c7c3bb70a849e4cc2edc62249ee4b9a2f17e22aff18340c40"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0100-retire-live-checkout-engine.md",
+      "bytes": 2574,
+      "sha256": "98084a03a97543c5185c7e0f5f635fb854c90ce3e7a0e061f8b6e7a6bddce619"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0101-update-fetch-and-isolation.md",
+      "bytes": 2379,
+      "sha256": "2a9eb2f5c59486e3d838e5e4a7b18fb1d884834360e48854c3bc616a317fc6d2"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0102-doctor-migration.md",
+      "bytes": 2631,
+      "sha256": "77634bc56215e830635b287a8bbe07b756024a3b11d28bd3b2fde3986ea94a19"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0103-help-docs-and-capabilities-truth.md",
+      "bytes": 2517,
+      "sha256": "46150f21ee8325e243652db05423a47b0efc2fbdc457160f939d1119b5b8e7a1"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0104-real-package-qualifier-on-taps.md",
+      "bytes": 2115,
+      "sha256": "765f37268bb0da297817ed051d38fabed8fc32cbb60e1cabb6cf4b41785607b1"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0105-owner-machine-migration-dogfood.md",
+      "bytes": 2070,
+      "sha256": "975769674587f24ca4d71b15c0c89c7956e94c9143c4c6e5a51d61a5a1864a63"
+    },
+    {
+      "path": "docs/issues/10-backlog/MASK-0106-close-tap-only-deployment.md",
+      "bytes": 3178,
+      "sha256": "95ffeb1552f68247a84bc1cf4f448a7a38fbc26e6c9cf62e42881707881c1ebc"
+    },
+    {
+      "path": "docs/issues/20-ready/MASK-0098-intake-and-legacy-baseline.md",
+      "bytes": 2430,
+      "sha256": "873f9b52a93e8fa28558849d48171404a4dcbf922ac67dedaf7c54cdb6a6a0b8"
+    },
+    {
+      "path": "docs/rfcs/RFC-MASK-0020-tap-only-deployment.md",
+      "bytes": 14041,
+      "sha256": "9a483e7386845e05f16b15532a6582190c43c92f841c9fa16e12133f7a2de6d2"
+    },
+    {
+      "path": "IMPLEMENTATION_PROMPT.md",
+      "bytes": 2509,
+      "sha256": "ab1d3869e06107ff4044180548c127c83ba4ffca0340a01ecd008a5dafabe592"
+    },
+    {
+      "path": "IMPORT.md",
+      "bytes": 2454,
+      "sha256": "e0c9700834eb99646274bfccecac372cc6b380ff978435f50fbbea35433f0163"
+    },
+    {
+      "path": "issue-plan.json",
+      "bytes": 4821,
+      "sha256": "3923343d18bcce33a57946e67e8c2d1d0b263415811efaece56d3e6e2bc86f08"
+    },
+    {
+      "path": "milestone-plan.json",
+      "bytes": 4077,
+      "sha256": "635e655472592ee0c1437ad1bd2b6a765d0d734c298e66e6851f3954bc4a6664"
+    },
+    {
+      "path": "MILESTONES.md",
+      "bytes": 3271,
+      "sha256": "d195d3141722d8f9d8d552b0066ce72be384429df3dc36af17c8360364174cc1"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3542,
+      "sha256": "153f2811480bd785be40d17ca38de8ee23373307172b1bdccf0ae0e18f34e392"
+    },
+    {
+      "path": "SOURCE_BASIS.md",
+      "bytes": 5654,
+      "sha256": "004cf4548e1de878ea208912eab15bc9917944d39bf212d5e108c1bedff05de5"
+    },
+    {
+      "path": "tools/validate_pack.py",
+      "bytes": 10852,
+      "sha256": "cc2dd6133ddd30adeee639df99ac20ea03a7c94f2857bd53acdcd699d9189bda"
+    },
+    {
+      "path": "VALIDATION.md",
+      "bytes": 2401,
+      "sha256": "34977f1f139ae310b39afefff67a2a744d91aad76bb83326bf15dbf1925310ed"
+    }
+  ]
+}
