@@ -1,12 +1,14 @@
 ---
 id: "RFC-MASK-0020"
 title: "Personal-scope workflow readiness for external implement-rfc state"
-status: "Implementing"
+status: "Auto-Verified"
 ---
 
 # RFC-MASK-0020: Personal-scope workflow readiness
 
 Accepted run `personal-mode-20260913`, mandate revision 1. AgentSkills [RFC-ASK-0013](https://github.com/MikeMarcin/AgentSkills/blob/main/docs/rfcs/RFC-ASK-0013-personal-implement-rfc-storage.md) owns the canonical skill and external tracker behavior. [MASK-0099](../issues/60-done/MASK-0099-close-personal-workflow-readiness.md) records the baseline, actual handoff and current status. Existing RFC-MASK-0019 work is retained.
+
+Auto-verification covers MASK's two-scope file readiness and public CLI integration at the recorded program/source revisions. AgentSkills ASK-0081 still owns actual Codex and Claude Code personal-role loading and a bounded native course.
 
 ## Decision
 
