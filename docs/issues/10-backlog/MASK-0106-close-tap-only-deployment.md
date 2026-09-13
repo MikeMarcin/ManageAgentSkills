@@ -16,7 +16,51 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-Refreshed at the end of dispatch `d1`, run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d1`, mandate revision `1`. The owner's mandate is `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized. The owner's real machine is changed only by attended MASK-0105.
+**Dispatch `d2` record (milestone `bootstrap` accepted).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
+
+- **Accepted milestone `bootstrap`:** MASK-0099 is Done at `eb2eff8`. The implementation is `01b2ae3` plus the review fix `94d4f1c`. MASK-0100 and MASK-0101 were promoted to Ready at `5ea6f13`.
+  - Exit 1: `tests.test_tap_bootstrap` passes 6 tests. On an empty `MASK_HOME`, `tap add` followed by `install` deploys v2 consumers from the store, with one bare cache and no checkout anywhere on disk. Negative controls: the pre-implementation product fails 5 of 5, and a retained author checkout fails the no-checkout assertion.
+  - Exit 2: on `94d4f1c`, the literal `python -B -m unittest` ran 391 tests OK (19 skipped) in 6477 s, and the per-module run passed all 44 modules. Tree hashes and the owner profile were unchanged across both. Only Windows 11 was exercised.
+  - Evidence: [MASK-0099 execution record](../60-done/MASK-0099-machine-v3-and-tap-bootstrap.md#execution-record) and the complete reference in [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md#runs).
+- **Binding** (unchanged from dispatch to finish):
+  - definition `sha256:4ffc77d27810b0f701a145961f84312dda7c289c56fad62d42261c1b2c20f0d8`
+  - obligation `sha256:ea9a3810366abb09d53d794db32643b9c48d85ae82ed10845bde1288776632b2`
+  - MASK-0099 source `sha256:9c05f5be4d20237474037f41814bc40bf7c115e67eaf0c7640d0661cca425717`
+  - prerequisite `sha256:256c0a53f234c928aa94807fde2efc3ba3352a9c71bece6414d5effed374f87b`
+  - The assignment and v2 return are in the ignored `.mask/generated/implement-rfc/runs/mask-rfc0020-2026-09-12-a/`.
+  - Card evidence goes under a trailing `## Execution record` heading, which leaves bound text unchanged. The installed helper hashes raw bytes, so a CRLF checkout of a card computes a different source fingerprint.
+- **Product state the next milestone inherits:**
+  - Machine config v3 is accepted beside v1 and v2, which still work fully. There is no migration gate yet.
+  - `init` no longer takes `--source`. `tap add` creates config and state when they are missing. Declarations created on v3 are v2, including those from `project init` and `user init`.
+  - On v3, legacy-only paths refuse with typed errors:
+    - `migration.required`: v1 declarations, legacy records, `update`, `inventory` rows and `link adopt`.
+    - `source.legacy_absent`: `source migrate`, `migrate`, `source status` and `source fetch` without a name.
+  - Pinned `update` still does not fetch.
+  - Manual pinned `ensure` reaches its one-time consent; events still need approval.
+- **Test state:**
+  - `tests/support.py` and `tests/public_support.py` start tap-first, providing `TAP`, `self.upstream`, `publish()`, `install()` and `binding()`.
+  - Tests of retired behavior start from `legacy_init` or `legacy_bootstrap` and carry a comment naming MASK-0100, MASK-0101 or MASK-0102. MASK-0100 ports or drops them, and should consolidate the local helper variants (`declare_pinned`, `authoring_init`, `push`).
+  - `tests/test_tap_bootstrap.py` holds the bootstrap journey and the refusals for legacy records on v3.
+- **Board:** MASK-0100 and MASK-0101 are Ready. MASK-0102 to MASK-0106 wait on their dependencies. The criterion rows below stay Not run.
+  - MASK-0099 records fixture evidence toward AC01, the `init --source` refusal toward AC05, and the Windows suite toward AC08.
+  - Still open: native qualification (AC07), the macOS suite, and the retirement work.
+- **Open notes for later cards** (not accepted scope; details are on MASK-0099):
+  - retained-pack case B04 names a different refusal code than the product returns;
+  - `source publish` republishes LF blobs as CRLF under `core.autocrlf`;
+  - a wrong-branch authoring checkout reports different codes with and without an origin;
+  - the plan hash of pinned `ensure --dry-run` on a cold store differs from the applying run;
+  - a refused `apply`, and a consent refusal after store hydration, both report `partial`;
+  - `project init` without machine config still writes v1;
+  - `scripts/qualify_real_package.py` still calls `init --source` (MASK-0104);
+  - README prose and the guides still describe the checkout journey (MASK-0103).
+- **Tooling notes:**
+  - The installed `milestone_plan.py adopt` Windows separator defect recorded by d1 is unchanged.
+  - Helper scripts need `PYTHONUTF8=1`.
+  - A full Windows suite run needs `MASK_HOME`, `USERPROFILE` and `HOME` redirected, because some `Fixture` tests exercise personal scope.
+- **Execution state:** all d2 children have returned: the scout, the diagnosis worker, five conversion workers and the critical reviewer. No command or child from d2 is active.
+- **Next milestone:** `engine` (MASK-0100 and MASK-0101), in a fresh integrator context. It should retire the live-checkout engine, remove retired commands from `capabilities` so they exit 2, gate v1/v2 configuration with `migration.required`, and make `update` fetch each referenced tap once, with isolation and one journal.
+
+**Dispatch `d1` record (historical; its next milestone and carried obligations were completed by d2).** Refreshed at the end of dispatch `d1`, run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d1`, mandate revision `1`. The owner's mandate is `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized. The owner's real machine is changed only by attended MASK-0105.
 
 - **Accepted milestone `baseline`:**
   - MASK-0098 is Done at `b294552`; implementation is `82b4200`.
