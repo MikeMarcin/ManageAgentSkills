@@ -21,7 +21,7 @@ except ImportError:  # Windows: prompts are exercised through a recorded native 
 
 from tests.public_support import ENTRY, PublicFixture
 from tests.support import TAP
-from tests.test_update_task import SharedSourceFixture
+from tests.test_update_task import TapUpdateFixture
 
 
 class ReadmeRecipes(PublicFixture):
@@ -161,26 +161,26 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(self.links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
 
 
-class ReadmeUpdate(SharedSourceFixture):
-    """``mask update`` and ``mask update --dry-run`` as the README describes them.
-
-    Legacy live-checkout starting state (inherited) until MASK-0101 retires the shared-checkout update.
-    """
+class ReadmeUpdate(TapUpdateFixture):
+    """``mask update`` and ``mask update --dry-run`` as the README describes them, on the fixture tap."""
 
     def test_update_previews_locally_and_applies_in_one_command(self):
-        before = self.head()
+        cache, lock = self.cached(), (self.project / '.mask.lock.json').read_bytes()
         candidate = self.push_upstream()
         preview = self.human('update', '--dry-run')
         self.assertEqual(preview.returncode, 0, preview.stderr)
-        self.assertEqual(self.tracking(), before)  # Preview did not fetch.
+        self.assertFalse(self.parses_as_result_envelope(preview.stdout))
+        self.assertNotIn('sha256:', preview.stdout)
+        self.assertEqual((self.cached(), (self.project / '.mask.lock.json').read_bytes()), (cache, lock))  # Preview did not fetch.
         applied = self.human('update')
         self.assertEqual(applied.returncode, 0, applied.stderr)
         self.assertFalse(self.parses_as_result_envelope(applied.stdout))
         self.assertNotIn('sha256:', applied.stdout)
-        self.assertEqual(self.head(), candidate)
+        self.assertEqual(self.locked(), candidate)
         again = self.human('update')
         self.assertEqual(again.returncode, 0, again.stderr)
-        self.assertEqual(self.head(), candidate)
+        self.assertIn('no change needed', again.stdout)
+        self.assertEqual(self.locked(), candidate)
 
 
 if __name__ == '__main__':

@@ -46,15 +46,14 @@ def validate_record(record):
 
 
 def target(link, config, home):
+    """The directory an owned link names: a store payload, or the approved authoring package of an explicit dev link."""
     import mask_store as store
     if 'dev' in link:
         validate_dev(link['dev'], config)
         return Path(link['dev']['root']) / link['dev']['path']
     if 'resolution' in link:
         return store.location(home, link['resolution']['payload_digest'], link['skill'])[1]
-    if c.legacy_source(config) is None:
-        c.fail('migration.required', 'A legacy link record has no live checkout on a tap catalog machine; it must be migrated.', 4, skill=link['skill'])
-    return c.legacy_source(config) / 'skills' / link['skill']
+    c.migration_required('A live-checkout link record has no store payload; migrate its consumer before MASK derives a target.', skill=link['skill'])
 
 
 def simple_targets(declaration):
@@ -152,8 +151,6 @@ def file_path(entry, home):
     role, root = entry['role'], Path(entry['root'])
     if role == 'selection_policy' and root == home:
         return home / 'selection-policy.json'
-    if role == 'machine_config' and root == home:
-        return home / 'config.json'
     if role == 'project_declaration':
         return root / '.mask.json'
     if role == 'project_lock':
@@ -190,11 +187,6 @@ def validate_files(pending, home):
             change = pending.get('selection_change', {})
             if entry != dict(root=str(home), role='selection_policy', before=change.get('policy_before'), after=change.get('policy_after')):
                 c.fail('recovery.conflict', 'Selection policy role differs from its explicit transition.', 8)
-            continue
-        if entry['role'] == 'machine_config':
-            migration = pending.get('migration', {})
-            if entry != dict(root=str(home), role='machine_config', before=migration.get('config_before'), after=migration.get('config_after')):
-                c.fail('recovery.conflict', 'Machine configuration role differs from explicit migration.', 8)
             continue
         key = (entry['root'], entry['role'])
         if key in seen or entry['root'] not in pending['selected']:
@@ -268,7 +260,7 @@ def check_observations(pending, home):
         c.fail('recovery.conflict', 'Local selection policy is no longer readable.', 8, cause=error.as_dict())
     if current_policy not in (policy_before, pending.get('selection_change', {}).get('policy_after', policy_before)):
         c.fail('recovery.conflict', 'Local selection policy changed.', 8)
-    if c.read_text(home / 'config.json', missing=True) not in (pending['pinned']['config_text'], pending.get('migration', {}).get('config_after', pending['pinned']['config_text'])) or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
+    if c.read_text(home / 'config.json', missing=True) != pending['pinned']['config_text'] or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
         c.fail('recovery.conflict', 'Pinned configuration or authority changed.', 8)
     for expected in observations:
         root = Path(expected['root'])
@@ -276,7 +268,7 @@ def check_observations(pending, home):
             c.fail('recovery.conflict', 'Pinned consumer root changed.', 8)
         actual = readiness.workspace_observation(root, scope=expected.get('scope', 'project'), home=home)
         for entry in pending.get('files', []):
-            if entry['root'] == str(root) and entry['role'] not in ('machine_config', 'selection_policy'):
+            if entry['root'] == str(root) and entry['role'] != 'selection_policy':
                 field = 'lock' if entry['role'].endswith('_lock') else 'manifest'
                 if actual.get(field) not in (entry['before'], entry['after']):
                     c.fail('recovery.conflict', 'Typed consumer control changed.', 8)
@@ -294,8 +286,8 @@ def validate_observations(pending, home):
     c.fields(value, ('workspaces', 'config_text', 'policy_text'), ('selection_policy_text', 'home_identity'), family='recovery')
     if not isinstance(value['workspaces'], list) or sorted(item.get('root', '') for item in value['workspaces'] if isinstance(item, dict)) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Pinned observations must cover selected consumers exactly.', 8)
-    expected_config = pending.get('migration', {}).get('config_before', c.text_json(pending['config']))
-    if not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text'])) != c.config(c.parse_json(expected_config)):
+    # Pinned journals on a v2 machine stay recoverable before its migration, so both sides parse legacy-readable.
+    if not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text']), legacy=True) != c.config(pending['config'], legacy=True):
         c.fail('recovery.conflict', 'Pinned config observation differs from intent.', 8)
     if value.get('selection_policy_text') is not None:
         import mask_selection as selection
@@ -461,199 +453,6 @@ def merge_preparation(output, *, completed):
         output['would_change'] = True
         if output['transaction'] in ('not_needed', 'not_started'):
             output['transaction'] = 'committed' if completed else 'partial'
-
-
-def authoring_snapshot(config):
-    """Exact clean legacy HEAD observation; reading never fetches or checks out."""
-    import mask_sources as sources
-    root = Path(config['source']['root'])
-    c.parents_safe(Path(root.anchor), root)
-    c.checkout(root)
-    head = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}', optional=True)
-    if head is None:
-        c.fail('migration.unborn', 'Commit the preserved authoring work before pin migration.', 4)
-    if c.git(root, 'config', '--bool', '--get', 'core.sparseCheckout', optional=True) == 'true':
-        c.fail('source.dirty', 'Sparse authoring checkouts cannot establish a clean migration baseline.', 4)
-    flags = c.git(root, 'ls-files', '-v', '-z', binary=True).split(b'\0')
-    if any(item and (item[: 1] == b'S' or item[: 1].islower()) for item in flags):
-        c.fail('source.dirty', 'Clear skip-worktree/assume-unchanged flags explicitly before migration.', 4)
-    if c.git(root, 'status', '--porcelain=v1', '--untracked-files=all'):
-        c.fail('source.dirty', 'Migration requires a clean committed authoring checkout; preserve or commit local edits explicitly.', 4)
-    branch = c.git(root, 'symbolic-ref', '--short', 'HEAD', optional=True)
-    if branch != config['source']['branch']:
-        c.fail('source.identity_mismatch', 'Migration requires the configured authoring branch.', 4)
-    name = config['legacy_source']
-    entry = sources.selected(config, name)
-    transport = c.git(root, 'remote', 'get-url', config['source']['remote'], optional=True) or str(root)
-    sources.endpoint(root, transport, entry['repository'])
-    for marker in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
-        path = Path(c.git(root, 'rev-parse', '--path-format=absolute', '--git-path', marker))
-        if c.kind(path) != 'missing':
-            c.fail('source.dirty', 'An unfinished authoring Git operation blocks migration.', 4)
-    return dict(root=str(root), identity=c.identity(root), head=head, branch=branch,
-                index = c.digest(c.git(root, 'ls-files', '--stage', '-z', binary=True)),
-                repository = entry['repository'], object_format = c.git(root, 'rev-parse', '--show-object-format'))
-
-
-def migrated_selection(legacy, config):
-    import mask_sources as sources
-    legacy = c.manifest(legacy)
-    name = config['legacy_source']
-    entry = sources.selected(config, name)
-    return r.selection(dict(schema_version=2, sources={name:dict(repository=entry['repository'], packages=entry['packages'], ref='refs/heads/' + config['source']['branch'])},
-                            default_agents = legacy.get('targets', config['default_targets']),
-                            skills = [dict(source=name, id=identifier) for identifier in legacy['skills']]))
-
-
-def validate_migration(pending, home):
-    import mask_sources as sources
-    value = pending.get('migration')
-    c.fields(value, ('config_before', 'config_after', 'source'), family='recovery')
-    if pending['operation'] != 'migrate' or 'pinned' not in pending or pending['schema_version'] != 3:
-        c.fail('recovery.conflict', 'Migration requires its explicit typed pinned journal.', 8)
-    if value['config_before'] != pending['pinned']['config_text']:
-        c.fail('recovery.conflict', 'Migration before config must preserve its exact observed bytes.', 8)
-    before, after = c.config(c.parse_json(value['config_before'])), c.config(c.parse_json(value['config_after']))
-    name = after.get('legacy_source')
-    if after != sources.migrated_config(before, home, name) or pending['config'] != after:
-        c.fail('recovery.conflict', 'Migration config changes exceed the legacy source binding.', 8)
-    config_entries = [entry for entry in pending['files'] if entry.get('role') == 'machine_config']
-    expected = [dict(root=str(home), role='machine_config', before=value['config_before'], after=value['config_after'])] if value['config_before'] != value['config_after'] else []
-    if config_entries != expected or c.read_text(home / 'config.json') not in (value['config_before'], value['config_after']):
-        c.fail('recovery.conflict', 'Migration config bytes or typed coverage changed.', 8)
-    c.fields(value['source'], ('root', 'identity', 'head', 'branch', 'index', 'repository', 'object_format'), family='recovery')
-    if value['source']['root'] != after['source']['root'] or value['source']['repository'] != after['sources'][name]['repository']:
-        c.fail('recovery.conflict', 'Migration source observation differs from approval.', 8)
-    for root in pending['selected']:
-        old = c.consumer_records(pending['before_state']).get(root)
-        new = c.consumer_records(pending['after_state']).get(root)
-        if old is None or not is_pinned(new):
-            c.fail('recovery.conflict', 'Migration needs registered before and pinned after ownership.', 8)
-        if not is_pinned(old):
-            observed = next(item for item in pending['pinned']['workspaces'] if item['root'] == root)
-            if new['last_manifest'] != migrated_selection(c.parse_json(observed['manifest']), after):
-                c.fail('recovery.conflict', 'Migrated selection differs from explicit legacy requirements/targets.', 8)
-            if any(row['commit'] != value['source']['head'] for row in new['last_lock']['packages']):
-                c.fail('recovery.conflict', 'Migrated locks must name the observed authoring HEAD.', 8)
-
-
-def check_migration(pending, home):
-    try:
-        if authoring_snapshot(pending['config']) != pending['migration']['source']:
-            c.fail('recovery.conflict', 'Authoring source changed during migration.', 8)
-    except c.MaskError as error:
-        c.fail('recovery.conflict', 'Migration authoring baseline changed; preserve work and inspect recovery.', 8, cause=error.as_dict())
-
-
-def transition_dispatch(args, output, home):
-    """Resolve/prepare outside the writer, then activate one frozen ordinary plan."""
-    import mask
-    import mask_fs as fs
-    import mask_packages as packages
-    import mask_sources as sources
-    import mask_store as store
-    if c.kind(home / 'pending.json') != 'missing':
-        c.fail('recovery.required', 'Recover the pending operation before resolving a transition.', 8)
-    state = c.state(c.read_json(home / 'state.json', default=c.empty_state()))
-    config_before = c.read_text(home / 'config.json')
-    original = c.config(c.parse_json(config_before))
-    roots = mask.selected_roots(args, state, all_default=args.command == 'update')
-    records = c.consumer_records(state)
-    if any(str(root) not in records for root in roots):
-        c.fail('migration.registration_required', 'Register selected consumers before changing deployment mode.', 4)
-    if args.command == 'update' and any(not is_pinned(records[str(root)]) for root in roots):
-        if getattr(args, 'skill', None):
-            c.fail('migration.required', 'Per-binding updates require pinned consumers; migrate explicitly first.', 4)
-        return False  # The legacy shared-source operation discloses its full impact itself.
-    if args.command == 'update' and not roots:
-        if getattr(args, 'skill', ()):
-            c.fail('invocation.invalid', '--skill requires coordinates present in the selected consumer scopes.', 2)
-        return False
-    if not roots:
-        c.fail('migration.no_selection', 'No registered consumer was selected for migration.', 4)
-    migration = args.command == 'migrate'
-    if migration and not getattr(args, 'to_pinned', False):
-        c.fail('invocation.invalid', 'Migration requires explicit --to-pinned.', 2)
-    config = sources.migrated_config(original, home, original.get('legacy_source', 'legacy')) if migration else original
-    consumers = [(root, c.consumer_scope(state, root)) for root in roots]
-    observed_consumers = consumers
-    before = snapshot(home, observed_consumers)
-    requested = getattr(args, 'skill', ()) if not migration else ()
-    scoped_skills = {}
-    if requested:
-        available = set()
-        for root, scope in consumers:
-            declaration = r.selection(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
-            bindings = {r.coordinate(binding) for binding in declaration['skills']}
-            available.update(bindings)
-            scoped_skills[str(root)] = sorted(set(requested) & bindings)
-        if len(set(requested)) != len(requested) or set(requested) - available:
-            c.fail('invocation.invalid', '--skill requires unique coordinates present in the selected consumer scopes.', 2)
-        consumers = [(root, scope) for root, scope in consumers if scoped_skills[str(root)]]
-        roots = [root for root, scope in consumers]
-    if any(records[str(root)].get('mode') == 'dev-link' for root in roots):
-        c.fail('dev_link.active', 'Return to pins explicitly before migration/update.', 4)
-    source = authoring_snapshot(config) if migration else None
-    proposals, locks, payloads = {}, {}, []
-    payload_views = {}
-    for root, scope in consumers:
-        current = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
-        if migration and not is_pinned(records[str(root)]):
-            declaration = migrated_selection(current, config)
-            rows = []
-            for binding in declaration['skills']:
-                found = [item for item in sources.discover(Path(source['root']), binding['source'], config['sources'][binding['source']], source['head'], identifier=binding['id']) if item['id'] == binding['id']]
-                if len(found) != 1:
-                    c.fail('skill.unknown', 'Migration needs one exact raw package at clean HEAD.', 4)
-                item = found[0]
-                payload = packages.validate(Path(source['root']), source['head'], item['path'], binding['id'])
-                row = dict(source=binding['source'], id=binding['id'], repository=item['repository'], path=item['path'], commit=source['head'], git_object_format=source['object_format'], selector=dict(ref=declaration['sources'][binding['source']]['ref']), **r.payload_digests(payload))
-                rows.append(row)
-                payloads.append((row, payload))
-                payload_views[row['payload_digest']] = payload
-            proposals[str(root)] = declaration
-            locks[str(root)] = r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(declaration), packages=rows), declaration)
-        else:
-            if migration:
-                declaration, previous = r.read_exact_lock(root, scope, home, config, verify=False)
-            else:
-                declaration = r.selection(current)
-                previous = r.lock(r.read_model(r.lock_path(root, scope, home), 'lock')[0])
-                r.approved(declaration, config)
-            locks[str(root)] = previous if migration else r.resolve_candidate(declaration, config, home, previous, refresh=True, skills=scoped_skills.get(str(root), ()), allow_ref_rebind=getattr(args, 'allow_ref_rebind', False), payload_views=payload_views)
-    planned = fs.plan(config, state, roots, home=home, proposals=proposals, lock_proposals=locks, operation=args.command, allow_migration=migration, payload_views=payload_views)
-    if migration:
-        config_after = config_before if config == original else c.text_json(config)
-        planned['intent']['migration'] = dict(config_before=config_before, config_after=config_after, source=source)
-        if config_after != config_before:
-            planned['intent']['files'].append(dict(root=str(home), role='machine_config', before=config_before, after=config_after))
-            planned['actions'].append(dict(kind='config.migrate', status='planned'))
-            planned['would_change'] = True
-        planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], migration=planned['intent']['migration']))
-    fs.public_plan(planned, output)
-    fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-    if output['dry_run']:
-        return True
-    effects = output['data']['preparation'] = []
-    for row, payload in payloads:
-        observation = dict(skill=r.coordinate(row), effects=dict(artifacts=[{}]))
-        effects.append(observation)
-        store.materialize(home, row, payload, effects=observation['effects']['artifacts'][0])
-    if not migration:
-        for root, scope in consumers:
-            observation = dict(root=str(root), effects={})
-            effects.append(observation)
-            import mask_selection as selection
-            declaration = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home)))
-            store.ensure(home, declaration, locks[str(root)], config, offline=True, coordinates=selection.applicable_coordinates(declaration), effects=observation['effects'])
-    with c.writer_lock(home):
-        if snapshot(home, observed_consumers) != before or migration and authoring_snapshot(config) != source:
-            c.fail('plan.stale', 'Source, consumer controls, generation or identity changed during preparation.', 4)
-        fs.execute(planned, home, output)
-    if args.command == 'update':
-        import mask_ensure as readiness
-        readiness.final_status(output)
-    return True
 
 
 def validate_live_lock(value, declaration, pending):

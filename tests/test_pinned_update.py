@@ -88,7 +88,7 @@ class UpdateTests(Fixture):
         self.assertEqual(state['projects'][str(self.project)]['mode'], 'dev-link')
         self.assertEqual(os.readlink(other / '.agents/skills/alpha'), old)
         self.assertFalse(self.call('project', 'show')['data']['reproducible'])
-        self.assertFalse(self.call('inventory')['data']['complete'])
+        self.assertFalse(self.call('inventory')['data']['consumers'][0]['reproducible'])
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'dev_link.active')
         self.call('source', 'fetch', TAP)
         self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'dev_link.active')
@@ -156,35 +156,6 @@ class UpdateTests(Fixture):
         self.call('update', '--project', self.project)
         self.assertEqual(c.read_json(self.project / '.mask.lock.json')['packages'][0]['commit'], original)
         self.assertFalse(self.call('update', '--project', self.project)['changed'])
-
-
-class LegacyUpdateTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100/0101 retires this behavior (no-name fetch and shared-checkout update)."""
-
-    def test_empty_registry_and_unqualified_shared_update_remain_legacy(self):
-        remote = self.base / 'AgentSkills.git'
-        self.git(self.base, 'clone', '--bare', str(self.source), str(remote))
-        self.git(self.source, 'remote', 'add', 'origin', str(remote))
-        self.legacy_init()
-        self.call('source', 'fetch')
-        self.assertFalse(self.call('update', '--dry-run')['would_change'])
-        self.declare()
-        self.call('project', 'register', '--apply')
-        # A targeted legacy update is the shared operation with its impact disclosed; the sole legacy scope needs no wider consent.
-        targeted = self.call('update', '--project', self.project)
-        self.assertEqual(targeted['data']['scope']['affected'], [str(self.project)])
-        self.assertNotIn('confirmation', targeted['data'])
-        self.assertEqual(self.call('update', '--project', self.project, '--skill', ALPHA, code=4)['error']['code'], 'migration.required')
-        clone = self.base / 'upstream clone'  # The fixture's tap upstream already occupies base/upstream.
-        self.git(self.base, 'clone', str(remote), str(clone))
-        self.git(clone, 'config', 'user.name', 'Fixture')
-        self.git(clone, 'config', 'user.email', 'fixture@example.invalid')
-        (clone / 'skills/alpha/shared').write_text('shared')
-        self.git(clone, 'add', '.')
-        self.git(clone, 'commit', '-m', 'shared update')
-        self.git(clone, 'push')
-        self.call('update')
-        self.assertTrue((self.source / 'skills/alpha/shared').exists())
 
 
 class RecoveryUpdateTests(UpdateTests):

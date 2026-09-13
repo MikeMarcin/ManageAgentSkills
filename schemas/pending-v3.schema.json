@@ -37,7 +37,6 @@
         "ensure.deactivate",
         "apply",
         "update",
-        "migrate",
         "source.dev-link",
         "project.register",
         "project.unregister",
@@ -281,7 +280,6 @@
               "project_lock",
               "user_declaration",
               "user_lock",
-              "machine_config",
               "selection_policy"
             ]
           },
@@ -413,77 +411,6 @@
             "inode": {
               "type": "integer",
               "minimum": 0
-            }
-          }
-        }
-      }
-    },
-    "migration": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "config_before",
-        "config_after",
-        "source"
-      ],
-      "properties": {
-        "config_before": {
-          "type": "string"
-        },
-        "config_after": {
-          "type": "string"
-        },
-        "source": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "root",
-            "identity",
-            "head",
-            "branch",
-            "index",
-            "repository",
-            "object_format"
-          ],
-          "properties": {
-            "root": {
-              "type": "string"
-            },
-            "identity": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "device",
-                "inode"
-              ],
-              "properties": {
-                "device": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "inode": {
-                  "type": "integer",
-                  "minimum": 0
-                }
-              }
-            },
-            "head": {
-              "type": "string"
-            },
-            "branch": {
-              "type": "string"
-            },
-            "index": {
-              "type": "string"
-            },
-            "repository": {
-              "type": "string"
-            },
-            "object_format": {
-              "enum": [
-                "sha1",
-                "sha256"
-              ]
             }
           }
         }
@@ -707,5 +634,5 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:pending:v3",
-  "$comment": "Typed readiness, pinned deployment, explicit migration, and development observations. Runtime checks complete transitions and recomputed physical paths before effects."
+  "$comment": "Typed readiness, pinned deployment, and development observations. Runtime checks complete transitions and recomputed physical paths before effects; journals of the retired live-checkout engine are refused."
 }

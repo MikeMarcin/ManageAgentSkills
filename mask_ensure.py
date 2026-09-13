@@ -272,12 +272,12 @@ def ensure(args, output, home):
     def replan(staged=None):
         """A fresh plan over the current registry with unchanged control observations, for setup publication and the final recheck."""
         current = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
-        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, staged_roles=staged, repair_roles=repair)
+        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, inactive=inactive, staged_roles=staged, repair_roles=repair)
         policy_text = c.read_text(home / 'integration.json', 'integration', missing=True)
         fresh['intent']['controls'] = dict(workspaces=observations, policy_before=policy_text, policy_after=policy_text)
         return fresh
 
-    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, source_status=False, inactive=inactive, repair_roles=repair)
+    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, inactive=inactive, repair_roles=repair)
     policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
     policy_after = c.text_json(proposed_approval) if proposed_approval != approval else policy_before
     planned['intent']['controls'] = dict(workspaces=observations, policy_before=policy_before, policy_after=policy_after)
@@ -507,7 +507,7 @@ def forget(args, output, home):
                for field in worktrees.split('\0') if field.startswith('worktree ')):
             c.fail('project.unavailable', 'Git still records this worktree; missing storage is not removal.', 4)
     planned = fs.plan(config, state, [root], unregister=[str(root)], keep_links=missing,
-                      operation='project.unregister', home=home, source_status=False)
+                      operation='project.unregister', home=home)
     fs.public_plan(planned, output)
     fs.ensure_applicable(planned)
     if not output['dry_run']:

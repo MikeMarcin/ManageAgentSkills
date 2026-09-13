@@ -1,101 +1,235 @@
-from pathlib import Path
-from unittest.mock import patch
-import argparse
+"""Tap-first inventory and where-used over pinned records (MASK-0100; RFC-MASK-0011-AC01, RFC-MASK-0020).
 
-import mask
+Every case drives the public CLI as a subprocess on a machine bootstrapped from local bare
+upstreams approved as ``file`` taps, and every observation proves that the whole fixture
+base, MASK_HOME included, is byte-identical afterwards.
+"""
+import json
+import os
+from types import SimpleNamespace
+
 import mask_core as c
-import mask_report
-from tests.support import Fixture
+from tests.support import TAP, Fixture
+
+ALPHA, BETA, VENDOR_ALPHA = TAP + '/alpha', TAP + '/beta', 'vendor/alpha'
+ARTIFACT = ('payload_digest', 'metadata_digest', 'commit', 'selector')
+
+
+def remove_link(path):
+    """Remove one directory link without following it; Windows removes directory links with rmdir."""
+    if os.name == 'nt' and path.is_dir():
+        os.rmdir(path)
+    else:
+        path.unlink()
 
 
 class InventoryTests(Fixture):
-    """Legacy live-checkout starting state until MASK-0100 retires this behavior (legacy inventory rows)."""
+    # Development links need the fixture tap's approved authoring checkout; every other case starts from init().
+    AUTHORING = {'test_dev_link_rows_follow_the_recorded_authoring_target'}
+
     def setUp(self):
         super().setUp()
-        self.legacy_init()
-        self.declare()
-        self.call('project', 'register', self.project)
+        if self._testMethodName in self.AUTHORING:
+            self.git(self.source, 'remote', 'add', 'origin', str(self.upstream))
+            self.call('tap', 'add', TAP, self.upstream, '--checkout', self.source)
+        else:
+            self.init()
+        self.install('alpha')
 
-    def test_desired_owned_drift_and_unpinned_truth(self):
+    def observe(self, *args, code=0, cwd=None):
+        """One inventory or where-used call that must write nothing anywhere under the fixture base."""
         before = self.snapshot()
-        rows = self.call('inventory')['data']['rows']
-        self.assertEqual({row['status'] for row in rows}, {'declared_not_deployed'})
-        self.assertEqual(before, self.snapshot())
-        self.call('apply')
-        rows = self.call('skill', 'where-used', 'legacy/alpha')['data']['rows']
-        self.assertEqual({row['status'] for row in rows}, {'managed_converged'})
-        self.assertTrue(all(row['artifact'] is None and row['host_load'] == 'not_verified' for row in rows))
-        leaf = self.project / '.agents/skills/alpha'
-        leaf.unlink()
-        rows = self.call('inventory')['data']['rows']
-        self.assertEqual(next(row for row in rows if row['agent'] == 'codex')['status'], 'managed_drifted')
-        self.call('skill', 'where-used', 'other/alpha', code=4)
-        self.call('skill', 'where-used', 'alpha', code=2)
+        result = self.call(*args, code=code, cwd=cwd)
+        self.assertEqual(before, self.snapshot(), args)
+        return result['data'] if code == 0 else result['error']
 
-    def test_scope_filters_pagination_and_unavailable_cache(self):
-        personal = self.base / 'personal'
-        personal.mkdir()
-        self.call('user', 'init')
-        self.call('user', 'require', 'alpha')
-        self.call('user', 'register', '--user-home', personal, '--apply')
-        rows = self.call('skill', 'where-used', 'legacy/alpha', '--agent', 'codex', '--scope', 'user')['data']['rows']
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]['root'], str(personal))
-        page = self.call('inventory', '--all', '--limit', '1')['data']
-        self.assertEqual(page['total_rows'], 4)
-        self.assertEqual(page['next_offset'], 1)
-        self.assertEqual(len(page['rows']), 1)
-        self.project.rename(self.base / 'unavailable')
-        data = self.call('inventory', '--project', self.project, cwd=self.base)['data']
-        self.assertFalse(data['complete'])
-        self.assertEqual({row['status'] for row in data['rows']}, {'unavailable_consumer'})
-        self.assertTrue(all(row['declaration_basis'] == 'cached_declaration' for row in data['rows']))
+    def lock_row(self, identifier='alpha'):
+        return next(row for row in c.read_json(self.project / '.mask.lock.json')['packages'] if row['id'] == identifier)
 
-    def test_unmanaged_is_shallow_observational_and_never_adopted(self):
-        directory = self.project / '.agents/skills'
-        directory.mkdir(parents=True)
+    def pick(self, rows, agent, skill=ALPHA, root=None):
+        return next(row for row in rows if (row['agent'], row['skill'], row['root']) == (agent, skill, str(root or self.project)))
+
+    def registered_copy(self, name):
+        """A second consumer registered with the project's declaration and lock but without --apply, so nothing is linked."""
+        other = self.base / name
+        other.mkdir()
+        for control in ('.mask.json', '.mask.lock.json'):
+            (other / control).write_bytes((self.project / control).read_bytes())
+        self.call('project', 'register', '--project', other)
+        return other
+
+    def vendor_tap(self):
+        """A second approved tap whose alpha package has different bytes under the same ID."""
+        source = self.base / 'Vendor'
+        (source / 'skills/alpha').mkdir(parents=True)
+        (source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Vendor skill\n---\n\nVendor instructions.\n')
+        self.git(source, 'init', '-b', 'main')
+        self.git(source, 'config', 'user.name', 'Fixture')
+        self.git(source, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(source, 'add', 'skills')
+        self.git(source, 'commit', '-m', 'vendor skills')
+        upstream = self.base / 'upstream' / 'Vendor.git'
+        self.git(self.base, 'init', '-q', '--bare', '-b', 'main', str(upstream))
+        self.git(source, 'push', '-q', str(upstream), 'main')
+        self.call('tap', 'add', 'vendor', upstream)
+        return upstream
+
+    def test_converged_rows_join_lock_artifact_source_and_compatibility(self):
+        lock = self.lock_row()
+        data = self.observe('inventory')
+        self.assertEqual((data['source_mode'], data['network'], data['scope'], data['complete']), ('tap', 'none', 'selected_consumer', True))
+        self.assertEqual(data['consumers'], [dict(root=str(self.project), scope='project', available=True, declaration_basis='live_declaration',
+                                                  error=None, mode='pinned', reproducible=True)])
+        self.assertEqual(sorted(row['agent'] for row in data['rows']), ['claude', 'codex'])
+        for row in data['rows']:
+            self.assertEqual(row['status'], 'managed_converged', row)
+            self.assertEqual((row['skill'], row['name'], row['source'], row['package_path']),
+                             (ALPHA, 'alpha', dict(alias=TAP, repository=self.upstream.as_uri()), lock['path']))
+            self.assertEqual(row['artifact'], {field: lock[field] for field in ARTIFACT})
+            self.assertEqual((row['recorded_source_revision'], row['content_mode'], row['declared'], row['origin'], row['owned']),
+                             (None, 'pinned', True, 'local_declaration', True))
+            self.assertEqual((row['compatibility'], row['host_load'], row['error'], row['actual']['type']), ('selected', 'not_verified', None, 'symlink'))
+        self.assertFalse(any('legacy' in item.lower() or 'unpinned' in item.lower() for item in data['limitations']))
+        self.assertNotIn('pinned_unsupported', json.dumps(data))
+
+    def test_hand_retargeted_removed_link_and_missing_store_payload_drift(self):
+        codex = self.project / '.agents/skills/alpha'
+        elsewhere = self.base / 'elsewhere'
+        elsewhere.mkdir()
+        remove_link(codex)
+        os.symlink(elsewhere, codex, target_is_directory=True)
+        rows = self.observe('inventory')['rows']
+        retargeted = self.pick(rows, 'codex')
+        self.assertEqual((retargeted['status'], retargeted['owned'], retargeted['actual']), ('managed_drifted', True, dict(type='symlink', link_text=os.readlink(codex))))
+        self.assertEqual(self.pick(rows, 'claude')['status'], 'managed_converged')
+        remove_link(codex)
+        removed = self.pick(self.observe('inventory')['rows'], 'codex')
+        self.assertEqual((removed['status'], removed['actual']), ('managed_drifted', dict(type='missing', link_text=None)))
+        (self.home / 'store').rename(self.home / 'store moved')
+        claude = self.pick(self.observe('inventory')['rows'], 'claude')
+        self.assertEqual((claude['status'], claude['actual']['type']), ('managed_drifted', 'symlink'))
+
+    def test_registered_declaration_without_links_and_shallow_unmanaged_neighbors(self):
+        other = self.registered_copy('registered only')
+        data = self.observe('inventory', '--project', other)
+        self.assertEqual(sorted((row['agent'], row['status'], row['owned'], row['actual']['type']) for row in data['rows']),
+                         [('claude', 'declared_not_deployed', False, 'missing'), ('codex', 'declared_not_deployed', False, 'missing')])
+        skills = other / '.agents/skills'
+        skills.mkdir(parents=True)
         external = self.base / 'external'
         external.mkdir()
         (external / 'private').write_text('must not read')
-        (directory / 'neighbor').symlink_to(external, target_is_directory=True)
-        (directory / 'alpha').mkdir()
-        before = self.snapshot()
-        data = self.call('inventory', '--include-unmanaged')['data']
-        self.assertEqual(before, self.snapshot())
-        neighbors = [row for row in data['rows'] if row['name'] == 'neighbor']
-        self.assertEqual(len(neighbors), 1)
-        self.assertEqual(neighbors[0]['status'], 'unmanaged_present')
-        self.assertIsNone(neighbors[0]['source'])
-        self.assertFalse(neighbors[0]['owned'])
-        self.assertEqual(data['work']['payload_files_read'], 0)
-        self.assertEqual(data['work']['directories_enumerated'], 1)
+        os.symlink(external, skills / 'neighbor', target_is_directory=True)
+        (other / '.claude/skills/alpha').mkdir(parents=True)
+        (other / '.claude/skills/alpha/mine').write_text('preserve')
+        data = self.observe('inventory', '--project', other, '--include-unmanaged')
+        self.assertEqual(len(data['rows']), 3)
+        neighbor = next(row for row in data['rows'] if row['name'] == 'neighbor')
+        self.assertEqual((neighbor['status'], neighbor['skill'], neighbor['source'], neighbor['artifact'], neighbor['owned'], neighbor['origin'], neighbor['content_mode'], neighbor['agent']),
+                         ('unmanaged_present', None, None, None, False, 'unmanaged', 'unknown', 'codex'))
+        occupied = self.pick(data['rows'], 'claude', root=other)
+        self.assertEqual((occupied['status'], occupied['declared'], occupied['owned'], occupied['actual']['type']), ('unmanaged_present', True, False, 'directory'))
+        self.assertEqual(self.pick(data['rows'], 'codex', root=other)['status'], 'declared_not_deployed')
+        self.assertEqual((data['work']['directories_enumerated'], data['work']['payload_files_read']), (2, 0))
+        self.assertNotIn('neighbor', {row['name'] for row in self.observe('inventory', '--project', other)['rows']})
 
-    def test_narrow_query_never_reads_payloads_or_unrelated_leaves(self):
-        self.call('project', 'require', 'beta', '--apply')
-        args = argparse.Namespace(command='skill.where-used', id='legacy/alpha', scope='project', agent='codex')
-        with patch.object(c, 'package', side_effect=AssertionError('payload read')), patch.object(c, 'git', side_effect=AssertionError('Git scan')):
-            output = mask.result()
-            mask_report.dispatch(args, output, self.home)
-        self.assertEqual(output['data']['work']['leaves_inspected'], 1)
-        self.assertEqual(output['data']['work']['declarations_read'], 1)
-        self.assertEqual(output['data']['work']['payload_files_read'], 0)
-        self.assertEqual(len(output['data']['rows']), 1)
-
-    def test_changed_declaration_and_missing_target_are_not_converged(self):
-        self.call('apply')
-        self.declare([])
-        rows = self.call('inventory')['data']['rows']
-        self.assertTrue(all(row['status'] == 'managed_drifted' and not row['declared'] for row in rows))
-        self.declare()
-        (self.source / 'skills/alpha').rename(self.source / 'skills/missing')
-        self.assertTrue(all(row['status'] == 'managed_drifted' for row in self.call('inventory')['data']['rows']))
-
-    def test_linked_parent_is_reported_without_traversal(self):
+    def test_linked_discovery_parent_is_blocked_and_never_traversed(self):
+        other = self.registered_copy('linked parent')
         outside = self.base / 'outside'
-        outside.mkdir()
-        (self.project / '.agents').symlink_to(outside, target_is_directory=True)
-        before = self.snapshot()
-        data = self.call('inventory', '--include-unmanaged')['data']
+        (outside / 'skills/hidden').mkdir(parents=True)
+        os.symlink(outside, other / '.agents', target_is_directory=True)
+        data = self.observe('inventory', '--project', other, '--include-unmanaged')
         self.assertFalse(data['complete'])
-        self.assertEqual(before, self.snapshot())
-        self.assertEqual(next(row for row in data['rows'] if row['agent'] == 'codex')['status'], 'blocked')
+        self.assertEqual([item['code'] for item in data['consumers'][0]['discovery_errors']], ['target.parent_link'])
+        codex = self.pick(data['rows'], 'codex', root=other)
+        self.assertEqual((codex['status'], codex['error']['code']), ('blocked', 'target.parent_link'))
+        self.assertNotIn('hidden', {row['name'] for row in data['rows']})
+
+    def test_unavailable_consumer_reports_its_cached_selection_as_diagnostic(self):
+        lock = self.lock_row()
+        self.project.rename(self.base / 'renamed away')
+        data = self.observe('inventory', '--project', self.project, cwd=self.base)
+        self.assertFalse(data['complete'])
+        consumer = data['consumers'][0]
+        self.assertEqual((consumer['available'], consumer['declaration_basis'], consumer['error']['code']), (False, 'cached_pinned_selection', 'project.unavailable'))
+        self.assertEqual(len(data['rows']), 2)
+        for row in data['rows']:
+            self.assertEqual((row['status'], row['declaration_basis'], row['skill'], row['artifact']['payload_digest'], row['actual']['type'], row['compatibility']),
+                             ('unavailable_consumer', 'cached_pinned_selection', ALPHA, lock['payload_digest'], 'unknown', 'unspecified'))
+        self.assertEqual((data['work']['declarations_read'], data['work']['locks_read'], data['work']['leaves_inspected']), (0, 0, 0))
+
+    def test_dev_link_rows_follow_the_recorded_authoring_target(self):
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--authoring-root', self.source)
+        data = self.observe('inventory')
+        self.assertEqual((data['consumers'][0]['mode'], data['consumers'][0]['reproducible'], data['complete']), ('dev-link', False, True))
+        self.assertEqual(len(data['rows']), 2)
+        for row in data['rows']:
+            self.assertEqual((row['content_mode'], row['status'], row['compatibility'], row['artifact']['payload_digest']),
+                             ('dev_link', 'managed_converged', 'unspecified', self.lock_row()['payload_digest']))
+        (self.source / 'skills/alpha').rename(self.source / 'skills/moved')
+        self.assertEqual({row['status'] for row in self.observe('inventory')['rows']}, {'managed_drifted'})
+
+    def test_same_id_from_two_taps_and_both_scopes_stay_distinct(self):
+        vendor = self.vendor_tap()
+        self.call('project', 'set-agents', ALPHA, 'codex', '--apply')
+        self.install(VENDOR_ALPHA, agents=('claude',))
+        self.install(VENDOR_ALPHA, user=True)
+        data = self.observe('inventory', '--all')
+        self.assertEqual((data['scope'], data['complete']), ('registered_local_consumers', True))
+        self.assertEqual(sorted((item['scope'], item['root']) for item in data['consumers']), [('project', str(self.project)), ('user', str(self.personal))])
+        self.assertEqual(sorted((row['scope'], row['agent'], row['skill'], row['source']['repository'], row['status']) for row in data['rows']), [
+            ('project', 'claude', VENDOR_ALPHA, vendor.as_uri(), 'managed_converged'),
+            ('project', 'codex', ALPHA, self.upstream.as_uri(), 'managed_converged'),
+            ('user', 'claude', VENDOR_ALPHA, vendor.as_uri(), 'managed_converged'),
+            ('user', 'codex', VENDOR_ALPHA, vendor.as_uri(), 'managed_converged')])
+        self.assertNotEqual(self.pick(data['rows'], 'codex')['artifact']['payload_digest'], self.pick(data['rows'], 'claude', VENDOR_ALPHA)['artifact']['payload_digest'])
+        where = self.observe('skill', 'where-used', VENDOR_ALPHA)
+        self.assertEqual(sorted((row['scope'], row['agent']) for row in where['rows']), [('project', 'claude'), ('user', 'claude'), ('user', 'codex')])
+        self.assertEqual([(row['scope'], row['agent']) for row in self.observe('skill', 'where-used', ALPHA)['rows']], [('project', 'codex')])
+        narrow = self.observe('skill', 'where-used', VENDOR_ALPHA, '--scope', 'user', '--agent', 'codex')
+        self.assertEqual([(row['root'], row['agent']) for row in narrow['rows']], [(str(self.personal), 'codex')])
+        self.assertEqual(([item['scope'] for item in narrow['consumers']], narrow['work']['leaves_inspected']), (['user'], 1))
+        self.assertEqual(self.observe('skill', 'where-used', 'unknown/alpha', code=4)['code'], 'source.unknown')
+        for operands in (('alpha',), (ALPHA, '--agent', 'cursor'), (ALPHA, '--scope', 'fleet')):
+            self.assertEqual(self.observe('skill', 'where-used', *operands, code=2)['code'], 'invocation.invalid', operands)
+
+    def test_pagination_bounded_work_and_metadata_exclusion(self):
+        self.call('project', 'set-targets', '--inherit', '--apply')
+        (self.source / 'skills/beta/mask-skill.json').write_text(json.dumps(dict(schema_version=1, agents=['codex'])))
+        self.publish('beta advertises codex only')
+        self.call('source', 'fetch', TAP)
+        self.install('beta')
+        declaration, lock = ((self.project / name).read_bytes() for name in ('.mask.json', '.mask.lock.json'))
+        full = self.observe('inventory')
+        self.assertEqual(full['work'], dict(declarations_read=1, declaration_bytes_read=2 * len(declaration), locks_read=1, lock_bytes_read=2 * len(lock),
+                                            payload_files_read=1, directories_enumerated=0, leaves_inspected=4))
+        excluded, selected = self.pick(full['rows'], 'claude', BETA), self.pick(full['rows'], 'codex', BETA)
+        self.assertEqual((excluded['status'], excluded['compatibility'], excluded['owned']), ('inapplicable', 'excluded_by_metadata', False))
+        self.assertEqual((selected['status'], selected['compatibility']), ('managed_converged', 'selected'))
+        page = self.observe('inventory', '--limit', '1')
+        self.assertEqual((page['total_rows'], page['next_offset'], page['rows'], page['work']), (4, 1, full['rows'][:1], full['work']))
+        last = self.observe('inventory', '--offset', '3', '--limit', '2')
+        self.assertEqual((last['rows'], last['next_offset']), (full['rows'][3:], None))
+        narrow = self.observe('skill', 'where-used', ALPHA, '--agent', 'codex', '--scope', 'project')
+        self.assertEqual((len(narrow['rows']), narrow['work']['leaves_inspected'], narrow['work']['declarations_read'], narrow['work']['payload_files_read']), (1, 1, 1, 0))
+        self.assertEqual(self.observe('inventory', '--limit', '0', code=2)['code'], 'invocation.invalid')
+
+    def test_mode_less_legacy_record_requires_migration_and_yields_no_rows(self):
+        from tests.legacy_support import create_links, legacy_record, write_json
+        legacy = self.base / 'legacy project'
+        legacy.mkdir()
+        declaration, record = legacy_record(SimpleNamespace(clone=self.source), legacy, ['beta'])
+        write_json(legacy / '.mask.json', declaration)
+        create_links(legacy, record)
+        state = c.read_json(self.home / 'state.json')
+        state['projects'][record['root']] = record
+        write_json(self.home / 'state.json', state)
+        self.assertEqual(c.read_json(self.home / 'config.json')['schema_version'], 3)
+        data = self.observe('inventory', '--all')
+        entry = next(item for item in data['consumers'] if item['root'] == str(legacy))
+        self.assertEqual((entry['error']['code'], entry['declaration_basis'], 'mode' in entry), ('migration.required', 'cached_declaration', False))
+        self.assertFalse(data['complete'])
+        self.assertEqual({row['root'] for row in data['rows']}, {str(self.project)})
+        only = self.observe('inventory', '--project', legacy)
+        self.assertEqual((only['rows'], only['total_rows'], only['complete']), ([], 0, False))
+        self.assertEqual(self.observe('skill', 'where-used', BETA)['rows'], [])

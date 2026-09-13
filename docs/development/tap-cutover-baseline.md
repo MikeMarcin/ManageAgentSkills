@@ -30,15 +30,15 @@ The clone is pushed to a local bare `upstream/AgentSkills.git`, so `refs/remotes
 The builder never prepares effects that later cards must prove. It writes no cache (`MASK_HOME/sources`), store, lock, pending journal or v2 declaration, and it does not register the unregistered declaration. It also omits `operation.lock`, the base program's one-byte writer-lock file, which the byte comparison ignores.
 
 `LegacyFixtureBytes` in `tests/test_legacy_baseline.py` checks three things for every state:
-- Each file parses with `mask_core.config`, `mask_core.state` or `mask_core.manifest` to an equal value, and re-serializes to identical bytes.
+- Each file parses to an equal value and re-serializes to identical bytes: machine configuration with `mask_core.config(..., legacy=True)`, state with `mask_core.state` and declarations with `mask_core.manifest`. Since MASK-0100 the default `mask_core.config` refuses both machine configurations with `migration.required`, and the test asserts that refusal too.
 - Keys follow `schemas/machine-v1.schema.json` or `machine-v2.schema.json`.
 - Each link is a real directory symlink whose text equals its record and which resolves to `<clone>/skills/<id>`.
 
-If legacy reading moves into the migration modules (MASK-0100 and MASK-0102), these parser assertions move with it. The fixture bytes stay the same.
+If legacy reading moves into the migration modules (MASK-0102), these parser assertions move with it. The fixture bytes stay the same.
 
 ## Recorded defects
 
-`LiveCheckoutBaseline` drives the public CLI as a subprocess. Observations are from the base program on Windows.
+`LiveCheckoutBaseline` drove the public CLI as a subprocess to record these observations from the base program on Windows.
 
 | Command | Observation | Retired by |
 |---|---|---|
@@ -51,14 +51,22 @@ If legacy reading moves into the migration modules (MASK-0100 and MASK-0102), th
 | `mask migrate --to-pinned --project <P>`, push upstream, then `mask update --project <P> --json` | Exit 4 `lock.resolution_required` ("Approved source has no cache"). The lock is unchanged and no cache is created | MASK-0101 |
 | `mask source fetch legacy`, push upstream again, then `mask update --project <P> --json` | Exit 0, `changed: false`. The lock stays at the cached commit, cache refs are unchanged, and the new upstream commit is absent from the cache. Only another `source fetch legacy` lets `update` move the lock | MASK-0101 |
 
-Each CLI test then removes exactly the files and links the program wrote, has the builder write the same state again, and compares a snapshot. The snapshot covers the bytes of `config.json`, `state.json`, `user.json` and each declaration, plus every link text.
+Each CLI test then removed exactly the files and links the program wrote, had the builder write the same state again, and compared a snapshot. The snapshot covered the bytes of `config.json`, `state.json`, `user.json` and each declaration, plus every link text.
 
-MASK-0099 removed `init --source` (it now exits 2 `invocation.invalid`). The `init --source` rows above were observed on the base program at `82b4200`, where its configuration and state bytes equalled `v1_config` and `legacy_state`. From MASK-0099 on, `LiveCheckoutBaseline` starts from those builder bytes. The remaining legacy commands (`install`, `source migrate`, `tap add`, `migrate --to-pinned`, `update`) still run through the CLI and are compared as before. Test fixtures that exercise retired behavior use the same bytes through `tests/support.py` `legacy_init` and `tests/public_support.py` `legacy_bootstrap`.
+MASK-0099 removed `init --source` (it now exits 2 `invocation.invalid`). The `init --source` rows above were observed on the base program at `82b4200`, where its configuration and state bytes equalled `v1_config` and `legacy_state`. From MASK-0099 on, `LiveCheckoutBaseline` started from those builder bytes, and the remaining legacy commands (`install`, `source migrate`, `tap add`, `migrate --to-pinned`, `update`) were still compared as before. Test fixtures that exercise retired behavior use the same bytes through `tests/support.py` `legacy_init` and `tests/public_support.py` `legacy_bootstrap`.
 
-The snapshots are identical in three cases:
+Until MASK-0100 the snapshots were identical in three cases:
 - the v1 machine with a project and a personal scope
 - the v2 machine with an extra tap
 - the empty-registry machine on a clone without a remote
+
+Since MASK-0100, `LiveCheckoutBaseline` is a retired-path baseline over the same builder states. Each command that linked into or extended the clone now refuses before any effect, and a snapshot of the whole disposable base (machine home, consumers, clone and upstream) stays unchanged:
+- `source migrate`, `source status` and `migrate --to-pinned` exit 2 `invocation.invalid`.
+- The migration gate refuses the rest with exit 4 `migration.required`:
+  - on the v1 empty registry, `install` into a project and `--user`;
+  - on the v1 machine with consumers, `apply --all`, `ensure`, `update`, `update --user`, `link adopt` and `tap add`;
+  - on the remote-less empty registry, `source fetch legacy`;
+  - on the v2 machine, `source fetch legacy`, `update` and `lock`.
 
 ## Runs
 

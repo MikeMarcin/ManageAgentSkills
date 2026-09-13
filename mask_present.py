@@ -420,23 +420,29 @@ def render_update(data, output):
     if isinstance(data.get('scope'), str):
         lines.append(f"  scope: {clean(data['scope'])}")
     lines.extend(fetch_lines(data))
-    scope = data.get('scope')
-    if isinstance(scope, dict):
-        affected = scope.get('affected', [])
-        others = [root for root in affected if root not in scope.get('selected', [])]
-        lines.append(f"  shared source: affects {len(affected)} legacy scope(s)" + (' (all registered)' if not others else f' including {len(others)} other than the selected scope'))
-        lines.extend(f"    {clean(root)}" for root in affected)
-        if scope.get('pinned_unaffected'):
-            lines.append(f"  pinned scopes unaffected: {len(scope['pinned_unaffected'])}; update them with --project/--user/--all --skill")
+    for row in data.get('consumers') or []:
+        note = f" ({clean(row['error'].get('code'))})" if row.get('error') else ''
+        if row.get('requires_fetch'):
+            note += '; the cache lacks this selection, so run update without --dry-run, --offline or --expect-plan-hash to fetch it'
+        lines.append(f"  {clean(row.get('scope'))} {clean(row.get('root'))}: {clean(row.get('status'))}{note}")
+        lines.extend(f"    {clean(item.get('coordinate'))}: {clean((item.get('before_commit') or 'none')[:12])} -> {clean((item.get('after_commit') or 'none')[:12])}"
+                     for item in row.get('changes') or [])
     lines.extend(workflow_lines(data))
     return lines + change()(data, output)[1:] if 'projects' in data else lines + actions(output) + plan_guard(data, output)
 
 
 def fetch_lines(data):
     effects = data.get('fetch_effects')
-    if not effects:
-        return []
-    return [f"  fetch: {'fetched' if effects.get('fetched') else 'attempted, nothing new' if effects.get('attempted') else 'not attempted (cached candidate used)'}"]
+    lines = [f"  fetch: {'fetched' if effects.get('fetched') else 'attempted, nothing new' if effects.get('attempted') else 'not attempted (cached candidate used)'}"] if effects else []
+    for name, row in (data.get('fetches') or {}).items():
+        if not row.get('attempted'):
+            outcome_text = 'not attempted (cached content used)'
+        elif not row.get('ok'):
+            outcome_text = f"failed ({clean((row.get('error') or {}).get('code'))})"
+        else:
+            outcome_text = 'fetched, configured ref moved' if row.get('remote_refs_changed') else 'fetched, configured ref unchanged'
+        lines.append(f"  fetch {clean(name)}: {outcome_text}")
+    return lines
 
 
 def render_launch(data, output):

@@ -86,8 +86,11 @@ def destination(config, name, identifier, *, new=False):
             if c.kind(marker_path) != 'missing':
                 c.fail('source.dirty', 'An in-progress Git operation blocks imports.', 4)
     else:
-        observed = g.checkout_preconditions(root, 'origin', branch, '', config['git_timeout_seconds'],
-                                           clean=False, approved_repository=entry['repository'])
+        observed = g.checkout_preconditions(root, 'origin', branch, timeout=config['git_timeout_seconds'], clean=False)
+        # The authoring checkout's identity is its origin normalized to the approved tap repository.
+        if s.repository(origin) != entry['repository']:
+            c.fail('source.identity_mismatch', 'Configured remote differs from its approved repository.', 4)
+        s.endpoint(root, origin, entry['repository'])
         head = observed['revision']
     path, index_digest = source_path(root, entry, identifier, existing=not new)
     target = root / path
@@ -440,8 +443,6 @@ def verify_upstream(config, home, record, data):
 def dispatch(args, output, home):
     original = c.read_text(home / 'config.json')
     config = c.config(c.parse_json(original))
-    if config['schema_version'] == 1:
-        c.fail('source.migration_required', 'Migrate the source catalog before importing or querying provenance.', 4)
     if args.command == 'skill.import':
         return import_skill(args, output, home, config, original)
     data, observation = observe(config, home, args)

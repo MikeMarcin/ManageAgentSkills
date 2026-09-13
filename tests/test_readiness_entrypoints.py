@@ -210,61 +210,48 @@ class Launch(EntrypointFixture):
         self.assertFalse(sentinel.exists())
 
 
-class LegacyUpdate(EntrypointFixture):
-    """A legacy consumer whose shared source tracks a local bare remote (W16: requirements follow the selected candidate).
-
-    Legacy live-checkout starting state until MASK-0101 retires this behavior (the shared-checkout update).
-    """
-
-    bootstrap = Fixture.legacy_init
+class TapUpdate(EntrypointFixture):
+    """A pinned consumer of the fixture tap (W16 on taps: requirements follow the fetched candidate)."""
 
     def setUp(self):
         super().setUp()
-        self.add_package('implement-rfc', STATIC)
-        package = self.source / 'skills/implement-rfc'
-        value = json.loads((package / 'mask-workflow.json').read_text(encoding='utf-8'))
-        value['native_roles'] = [role for role in value['native_roles'] if role['name'] != 'rfc-integrator']
-        (package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
-        # Fingerprinted role assets must reach every checkout byte-exact; a publisher disables line-ending normalization.
+        # Fingerprinted role assets must reach the tap byte-exact; a publisher disables line-ending normalization.
         (self.source / '.gitattributes').write_text('* -text\n', encoding='utf-8')
         self.git(self.source, 'add', '.gitattributes')
-        self.git(self.source, 'commit', '-q', '-am', 'legacy descriptor without the integrator')
-        self.remote = self.base / 'AgentSkills.git'
-        self.git(self.base, 'init', '-q', '--bare', str(self.remote))
-        self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
-        self.git(self.source, 'push', '-q', '-u', 'origin', 'main')
-        self.author = self.base / 'author'
-        self.git(self.base, 'clone', '-q', '--branch', 'main', str(self.remote), str(self.author))
-        self.git(self.author, 'config', 'user.name', 'Fixture')
-        self.git(self.author, 'config', 'user.email', 'fixture@example.invalid')
-        self.upstream = self.author / 'skills/implement-rfc'
+        self.package = self.source / 'skills/implement-rfc'
+        shutil.copytree(STATIC, self.package)
+        value = json.loads((self.package / 'mask-workflow.json').read_text(encoding='utf-8'))
+        value['native_roles'] = [role for role in value['native_roles'] if role['name'] != 'rfc-integrator']
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        Fixture.publish(self, 'descriptor without the integrator')
         shutil.copytree(CONTEXT, self.project / '.mask')
         installed = self.call('install', 'implement-rfc')
         self.assertEqual(installed['data']['workflow'], {str(self.project): 'complete'})
         self.assertFalse((self.project / '.codex/agents/rfc-integrator.toml').exists())
 
     def publish(self, message):
-        republish(self.upstream)
-        self.git(self.author, 'add', '-A', 'skills')
-        self.git(self.author, 'commit', '-q', '-m', message)
-        self.git(self.author, 'push', '-q', 'origin', 'main')
-        return self.git(self.author, 'rev-parse', 'HEAD')
+        """Refingerprint the edited package and push it to the tap upstream; MASK sees it only after a fetch."""
+        republish(self.package)
+        return Fixture.publish(self, message)
+
+    def locked(self):
+        return json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit']
 
     def test_update_adds_renames_and_converts_roles_from_the_candidate(self):
-        value = json.loads((self.upstream / 'mask-workflow.json').read_text(encoding='utf-8'))
+        value = json.loads((self.package / 'mask-workflow.json').read_text(encoding='utf-8'))
         # The candidate adds the integrator with bytes that differ from the retained fixture and renames rfc-scout.
         for agent, suffix in (('codex', 'toml'), ('claude', 'md')):
-            integrator = self.upstream / f'runtime/roles/{agent}/rfc-integrator.{suffix}'
+            integrator = self.package / f'runtime/roles/{agent}/rfc-integrator.{suffix}'
             integrator.write_bytes(integrator.read_bytes().replace(b'Fixture identity only.', b'Candidate identity only.'))
             value['native_roles'].append(dict(agent=agent, name='rfc-integrator', asset=dict(path=f'runtime/roles/{agent}/rfc-integrator.{suffix}', sha256='0' * 64)))
-            old = self.upstream / f'runtime/roles/{agent}/rfc-scout.{suffix}'
-            new = self.upstream / f'runtime/roles/{agent}/rfc-explorer.{suffix}'
+            old = self.package / f'runtime/roles/{agent}/rfc-scout.{suffix}'
+            new = self.package / f'runtime/roles/{agent}/rfc-explorer.{suffix}'
             new.write_bytes(old.read_bytes().replace(b'rfc-scout', b'rfc-explorer'))
             old.unlink()
             for role in value['native_roles']:
                 if role['name'] == 'rfc-scout' and role['agent'] == agent:
                     role.update(name='rfc-explorer', asset=dict(path=f'runtime/roles/{agent}/rfc-explorer.{suffix}', sha256='0' * 64))
-        (self.upstream / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
         candidate = self.publish('add integrator, rename scout')
         edited = self.project / '.claude/agents/rfc-scout.md'
         edited.write_text('---\nname: rfc-scout\nmodel: fixture-model-do-not-run\n---\n\nlocal edit\n', encoding='utf-8')
@@ -280,29 +267,29 @@ class LegacyUpdate(EntrypointFixture):
         self.assertEqual(integrator['host_load'], 'not_verified')
         self.assertFalse((self.project / '.codex/agents/rfc-integrator.toml').exists(), 'a dry run deploys nothing')
         result = self.call('update')
-        self.assertEqual(result['data']['source_after'], candidate)
+        self.assertEqual(self.locked(), candidate)
         self.assertEqual(result['data']['workflow'], {str(self.project): 'complete'})
-        self.assertEqual((self.project / '.codex/agents/rfc-integrator.toml').read_bytes(), (self.upstream / 'runtime/roles/codex/rfc-integrator.toml').read_bytes())
+        self.assertEqual((self.project / '.codex/agents/rfc-integrator.toml').read_bytes(), (self.package / 'runtime/roles/codex/rfc-integrator.toml').read_bytes())
         self.assertIn(b'Candidate identity only.', (self.project / '.codex/agents/rfc-integrator.toml').read_bytes())
         self.assertTrue((self.project / '.codex/agents/rfc-explorer.toml').is_file())
         self.assertFalse((self.project / '.codex/agents/rfc-scout.toml').exists(), 'an unchanged managed legacy name is retired')
         self.assertEqual(edited.read_text(encoding='utf-8').splitlines()[-1], 'local edit', 'an edited legacy role is preserved')
         self.assertIn('native_role.released', {warning['code'] for warning in result['warnings']})
         self.assertEqual(self.roles(result)[('codex', 'rfc-explorer')]['state'], 'ok')
-        # A later candidate turns the integrator into a generated role: the checkout advances, links stay, readiness is truthful.
-        value = json.loads((self.upstream / 'mask-workflow.json').read_text(encoding='utf-8'))
+        # A later candidate turns the integrator into a generated role: the lock advances, links stay, readiness is truthful.
+        value = json.loads((self.package / 'mask-workflow.json').read_text(encoding='utf-8'))
         generated = json.loads((GENERATED / 'mask-workflow.json').read_text(encoding='utf-8'))
         value['setup'] = generated['setup']
         for role in value['native_roles']:
             if role['name'] == 'rfc-integrator':
                 role.pop('asset')
                 role['setup'] = 'prepare-roles'
-        (self.upstream / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
-        shutil.copytree(GENERATED / 'scripts', self.upstream / 'scripts')
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        shutil.copytree(GENERATED / 'scripts', self.package / 'scripts')
         converted = self.publish('generate the integrator')
         outcome = self.call('update', code=4)
         self.assertEqual(outcome['error']['code'], 'workflow.incomplete', outcome['error'])
-        self.assertEqual(outcome['data']['source_after'], converted)
+        self.assertEqual(self.locked(), converted)
         self.assertEqual(outcome['data']['workflow'], {str(self.project): 'incomplete'})
         self.assertIn('implement-rfc codex/rfc-integrator: setup_required', outcome['error']['details']['workflow'])
         self.assertIn('mask ensure', outcome['error']['remediation'][0]['message'])

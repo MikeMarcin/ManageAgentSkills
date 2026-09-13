@@ -33,29 +33,35 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, candidate=None, operation='apply', home=None, user_root=None, register_only=False, source_status=True, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False):
+    """One observational plan; every owned link text names a store payload or an explicit dev link.
+
+    A mode-less (live-checkout) record or a v1 declaration refuses ``migration.required`` per root.
+    ``allow_migration`` admits a v2 proposal for them, but a legacy link record still never yields a
+    checkout link text: its target derivation refuses as well.
+    """
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
     dev_proposals = dev_proposals or {}
-    source = c.legacy_source(config)
     after = copy.deepcopy(state)
-    links, files, actions, blockers, observations, packages = [], [], [], [], [], {}
+    links, actions, blockers, observations = [], [], [], []
     import mask_selection as selection
     policy_value = selection.policy(selection_policy) if selection_policy is not None else selection.read_policy(home)[0] if home is not None else selection.policy()
     typed_files, uses_pinned = [], selection_policy is not None
     role_files, workflow_reports, released_roles, retired_files = [], [], [], []
     outcomes = []
-    revision, dirty = None, None
     for root in sorted(roots, key=str):
         key = str(root)
         record = c.consumer_records(state).get(key)
         scope = 'user' if user_root == root else c.consumer_scope(state, root)
         manifest_path = c.declaration_path(root, scope, home)
         try:
+            if record is not None and not pinned.is_pinned(record) and not allow_migration:
+                c.migration_required('Live-checkout ownership must be migrated before this consumer is planned.', root=key)
             if record is None and key not in register:
                 c.fail(scope + '.not_registered', 'Consumer is not registered.', 4, root=key)
             if key in register:
-                c.registration_safe(root, source, home, state, scope)
+                c.registration_safe(root, home, state, scope)
             if key in unregister and keep_links:
                 c.set_consumer(after, root, None, scope)
                 actions.extend(dict(kind='link.abandon', status='planned', path=str(root / rel)) for rel in record['links'])
@@ -69,65 +75,46 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
             if key in inactive:
                 if before_text is not None or record is None:
                     c.fail('readiness.blocked', 'Inactive transition requires an absent declaration and existing registration.', 4)
-                current = record['last_manifest']
-                desired = dict(schema_version=1, skills=[])
+                current = desired = record['last_manifest']
             else:
                 current = c.selection_manifest(c.parse_json(before_text, 'manifest'))
                 desired = c.selection_manifest(proposals.get(key, current))
+                if desired['schema_version'] == 1 or (current['schema_version'] == 1 and not allow_migration):
+                    c.migration_required('A v1 declaration must be migrated to a v2 declaration before this consumer is planned.', root=key, path=str(manifest_path))
             old_links = record['links'] if record else {}
-            selected_pinned = desired['schema_version'] == 2 or pinned.is_pinned(record)
             expected = {}
-            if selected_pinned:
-                uses_pinned = True
-                if record is not None and not pinned.is_pinned(record) and not allow_migration:
-                    c.fail('migration.required', 'Convert legacy ownership through explicit pinned migration.', 4)
-                if key in inactive:
-                    desired, locked = record['last_manifest'], record['last_lock']
-                    lock_before = None
-                else:
-                    lock_value, lock_raw = resolve.read_model(resolve.lock_path(root, scope, home), 'lock', missing=key in lock_proposals)
-                    locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
-                    lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
-                devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
-                if devs and operation in ('apply', 'update', 'ensure'):
-                    c.fail('dev_link.active', 'Explicit dev-link is unpinned; use source dev-link --to-pinned before ordinary reconciliation.', 4)
-                if key not in unregister and key not in inactive:
-                    expected = pinned.expected_links(home, desired, locked, config, payload_views, root=root, scope=scope, policy_value=policy_value, devs=devs, outcomes=outcomes)
-                    for link in expected.values():
-                        dev = devs.get(resolve.coordinate(link['resolution']))
-                        if dev is not None:
-                            pinned.observe_dev(dev, config)
-                            link['dev'] = dev
-                            link['link_text'] = creation_link_text(pinned.target(link, config, home))
-                next_record = dict(root=key, root_identity=c.identity(root), mode='pinned', last_manifest=desired,
-                                   last_manifest_digest=resolve.selection_digest(desired), last_source_revision=None,
-                                   last_lock=locked, links={})
-                if devs:
-                    next_record.update(mode='dev-link', dev_links=devs)
-                if key not in inactive:
-                    for role, before_raw, after_raw in (('declaration', before_text, c.text_json(desired)), ('lock', lock_before, c.text_json(locked))):
-                        changed = desired != current if role == 'declaration' else lock_value != locked
-                        if changed:
-                            if len(after_raw.encode('utf-8')) > resolve.MODEL_BYTES:
-                                c.fail('lock.limit' if role == 'lock' else 'selection.limit', 'Serialized pinned control exceeds the 4 MiB model limit.', 4)
-                            typed_files.append(dict(root=key, role=scope + '_' + role, before=before_raw, after=after_raw))
-                            actions.append(dict(kind=role + '.write', status='planned', path=str(c.declaration_path(root, scope, home) if role == 'declaration' else resolve.lock_path(root, scope, home))))
+            uses_pinned = True
+            if key in inactive:
+                locked, lock_before = record['last_lock'], None
             else:
-                if source is None:
-                    c.fail('migration.required', 'A v1 declaration or legacy record has no live checkout on a tap catalog machine; it must be migrated.', 4, root=key)
-                revision = candidate['revision'] if candidate else c.git(source, 'rev-parse', 'HEAD', optional=True)
-                dirty = (bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False) if source_status else None
-                if key not in unregister:
-                    disabled = set(desired.get('targets', config['default_targets'])) - set(policy_value['enabled_agents'])
-                    if desired['skills'] and disabled:
-                        c.fail('compatibility.unsupported', 'Legacy explicit targets include a locally disabled agent; adjust targets or migrate explicitly.', 4, agents=sorted(disabled))
-                    for identifier in desired['skills']:
-                        if identifier not in packages:
-                            packages[identifier] = candidate['packages'][identifier] if candidate else c.package(source, identifier)
-                        for agent in desired.get('targets', config['default_targets']):
-                            relative = adapters.relative(agent, scope, identifier)
-                            expected[relative] = dict(skill=identifier, target=agent, link_text=creation_link_text(source / 'skills' / identifier))
-                next_record = copy.deepcopy(record) if record else c.registry_record(root, desired, source)
+                lock_value, lock_raw = resolve.read_model(resolve.lock_path(root, scope, home), 'lock', missing=key in lock_proposals)
+                locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
+                lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
+            devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
+            if devs and operation in ('apply', 'update', 'ensure'):
+                c.fail('dev_link.active', 'Explicit dev-link is unpinned; use source dev-link --to-pinned before ordinary reconciliation.', 4)
+            if key not in unregister and key not in inactive:
+                expected = pinned.expected_links(home, desired, locked, config, payload_views, root=root, scope=scope, policy_value=policy_value, devs=devs, outcomes=outcomes)
+                for link in expected.values():
+                    dev = devs.get(resolve.coordinate(link['resolution']))
+                    if dev is not None:
+                        # The only link text outside the store: an explicit source dev-link to its approved authoring package.
+                        pinned.observe_dev(dev, config)
+                        link['dev'] = dev
+                        link['link_text'] = creation_link_text(pinned.target(link, config, home))
+            next_record = dict(root=key, root_identity=c.identity(root), mode='pinned', last_manifest=desired,
+                               last_manifest_digest=resolve.selection_digest(desired), last_source_revision=None,
+                               last_lock=locked, links={})
+            if devs:
+                next_record.update(mode='dev-link', dev_links=devs)
+            if key not in inactive:
+                for role, before_raw, after_raw in (('declaration', before_text, c.text_json(desired)), ('lock', lock_before, c.text_json(locked))):
+                    changed = desired != current if role == 'declaration' else lock_value != locked
+                    if changed:
+                        if len(after_raw.encode('utf-8')) > resolve.MODEL_BYTES:
+                            c.fail('lock.limit' if role == 'lock' else 'selection.limit', 'Serialized pinned control exceeds the 4 MiB model limit.', 4)
+                        typed_files.append(dict(root=key, role=scope + '_' + role, before=before_raw, after=after_raw))
+                        actions.append(dict(kind=role + '.write', status='planned', path=str(c.declaration_path(root, scope, home) if role == 'declaration' else resolve.lock_path(root, scope, home))))
             if register_only:
                 expected = old_links
             next_record['links'] = {}
@@ -164,10 +151,9 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 bindings.setdefault(link['skill'], set()).add(link['target'])
                 if link['skill'] not in targets:
                     location = pinned.target(link, config, home)
-                    view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'resolution' in link and 'dev' not in link else None
-                    frozen = (candidate['packages'].get(link['skill'], {}).get('files') if candidate and 'resolution' not in link else None)
-                    targets[link['skill']] = workflow.PackageView(files=frozen) if frozen is not None else workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
-                    coordinates[link['skill']] = resolve.coordinate(link['resolution']) if 'resolution' in link else legacy_alias(config) + '/' + link['skill']
+                    view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'dev' not in link else None
+                    targets[link['skill']] = workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
+                    coordinates[link['skill']] = resolve.coordinate(link['resolution'])
             roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles)
             from mask_repair import retired_files as plan_retired
             retired = plan_retired(root, roles['reports'], repair_roles)
@@ -188,25 +174,17 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 if outcome['root'] == key and outcome['status'] == 'selected' and outcome.get('target_verified', False) and owned is not None and link_value(root / relative) == dict(type='symlink', link_text=owned['link_text']):
                     outcome['status'] = 'deployed'
             observations.append(dict(root=key, scope=scope, identity=c.identity(root), manifest=desired, manifest_path=str(manifest_path), manifest_bytes=c.digest(before_text.encode()) if before_text is not None else None, leaves=leaves))
-            if key in unregister:
-                c.set_consumer(after, root, None, scope)
-            else:
-                if key not in inactive and not selected_pinned:
-                    next_record.update(last_manifest=desired, last_manifest_digest=c.digest(desired), last_source_revision=revision)
-                c.set_consumer(after, root, next_record, scope)
-            if desired != current and key not in inactive and not selected_pinned:
-                files.append(dict(root=key, before=before_text, after=c.text_json(desired)))
-                actions.append(dict(kind='manifest.write', status='planned', path=str(manifest_path)))
+            c.set_consumer(after, root, None if key in unregister else next_record, scope)
         except c.MaskError as error:
             blockers.append(error.as_dict())
     if after != state:
         actions.append(dict(kind='state.record', status='planned'))
         after['generation'] = state['generation'] + 1
-    source_data = dict(root=str(source) if source is not None else None, revision=revision, dirty=dirty,
-                       fingerprint=c.digest({key: value['fingerprint'] for key, value in sorted(packages.items())}))
+    # No plan reads a checkout; the retired live-source facts keep the plan's shape and hash, always empty.
+    source_data = dict(root=None, revision=None, dirty=None, fingerprint=c.digest({}))
     pinned_controls = dict(workspaces=pinned.observe(roots, state, home, user_root=user_root), config_text=c.read_text(home / 'config.json'), policy_text=c.read_text(home / 'integration.json', missing=True), selection_policy_text=selection.read_policy(home)[1], home_identity=c.identity(home)) if uses_pinned else None
     payload = dict(protocol=1, adapters=c.ADAPTERS, operation=operation, config=config, generation=state['generation'],
-                   state=state, observations=observations, source=source_data, links=links, manifests=files,
+                   state=state, observations=observations, source=source_data, links=links, manifests=[],
                    register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only, inactive=sorted(inactive))
     if uses_pinned:
         payload.update(files=typed_files, pinned=pinned_controls)
@@ -218,14 +196,12 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     development = pinned.development_observations(state, after, [str(root) for root in roots], config) if uses_pinned else []
     if development:
         payload['development'] = development
-    if candidate:
-        payload['transition'] = candidate.get('transition')
     payload['selection_policy'] = policy_value
     shadowing = scope_shadowing(after, config, home, {str(root) for root in roots})
     result = dict(outcomes=outcomes, shadowing=shadowing, applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
                 projects=[entry for entry in observations if entry['scope'] == 'project'],
                 users=[entry for entry in observations if entry['scope'] == 'user'], actions=actions, would_change=bool(actions),
-                intent=dict(operation=operation, selected=[str(root) for root in roots], links=links, manifests=files,
+                intent=dict(operation=operation, selected=[str(root) for root in roots], links=links, manifests=[],
                             before_state=state, after_state=after, config=config))
     if uses_pinned:
         result['intent'].update(files=typed_files, pinned=pinned_controls)
@@ -238,11 +214,6 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if development or operation == 'source.dev-link':
         result['intent']['development'] = development
     return result
-
-
-def legacy_alias(config):
-    """The source-qualified alias of the shared legacy checkout (``mask_task`` uses the same rule)."""
-    return config['legacy_source'] if config['schema_version'] == 2 else 'legacy'
 
 
 def scope_shadowing(state, config, home, selected):
@@ -310,8 +281,6 @@ def public_plan(planned, output):
     for row in planned.get('outcomes', []):
         if row['status'] == 'overridden':
             output['warnings'].append(dict(code='compatibility.local_override', message=row['reason'], coordinate=row['coordinate'], root=row['root'], agent=row['agent']))
-    if planned['source']['dirty']:
-        output['warnings'].append(dict(code='source.dirty', message='Local authoring changes are included in the source fingerprint.'))
     if not planned['projects'] and not planned.get('users') and not planned['blockers']:
         output['warnings'].append(dict(code='project.empty_registry', message='No registered projects selected.'))
 
@@ -355,12 +324,30 @@ def make_pending(planned, home):
     return intent
 
 
+def retired_journal(pending):
+    """The retired live-checkout transition a journal records, or None: a migration, a shared-checkout Git advance or legacy ownership."""
+    try:
+        if pending['operation'] == 'migrate' or 'migration' in pending or any(entry['role'] == 'machine_config' for entry in pending.get('files', [])):
+            return 'migration'
+        if pending.get('git', {}).get('scope') == 'source':
+            return 'shared_checkout_update'
+        records = [c.consumer_records(pending[side]).get(root) for side in ('before_state', 'after_state') for root in pending['selected']]
+        if any(record is not None and not pinned.is_pinned(record) for record in records):
+            return 'legacy_ownership'
+    except (AttributeError, KeyError, TypeError):
+        pass  # A malformed journal is refused by ordinary validation.
+    return None
+
+
 def validate_pending(pending, home):
     import mask_selection as selection
+    retired = retired_journal(pending)
+    if retired is not None:
+        c.fail('recovery.conflict', 'The journal records a retired live-checkout transition; this program never replays it.', 8, retired=retired)
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
-    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'migrate', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
+    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'update', 'self.update', 'self.install', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -375,7 +362,7 @@ def validate_pending(pending, home):
         c.fail('recovery.conflict', 'Invalid pending transaction identity or phase.', 8)
     if 'git' in pending:
         from mask_git import validate_git_intent
-        validate_git_intent(pending['git'], pending['config'], Path(__file__).resolve().parent)
+        validate_git_intent(pending['git'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
     if pending['schema_version'] != (3 if any(key in pending for key in ('controls', 'selection_change', 'native_roles', 'retired_files')) else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
@@ -388,13 +375,11 @@ def validate_pending(pending, home):
     if pending['config'] is None:
         if pending['operation'] not in ('self.install', 'self.update') or current_config:
             c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
-    elif 'migration' not in pending and c.config(pending['config']) != c.config(current_config):
+    elif c.config(pending['config'], legacy=True) != c.config(current_config, legacy=True):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
-    if 'migration' in pending or pending['operation'] == 'migrate':
-        pinned.validate_migration(pending, home)
     if 'pinned' not in pending:
         for root in selected:
             old, new = before_records.get(root), after_records.get(root)
@@ -443,7 +428,7 @@ def validate_pending(pending, home):
     elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
     for root in before_records.keys() | after_records.keys():
-        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]) and 'migration' not in pending:
+        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]):
             c.fail('recovery.conflict', 'Existing consumer mode conversion requires an explicit migration journal.', 8)
         if root in before_records and root in after_records and c.consumer_scope(before, root) != c.consumer_scope(after, root):
             c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
@@ -515,8 +500,6 @@ def pending_manifest_path(pending, entry, home):
 def check_current(pending, home):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
-    if 'migration' in pending:
-        pinned.check_migration(pending, home)
     if 'development' in pending:
         pinned.check_development(pending)
     if 'pinned' in pending:
@@ -609,8 +592,6 @@ def restore(pending, home, side, *, inject=False):
         set_link(entry, side, inject=inject)
         if inject:
             checkpoint('link')
-    if 'migration' in pending:
-        pinned.check_migration(pending, home)
     for entry in pending['manifests']:
         path = pending_manifest_path(pending, entry, home)
         actual = c.read_text(path, 'manifest')
@@ -632,7 +613,7 @@ def restore(pending, home, side, *, inject=False):
         else:
             c.atomic_text(path, wanted, actual)
         if inject:
-            checkpoint('selection_policy' if entry['role'] == 'selection_policy' else 'config' if entry['role'] == 'machine_config' else 'lock' if entry['role'].endswith('_lock') else 'manifest')
+            checkpoint('selection_policy' if entry['role'] == 'selection_policy' else 'lock' if entry['role'].endswith('_lock') else 'manifest')
     for entry in (pending.get('native_roles', []) if side == 'after' else reversed(pending.get('native_roles', []))):
         workflow.set_role(entry, side)
         if inject:
@@ -658,8 +639,6 @@ def restore(pending, home, side, *, inject=False):
     if 'controls' in pending:
         from mask_ensure import restore_controls
         restore_controls(pending, home, side)
-    if 'migration' in pending:
-        pinned.check_migration(pending, home)
     check_final_controls(pending, home, side)
     text = pending[side + '_state_text']
     path = home / 'state.json'
@@ -688,8 +667,6 @@ def check_final_controls(pending, home, side):
 
 def clear_pending(home, pending, side='after'):
     check_final_controls(pending, home, side)
-    if 'migration' in pending:
-        pinned.check_migration(pending, home)
     path = home / 'pending.json'
     if c.read_json(path, 'recovery') != pending:
         c.fail('recovery.conflict', 'Pending journal changed before cleanup.', 8)
@@ -767,8 +744,14 @@ def recover(home, output, mode):
         output['data'] = dict(pending=None)
         return
     pending = c.parse_json(raw, 'recovery')
-    validate_pending(pending, home)
+    retired = retired_journal(pending)
+    if retired is None or mode != 'inspect':
+        validate_pending(pending, home)
     output['data'] = dict(pending=pending, recovery_mode=mode)
+    if retired is not None:
+        # Inspection shows a retired live-checkout journal; completing or rolling it back was refused above.
+        output['data']['retired'] = retired
+        return
     if 'setup' in pending:
         # Package script side effects are never inspected or undone; only MASK's own staged/published files are.
         output['data']['setup'] = dict(phase=pending['setup']['phase'], skill=pending['setup']['skill'], script_effects='unknown')
@@ -780,14 +763,6 @@ def recover(home, output, mode):
     if pending.get('git'):
         from mask_git import recover_git
         recover_git(pending, home, output, mode)
-    if mode == 'complete':
-        source = c.legacy_source(pending['config'])
-        for key in pending['selected']:
-            record = c.consumer_records(pending['after_state']).get(key)
-            if record and not pinned.is_pinned(record):
-                identifiers = {link['skill'] for link in record['links'].values()} if pending['operation'] == 'ensure.deactivate' else record['last_manifest']['skills']
-                for identifier in identifiers:
-                    c.package(source, identifier)
     output['would_change'] = True
     if output['dry_run']:
         return
@@ -811,29 +786,20 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     if record is None:
         c.fail('project.not_registered', 'Adoption requires registration.', 4)
     c.registered_root(root, record, scope)
-    if record.get('mode') == 'dev-link':
+    if not pinned.is_pinned(record):
+        c.migration_required('Live-checkout ownership must be migrated before adopting links.', root=str(root))
+    if record['mode'] == 'dev-link':
         c.fail('dev_link.active', 'Return to pins explicitly before adopting additional links.', 4)
-    if pinned.is_pinned(record):
-        declaration, locked = resolve.read_exact_lock(root, scope, home, config, verify=False)
-        if declaration != record['last_manifest'] or locked != record['last_lock']:
-            c.fail('target.adoption_stale', 'Reconcile changed pinned selection/lock through apply before adopting its links.', 4)
-        expected_links = pinned.expected_links(home, declaration, locked, config, root=root, scope=scope)
-        wanted = expected_links.get(adapters.relative(target, scope, identifier))
-        if wanted is None:
-            c.fail('target.unmanaged_link', 'Adoption requires a selected pinned skill and target.', 4)
-        import mask_store as store
-        expected = store.verify(home, wanted['resolution'])
-        package = wanted['resolution']
-    else:
-        if c.legacy_source(config) is None:
-            c.fail('migration.required', 'A legacy consumer has no live checkout on a tap catalog machine; migrate it before adopting links.', 4, root=str(root))
-        declaration = c.consumer_manifest(root, scope, home)
-        if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
-            c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)
-        source = Path(config['source']['root'])
-        package = c.package(source, identifier)
-        expected = source / 'skills' / identifier
-        wanted = dict(skill=identifier, target=target)
+    declaration, locked = resolve.read_exact_lock(root, scope, home, config, verify=False)
+    if declaration != record['last_manifest'] or locked != record['last_lock']:
+        c.fail('target.adoption_stale', 'Reconcile changed pinned selection/lock through apply before adopting its links.', 4)
+    expected_links = pinned.expected_links(home, declaration, locked, config, root=root, scope=scope)
+    wanted = expected_links.get(adapters.relative(target, scope, identifier))
+    if wanted is None:
+        c.fail('target.unmanaged_link', 'Adoption requires a selected pinned skill and target.', 4)
+    import mask_store as store
+    expected = store.verify(home, wanted['resolution'])
+    package = wanted['resolution']
     if not Path(expected_source).is_absolute() or Path(expected_source).resolve() != expected:
         c.fail('target.unmanaged_link', 'Expected source does not match the configured package.', 4)
     relative = adapters.relative(target, scope, identifier)

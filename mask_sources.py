@@ -139,18 +139,11 @@ def binding(home, name, transport, ref='main', packages='skills', authoring=None
 
 
 def selected(config, name):
-    if config['schema_version'] == 1:
-        c.fail('source.migration_required', 'Preview source migrate before using the multi-source catalog.', 4)
     alias(name)
-    if name not in config['sources']:
+    catalog = config.get('sources', {})
+    if name not in catalog:
         c.fail('source.unknown', 'Source alias is not approved.', 4, source=name)
-    return config['sources'][name]
-
-
-def approved_legacy(config):
-    if config['schema_version'] == 2:
-        return selected(config, config['legacy_source'])['repository']
-    return None
+    return catalog[name]
 
 
 def endpoint(root, transport, identity):
@@ -248,7 +241,8 @@ def cached_refs(root, entry):
     return value['refs']
 
 
-def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
+def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None, extra=()):
+    """Fetch one selector; ``extra`` object IDs join the same Git invocation and are retained under refs/mask/frozen."""
     root = cache_root(home, name, entry)
     endpoint(home, entry['transport'], entry['repository'])
     existing = cached(home, name, entry)
@@ -256,6 +250,9 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
     refs, options = advertised or remote_refs(context, entry, timeout, output)
     requested = entry['ref'] if ref is None else ref
     oid = resolve_ref(refs, requested)
+    extra = sorted(set(extra))
+    if any(not isinstance(item, str) or len(item) != len(oid) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', item) for item in extra):
+        c.fail('source.ref_invalid', 'Additional acquisitions require full object IDs in the source object format.', 4)
     if existing is None:
         root.parent.mkdir(parents=True, exist_ok=True)
         root.mkdir()
@@ -288,11 +285,14 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
         c.git(root, *options, '-c', 'fetch.unpackLimit=0', '-c', 'gc.auto=0',
               'fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
               '--no-auto-maintenance', entry['transport'],
-              '+' + oid + ':' + staged, timeout=timeout, mutating=True, monitor=resource_check)
+              '+' + oid + ':' + staged, *(f'+{item}:{staged}-{index}' for index, item in enumerate(extra)),
+              timeout=timeout, mutating=True, monitor=resource_check)
         resource_check(force=True)
         resolved = c.git(root, 'rev-parse', '--verify', staged + '^{commit}')
         c.git(root, 'update-ref', destination, resolved, before or '0' * len(resolved), mutating=True)
         c.git(root, 'update-ref', '-d', staged, oid, mutating=True)
+        for index, item in enumerate(extra):
+            freeze(root, item, f'{staged}-{index}')
         path = root / 'mask-refs.json'
         c.atomic_text(path, c.text_json(dict(schema_version=1, repository=entry['repository'], refs=refs)), c.read_text(path, missing=True))
     finally:
@@ -301,9 +301,19 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
     return root, after
 
 
+def freeze(root, oid, staged):
+    """Retain one fetched object: refs/mask/frozen/OID names its peeled commit, as source inspect records it."""
+    commit = c.git(root, 'rev-parse', '--verify', staged + '^{commit}')
+    frozen = 'refs/mask/frozen/' + oid
+    previous = c.git(root, 'rev-parse', '--verify', frozen, optional=True)
+    if previous not in (None, commit):
+        c.fail('source.cache_invalid', 'An exact cache ref has an unexpected value.', 4)
+    if previous is None:
+        c.git(root, 'update-ref', frozen, commit, '0' * len(commit), mutating=True)
+    c.git(root, 'update-ref', '-d', staged, oid, mutating=True)
+
+
 def references(home, config, state, name):
-    if name == config.get('legacy_source'):
-        return ['legacy source binding']
     result = []
     for key, record in c.consumer_records(state).items():
         root = Path(key)
@@ -321,24 +331,6 @@ def references(home, config, state, name):
     return result
 
 
-def migrated_config(config, home, name='legacy'):
-    proposal = copy.deepcopy(config)
-    alias(name)
-    if config['schema_version'] == 3:
-        c.fail('source.legacy_absent', 'This machine has no live checkout to migrate; its taps already form the source catalog.', 4)
-    if config['schema_version'] == 1:
-        old = config['source']
-        root = Path(old['root'])
-        c.checkout(root)
-        transport = c.git(root, 'remote', 'get-url', old['remote'], optional=True) or str(root)
-        entry = binding(home, name, transport, old['branch'], authoring=str(root))
-        endpoint(root, transport, entry['repository'])
-        proposal.update(schema_version=2, legacy_source=name, sources={name: entry})
-    elif config['legacy_source'] != name:
-        c.fail('source.alias_conflict', 'Legacy source already migrated under another alias.', 4)
-    return c.config(proposal)
-
-
 def dispatch(args, output, home):
     original = c.read_text(home / 'config.json', missing=args.command == 'tap.add')
     # The first tap bootstraps a machine: it creates the v3 catalog (and empty state) in the same guarded write.
@@ -347,16 +339,10 @@ def dispatch(args, output, home):
     name = getattr(args, 'name', None)
     proposal = copy.deepcopy(config)
     output['data'] = dict(catalog_only=True)
-    if args.command == 'source.migrate':
-        name = getattr(args, 'alias', 'legacy')
-        proposal = migrated_config(config, home, name)
-    elif args.command == 'source.list':
-        output['data']['sources'] = config.get('sources', {})
-        output['data']['migration_required'] = config['schema_version'] == 1
+    if args.command == 'source.list':
+        output['data']['sources'] = config['sources']
         return
     elif args.command == 'tap.add':
-        if config['schema_version'] == 1:
-            c.fail('source.migration_required', 'Preview source migrate before adding a tap.', 4)
         entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None))
         if entry['authoring'] is not None:
             root = Path(entry['authoring']).expanduser().resolve()
@@ -598,8 +584,6 @@ def url_selection(tail, kind, refs, requested_ref, requested_path, default_ref):
 
 def inspect(args, output, home):
     config = c.config(c.read_json(home / 'config.json'))
-    if config['schema_version'] == 1:
-        c.fail('source.migration_required', 'Migrate the source catalog before URL inspection.', 4)
     name, entry, tail, kind = locate_url(config, args.url)
     root = cached(home, name, entry)
     output['data'] = dict(source=name, repository=entry['repository'], resolution_required=True, catalog_only=True)

@@ -295,21 +295,15 @@ def validate_after_links(pending, home, after_policy):
     for key in pending['selected']:
         record = records[key]
         root = Path(key)
-        if pinned.is_pinned(record):
-            expected = pinned.expected_links(home, record['last_manifest'], record['last_lock'], config,
-                                             root=root, scope=c.consumer_scope(pending['after_state'], root),
-                                             policy_value=after_policy, devs=record.get('dev_links', {}))
-            for link in expected.values():
-                dev = record.get('dev_links', {}).get(r.coordinate(link['resolution']))
-                if dev is not None:
-                    link['dev'] = dev
-        else:
-            manifest = record['last_manifest']
-            agents = manifest.get('targets', config['default_targets'])
-            if manifest['skills'] and set(agents) - set(after_policy['enabled_agents']):
-                c.fail('recovery.conflict', 'Legacy explicit targets exceed after-policy authority.', 8)
-            expected = {adapters.relative(agent, c.consumer_scope(pending['after_state'], root), identifier): dict(skill=identifier, target=agent)
-                        for identifier in manifest['skills'] for agent in agents}
+        if not pinned.is_pinned(record):
+            c.fail('recovery.conflict', 'Legacy live-checkout ownership has no effective selection authority to recover.', 8)
+        expected = pinned.expected_links(home, record['last_manifest'], record['last_lock'], config,
+                                         root=root, scope=c.consumer_scope(pending['after_state'], root),
+                                         policy_value=after_policy, devs=record.get('dev_links', {}))
+        for link in expected.values():
+            dev = record.get('dev_links', {}).get(r.coordinate(link['resolution']))
+            if dev is not None:
+                link['dev'] = dev
         if set(expected) != set(record['links']):
             c.fail('recovery.conflict', 'After ownership differs from effective selection authority.', 8)
         for relative, wanted in expected.items():
@@ -354,9 +348,7 @@ def dispatch(args, output, home):
             root = Path(state['user']['root']) if state.get('user') else home
         declaration = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
         if setter and declaration['schema_version'] == 1:
-            if command.endswith('set-targets'):
-                return False
-            c.fail('migration.required', 'Per-binding agents require explicit v2 migration.', 4)
+            c.migration_required('A v1 declaration must be migrated to a v2 declaration before setting agents or targets.', path=str(c.declaration_path(root, scope, home)))
         record = records.get(str(root))
         if not pinned.is_pinned(record):
             c.fail(scope + '.not_registered', 'Register this v2 consumer explicitly with ' + scope + ' register before setting agents or compatibility policy.', 4)

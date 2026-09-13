@@ -1,28 +1,22 @@
-"""Pre-implementation baseline for RFC-MASK-0020 (MASK-0098).
+"""Legacy starting states and the retired live-checkout paths for RFC-MASK-0020 (MASK-0098, MASK-0100).
 
-``LegacyFixtureBytes`` is durable. The schema-true builder in
-``tests.legacy_support`` writes v1 and v2 machines with a registered legacy
-project, a registered legacy personal scope and an unregistered v1 declaration,
-and the current parsers accept every byte unchanged. Later doctor-migration tests
-start from these states.
+``LegacyFixtureBytes`` is durable. The schema-true builder in ``tests.legacy_support`` writes v1 and v2 machines
+with a registered legacy project, a registered legacy personal scope and an unregistered v1 declaration. The
+current parsers accept every byte unchanged; machine configuration parses only with ``legacy=True`` and the
+default refuses it with ``migration.required``. Later doctor-migration tests start from these states.
 
-``LiveCheckoutBaseline`` records the defect RFC-MASK-0020 removes, through the
-public CLI, and proves the builder writes what the program wrote. It describes
-retired behavior. MASK-0099 removed ``init --source``: its bytes were compared with
-``v1_config`` at 82b4200 and the machine configuration now comes from the builder,
-while the program still writes everything after it. MASK-0100 (clone links,
-``source migrate``, ``migrate``) and MASK-0101 (fetching ``update``) replace the
-remaining assertions when they land. Evidence: docs/development/tap-cutover-baseline.md.
+``LiveCheckoutBaseline`` recorded, through the public CLI, the defect RFC-MASK-0020 removes and proved that the
+builder writes what the base program wrote (observed at 82b4200 and b92372f). Since MASK-0100 it is a retired-path
+baseline over the same builder states: every command that linked into or extended the clone now refuses before any
+effect. Evidence: docs/development/tap-cutover-baseline.md.
 """
 import json
 import os
 from pathlib import Path
-import subprocess
 
 import mask_core as c
 import mask_sources as sources
-from tests.legacy_support import (AGENT_PATHS, LegacyFixture, git, legacy_state, link_text, make_bare, make_clone, remove_entry,
-                                  snapshot, text_json, v2_config, write_machine)
+from tests.legacy_support import LegacyFixture, git, make_bare, snapshot, text_json, v2_config
 
 SCHEMAS = Path(__file__).resolve().parents[1] / 'schemas'
 
@@ -39,6 +33,15 @@ class LegacyFixtureBytes(LegacyFixture):
         value = c.parse_json(raw)
         self.assertEqual(parse(value), value, path)
         self.assertEqual(text_json(value), raw, path)
+        return value
+
+    def legacy_config(self, path):
+        """Machine configuration parses for migration only; every other reader refuses it."""
+        value = self.canonical(path, lambda item: c.config(item, legacy=True))
+        with self.assertRaises(c.MaskError) as refused:
+            c.config(value)
+        self.assertEqual((refused.exception.code, refused.exception.exit_code, refused.exception.details['schema_version']),
+                         ('migration.required', 4, value['schema_version']))
         return value
 
     def assert_schema_shape(self, value, rule):
@@ -79,7 +82,7 @@ class LegacyFixtureBytes(LegacyFixture):
 
     def test_v1_machine_with_legacy_project_personal_scope_and_unregistered_declaration(self):
         roots = self.legacy_machine(1)
-        config = self.canonical(roots.home / 'config.json', c.config)
+        config = self.legacy_config(roots.home / 'config.json')
         self.assert_schema_shape(config, schema('machine-v1.schema.json'))
         self.assertEqual(config['source'], dict(root=str(roots.clone), remote='origin', branch='main'))
         state = self.canonical(roots.home / 'state.json', c.state)
@@ -88,7 +91,7 @@ class LegacyFixtureBytes(LegacyFixture):
 
     def test_v2_machine_keeps_the_clone_binding_beside_an_extra_tap(self):
         roots = self.legacy_machine(2)
-        config = self.canonical(roots.home / 'config.json', c.config)
+        config = self.legacy_config(roots.home / 'config.json')
         self.assert_schema_shape(config, schema('machine-v2.schema.json'))
         self.assertEqual((config['legacy_source'], sorted(config['sources'])), ('legacy', ['extra', 'legacy']))
         self.assertEqual(config['sources']['legacy']['authoring'], str(roots.clone))
@@ -101,113 +104,53 @@ class LegacyFixtureBytes(LegacyFixture):
 
     def test_empty_registry_and_a_clone_without_remote(self):
         roots = self.legacy_machine(1, remote=False, project_skills=None, user_skills=None, straggler_skills=None)
-        self.canonical(roots.home / 'config.json', c.config)
+        self.legacy_config(roots.home / 'config.json')
         self.assertEqual(self.canonical(roots.home / 'state.json', c.state), c.empty_state())
         self.assertEqual(sorted(p.name for p in roots.home.iterdir()), ['config.json', 'state.json'])
-        catalog = c.config(v2_config(roots, extra_tap=False))['sources']['legacy']
+        catalog = c.config(v2_config(roots, extra_tap=False), legacy=True)['sources']['legacy']
         self.assertEqual((catalog['transport'], catalog['repository']), (str(roots.clone), roots.clone.as_uri()))
 
 
 class LiveCheckoutBaseline(LegacyFixture):
-    """The base program deploys from the user's clone and never fetches for update; the builder reproduces its bytes."""
+    """Retired-path baseline: on the builder states the live-checkout program left, its clone-linking commands refuse.
 
-    def setUp(self):
-        super().setUp()
-        for directory in (self.roots.personal, self.roots.project):
-            directory.mkdir(parents=True)
-        git(self.roots.project, 'init', '-q', '-b', 'main')
-        make_clone(self.roots)
+    Removed commands are invocation errors (exit 2); the migration gate refuses the rest (exit 4). A snapshot of the
+    whole disposable base (machine home, consumers, clone and upstream) is unchanged by every refusal.
+    """
 
-    def written(self):
-        return snapshot(self.roots.base, self.roots.home, self.roots.project, self.roots.personal)
+    def assert_refused(self, *args, code, error):
+        before = snapshot(self.roots.base, self.roots.base)
+        self.assertEqual(self.machine(*args, code=code)['error']['code'], error, args)
+        self.assertEqual(snapshot(self.roots.base, self.roots.base), before, args)
 
-    def live_checkout_machine(self):
-        """The v1 configuration and empty state that the retired ``init --source CLONE`` wrote (compared at 82b4200)."""
-        write_machine(self.roots, 1, project_skills=None, user_skills=None, straggler_skills=None)
+    def test_legacy_install_no_longer_links_into_the_clone(self):
+        roots = self.legacy_machine(1, project_skills=None, user_skills=None, straggler_skills=None)
+        for args in (('install', 'alpha', '--project', roots.project), ('install', 'beta', '--user')):
+            self.assert_refused(*args, code=4, error='migration.required')
+        self.assertFalse([path for root in (roots.project, roots.personal) for path in root.rglob('*') if path.is_symlink()])
 
-    def assert_builder_reproduces(self, version, **options):
-        """Remove only what the program wrote, let the builder write that state again and compare every byte and link."""
-        observed = self.written()
-        for key in observed:
-            remove_entry(self.roots.base / key)
-        write_machine(self.roots, version, straggler_skills=None, **options)
-        self.assertEqual(self.written(), observed)
+    def test_registered_clone_links_are_refused_not_reconciled(self):
+        roots = self.legacy_machine(1)
+        for args in (('apply', '--all'), ('ensure', '--project', roots.project), ('update',), ('update', '--user'),
+                     ('link', 'adopt', '--project', roots.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', roots.clone / 'skills/alpha')):
+            self.assert_refused(*args, code=4, error='migration.required')
 
-    def clone_links(self):
-        return {key: value for key, value in self.written().items() if value[0] == 'link'}
-
-    def publish(self, name):
-        (self.roots.clone / 'skills/alpha' / (name + '.md')).write_text(name + '\n', encoding='utf-8', newline='\n')
-        git(self.roots.clone, 'add', 'skills')
-        git(self.roots.clone, 'commit', '-q', '-m', name)
-        git(self.roots.clone, 'push', '-q', 'origin', 'main')
-        return git(self.roots.clone, 'rev-parse', 'HEAD')
-
-    def test_legacy_install_links_project_and_personal_scope_into_the_clone(self):
-        roots = self.roots
-        # The configuration bytes come from the builder; their equality with init --source output was observed at 82b4200.
-        self.live_checkout_machine()
-        self.machine('install', 'alpha', '--project', roots.project)
-        self.machine('install', 'beta', '--user')
-        for root, identifier in ((roots.project, 'alpha'), (roots.personal, 'beta')):
-            for agent_path in AGENT_PATHS.values():
-                leaf = root / agent_path / identifier
-                self.assertEqual(os.readlink(leaf), link_text(roots.clone / 'skills' / identifier), leaf)
-        (roots.clone / 'skills/alpha/unreviewed.md').write_text('edited in the clone\n', encoding='utf-8')
-        for agent_path in AGENT_PATHS.values():
-            self.assertEqual((roots.project / agent_path / 'alpha/unreviewed.md').read_text(encoding='utf-8'), 'edited in the clone\n')
-        self.assert_builder_reproduces(1)
-
-    def test_source_migrate_keeps_the_clone_as_the_legacy_binding(self):
-        roots = self.roots
-        self.live_checkout_machine()
-        self.machine('install', 'alpha', '--project', roots.project)
-        self.machine('install', 'beta', '--user')
-        links = self.clone_links()
-        self.machine('source', 'migrate')
+    def test_source_migrate_and_tap_add_no_longer_extend_the_clone_binding(self):
+        roots = self.legacy_machine(1)
         make_bare(roots.extra)
-        self.machine('tap', 'add', 'extra', roots.extra)
-        config = c.read_json(roots.home / 'config.json')
-        self.assertEqual((config['source']['root'], config['sources']['legacy']['authoring']), (str(roots.clone), str(roots.clone)))
-        self.assertEqual(self.clone_links(), links)
-        self.assertTrue(all('mode' not in record for record in c.consumer_records(c.read_json(roots.home / 'state.json')).values()))
-        self.assertEqual(c.kind(roots.home / 'sources'), 'missing')
-        self.assert_builder_reproduces(2)
-
-    def test_empty_registry_and_remote_less_clone_match_the_builder(self):
-        roots = self.roots
-        git(roots.clone, 'remote', 'remove', 'origin')
-        self.live_checkout_machine()
-        self.assertEqual((roots.home / 'state.json').read_bytes().decode('utf-8'), text_json(legacy_state()))
-        self.machine('source', 'migrate')
-        self.assertEqual((roots.home / 'config.json').read_bytes().decode('utf-8'), text_json(v2_config(roots, extra_tap=False)))
+        self.assert_refused('source', 'migrate', code=2, error='invocation.invalid')
+        self.assert_refused('tap', 'add', 'extra', roots.extra, code=4, error='migration.required')
         self.assertEqual(c.kind(roots.home / 'sources'), 'missing')
 
-    def test_pinned_update_resolves_from_the_cache_and_never_fetches(self):
-        roots = self.roots
-        lock = roots.project / '.mask.lock.json'
+    def test_empty_registry_and_remote_less_clone_refuse_the_retired_source_commands(self):
+        self.legacy_machine(1, remote=False, project_skills=None, user_skills=None, straggler_skills=None)
+        for args in (('source', 'migrate'), ('source', 'status')):
+            self.assert_refused(*args, code=2, error='invocation.invalid')
+        self.assert_refused('source', 'fetch', 'legacy', code=4, error='migration.required')
 
-        def locked():
-            return json.loads(lock.read_text(encoding='utf-8'))['packages'][0]['commit']
-
-        self.live_checkout_machine()
-        self.machine('install', 'alpha', '--project', roots.project)
-        self.machine('source', 'migrate')
-        self.machine('migrate', '--to-pinned', '--project', roots.project)
-        first = locked()
-        cache = Path(c.read_json(roots.home / 'config.json')['sources']['legacy']['cache'])
-        second = self.publish('second')
-        refused = self.machine('update', '--project', roots.project, code=4)
-        self.assertEqual(refused['error']['code'], 'lock.resolution_required')
-        self.assertEqual((c.kind(cache), locked()), ('missing', first))
-        self.machine('source', 'fetch', 'legacy')
-        self.machine('update', '--project', roots.project)
-        self.assertEqual(locked(), second)
-        third = self.publish('third')
-        refs = git(cache, 'for-each-ref')
-        self.assertFalse(self.machine('update', '--project', roots.project)['changed'])
-        self.assertEqual((locked(), git(cache, 'for-each-ref')), (second, refs))
-        self.assertNotEqual(subprocess.run(['git', '-C', str(cache), 'cat-file', '-e', third + '^{commit}'], capture_output=True).returncode, 0)
-        self.machine('source', 'fetch', 'legacy')
-        self.machine('update', '--project', roots.project)
-        self.assertEqual(locked(), third)
+    def test_pin_migration_and_cache_updates_are_retired_on_a_v2_machine(self):
+        roots = self.legacy_machine(2)
+        self.assert_refused('migrate', '--to-pinned', '--project', roots.project, code=2, error='invocation.invalid')
+        for args in (('source', 'fetch', 'legacy'), ('update', '--project', roots.project), ('lock', '--project', roots.project)):
+            self.assert_refused(*args, code=4, error='migration.required')
+        self.assertEqual(c.kind(roots.home / 'sources'), 'missing')

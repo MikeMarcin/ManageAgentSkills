@@ -7,8 +7,8 @@ gathered with no writer lock held; the caller reacquires the lock, recomputes th
 proposal and refuses a stale hash before any effect (see ``mask.dispatch_impl``).
 
 Kinds name the authority being asked for. ``--yes`` grants only ORDINARY kinds;
-package scripts, new source identities, overwriting edited content, ref rebinding
-and cross-consumer expansion are never granted by ``--yes``. ``--expect-plan-hash``
+package scripts, new source identities, overwriting edited content and ref
+rebinding are never granted by ``--yes``. ``--expect-plan-hash``
 grants exactly the frozen proposal it was produced for; NAMED kinds additionally
 need every subject named by an exact ``--allow-setup SOURCE/ID:ACTION`` entry.
 """
@@ -20,7 +20,7 @@ import sys
 import mask_core as c
 
 ORDINARY = {'readiness'}
-SIGNIFICANT = {'readiness', 'source.trust', 'package.setup', 'overwrite', 'ref.rebind', 'scope.expand'}
+SIGNIFICANT = {'readiness', 'source.trust', 'package.setup', 'overwrite', 'ref.rebind'}
 NAMED = {'package.setup'}
 # Declining these leaves the rest of the task to proceed without that authority instead of aborting it.
 CONTINUES_ON_DECLINE = {'package.setup'}

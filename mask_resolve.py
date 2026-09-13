@@ -396,14 +396,6 @@ def read_exact_lock(root, scope='project', home=None, config=None, *, verify=Tru
     return declaration, resolved
 
 
-def guard_legacy(root, scope='project', home=None):
-    """Validate v2 lock before entering version-dispatched consumer operations."""
-    value, _ = read_model(c.declaration_path(root, scope, home), 'manifest', missing=True)
-    if isinstance(value, dict) and value.get('schema_version') == 2:
-        declaration = selection(value)
-        lock(read_model(lock_path(root, scope, home), 'lock')[0], declaration)
-
-
 def dispatch(args, output, home):
     scope = 'user' if getattr(args, 'user', False) else 'project'
     root = home if scope == 'user' else c.project_root(getattr(args, 'project', None))
@@ -440,17 +432,23 @@ def dispatch(args, output, home):
             output.update(changed=True, transaction='committed')
 
 
+SELECTION_SETTERS = {'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets'}
+
+
 def guard_command(args, home):
-    """Central guard for public legacy consumer operations, before side effects."""
+    """Central consumer guard before side effects: a v1 declaration needs migration, a v2 declaration a matching lock.
+
+    Inventory and where-used are not guarded: they report an invalid declaration or lock per consumer.
+    """
     command = args.command
-    scoped = command.startswith(('project.', 'user.', 'integration.')) or command in {'ensure', 'plan', 'apply', 'doctor', 'inventory', 'skill.where-used', 'link.adopt', 'update'}
-    if not scoped or command in {'project.list', 'integration.revoke', 'integration.status', 'update'}:
+    scoped = command.startswith(('project.', 'user.', 'integration.')) or command in {'ensure', 'plan', 'apply', 'doctor', 'link.adopt'}
+    if not scoped or command in {'project.list', 'integration.revoke', 'integration.status'}:
         return
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     roots = []
     if command.startswith('user.') or getattr(args, 'user', False):
         roots.append((home, 'user'))
-    elif command in {'update', 'skill.where-used'} or getattr(args, 'all', False) or command in {'doctor', 'inventory'} and not getattr(args, 'project', None):
+    elif getattr(args, 'all', False) or command == 'doctor' and not getattr(args, 'project', None):
         roots.extend((Path(root), c.consumer_scope(state, root)) for root in c.consumer_records(state))
     else:
         requested = getattr(args, 'project', getattr(args, 'path', None))
@@ -464,8 +462,14 @@ def guard_command(args, home):
         if command == 'ensure' and getattr(args, 'event', '').startswith('post-'):
             roots.extend((Path(root), 'project') for root in state['projects'])
     for root, scope in roots:
-        if root.is_dir():
-            guard_legacy(root, scope, home)
-            value = c.read_json(c.declaration_path(root, scope, home), 'manifest', default={})
-            if value.get('schema_version') == 2 and command in {'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets'}:
+        if not root.is_dir():
+            continue
+        path = c.declaration_path(root, scope, home)
+        value, _ = read_model(path, 'manifest', missing=True)
+        version = value.get('schema_version') if isinstance(value, dict) else None
+        if type(version) is int and version == 1 and command != 'doctor':
+            c.migration_required('A v1 declaration must be migrated to a v2 declaration before this command.', path=str(path))
+        if version == 2:
+            lock(read_model(lock_path(root, scope, home), 'lock')[0], selection(value))
+            if command in SELECTION_SETTERS:
                 c.fail('selection.command_unsupported', 'Legacy consumer mutation requires an explicit pinned-aware operation.', 4)

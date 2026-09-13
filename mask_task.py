@@ -60,18 +60,16 @@ def consumer(args, state, home, *, creating):
     return root, 'project', str(root), state['projects'].get(str(root))
 
 
-def fresh_declaration(config):
-    """New consumers follow the configured source mode: a v2 selection on a catalog machine, v1 on a live-checkout machine."""
-    if config['schema_version'] == 3:
-        return r.selection(dict(schema_version=2, sources={}, default_agents=config['default_targets'], skills=[]))
-    if config['schema_version'] == 2:
-        return pinned.migrated_selection(dict(schema_version=1, skills=[]), config)
-    return dict(schema_version=1, skills=[])
+def fresh_declaration(config=None):
+    """A new consumer is always an empty v2 selection: the machine's default agents, or every agent before a machine exists."""
+    if config is None:
+        return dict(schema_version=2, sources={}, skills=[])
+    return r.selection(dict(schema_version=2, sources={}, default_agents=config['default_targets'], skills=[]))
 
 
-def require_live_checkout(config, path):
-    if c.legacy_source(config) is None:
-        c.fail('migration.required', 'A v1 declaration has no live checkout on a tap catalog machine; it must be migrated to a v2 declaration.', 4, path=str(path))
+def require_v2(declaration, path):
+    if declaration['schema_version'] == 1:
+        c.migration_required('A v1 declaration must be migrated to a v2 declaration before task commands manage it.', path=str(path))
 
 
 def parse_request(identifiers):
@@ -88,46 +86,6 @@ def parse_request(identifiers):
             c.fail('invocation.invalid', 'Each skill may be requested once.', 2, operand=raw)
         requested.append((alias, identifier))
     return requested
-
-
-def legacy_alias(config):
-    return config['legacy_source'] if config['schema_version'] == 2 else 'legacy'
-
-
-def v1_proposal(args, declaration, config, requested, output):
-    """Set union/subtraction with whole-declaration targets; per-binding agents need explicit migration."""
-    installing = args.command == 'install'
-    for alias, _ in requested:
-        if alias is not None and alias != legacy_alias(config):
-            c.fail('selection.source_unsupported', 'A legacy declaration selects skills from the configured source only.', 4, source=alias,
-                   remediation_hint="migrate --to-pinned before selecting from other sources")
-    identifiers = [identifier for _, identifier in requested]
-    existing = list(declaration['skills'])
-    proposal = copy.deepcopy(declaration)
-    if installing:
-        proposal['skills'] = sorted(set(existing) | set(identifiers))
-        changed = [identifier for identifier in identifiers if identifier not in existing]
-        unchanged = [identifier for identifier in identifiers if identifier in existing]
-    else:
-        proposal['skills'] = sorted(set(existing) - set(identifiers))
-        changed = [identifier for identifier in identifiers if identifier in existing]
-        unchanged = [identifier for identifier in identifiers if identifier not in existing]
-        for identifier in unchanged:
-            output['warnings'].append(dict(code='selection.not_selected', message='Skill is not selected in this scope; nothing to remove.', skill=identifier))
-    agents = getattr(args, 'agent', None)
-    if installing and agents:
-        agents = sorted(set(r.agents(agents)))
-        current = sorted(set(declaration.get('targets', config['default_targets'])))
-        if not existing:
-            proposal['targets'] = agents
-        elif agents != current:
-            c.fail('selection.per_binding_unsupported', 'A legacy declaration targets every skill alike; it cannot hold a different agent set for one skill.', 4,
-                   current_targets=current, requested_agents=agents)
-    proposal = c.manifest(proposal)
-    source = Path(config['source']['root'])
-    for identifier in proposal['skills']:
-        c.package(source, identifier)
-    return proposal, None, changed, unchanged, {}
 
 
 def choose_source(identifier, proposal, config, home, args, output):
@@ -186,15 +144,15 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
     agents = sorted(set(r.agents(args.agent))) if installing and getattr(args, 'agent', None) else None
     changed, unchanged, new = [], [], set()
     for alias, identifier in requested:
-        if alias is None:
-            if installing:
-                alias = choose_source(identifier, proposal, config, home, args, output)
-            else:
-                bound = sorted({row['source'] for row in proposal['skills'] if row['id'] == identifier})
-                if len(bound) > 1:
-                    c.fail('skill.ambiguous', 'The skill is selected from several sources; name one.', 4, skill=identifier, choices=[name + '/' + identifier for name in bound])
-                alias = bound[0] if bound else legacy_alias(config)
-        coordinate = alias + '/' + identifier
+        if alias is None and installing:
+            alias = choose_source(identifier, proposal, config, home, args, output)
+        elif alias is None:
+            bound = sorted({row['source'] for row in proposal['skills'] if row['id'] == identifier})
+            if len(bound) > 1:
+                c.fail('skill.ambiguous', 'The skill is selected from several sources; name one.', 4, skill=identifier, choices=[name + '/' + identifier for name in bound])
+            alias = bound[0] if bound else None
+        # An unselected bare ID stays bare in the not-selected warning; no source alias is invented for it.
+        coordinate = identifier if alias is None else alias + '/' + identifier
         present = next((row for row in proposal['skills'] if r.coordinate(row) == coordinate), None)
         if installing:
             if present is not None:
@@ -202,10 +160,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
                 continue
             entry = sources.selected(config, alias)
             if alias not in proposal['sources']:
-                binding = dict(repository=entry['repository'], packages=entry['packages'])
-                if config['schema_version'] == 2 and alias == legacy_alias(config):
-                    binding['ref'] = 'refs/heads/' + config['source']['branch']
-                proposal['sources'][alias] = binding
+                proposal['sources'][alias] = dict(repository=entry['repository'], packages=entry['packages'])
             binding = dict(source=alias, id=identifier)
             if agents:
                 binding['agents'] = agents
@@ -250,20 +205,16 @@ def mutate(args, output, home):
             c.fail('manifest.missing', 'No declaration exists for this scope.', 4, path=str(path))
         fresh = fresh_declaration(config)
         created[path] = c.text_json(fresh)
-        if fresh['schema_version'] == 2:
-            created[r.lock_path(root, scope, home)] = c.text_json(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(fresh), packages=[]))
+        created[r.lock_path(root, scope, home)] = c.text_json(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(fresh), packages=[]))
     declaration = c.selection_manifest(c.parse_json(text if text is not None else created[path], 'manifest'))
-    if declaration['schema_version'] == 2:
-        proposal, lock, changed, unchanged, payload_views = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
-    else:
-        require_live_checkout(config, path)
-        proposal, lock, changed, unchanged, payload_views = v1_proposal(args, declaration, config, requested, output)
+    require_v2(declaration, path)
+    proposal, lock, changed, unchanged, payload_views = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
     acquisitions = output['data'].get('acquisitions', [])
     task = dict(root=key, scope=scope, declaration_path=str(path), registered=record is not None, declaration_created=bool(created),
-                mode=(record or {}).get('mode', 'pinned' if proposal['schema_version'] == 2 else 'legacy'),
+                mode=(record or {}).get('mode', 'pinned'),
                 requested=[identifier if alias is None else alias + '/' + identifier for alias, identifier in requested],
                 added=changed if installing else [], removed=[] if installing else changed, already=unchanged,
-                skills=[r.coordinate(row) if proposal['schema_version'] == 2 else row for row in proposal['skills']],
+                skills=[r.coordinate(row) for row in proposal['skills']],
                 acquisitions=acquisitions, network='fetch' if acquisitions else 'none')
     if getattr(args, 'agent', None):
         task['agents'] = sorted(set(args.agent))
@@ -340,24 +291,17 @@ def listing(args, output, home):
         data['mode'] = None
         return
     declaration = c.selection_manifest(c.parse_json(text, 'manifest'))
-    v2 = declaration['schema_version'] == 2
-    data['mode'] = data['mode'] or ('pinned' if v2 else 'legacy')
+    require_v2(declaration, path)
+    data['mode'] = data['mode'] or 'pinned'
     planned = fs.plan(config, state, [root], register=[] if record else [key], home=home, user_root=root if scope == 'user' else None, operation='list')
     for blocker in planned['blockers']:
         output['warnings'].append(dict(code=blocker['code'], message=blocker['message'], details=blocker.get('details')))
     expected = c.consumer_records(planned['intent']['after_state']).get(key, {}).get('links', {}) if not planned['blockers'] else {}
     leaves = {leaf['relative']: leaf for entry in planned['projects'] + planned['users'] if entry['root'] == key for leaf in entry['leaves']}
-    if v2:
-        lock_value = r.read_model(r.lock_path(root, scope, home), 'lock', missing=True)[0]
-        rows = {r.coordinate(row): row for row in (lock_value or {}).get('packages', [])} if isinstance(lock_value, dict) else {}
-        data['source'] = dict(mode='pinned', sources=sorted(declaration['sources']))
-        bindings = [(r.coordinate(binding), binding['id'], binding['source'], rows.get(r.coordinate(binding))) for binding in declaration['skills']]
-    else:
-        require_live_checkout(config, path)
-        source = Path(config['source']['root'])
-        data['source'] = dict(mode='legacy', alias=legacy_alias(config), root=str(source), revision=planned['source'].get('revision'), dirty=planned['source'].get('dirty'))
-        data['limitations'].append('Legacy live-source content is not version-pinned.')
-        bindings = [(identifier, identifier, legacy_alias(config), None) for identifier in declaration['skills']]
+    lock_value = r.read_model(r.lock_path(root, scope, home), 'lock', missing=True)[0]
+    rows = {r.coordinate(row): row for row in (lock_value or {}).get('packages', [])} if isinstance(lock_value, dict) else {}
+    data['source'] = dict(mode='pinned', sources=sorted(declaration['sources']))
+    bindings = [(r.coordinate(binding), binding['id'], binding['source'], rows.get(r.coordinate(binding))) for binding in declaration['skills']]
     linked = 0
     for coordinate, identifier, alias, row in bindings:
         states = {}

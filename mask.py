@@ -23,7 +23,6 @@ PROGRAM_ROOT = Path(__file__).resolve().parent
 import mask_consent as consent
 import mask_core as core
 import mask_fs as fs
-import mask_git as git_ops
 import mask_install as install_ops
 import mask_ensure as ensure_ops
 import mask_integration as integration_ops
@@ -88,19 +87,16 @@ COMMANDS = {
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
     'doctor': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag')]),
-    'source.status': (False, False, []),
     'source.fetch': (True, True, [('name', 'optional'), ('locked', 'flag'), ('project', 'value'), ('user', 'flag'), ('offline', 'flag')]),
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
     'source.publish': (True, True, [('name', 'pos'), ('paths', 'repeat'), ('commit', 'flag'), ('push', 'flag'), ('message', 'value')]),
     'source.dev-link': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('authoring-root', 'value'), ('to-pinned', 'flag')]),
-    'source.migrate': (True, False, [('alias', 'value')]),
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
-    'migrate': (True, False, [('to-pinned', 'flag'), ('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.update': (True, True, []),
@@ -115,8 +111,8 @@ GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'p
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
-GUARDED.update({'source.migrate', 'tap.add', 'tap.remove'})
-GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'migrate', 'source.dev-link', 'source.publish'})
+GUARDED.update({'tap.add', 'tap.remove'})
+GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'source.dev-link', 'source.publish'})
 GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear'})
 GUARDED.add('ensure')
 GUARDED.update({'install', 'remove'})
@@ -199,7 +195,7 @@ def capabilities(leaves):
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2, 3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
+                deployment_model='taps', pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
                 workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
 
@@ -216,7 +212,7 @@ CONFLICTS = {
 }
 for action in ('set', 'set-targets'):
     CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
-for command in ('plan', 'apply', 'doctor', 'inventory', 'migrate', 'update', 'ensure'):
+for command in ('plan', 'apply', 'doctor', 'inventory', 'update', 'ensure'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
 for command in ('install', 'remove', 'list'):
@@ -276,20 +272,38 @@ def selected_roots(args, state, *, all_default=False):
     return [root]
 
 
+# Commands that stay available on a v1/v2 (live-checkout) machine so it can be inspected, recovered and migrated.
+MIGRATION_EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover'}
+
+
+def migration_gate(command, home):
+    """Refuse every other command on a v1/v2 machine before any effect; a missing configuration is not gated."""
+    if command in MIGRATION_EXEMPT or command.startswith('self.'):
+        return
+    try:
+        value = core.read_json(home / 'config.json', default={})
+    except MaskError:
+        return  # An unreadable configuration is reported by the command that reads it.
+    core.refuse_legacy_config(value)
+
+
 def diagnostics(args, output, home):
-    config = machine_config(home)
+    config = core.config(core.read_json(home / 'config.json'), legacy=True)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
     roots = selected_roots(args, state, all_default=True)
+    pending = [MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict()] if core.kind(home / 'pending.json') != 'missing' else []
+    symlinks = 'unknown' if os.name == 'nt' else 'available'
+    try:
+        core.refuse_legacy_config(config)
+    except MaskError as error:
+        # Reported only: nothing is planned on a live-checkout machine, so no checkout link is derived or observed.
+        output['data'].update(healthy=False, issues=[error.as_dict(), *pending], filesystem_present=False, host_load='not_verified', symlink_capability=symlinks)
+        if getattr(args, 'check', False):
+            core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7)
+        return
     planned = fs.plan(config, state, roots, home=home)
     fs.public_plan(planned, output)
-    issues = list(planned['blockers'])
-    if core.kind(home / 'pending.json') != 'missing':
-        issues.append(MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict())
-    try:
-        if core.legacy_source(config) is not None and any(not fs.pinned.is_pinned(core.consumer_records(state).get(str(root))) for root in roots):
-            core.checkout(core.legacy_source(config))
-    except MaskError as error:
-        issues.append(error.as_dict())
+    issues = list(planned['blockers']) + pending
     try:
         fs.pinned.verify_artifacts(planned['intent']['after_state'], [str(root) for root in roots], home)
     except MaskError as error:
@@ -363,16 +377,14 @@ def project_dispatch(args, output, home):
             declaration = core.selection_manifest(core.read_json(path, 'manifest'))
             output['data'] = dict(root=key, manifest=declaration)
             return
-        created = {path: dict(schema_version=1, skills=[])}
-        if config is not None and config['schema_version'] == 3:
-            # A tap catalog machine creates a v2 selection and its empty lock, as install does for a new consumer.
-            import mask_resolve
-            import mask_task
-            fresh = mask_task.fresh_declaration(config)
-            created = {path: fresh}
-            lock_path = mask_resolve.lock_path(root, scope, home)
-            if core.kind(lock_path) == 'missing':
-                created[lock_path] = dict(schema_version=1, resolver='mask-lock-v1', selection_digest=mask_resolve.selection_digest(fresh), packages=[])
+        # A new consumer is a v2 selection with its empty lock, as install creates one; no machine configuration is written.
+        import mask_resolve
+        import mask_task
+        fresh = mask_task.fresh_declaration(config)
+        created = {path: fresh}
+        lock_path = mask_resolve.lock_path(root, scope, home)
+        if core.kind(lock_path) == 'missing':
+            created[lock_path] = dict(schema_version=1, resolver='mask-lock-v1', selection_digest=mask_resolve.selection_digest(fresh), packages=[])
         output['data'] = dict(root=key, manifest=created[path])
         output['would_change'] = True
         if not output['dry_run']:
@@ -407,19 +419,20 @@ def project_dispatch(args, output, home):
         return
     declaration_text = core.read_text(path, 'manifest')
     declaration = core.selection_manifest(core.parse_json(declaration_text, 'manifest'))
+    if declaration['schema_version'] == 1:
+        core.migration_required('A v1 declaration must be migrated to a v2 declaration before this command.', path=str(path))
     if record:
         core.registered_root(root, record, scope)
+    import mask_pinned
+    mode = (record or {}).get('mode', 'pinned')
     output['data'] = dict(root=key, scope=scope, manifest_path=str(path), manifest=declaration, registered=record is not None,
-                          configured_targets=declaration.get('targets'), effective_targets=declaration.get('targets', config['default_targets'] if config else None))
-    if declaration['schema_version'] == 2:
-        import mask_pinned
-        output['data'].update(mode=(record or {}).get('mode', 'pinned'), reproducible=(record or {}).get('mode') != 'dev-link', fleet_eligible=(record or {}).get('mode') != 'dev-link', requested_targets=mask_pinned.simple_targets(declaration), effective_targets=None)
+                          configured_targets=None, effective_targets=None, mode=mode, reproducible=mode != 'dev-link',
+                          fleet_eligible=mode != 'dev-link', requested_targets=mask_pinned.simple_targets(declaration))
     if command == 'project.show':
-        output['data']['source'] = dict(config.get('source', {})) if config else None
         output['data']['ownership'] = record['links'] if record else {}
         if config:
             inspection = fs.plan(config, state, [root], register=[] if record else [key], home=home, user_root=root if scope == 'user' else None)
-            output['data']['source'].update(inspection['source'])
+            output['data']['source'] = inspection['source']
             output['data']['expected_links'] = core.consumer_records(inspection['intent']['after_state']).get(key, {}).get('links', {})
             observations = inspection['users'] if scope == 'user' else inspection['projects']
             output['data']['actual_links'] = observations[0]['leaves'] if observations else []
@@ -427,78 +440,27 @@ def project_dispatch(args, output, home):
             output['data']['outcomes'] = inspection['outcomes']
             output['data']['shadowing'] = inspection['shadowing']
             output['warnings'].extend(fs.shadow_warnings(inspection['shadowing']))
-            if declaration['schema_version'] == 2:
-                output['data']['effective_targets'] = sorted({row['agent'] for row in inspection['outcomes'] if row['status'] in ('selected', 'deployed', 'overridden')})
+            output['data']['effective_targets'] = sorted({row['agent'] for row in inspection['outcomes'] if row['status'] in ('selected', 'deployed', 'overridden')})
         output['data']['host_load'] = 'not_verified'
         return
     if config is None:
         core.fail('config.missing', 'Add a skill source before this operation.')
-    source = core.legacy_source(config)
-    if source is None and declaration['schema_version'] == 1:
-        core.fail('migration.required', 'A v1 declaration has no live checkout on a tap catalog machine; it must be migrated to a v2 declaration.', 4, path=str(path))
-    if getattr(args, 'apply', False):
-        if record is None and command != 'project.register':
-            core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
-
+    apply = getattr(args, 'apply', False)
     if command == 'project.register':
-        if record and not getattr(args, 'apply', False):
+        if record and not apply:
             return
-        core.registration_safe(root, source, home, state, scope)
-        if declaration['schema_version'] == 1:
-            for identifier in declaration['skills']:
-                core.package(source, identifier)
-        if declaration['schema_version'] == 2 or scope == 'user' or getattr(args, 'apply', False):
-            planned = fs.plan(config, state, [root], register=[key], operation=args.command, home=home,
-                              user_root=root if scope == 'user' else None, register_only=not getattr(args, 'apply', False))
-            fs.public_plan(planned, output)
-            fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-            if not output['dry_run']:
-                fs.execute(planned, home, output)
-            return
-        after = copy.deepcopy(state)
-        after['projects'][key] = core.registry_record(root, declaration, source)
-        output['data']['registered'] = True
-        output['would_change'] = True
-        output['data']['plan_hash'] = core.digest(dict(command=command, root=key, state=state, after=after, config=config))
-        if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
-            core.fail('plan.stale', 'Registry operation changed since preview.', 4)
-        if not output['dry_run']:
-            core.save_state(home, state, after)
-            output.update(changed=True, transaction='committed')
-        return
-    if declaration['schema_version'] == 2:
-        core.fail('selection.command_unsupported', 'Edit v2 selection intent explicitly; legacy string mutation commands do not apply.', 4)
-    proposal = copy.deepcopy(declaration)
-    if command == 'project.set':
-        proposal['skills'] = getattr(args, 'skill', [])
-    elif command in ('project.require', 'project.unrequire'):
-        for identifier in args.ids:
-            core.skill_id(identifier)
-        existing = set(proposal['skills'])
-        proposal['skills'] = sorted(existing.union(args.ids) if command.endswith('require') and not command.endswith('unrequire') else existing.difference(args.ids))
-    elif command == 'project.set-targets':
-        if getattr(args, 'inherit', False):
-            proposal.pop('targets', None)
-        else:
-            proposal['targets'] = args.targets
-    proposal = core.manifest(proposal)
-    for identifier in proposal['skills']:
-        core.package(source, identifier)
-    if getattr(args, 'apply', False):
-        planned = fs.plan(config, state, [root], proposals={key: proposal}, operation=args.command, home=home)
+        core.registration_safe(root, home, state, scope)
+        planned = fs.plan(config, state, [root], register=[key], operation=args.command, home=home,
+                          user_root=root if scope == 'user' else None, register_only=not apply)
         fs.public_plan(planned, output)
         fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
         if not output['dry_run']:
             fs.execute(planned, home, output)
         return
-    output['data']['manifest'] = proposal
-    output['data']['plan_hash'] = core.digest(dict(command=args.command, root=key, manifest_path=str(path), before=declaration, after=proposal, generation=state['generation'], config=config))
-    output['would_change'] = proposal != declaration
-    if getattr(args, 'expect_plan_hash', output['data']['plan_hash']) != output['data']['plan_hash']:
-        core.fail('plan.stale', 'The prospective manifest changed since preview.', 4)
-    if proposal != declaration and not output['dry_run']:
-        core.atomic_text(path, core.text_json(proposal), declaration_text)
-        output.update(changed=True, transaction='committed')
+    if apply and record is None:
+        core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
+    # set, require and unrequire only ever edited v1 string selections, which are retired.
+    core.fail('selection.command_unsupported', 'Edit v2 selection intent explicitly; legacy string mutation commands do not apply.', 4)
 
 
 def local_dispatch(args, output, leaves):
@@ -515,6 +477,9 @@ def local_dispatch(args, output, leaves):
         return mask_store.dispatch(args, output, home)
     if command == 'source.fetch' and any(getattr(args, flag, False) for flag in ('project', 'user', 'offline')):
         core.fail('invocation.invalid', 'Scope/offline options require source fetch --locked.', 2)
+    if command == 'source.fetch' and not getattr(args, 'name', None):
+        import mask_update
+        return mask_update.fetch_all(args, output, home)
     mask_resolve.guard_command(args, home)
     if command in ('inventory', 'skill.where-used'):
         return report_ops.dispatch(args, output, home)
@@ -528,7 +493,7 @@ def local_dispatch(args, output, leaves):
         return sources_ops.publication(args, output, home)
     if command == 'source.inspect':
         return sources_ops.inspect(args, output, home)
-    if command in ('source.list', 'source.show', 'source.migrate', 'tap.add', 'tap.remove') or command == 'source.fetch' and getattr(args, 'name', None):
+    if command in ('source.list', 'source.show', 'source.fetch', 'tap.add', 'tap.remove'):
         return sources_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
         return integration_ops.dispatch(args, output, home)
@@ -542,7 +507,7 @@ def local_dispatch(args, output, leaves):
         if existing:
             current = core.config(existing)
             explicit = [key for key, option in (('default_targets', 'target'), ('git_timeout_seconds', 'git_timeout')) if hasattr(args, option)]
-            if current['schema_version'] != 3 or any(current[key] != proposal[key] for key in explicit):
+            if any(current[key] != proposal[key] for key in explicit):
                 core.fail('config.already_initialized', 'Machine already has a different configuration.', 4, schema_version=current['schema_version'])
             proposal = current
         output['data'] = dict(config=proposal, program_root=str(PROGRAM_ROOT))
@@ -573,57 +538,26 @@ def local_dispatch(args, output, leaves):
         return reconciliation(args, output, home)
     if command.startswith(('project.', 'user.')):
         return project_dispatch(args, output, home)
-    config = machine_config(home)
-    source = core.legacy_source(config)
-    if config['schema_version'] in (2, 3) and command in ('skill.list', 'skill.show', 'skill.validate'):
+    if command in ('skill.list', 'skill.show', 'skill.validate'):
         return sources_ops.query(args, output, home)
-    if source is None and command == 'update':
-        # Pinned updates never reach this point. A tap catalog has no shared checkout, so a selected legacy record
-        # refuses instead of being skipped silently; only an empty selection is a no-op.
-        state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
-        records = core.consumer_records(state)
-        legacy = [str(root) for root in selected_roots(args, state, all_default=True) if not fs.pinned.is_pinned(records.get(str(root)))]
-        if legacy:
-            core.fail('migration.required', 'A legacy consumer has no live checkout on a tap catalog machine; it must be migrated before update.', 4, roots=legacy)
-        output['warnings'].append(dict(code='project.empty_registry', message='No registered consumers selected.'))
+    if command == 'config.show':
+        config = core.config(core.read_json(home / 'config.json'), legacy=True)
+        output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home), migration_required=config['schema_version'] != 3)
         return
-    if source is None and command in ('source.status', 'source.fetch'):
-        core.fail('source.legacy_absent', 'This machine has no live checkout; name the tap to fetch.', 4)
-    if command == 'source.status':
-        output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])
-    elif command == 'source.fetch':
-        remote, branch = config['source']['remote'], config['source']['branch']
-        git_ops.checkout_preconditions(source, remote, branch, 'AgentSkills', config['git_timeout_seconds'], clean=False, approved_repository=sources_ops.approved_legacy(config))
-        if not output['dry_run']:
-            git_ops.fetch(source, remote, branch, config['git_timeout_seconds'], output)
-        else:
-            output['data'] = dict(fetch_effects=dict(attempted=False, fetched=False), remote_freshness='last_fetched')
-    elif command == 'update':
-        state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
-        return git_ops.update(config, state, home, output, args)
-    elif command == 'config.show':
-        output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home))
-    elif command == 'config.set':
-        proposal = dict(config)
-        if hasattr(args, 'target'):
-            proposal['default_targets'] = args.target
-        if hasattr(args, 'git_timeout'):
-            proposal['git_timeout_seconds'] = args.git_timeout
-        proposal = core.config(proposal)
-        output['data'] = dict(config=proposal)
-        output['would_change'] = proposal != config
-        if proposal != config and not output['dry_run']:
-            core.atomic_text(home / 'config.json', core.text_json(proposal), core.read_text(home / 'config.json'))
-            output.update(changed=True, transaction='committed')
-    elif command == 'skill.list' or command == 'skill.validate' and getattr(args, 'all', False):
-        entries = core.catalog(source)
-        output['data'] = dict(skills=entries, scope='mask-package-v1')
-        if command == 'skill.validate' and any(not item['valid'] for item in entries):
-            core.fail('skill.invalid', 'One or more packages failed validation.')
-    elif command in ('skill.show', 'skill.validate'):
-        output['data'] = core.package(source, args.id, getattr(args, 'content', False))
-    else:
+    if command != 'config.set':
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
+    config = machine_config(home)
+    proposal = dict(config)
+    if hasattr(args, 'target'):
+        proposal['default_targets'] = args.target
+    if hasattr(args, 'git_timeout'):
+        proposal['git_timeout_seconds'] = args.git_timeout
+    proposal = core.config(proposal)
+    output['data'] = dict(config=proposal)
+    output['would_change'] = proposal != config
+    if proposal != config and not output['dry_run']:
+        core.atomic_text(home / 'config.json', core.text_json(proposal), core.read_text(home / 'config.json'))
+        output.update(changed=True, transaction='committed')
 
 
 def locked_dispatch(args, output, leaves, home, preparation):
@@ -641,6 +575,8 @@ def locked_dispatch(args, output, leaves, home, preparation):
 
 
 def dispatch_impl(args, output, leaves):
+    home = machine_home(args)
+    migration_gate(args.command, home)
     if args.command == 'launch':
         if args.agent not in ADAPTERS:
             core.fail('invocation.invalid', 'Choose a supported agent.', 2)
@@ -666,7 +602,6 @@ def dispatch_impl(args, output, leaves):
     if args.command not in IMPLEMENTED:
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
     mutates = COMMANDS[args.command][0] and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))
-    home = machine_home(args)
     if args.command == 'ensure' and getattr(args, 'repair', False) and getattr(args, 'all', False):
         if getattr(args, 'event', 'manual') != 'manual':
             core.fail('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
@@ -681,8 +616,9 @@ def dispatch_impl(args, output, leaves):
     import mask_task
     if mask_selection.dispatch(args, output, home) or mask_task.dispatch(args, output, home):
         return
-    if args.command in ('migrate', 'update') and mask_pinned.transition_dispatch(args, output, home):
-        return
+    if args.command == 'update':
+        import mask_update
+        return mask_update.dispatch(args, output, home)
     if args.command == 'source.dev-link':
         return mask_pinned.dev_dispatch(args, output, home)
     preparation = mask_pinned.prepare_dispatch(args, output, home) if mutates else None

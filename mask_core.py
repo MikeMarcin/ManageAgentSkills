@@ -57,8 +57,7 @@ REMEDIATION = {
     'skill.unknown': "Check the exact skill name with 'mask skill list' or 'mask source show NAME'.",
     'source.unresolved': "Fetch the approved source with 'mask source fetch NAME', or name SOURCE/ID for a resolved source.",
     'lock.resolution_required': "Fetch the approved source with 'mask source fetch NAME' before an offline or dry-run resolution.",
-    'selection.per_binding_unsupported': "Install without --agent to use the declaration's targets, or run 'mask migrate --to-pinned' for per-skill agents.",
-    'selection.source_unsupported': "Run 'mask migrate --to-pinned' before selecting skills from additional sources.",
+    'migration.required': "This machine or consumer still uses the retired live-checkout model; preview its conversion to taps with 'mask doctor --migrate --dry-run'.",
     'target.collision': 'Move or delete the conflicting entry yourself, then rerun; MASK never overwrites it.',
     'recovery.required': "Run 'mask recover --inspect' and complete or roll back the pending operation.",
     'lock.busy': 'Another MASK operation holds the lock; retry when it finishes.',
@@ -459,8 +458,25 @@ def checkout(root):
     return root
 
 
-def config(value):
-    """Machine configuration: v3 is a tap catalog; v1 (live checkout) and v2 (catalog plus legacy binding) stay readable."""
+MIGRATION_REMEDIATION = ['mask', 'doctor', '--migrate', '--dry-run']
+
+
+def migration_required(message, **details):
+    """Refuse a retired live-checkout input before any effect; ``mask doctor --migrate`` converts it."""
+    fail('migration.required', message, 4, remediation=MIGRATION_REMEDIATION, **details)
+
+
+def refuse_legacy_config(value):
+    """A v1 (live checkout) or v2 (catalog plus legacy binding) machine configuration is read only for migration."""
+    version = value.get('schema_version') if isinstance(value, dict) else None
+    if type(version) is int and version in (1, 2):
+        migration_required('This machine configuration predates taps; convert it with mask doctor before using this command.', schema_version=version)
+
+
+def config(value, *, legacy=False):
+    """Machine configuration: v3 is a tap catalog; v1 and v2 parse only with ``legacy=True`` (migration and exempt commands)."""
+    if not legacy:
+        refuse_legacy_config(value)
     version = value.get('schema_version') if isinstance(value, dict) else None
     if version == 3:
         fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), versions=(1, 2, 3))
@@ -491,11 +507,6 @@ def empty_config(targets=None, timeout=30):
     """The v3 machine configuration that ``init`` and a bootstrapping ``tap add`` write: no taps yet."""
     return config(dict(schema_version=3, default_targets=list(ADAPTERS) if targets is None else targets,
                        git_timeout_seconds=timeout, sources={}))
-
-
-def legacy_source(value):
-    """The live checkout of a v1/v2 machine, or None on a v3 tap catalog."""
-    return Path(value['source']['root']) if value is not None and 'source' in value else None
 
 
 def identity(root):
@@ -535,69 +546,6 @@ def metadata(text, expected_id):
     if values.get('name') != expected_id or not values.get('description'):
         fail('skill.invalid', 'Frontmatter name must match ID and description must be present.', skill=expected_id)
     return values
-
-
-def package(source, identifier, content=False):
-    skill_id(identifier)
-    if kind(source) != 'directory':
-        fail('source.missing', 'Source checkout is unavailable or linked.')
-    base = source / 'skills'
-    root = base / identifier
-    for path in (base, root):
-        if kind(path) == 'missing':
-            fail('skill.unknown', 'Skill is not available in the configured source.', skill=identifier)
-        if kind(path) != 'directory':
-            fail('skill.path_escape', 'Source packages require real directories.', path=str(path))
-    names = [entry.name.casefold() for entry in base.iterdir()]
-    if len(names) != len(set(names)):
-        fail('skill.invalid', 'Case-colliding skill IDs.')
-    staged = git(source, 'ls-files', '--stage', '--', 'skills/' + identifier, optional=True)
-    if staged and any(line.startswith('160000 ') for line in staged.splitlines()):
-        fail('skill.path_escape', 'Submodules are unsupported in skill packages.')
-    files = {}
-    def walk(directory):
-        folded = set()
-        for entry in sorted(directory.iterdir()):
-            if entry.name.casefold() in folded:
-                fail('skill.invalid', 'Case-colliding source entries.', path=str(entry))
-            folded.add(entry.name.casefold())
-            observed = kind(entry)
-            if observed == 'directory':
-                walk(entry)
-            elif observed == 'file':
-                files[entry.relative_to(root).as_posix()] = entry.read_bytes()
-            else:
-                fail('skill.path_escape', 'Source package contains a link or special entry.', path=str(entry))
-    walk(root)
-    if 'SKILL.md' not in files:
-        fail('skill.invalid', 'SKILL.md is missing.', skill=identifier)
-    try:
-        text = files['SKILL.md'].decode('utf-8')
-    except UnicodeError:
-        fail('skill.invalid', 'SKILL.md must be UTF-8.')
-    facts = metadata(text, identifier)
-    answer = dict(id=identifier, asset_path=str(root), description=facts['description'], valid=True,
-                  scope='mask-package-v1', issues=[], fingerprint=digest({name: digest(data) for name, data in files.items()}))
-    if content:
-        answer['content'] = text
-    return answer
-
-
-def catalog(source):
-    base = source / 'skills'
-    if kind(base) != 'directory':
-        fail('source.missing', 'Source must contain a real skills directory.')
-    entries, folded = [], set()
-    for path in sorted(base.iterdir()):
-        if path.name.casefold() in folded:
-            fail('skill.invalid', 'Case-colliding skill IDs.')
-        folded.add(path.name.casefold())
-        try:
-            entries.append(package(source, path.name))
-        except MaskError as error:
-            entries.append(dict(id=path.name, asset_path=str(path), valid=False, description=None,
-                                scope='mask-package-v1', issues=[error.as_dict()]))
-    return entries
 
 
 def empty_state():
@@ -692,20 +640,13 @@ def selection_manifest(value):
     return manifest(value)
 
 
-def consumer_manifest(root, scope='project', home=None):
-    import mask_resolve
-    mask_resolve.guard_legacy(Path(root), scope, home)
-    return manifest(read_json(declaration_path(root, scope, home), 'manifest'))
-
-
-def registration_safe(root, source, home, value, scope):
+def registration_safe(root, home, value, scope):
     if str(root) in consumer_records(value) and consumer_scope(value, root) != scope:
         fail('target.overlap', 'The root is already registered in another scope.', 4, root=str(root))
     for adapter in adapters.paths(scope).values():
         destination = root / adapter
-        overlaps_source = source is not None and (source.is_relative_to(destination) or destination.is_relative_to(source / 'skills'))
-        if overlaps_source or (home is not None and home.is_relative_to(destination)) or root == home:
-            fail('config.invalid', 'Managed source, state and destination locations overlap.')
+        if (home is not None and home.is_relative_to(destination)) or root == home:
+            fail('config.invalid', 'Managed state and destination locations overlap.')
         parents_safe(root, destination / 'mask-registration-check')
         for known in consumer_records(value):
             if known == str(root):
@@ -737,15 +678,6 @@ def project_root(selection=None, *, initializing=False, cwd=None):
             break
         current = current.parent
     fail('manifest.missing', 'No declaration found within the current Git worktree.')
-
-
-def project_manifest(root):
-    return manifest(read_json(root / '.mask.json', 'manifest'))
-
-
-def registry_record(root, declaration, source):
-    return dict(root=str(root), root_identity=identity(root), last_manifest=declaration,
-                last_manifest_digest=digest(declaration), last_source_revision=git(source, 'rev-parse', 'HEAD', optional=True), links={})
 
 
 def registered_root(root, record, scope='project'):

@@ -108,18 +108,20 @@ class HumanTerminal(PublicFixture):
                 self.assertIn(expected, run.stdout + run.stderr)
                 self.assertFalse(self.parses_as_result_envelope(run.stdout))
 
-    def test_inventory_shows_three_skill_rows_with_separate_agent_states(self):
-        # Legacy live-checkout starting state until MASK-0102 retires legacy inventory rows (pinned inventory detail is not reported yet).
-        self.legacy_bootstrap()
+    def test_inventory_shows_three_pinned_skill_rows_with_separate_agent_states(self):
+        # Tap-first pinned rows (MASK-0100): one line per SOURCE/ID with a per-agent state column.
+        self.assertTrue(self.machine('install', 'beta', '--project', self.project)['ok'])
         self.linked_consumer_with_stale_roles()
-        self.assertTrue(self.machine('project', 'require', 'beta', '--project', self.project, '--apply')['ok'])
         run = self.human('inventory', '--project', self.project)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn('3 skill row(s), 6 link(s) shown of 6 total', run.stdout)
-        self.assertEqual(len([line for line in run.stdout.splitlines() if line.startswith('  legacy/')]), 3, run.stdout)
+        lines = [line for line in run.stdout.splitlines() if line.startswith(f'  {TAP}/')]
+        self.assertEqual(sorted(line.split()[0] for line in lines), [f'{TAP}/alpha', f'{TAP}/beta', f'{TAP}/implement-rfc'], run.stdout)
+        self.assertTrue(all(line.split()[1:5] == [TAP, 'pinned', 'ok', 'ok'] for line in lines), run.stdout)
         self.assertIn('CLAUDE', run.stdout)
         self.assertIn('CODEX', run.stdout)
         self.assertIn('limitation:', run.stdout)
+        self.assertNotIn('legacy', run.stdout)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
         page = self.human('inventory', '--project', self.project, '--limit', '2')
         self.assertIn('partial page', page.stdout)
