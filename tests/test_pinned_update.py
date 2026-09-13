@@ -8,12 +8,6 @@ from tests.support import TAP, Fixture
 ALPHA = TAP + '/alpha'
 
 
-def authoring_init(fixture):
-    """Bootstrap the fixture tap with ``fixture.source`` as its approved authoring checkout; its origin names the tap identity."""
-    fixture.git(fixture.source, 'remote', 'add', 'origin', str(fixture.upstream))
-    return fixture.call('tap', 'add', TAP, fixture.upstream, '--checkout', fixture.source)
-
-
 class UpdateTests(Fixture):
     # Development links and publication from the fixture tap need its approved authoring checkout; the rest start from init().
     AUTHORING = {'test_dev_link_dirty_scope_and_guarded_return', 'test_development_recovery_binds_live_authoring_and_typed_extension',
@@ -21,7 +15,7 @@ class UpdateTests(Fixture):
 
     def setUp(self):
         super().setUp()
-        authoring_init(self) if self._testMethodName in self.AUTHORING else self.init()
+        self.authoring_init() if self._testMethodName in self.AUTHORING else self.init()
         self.install('alpha')
 
     def test_selected_update_isolates_consumers_and_uses_cached_candidate(self):

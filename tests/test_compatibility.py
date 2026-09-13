@@ -15,19 +15,13 @@ from tests.support import ENTRY, TAP, Fixture
 ALPHA = TAP + '/alpha'
 
 
-def authoring_init(fixture):
-    """Bootstrap the fixture tap with ``fixture.source`` as its approved authoring checkout; its origin names the tap identity."""
-    fixture.git(fixture.source, 'remote', 'add', 'origin', str(fixture.upstream))
-    return fixture.call('tap', 'add', TAP, fixture.upstream, '--checkout', fixture.source)
-
-
 class CompatibilityTests(Fixture):
     # Development links need an approved authoring checkout on the tap; every other test starts from init().
     AUTHORING = {'test_live_dev_metadata_is_used_and_duplicate_destinations_refuse'}
 
     def setUp(self):
         super().setUp()
-        authoring_init(self) if self._testMethodName in self.AUTHORING else self.init()
+        self.authoring_init() if self._testMethodName in self.AUTHORING else self.init()
         self.declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha')])
         (self.project / '.mask.json').write_text(json.dumps(self.declaration))
 

@@ -4,9 +4,8 @@ A machine starts the way a user's does: ``tap add`` on an empty MASK_HOME approv
 local bare repository as a ``file`` tap and creates machine config v3 and state. New
 consumers are v2 declarations with locks and links into ``MASK_HOME/store``.
 ``self.source`` is only the test author's checkout; it reaches MASK solely through
-``publish`` and a fetch. Tests of retired live-checkout behavior opt in explicitly with
-``legacy_init``, which writes the schema-true v1 bytes from ``tests.legacy_support``
-instead of running the removed ``init --source``.
+``publish`` and a fetch. Legacy starting states for doctor
+migration come from ``tests.legacy_support``.
 """
 import json
 import os
@@ -14,7 +13,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from types import SimpleNamespace
 import unittest
 
 ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
@@ -107,26 +105,6 @@ class Fixture(unittest.TestCase):
         """Bootstrap the fixture tap with ``self.source`` as its approved authoring checkout; its origin names the tap identity."""
         self.git(self.source, 'remote', 'add', 'origin', str(self.upstream))
         return self.call('tap', 'add', TAP, self.upstream, '--checkout', self.source)
-
-    def legacy_init(self):
-        """A v1 live-checkout machine over ``self.source``: the files the retired ``init --source`` wrote.
-
-        That command held the writer lock, so its one-byte (Windows) or empty lock file exists as well.
-        """
-        from tests.legacy_support import legacy_state, v1_config, write_json
-        write_json(self.home / 'config.json', v1_config(SimpleNamespace(clone=self.source)))
-        if not (self.home / 'state.json').exists():
-            write_json(self.home / 'state.json', legacy_state())
-        if not (self.home / 'operation.lock').exists():
-            (self.home / 'operation.lock').write_bytes(b'\0' if os.name == 'nt' else b'')
-        return json.loads((self.home / 'config.json').read_text(encoding='utf-8'))
-
-    def declare(self, skills=None, targets=None):
-        """A v1 declaration; it is served only on a ``legacy_init`` machine."""
-        data = dict(schema_version=1, skills=['alpha'] if skills is None else skills)
-        if targets is not None:
-            data['targets'] = targets
-        (self.project / '.mask.json').write_text(json.dumps(data) + '\n')
 
     def snapshot(self, root=None):
         root = root or self.base
