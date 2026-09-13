@@ -33,6 +33,11 @@ TARGETS = {"Path(link['dev']['root']) / link['dev']['path']", "store.location(ho
 CRASH = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;mask.main(sys.argv[3:])"
 
 
+# Every spelling that creates a link or computes a link text: pathlib, os (also imported bare), the Win32 API through
+# ctypes, and the shell's mklink. A new spelling here must be allowlisted in PRODUCERS with its target derivation.
+LINK_CALLS = {'symlink_to', 'symlink', 'creation_link_text', 'link_to', 'hardlink_to', 'CreateSymbolicLink', 'CreateSymbolicLinkW', 'CreateSymbolicLinkA'}
+
+
 def link_producers():
     found = set()
 
@@ -44,10 +49,12 @@ def link_producers():
             if isinstance(child, ast.Call):
                 function = child.func
                 name = function.attr if isinstance(function, ast.Attribute) else getattr(function, 'id', None)
-                if isinstance(function, ast.Attribute) and name == 'symlink' and getattr(function.value, 'id', None) == 'os':
-                    name = 'os.symlink'
-                if name in ('symlink_to', 'os.symlink', 'creation_link_text'):
+                if name in LINK_CALLS:
+                    if name == 'symlink':
+                        name = 'os.symlink'
                     found.add(('.'.join([module] + scope), name, ast.unparse(child.args[0]) if child.args else ''))
+            elif isinstance(child, ast.Constant) and isinstance(child.value, str) and 'mklink' in child.value.lower():
+                found.add(('.'.join([module] + scope), 'mklink', child.value))
             visit(child, module, scope)
 
     for path in sorted(PROGRAM.glob('mask*.py')):
