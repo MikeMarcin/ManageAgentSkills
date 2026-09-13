@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0099"
 title: "Close personal workflow readiness against integrated source"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098"]
 closeout_for: ["RFC-MASK-0020"]
