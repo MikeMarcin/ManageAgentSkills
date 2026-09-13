@@ -121,7 +121,7 @@ def proposals(planned, *, repair=False):
                                  detail=f"consumer inputs are missing or invalid: {', '.join(blocked)}" if blocked else 'package content is not a local directory'))
                 continue
             package_root = Path(report['package']['root'])
-            desc = workflow.descriptor(workflow.PackageView(root=package_root), report['skill'])
+            desc = workflow.descriptor(workflow.PackageView(root=package_root), report['skill'], entry['scope'])
             package_sha256 = snapshot(package_root)
             for action_id, roles in sorted(wanted.items()):
                 row = describe(entry, report, desc, action_id, roles, package_sha256)
@@ -170,7 +170,7 @@ def authorize(args, output, planned, rows):
 
 
 def request_text(row):
-    return c.text_json(dict(schema=REQUEST_SCHEMA, action=row['action'], native_roles=row['native_roles'], inputs=row['inputs'], parameters=row['parameters'], paths=workflow.paths(row['skill'])))
+    return c.text_json(dict(schema=REQUEST_SCHEMA, scope=row['scope'], action=row['action'], native_roles=row['native_roles'], inputs=row['inputs'], parameters=row['parameters'], paths=workflow.paths(row['skill'])))
 
 
 def excerpt(data):
@@ -295,7 +295,7 @@ def recheck(planned, rows, *, ran=False):
     if entry is None:
         stale(rows, ran, 'the consumer can no longer be planned (a blocker such as a replaced role directory was observed)')
     report = skill_report(planned, root, skill)
-    desc = workflow.descriptor(workflow.PackageView(root=Path(report['package']['root'])), skill) if report['package']['root'] else None
+    desc = workflow.descriptor(workflow.PackageView(root=Path(report['package']['root'])), skill, entry['scope']) if report['package']['root'] else None
     package_sha256 = snapshot(Path(report['package']['root'])) if report['package']['root'] else None
     for row in rows:
         fresh = describe(entry, report, desc, row['action'], [(role['agent'], role['name']) for role in row['native_roles']], package_sha256) if desc and row['action'] in desc['setup'] else None

@@ -97,7 +97,7 @@ class PackageView:
         return path.read_bytes()
 
 
-def descriptor(view, skill):
+def descriptor(view, skill, scope='project'):
     """Parse and validate the passive descriptor, or return None when the package declares nothing."""
     if not isinstance(view, PackageView):
         view = PackageView(root=view)
@@ -110,7 +110,24 @@ def descriptor(view, skill):
         value = c.parse_json(data.decode('utf-8'), 'workflow')
     except UnicodeError:
         c.fail('workflow.invalid', 'The workflow descriptor must be UTF-8 JSON.', 4, skill=skill)
-    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks'), family='workflow')
+    if scope not in ('project', 'user'):
+        c.fail('workflow.invalid', 'Unknown workflow consumer scope.', 4)
+    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks', 'scopes'), family='workflow')
+    scopes = value.get('scopes', {})
+    if not isinstance(scopes, dict) or set(scopes) - {'user'}:
+        c.fail('workflow.invalid', 'Workflow scopes may contain only a complete user contract.', 4)
+    base = {key: item for key, item in value.items() if key != 'scopes'}
+    project = parse_contract(base, view, skill, sha256(data))
+    personal = None
+    if 'user' in scopes:
+        c.fields(scopes['user'], ('inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks'), family='workflow')
+        # A project lock cannot vouch for a different personal contract with fewer inputs.
+        personal = parse_contract(dict(scopes['user'], schema_version=1), view, skill, sha256(b'user\0' + data))
+    return personal if scope == 'user' and personal is not None else project
+
+
+def parse_contract(value, view, skill, digest):
+    """Validate one complete scope contract; inactive scope declarations are validated too."""
     inputs, ids, paths = [], set(), set()
     if not isinstance(value['inputs'], list) or len(value['inputs']) > LIMITS['inputs']:
         c.fail('workflow.invalid', 'Descriptor inputs must be a bounded list.', 4)
@@ -176,7 +193,7 @@ def descriptor(view, skill):
         c.fields(entry, ('contract_sha256', 'role_inputs_sha256'), family='workflow')
         if any(not isinstance(item, str) or not HEX_RE.fullmatch(item) for item in entry.values()):
             c.fail('workflow.invalid', 'Compatible locks require exact lowercase SHA-256 pairs.', 4)
-    return dict(skill=skill, view=view, digest=sha256(data), inputs=inputs, roles=roles, setup=setup,
+    return dict(skill=skill, view=view, digest=digest, inputs=inputs, roles=roles, setup=setup,
                 retired_paths=retired, compatible_locks=compatible)
 
 
@@ -336,7 +353,7 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
             # Unavailable content is never "not declared": readiness stays unknown until the payload exists.
             reports.append(dict(skill=skill, workflow='unexamined', contract=None, inputs=[], roles=[], complete=False, detail='package content is not available locally; readiness was not examined'))
             continue
-        desc = descriptor(targets[skill], skill)
+        desc = descriptor(targets[skill], skill, scope)
         if desc is None:
             reports.append(dict(skill=skill, workflow='not_declared', contract=None, inputs=[], roles=[], complete=True))
             continue

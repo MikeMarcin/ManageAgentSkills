@@ -47,7 +47,27 @@ until every applicable role and input matches. The result field
 `workflow_readiness` lists each role's state, ownership and configured route;
 host loading stays `not_verified`.
 
-Setup requests (`mask.setup-request.v1`) include `paths.native_role_lock` and
+A descriptor can add `scopes.user` to declare a complete personal-scope contract.
+The top-level `inputs`, `native_roles`, `setup`, `retired_paths` and
+`compatible_locks` retain their project meaning. The user contract requires
+`inputs` and `native_roles`, accepts the same optional fields, and has no
+`schema_version` or nested `scopes`. Fields are not merged. Without `scopes.user`,
+the original contract applies to both scopes. Only the `user` override is
+accepted, and both contracts are validated even when only one is selected.
+The user override has a distinct contract fingerprint, so a project lock cannot
+automatically vouch for personal roles.
+
+For example, a package can declare project configuration inputs at the top level
+and `inputs: []` with a separate setup action under `scopes.user`. Personal setup
+then prepares shared roles without requiring a Git repository or project facts
+in the user's home. `mask ensure --user` uses the same consent, staging, collision
+and ownership checks as project setup. Role destinations and lock paths are
+relative to the registered personal home: `.codex/agents/`, `.claude/agents/` and
+`.mask/generated/<skill>/native-roles.lock.json`. A workflow's source/tracker
+binding remains a separate prerequisite checked by that workflow's preflight;
+MASK's generic file readiness does not establish that binding or host loading.
+
+Setup requests (`mask.setup-request.v1`) include `scope` (`project` or `user`), `paths.native_role_lock` and
 `paths.retired_native_role_locks`, relative to the consumer root. Standalone
 tools read the same keys under `data.workflow.paths` in `mask capabilities
 --json`, substituting their skill ID for `{skill}`. These are observational
