@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0101"
 title: "Fetch every referenced tap and update all consumers in one journal"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0099"]
 priority: "P1"
