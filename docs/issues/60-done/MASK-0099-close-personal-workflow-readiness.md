@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0099"
 title: "Close personal workflow readiness against integrated source"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098"]
 closeout_for: ["RFC-MASK-0020"]
 metadata: {"criterion_coverage":["RFC-MASK-0020-AC01","RFC-MASK-0020-AC02","RFC-MASK-0020-AC03","RFC-MASK-0020-AC04"]}
+acceptance: [{"criterion":"RFC-MASK-0020-AC01 complete scope-specific passive descriptor","outcome":"pass","revision":"78cc57cdac4ea493a3e0ba38ca0e51218af7991a","evidence":{"kind":"artifact","detail":"docs/rfcs/MASK-0098.readiness.json"}},{"criterion":"RFC-MASK-0020-AC02 personal readiness with canonical AgentSkills source and separate native loading state","outcome":"pass","revision":"78cc57cdac4ea493a3e0ba38ca0e51218af7991a","evidence":{"kind":"artifact","detail":"docs/rfcs/MASK-0098.readiness.json"}},{"criterion":"RFC-MASK-0020-AC03 project and managed-state safeguards preserved without persistent approval","outcome":"pass","revision":"78cc57cdac4ea493a3e0ba38ca0e51218af7991a","evidence":{"kind":"artifact","detail":"docs/rfcs/MASK-0098.readiness.json"}},{"criterion":"RFC-MASK-0020-AC04 two-scope disposable public CLI at actual MASK and AgentSkills revisions; native loading separately open","outcome":"pass","revision":"78cc57cdac4ea493a3e0ba38ca0e51218af7991a","evidence":{"kind":"artifact","detail":"docs/rfcs/MASK-0098.readiness.json"}}]
 ---
 
 # MASK-0099: Close personal workflow readiness
