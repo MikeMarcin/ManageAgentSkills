@@ -71,4 +71,13 @@ The snapshots are identical in three cases:
   | Catalog `ref` spelled `refs/heads/main` | The v2 CLI comparison |
 
   Limitation: the remote-less CLI test compares against the test module's own `legacy_state` reference, so the generation patch did not reach it.
-- Windows reference run of the existing suite at `1f93ab0`: pending.
+- Windows reference run of the existing suite at `1f93ab0`: **incomplete**. It ran every module except the new one in a single process, with `USERPROFILE` and `MASK_HOME` redirected to empty disposable directories. It was stopped after 32 minutes because progress had slowed to about two tests per minute; it is not an exit criterion for this card.
+  - The owner's real profile snapshot was identical before the run and after the stop. The snapshot covers `~/.mask` file hashes and the skill, agent and launcher entries.
+  - The first 155 results ran before the stop, through `tests.test_pin_migration`. These existing tests failed on unchanged product code; they are not diagnosed here:
+    - `test_compatibility`:
+      - `PolicyModelTests.test_closed_policy_authority_and_device_conditions`: error `Integers must be nonnegative JSON-safe integers`
+      - `CompatibilityTests.test_final_policy_edits_retain_partial_recovery`: two failing subtests
+      - `test_override_is_reasoned_physical_scope_local_and_cannot_enable` and `test_recovery_rederives_links_from_effective_after_policy`: `selection_policy.invalid` or unexpected exit codes
+    - `test_git_integration.GitIntegrationTests.test_interrupted_install_is_recoverable`: `integration.drift`, exit 4 where 8 was expected
+    - `test_pin_migration.MigrationTests.test_project_migration_preview_targets_and_unselected_preservation`: asserts a `/store/v1/` substring against a backslash Windows path
+  - The results after the stop are not a reference. In 209 entries a child process exited `0xC0000142` (DLL initialization failed) while the stop tore down the console. One empty-stdout error in `test_pinned_recovery` came from the same burst. The summary `Ran 374 tests, failures=15, errors=202, skipped=18` therefore overstates failures. Modules from `test_pinned_recovery` onward are unobserved on Windows.
