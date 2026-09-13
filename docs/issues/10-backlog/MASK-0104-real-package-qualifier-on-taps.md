@@ -4,7 +4,7 @@ id: "MASK-0104"
 title: "Requalify the real AgentSkills package and legacy lab natively"
 status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
-depends_on: ["MASK-0101", "MASK-0102", "MASK-0103"]
+depends_on: ["MASK-0101", "MASK-0102", "MASK-0103", "MASK-0107"]
 priority: "P1"
 metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"real-package-qualifier-on-taps","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---

@@ -13,6 +13,11 @@ metadata: {"milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/
 
 **Accepted for implementation (September 12, 2026)** by the owner's `/implement-rfc RFC-MASK-0020` direction; implementing from RFC_BASE_SHA `b92372f` under the adopted plan [plans/tap-only-deployment](plans/tap-only-deployment/milestone-plan.json). Current frontier and per-criterion evidence: closeout [MASK-0106](../issues/10-backlog/MASK-0106-close-tap-only-deployment.md). Nothing is qualified until that closeout records it.
 
+**Owner decisions (September 13, 2026; run `mask-rfc0020-2026-09-12-a`, mandate revisions r2 and r3).**
+- An offline install of a bare ID before its only tap is fetched refuses `source.unresolved`, naming the tap. `lock.resolution_required` is the offline refusal for a qualified `SOURCE/ID`. Retained case B04 is read with this decision; the retained packet is unchanged.
+- Taps keep exact bytes. MASK disables Git line-ending conversion for tap operations by default; only an explicit opt-in at tap registration enables `core.autocrlf`. This is tracked on [MASK-0107](../issues/10-backlog/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it.
+- The remaining d2 follow-up candidates are filed outside this RFC as [MASK-0108](../issues/10-backlog/MASK-0108-authoring-checkout-branch-refusal.md), [MASK-0109](../issues/10-backlog/MASK-0109-ensure-cold-dry-run-plan-hash.md) and [MASK-0110](../issues/10-backlog/MASK-0110-refusal-after-retained-preparation.md).
+
 Amends applicable current behavior from RFC-MASK-0003 (`init --source`, shared
 checkout `update`), RFC-MASK-0007 (a v2 catalog that still requires a legacy
 checkout binding), RFC-MASK-0008 (the legacy live-checkout mode "remains

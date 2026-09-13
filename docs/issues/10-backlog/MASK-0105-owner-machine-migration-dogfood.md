@@ -4,7 +4,7 @@ id: "MASK-0105"
 title: "Migrate the owner's real machine and personal scope (attended)"
 status: "Backlog"
 rfcs: ["RFC-MASK-0020"]
-depends_on: ["MASK-0102", "MASK-0103"]
+depends_on: ["MASK-0102", "MASK-0103", "MASK-0107"]
 priority: "P1"
 metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"owner-machine-migration-dogfood","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
