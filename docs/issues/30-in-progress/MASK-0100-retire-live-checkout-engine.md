@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0100"
 title: "Remove legacy paths, commands and add the migration gate"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0099"]
 priority: "P1"
