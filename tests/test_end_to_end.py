@@ -32,7 +32,12 @@ def verify(program):
             return data
         capabilities = call('capabilities')['data']
         assert capabilities
-        call('init', '--source', source); call('config', 'show'); call('source', 'status')
+        # Legacy live-checkout starting state until MASK-0100/0101 retires this behavior: the v1 bytes the removed init --source wrote.
+        from types import SimpleNamespace
+        from tests.legacy_support import legacy_state, v1_config, write_json
+        write_json(home / 'config.json', v1_config(SimpleNamespace(clone=source)))
+        write_json(home / 'state.json', legacy_state())
+        call('config', 'show'); call('source', 'status')
         call('project', 'init', '--project', project); call('project', 'register', project)
         preview = call('project', 'require', 'alpha', '--project', project, '--apply', '--dry-run')
         call('project', 'require', 'alpha', '--project', project, '--apply', '--expect-plan-hash', preview['data']['plan_hash'])
@@ -84,26 +89,34 @@ class EndToEndTests(unittest.TestCase):
         contexts = Path(os.environ['MASK_CONTEXT_ROOT']).resolve()
         with tempfile.TemporaryDirectory(prefix='mask-context-') as temporary:
             base = Path(temporary).resolve(); source = base / 'AgentSkills'; source.mkdir()
-            subprocess.run(['git', '-C', str(source), 'init', '-b', 'main'], capture_output=True, check=True)
+            def git(root, *args):
+                subprocess.run(['git', '-C', str(root), *map(str, args)], capture_output=True, check=True)
+            git(source, 'init', '-b', 'main'); git(source, 'config', 'user.name', 'Fixture'); git(source, 'config', 'user.email', 'fixture@example.invalid')
             shutil.copytree(shared, source / 'skills/implement-rfc')
+            git(source, 'add', 'skills'); git(source, 'commit', '-q', '-m', 'shared skill fixture')
+            upstream = base / 'upstream' / 'AgentSkills.git'; upstream.parent.mkdir()
+            git(base, 'init', '-q', '--bare', '-b', 'main', upstream); git(source, 'push', '-q', upstream, 'main')
             program = Path(__file__).resolve().parents[1] / 'mask.py'
             home = base / 'machine'
             def call(*args):
                 run = subprocess.run([sys.executable, '-B', str(program), '--home', str(home), '--json', *map(str,args)], capture_output=True, encoding='utf-8')
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
                 return json.loads(run.stdout)
-            call('init', '--source', source)
+            call('tap', 'add', 'agentskills', upstream)
+            store = (home / 'store' / 'v1').resolve()
             facts = []
             for name in ('ManageAgentSkills', 'AgentSkills'):
                 root = base / ('consumer ' + name); root.mkdir()
-                subprocess.run(['git', '-C', str(root), 'init', '-b', 'main'], capture_output=True, check=True)
+                git(root, 'init', '-b', 'main')
                 target = root / '.mask/skill-config/implement-rfc'; target.mkdir(parents=True)
                 for filename in ('project.json', 'project.md'):
                     shutil.copyfile(contexts / name / filename, target / filename)
-                call('project', 'init', '--project', root); call('project','register',root)
-                call('project','require','implement-rfc','--project',root,'--apply')
+                call('install', 'implement-rfc', '--project', root)
                 link = root / '.agents/skills/implement-rfc'
-                self.assertTrue(link.is_symlink()); self.assertTrue(os.path.samefile(link,source / 'skills/implement-rfc'))
+                record = json.loads((home / 'state.json').read_text(encoding='utf-8'))['projects'][str(root)]
+                store_link = record['links']['.agents/skills/implement-rfc']['link_text']
+                self.assertTrue(link.is_symlink()); self.assertTrue(link.resolve().is_relative_to(store))
+                self.assertTrue(os.path.samefile(link, store_link))
                 code = "import sys,json;sys.path.insert(0,sys.argv[1]);from project_config import resolve_context;c=resolve_context();print(json.dumps([c.config['project'],str(c.repo_root),str(c.asset_root)]))"
                 run = subprocess.run([sys.executable,'-B','-c',code,str(link / 'scripts')],cwd=root,capture_output=True,encoding='utf-8')
                 self.assertEqual(run.returncode,0,run.stderr); facts.append(json.loads(run.stdout))

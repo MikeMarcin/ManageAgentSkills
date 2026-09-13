@@ -13,7 +13,7 @@ class DeploymentContracts(SetupFixture):
         value = json.loads(path.read_text())
         value.update(changes)
         path.write_text(json.dumps(value, indent=2) + '\n')
-        self.commit('deployment contract fixture')
+        return self.commit('deployment contract fixture')
 
     def repair(self, *args):
         return self.machine('ensure', '--project', self.project, '--repair', *args)
@@ -131,9 +131,12 @@ class DeploymentContracts(SetupFixture):
                         dict(retired_paths=['.mask/generated/implement-rfc/native-roles.lock.json']),
                         dict(compatible_locks=[dict(contract_sha256='0' * 64, role_inputs_sha256='bogus')])]:
             self.descriptor(retired_paths=[], compatible_locks=[])
-            self.descriptor(**changes)
-            result = self.repair()
+            locked = (self.project / '.mask.lock.json').read_bytes()
+            # A pinned consumer adopts package bytes only through update, which plans the descriptor and fails closed;
+            # the consumer keeps its prior lock, so no later repair can act on the invalid declaration.
+            result = self.descriptor(**changes)
             self.assertFalse(result['ok'], changes)
+            self.assertEqual((self.project / '.mask.lock.json').read_bytes(), locked, changes)
             self.assertEqual(self.launches(), 0)
 
     def test_cleanup_crash_can_roll_back_or_complete_without_setup(self):

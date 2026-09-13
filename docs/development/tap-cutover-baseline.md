@@ -53,6 +53,8 @@ If legacy reading moves into the migration modules (MASK-0100 and MASK-0102), th
 
 Each CLI test then removes exactly the files and links the program wrote, has the builder write the same state again, and compares a snapshot. The snapshot covers the bytes of `config.json`, `state.json`, `user.json` and each declaration, plus every link text.
 
+MASK-0099 removed `init --source` (it now exits 2 `invocation.invalid`). The `init --source` rows above were observed on the base program at `82b4200`, where its configuration and state bytes equalled `v1_config` and `legacy_state`. From MASK-0099 on, `LiveCheckoutBaseline` starts from those builder bytes. The remaining legacy commands (`install`, `source migrate`, `tap add`, `migrate --to-pinned`, `update`) still run through the CLI and are compared as before. Test fixtures that exercise retired behavior use the same bytes through `tests/support.py` `legacy_init` and `tests/public_support.py` `legacy_bootstrap`.
+
 The snapshots are identical in three cases:
 - the v1 machine with a project and a personal scope
 - the v2 machine with an extra tap
@@ -81,3 +83,22 @@ The snapshots are identical in three cases:
     - `test_git_integration.GitIntegrationTests.test_interrupted_install_is_recoverable`: `integration.drift`, exit 4 where 8 was expected
     - `test_pin_migration.MigrationTests.test_project_migration_preview_targets_and_unselected_preservation`: asserts a `/store/v1/` substring against a backslash Windows path
   - The results after the stop are not a reference. In 209 entries a child process exited `0xC0000142` (DLL initialization failed) while the stop tore down the console. One empty-stdout error in `test_pinned_recovery` came from the same burst. The summary `Ran 374 tests, failures=15, errors=202, skipped=18` therefore overstates failures. Modules from `test_pinned_recovery` onward are unobserved on Windows.
+- **Complete Windows reference at `d05bad8` (MASK-0099, dispatch d2):** product sources are identical to RFC_BASE_SHA.
+  - Method:
+    - The reference ran in a disposable clone. Each of the 43 `tests.test_*` modules ran as its own `python -B -m unittest -v tests.MODULE` process, three at a time, for 27.6 minutes of wall time.
+    - Each process had `MASK_HOME`, `USERPROFILE` and `HOME` redirected to empty per-module directories.
+    - The owner's profile snapshot (`~/.mask` hashes and the skill, agent and launcher entries) was identical before and after.
+  - Result: 381 tests, 19 skipped.
+  - Load defect: `tests.test_imports` and `tests.test_provenance` cannot load in a process of their own. `mask_provenance` → `mask_git` → `mask_fs` → `mask_pinned` → `mask_resolve` imports `regular_bytes` back from the half-initialized `mask_provenance`. A single discovery process hides this because another module imports `mask_resolve` first. With `mask_resolve` imported first, those modules ran 8 and 6 tests OK.
+  - Ten existing tests fail on unchanged code. The first six are the ones above. The last four are in modules the stopped run never reached:
+    1. `test_compatibility`: `PolicyModelTests.test_closed_policy_authority_and_device_conditions`
+    2. `test_compatibility`: `test_final_policy_edits_retain_partial_recovery`
+    3. `test_compatibility`: `test_override_is_reasoned_physical_scope_local_and_cannot_enable`
+    4. `test_compatibility`: `test_recovery_rederives_links_from_effective_after_policy`
+    5. `test_git_integration.GitIntegrationTests.test_interrupted_install_is_recoverable`: `recover --complete` exits 4 `integration.drift` where 8 is expected
+    6. `test_pin_migration.MigrationTests.test_project_migration_preview_targets_and_unselected_preservation`
+    7. `test_reconcile_plan.PlannerTests.test_all_unavailable_and_poisoned_state`: `KeyError` on the `project with ü spaces` registry key
+    8. `test_pinned_update.UpdateTests.test_isolated_publication_exact_paths_and_separate_push`: the publication commit also lists `skills/alpha/SKILL.md`
+    9. `test_selection_conflicts.PublicConflictTests.test_public_scope_shadowing_warns_when_the_scopes_resolve_to_different_targets`: `git commit` in a second clone exits 128
+    10. `test_workflow_roles.StaticRoles.test_fresh_clone_with_tracked_roles_passes_without_adoption`: `ensure` reports every tracked role in a fresh clone as `modified`
+  - Root causes are recorded on MASK-0099. Scratch logs and the runner are not retained in the repository.

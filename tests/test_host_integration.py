@@ -6,14 +6,27 @@ import shutil
 import shlex
 import sys
 
-from tests.support import Fixture, ENTRY
+from tests.support import Fixture, ENTRY, TAP
 
 
 class HostIntegrationTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.declare()
+        self.call('source', 'fetch', TAP)
+        (self.project / '.mask.json').write_text(json.dumps(self.selection(['alpha'])) + '\n')
+        self.call('lock', '--project', self.project)
+        self.call('source', 'fetch', '--locked', '--offline', '--project', self.project)
+
+    def selection(self, skills):
+        return dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id=identifier) for identifier in skills])
+
+    def register_user(self, personal, skills):
+        """A registered personal consumer with a locked v2 selection and hydrated artifacts that is not yet deployed."""
+        (self.home / 'user.json').write_text(json.dumps(self.selection(skills)) + '\n')
+        self.call('lock', '--user')
+        self.call('source', 'fetch', '--locked', '--offline', '--user')
+        return self.call('user', 'register', '--user-home', personal)
 
     def hook(self, agent, cwd=None):
         run = subprocess.run([sys.executable, str(ENTRY.parent / 'mask_integration.py'), 'host-hook', str(self.home), agent],
@@ -52,9 +65,7 @@ class HostIntegrationTests(Fixture):
         self.call('integration', 'approve', '--project', self.project)
         personal = self.base / 'personal'
         personal.mkdir()
-        self.call('user', 'init')
-        self.call('user', 'require', 'beta')
-        self.call('user', 'register', '--user-home', personal)
+        self.register_user(personal, ['beta'])
         leaf = personal / '.agents/skills/beta'
         leaf.mkdir(parents=True)
         before = self.snapshot()
@@ -71,9 +82,7 @@ class HostIntegrationTests(Fixture):
     def test_no_project_session_checks_only_registered_personal_scope(self):
         personal = self.base / 'personal'
         personal.mkdir()
-        self.call('user', 'init')
-        self.call('user', 'require', 'alpha')
-        self.call('user', 'register', '--user-home', personal)
+        self.register_user(personal, ['alpha'])
         result = self.call('ensure', '--event', 'startup', cwd=self.base)
         self.assertEqual(result['data']['projects'], [])
         self.assertEqual(len(result['data']['users']), 1)
@@ -134,8 +143,7 @@ class HostIntegrationTests(Fixture):
     def test_user_adapter_readies_a_future_approved_clone(self):
         personal = self.base / 'personal'
         personal.mkdir()
-        self.call('user', 'init')
-        self.call('user', 'register', '--user-home', personal)
+        self.register_user(personal, [])
         self.call('integration', 'enable', '--agent', 'claude')
         settings = personal / '.claude/settings.json'
         command = json.loads(settings.read_text())['hooks']['SessionStart'][0]['hooks'][0]['command']
@@ -144,7 +152,7 @@ class HostIntegrationTests(Fixture):
         boundary.mkdir()
         self.git(self.project, 'config', 'user.name', 'Fixture')
         self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
-        self.git(self.project, 'add', '.mask.json')
+        self.git(self.project, 'add', '.mask.json', '.mask.lock.json')
         self.git(self.project, 'commit', '-m', 'declaration')
         self.call('integration', 'approve', '--repository', str(self.project), '--under', boundary)
         clone = boundary / 'new-clone'

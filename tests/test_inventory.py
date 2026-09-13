@@ -9,9 +9,10 @@ from tests.support import Fixture
 
 
 class InventoryTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (legacy inventory rows)."""
     def setUp(self):
         super().setUp()
-        self.init()
+        self.legacy_init()
         self.declare()
         self.call('project', 'register', self.project)
 

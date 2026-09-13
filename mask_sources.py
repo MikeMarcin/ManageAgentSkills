@@ -106,11 +106,13 @@ def package_path(value):
 
 
 def validate_config(value):
-    if not isinstance(value['sources'], dict) or not 1 <= len(value['sources']) <= 256:
+    legacy = value['schema_version'] == 2
+    if not isinstance(value['sources'], dict) or not (1 if legacy else 0) <= len(value['sources']) <= 256:
         c.fail('config.invalid', 'Expected a bounded approved source catalog.')
-    alias(value['legacy_source'])
-    if value['legacy_source'] not in value['sources']:
-        c.fail('config.invalid', 'The legacy source binding is missing.')
+    if legacy:
+        alias(value['legacy_source'])
+        if value['legacy_source'] not in value['sources']:
+            c.fail('config.invalid', 'The legacy source binding is missing.')
     for name, entry in value['sources'].items():
         alias(name)
         c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), family='source')
@@ -122,8 +124,7 @@ def validate_config(value):
             c.fail('config.invalid', 'Source cache must be an absolute machine-local path.')
         if entry['authoring'] is not None and (not isinstance(entry['authoring'], str) or not Path(entry['authoring']).is_absolute()):
             c.fail('config.invalid', 'Authoring checkout must be an absolute machine-local path.')
-    legacy = value['sources'][value['legacy_source']]
-    if legacy['authoring'] != value['source']['root']:
+    if legacy and value['sources'][value['legacy_source']]['authoring'] != value['source']['root']:
         c.fail('config.invalid', 'Legacy source migration must preserve its authoring root.')
 
 
@@ -138,7 +139,7 @@ def binding(home, name, transport, ref='main', packages='skills', authoring=None
 
 
 def selected(config, name):
-    if config['schema_version'] != 2:
+    if config['schema_version'] == 1:
         c.fail('source.migration_required', 'Preview source migrate before using the multi-source catalog.', 4)
     alias(name)
     if name not in config['sources']:
@@ -301,7 +302,7 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None):
 
 
 def references(home, config, state, name):
-    if name == config['legacy_source']:
+    if name == config.get('legacy_source'):
         return ['legacy source binding']
     result = []
     for key, record in c.consumer_records(state).items():
@@ -323,6 +324,8 @@ def references(home, config, state, name):
 def migrated_config(config, home, name='legacy'):
     proposal = copy.deepcopy(config)
     alias(name)
+    if config['schema_version'] == 3:
+        c.fail('source.legacy_absent', 'This machine has no live checkout to migrate; its taps already form the source catalog.', 4)
     if config['schema_version'] == 1:
         old = config['source']
         root = Path(old['root'])
@@ -337,8 +340,10 @@ def migrated_config(config, home, name='legacy'):
 
 
 def dispatch(args, output, home):
-    original = c.read_text(home / 'config.json')
-    config = c.config(c.parse_json(original))
+    original = c.read_text(home / 'config.json', missing=args.command == 'tap.add')
+    # The first tap bootstraps a machine: it creates the v3 catalog (and empty state) in the same guarded write.
+    bootstrap = original is None
+    config = c.empty_config() if bootstrap else c.config(c.parse_json(original))
     name = getattr(args, 'name', None)
     proposal = copy.deepcopy(config)
     output['data'] = dict(catalog_only=True)
@@ -350,7 +355,7 @@ def dispatch(args, output, home):
         output['data']['migration_required'] = config['schema_version'] == 1
         return
     elif args.command == 'tap.add':
-        if config['schema_version'] != 2:
+        if config['schema_version'] == 1:
             c.fail('source.migration_required', 'Preview source migrate before adding a tap.', 4)
         entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None))
         if entry['authoring'] is not None:
@@ -385,15 +390,19 @@ def dispatch(args, output, home):
             output['data']['resolution_required'] = output['data']['cached_revision'] is None
         return
     proposal = c.config(proposal)
-    plan_hash = c.digest(dict(before=config, after=proposal))
+    plan_hash = c.digest(dict(before=None if bootstrap else config, after=proposal))
     if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
         c.fail('plan.stale', 'Source configuration changed; review a new preview.', 4)
     output['data'].update(config=proposal, plan_hash=plan_hash)
-    output['would_change'] = proposal != config
+    output['would_change'] = bootstrap or proposal != config
     if output['would_change']:
-        output['actions'] = [dict(kind='source.catalog', status='planned')]
+        output['actions'] = ([dict(kind='config.create', status='planned')] if bootstrap else []) + [dict(kind='source.catalog', status='planned')]
         if not output['dry_run']:
+            if bootstrap:
+                c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
             c.atomic_text(home / 'config.json', c.text_json(proposal), original)
+            if bootstrap and c.kind(home / 'state.json') == 'missing':
+                c.atomic_text(home / 'state.json', c.text_json(c.empty_state()), None)
             output.update(changed=True, transaction='committed')
 
 
@@ -589,7 +598,7 @@ def url_selection(tail, kind, refs, requested_ref, requested_path, default_ref):
 
 def inspect(args, output, home):
     config = c.config(c.read_json(home / 'config.json'))
-    if config['schema_version'] != 2:
+    if config['schema_version'] == 1:
         c.fail('source.migration_required', 'Migrate the source catalog before URL inspection.', 4)
     name, entry, tail, kind = locate_url(config, args.url)
     root = cached(home, name, entry)

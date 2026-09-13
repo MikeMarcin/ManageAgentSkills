@@ -440,7 +440,7 @@ def verify_upstream(config, home, record, data):
 def dispatch(args, output, home):
     original = c.read_text(home / 'config.json')
     config = c.config(c.parse_json(original))
-    if config['schema_version'] != 2:
+    if config['schema_version'] == 1:
         c.fail('source.migration_required', 'Migrate the source catalog before importing or querying provenance.', 4)
     if args.command == 'skill.import':
         return import_skill(args, output, home, config, original)

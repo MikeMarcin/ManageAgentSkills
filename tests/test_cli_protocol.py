@@ -28,7 +28,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(any(a['name'] == 'ids' and a['repeatable'] for a in commands['project.require']['arguments']))
 
     def test_parser_errors_are_json(self):
-        for args in [('wat',), ('init',), ('capabilities', '--wat'), ('project', 'set'), ('project', 'set', '--clear', '--skill', 'foo'), ('project', 'register', '.', '--project', '.')]:
+        for args in [('wat',), ('init', '--source', '.'), ('capabilities', '--wat'), ('project', 'set'), ('project', 'set', '--clear', '--skill', 'foo'), ('project', 'register', '.', '--project', '.')]:
             with self.subTest(args=args):
                 run, data = self.invoke(*args, '--json')
                 self.assertEqual(run.returncode, 2)

@@ -20,11 +20,20 @@ except ImportError:  # Windows: prompts are exercised through a recorded native 
     pty = None
 
 from tests.public_support import ENTRY, PublicFixture
+from tests.support import TAP
 from tests.test_update_task import SharedSourceFixture
 
 
 class ReadmeRecipes(PublicFixture):
     """The README from "Install once" to "Everyday commands" on a fresh machine."""
+
+    def bootstrap(self):
+        """Nothing: README runs ``self install`` before the one-time ``tap add``, which each journey replays itself."""
+
+    def select_source(self):
+        """README "Install once": approve the skills upstream as a tap; the first command that creates machine config."""
+        self.assertFalse((self.home / 'config.json').exists())
+        return self.mask('tap', 'add', TAP, self.upstream)
 
     def setUp(self):
         super().setUp()
@@ -78,9 +87,11 @@ class ReadmeRecipes(PublicFixture):
         return sorted(path.relative_to(root).as_posix() for path in root.glob('.*/skills/*') if path.is_symlink())
 
     def test_install_once_then_in_your_project(self):
-        selected = self.mask('init', '--source', self.source)
+        # README: `mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git`, with the fixture's local bare upstream for the URL.
+        selected = self.select_source()
         self.assertEqual(selected.returncode, 0, selected.stderr)
         self.assertFalse(self.parses_as_result_envelope(selected.stdout))
+        self.assertTrue((self.home / 'config.json').is_file())
 
         # The package declares consumer inputs this fresh project does not have yet: the links and
         # static roles are committed, but install cannot report success (MASK-0090); it names them.
@@ -110,6 +121,7 @@ class ReadmeRecipes(PublicFixture):
 
     @unittest.skipUnless(pty, 'POSIX pseudoterminal required; native Windows console is recorded separately')
     def test_ensure_asks_once_in_the_terminal_and_completes(self):
+        self.assertEqual(self.select_source().returncode, 0)
         installed = self.mask('install', 'alpha')
         self.assertEqual(installed.returncode, 0, installed.stderr)
         (self.project / '.claude/skills/alpha').unlink()  # Something to reconcile.
@@ -130,6 +142,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertIn('confirmation.required', piped.stderr)
 
     def test_personal_scope_and_remove(self):
+        self.assertEqual(self.select_source().returncode, 0)
         personal = self.mask('install', 'alpha', '--user')
         self.assertEqual(personal.returncode, 0, personal.stderr)
         self.assertEqual(self.links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
@@ -143,17 +156,20 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         removed = self.mask('remove', 'beta')
         self.assertEqual(removed.returncode, 0, removed.stderr)
-        self.assertIn('removed: beta', removed.stdout)
+        self.assertIn(f'removed: {TAP}/beta', removed.stdout)
         self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
         self.assertEqual(self.links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
 
 
 class ReadmeUpdate(SharedSourceFixture):
-    """``mask update`` and ``mask update --dry-run`` as the README describes them."""
+    """``mask update`` and ``mask update --dry-run`` as the README describes them.
+
+    Legacy live-checkout starting state (inherited) until MASK-0101 retires the shared-checkout update.
+    """
 
     def test_update_previews_locally_and_applies_in_one_command(self):
         before = self.head()
-        candidate = self.upstream()
+        candidate = self.push_upstream()
         preview = self.human('update', '--dry-run')
         self.assertEqual(preview.returncode, 0, preview.stderr)
         self.assertEqual(self.tracking(), before)  # Preview did not fetch.

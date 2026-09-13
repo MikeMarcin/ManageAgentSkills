@@ -3,16 +3,26 @@ import os
 from pathlib import Path
 
 import mask_core as c
-from tests.support import Fixture
+from tests.support import TAP, Fixture
+
+ALPHA = TAP + '/alpha'
+
+
+def authoring_init(fixture):
+    """Bootstrap the fixture tap with ``fixture.source`` as its approved authoring checkout; its origin names the tap identity."""
+    fixture.git(fixture.source, 'remote', 'add', 'origin', str(fixture.upstream))
+    return fixture.call('tap', 'add', TAP, fixture.upstream, '--checkout', fixture.source)
 
 
 class UpdateTests(Fixture):
+    # Development links and publication from the fixture tap need its approved authoring checkout; the rest start from init().
+    AUTHORING = {'test_dev_link_dirty_scope_and_guarded_return', 'test_development_recovery_binds_live_authoring_and_typed_extension',
+                 'test_publication_index_mapping_and_retained_object_failure'}
+
     def setUp(self):
         super().setUp()
-        self.init()
-        self.declare()
-        self.call('project', 'register', '--apply')
-        self.call('migrate', '--to-pinned')
+        authoring_init(self) if self._testMethodName in self.AUTHORING else self.init()
+        self.install('alpha')
 
     def test_selected_update_isolates_consumers_and_uses_cached_candidate(self):
         other = self.base / 'other'
@@ -23,24 +33,23 @@ class UpdateTests(Fixture):
         before = c.read_json(self.home / 'state.json')['projects'][str(other)]
         old = os.readlink(other / '.agents/skills/alpha')
         (self.source / 'skills/alpha/version').write_bytes(b'raw\r\n')
-        self.git(self.source, 'add', '.')
-        self.git(self.source, 'commit', '-m', 'next')
-        self.call('source', 'fetch', 'legacy')
+        self.publish('next')
+        self.call('source', 'fetch', TAP)
         snapshot = self.snapshot()
-        preview = self.call('update', '--project', self.project, '--skill', 'legacy/alpha', '--dry-run')
+        preview = self.call('update', '--project', self.project, '--skill', ALPHA, '--dry-run')
         self.assertEqual(snapshot, self.snapshot())
-        self.call('update', '--project', self.project, '--skill', 'legacy/alpha', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.call('update', '--project', self.project, '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertEqual(c.read_json(self.home / 'state.json')['projects'][str(other)], before)
         self.assertEqual(os.readlink(other / '.agents/skills/alpha'), old)
         self.assertNotEqual(os.readlink(self.project / '.agents/skills/alpha'), old)
         self.assertFalse(self.call('update', '--project', self.project)['changed'])
 
     def test_all_selected_skill_preserves_disjoint_consumer(self):
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         other = self.base / 'beta-only'
         other.mkdir()
         declaration = c.read_json(self.project / '.mask.json')
-        declaration['skills'] = [dict(source='legacy', id='beta')]
+        declaration['skills'] = [dict(source=TAP, id='beta')]
         (other / '.mask.json').write_text(json.dumps(declaration))
         self.call('lock', '--project', other)
         self.call('project', 'register', '--project', other, '--apply')
@@ -50,17 +59,16 @@ class UpdateTests(Fixture):
         alpha_link = os.readlink(self.project / '.agents/skills/alpha')
         for identifier in ('alpha', 'beta'):
             (self.source / 'skills' / identifier / 'new-version').write_text(identifier)
-        self.git(self.source, 'add', '.')
-        self.git(self.source, 'commit', '-m', 'both packages move')
-        self.call('source', 'fetch', 'legacy')
+        self.publish('both packages move')
+        self.call('source', 'fetch', TAP)
         before = self.snapshot()
-        for skills in (['legacy/absent'], ['legacy/alpha', 'legacy/alpha']):
+        for skills in ([TAP + '/absent'], [ALPHA, ALPHA]):
             arguments = [operand for skill in skills for operand in ('--skill', skill)]
             self.call('update', '--all', *arguments, code=2)
             self.assertEqual(before, self.snapshot())
-        preview = self.call('update', '--all', '--skill', 'legacy/alpha', '--dry-run')
+        preview = self.call('update', '--all', '--skill', ALPHA, '--dry-run')
         self.assertEqual(before, self.snapshot())
-        self.call('update', '--all', '--skill', 'legacy/alpha', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.call('update', '--all', '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertNotEqual(os.readlink(self.project / '.agents/skills/alpha'), alpha_link)
         self.assertEqual(c.read_json(self.home / 'state.json')['projects'][str(other)], record)
         self.assertEqual((other / '.mask.lock.json').read_bytes(), lock_bytes)
@@ -74,18 +82,18 @@ class UpdateTests(Fixture):
         self.call('project', 'register', '--project', other, '--apply')
         old = os.readlink(self.project / '.agents/skills/alpha')
         (self.source / 'skills/alpha/local').write_text('dirty edit')
-        preview = self.call('source', 'dev-link', 'legacy/alpha', '--project', self.project, '--authoring-root', self.source, '--dry-run')
-        self.call('source', 'dev-link', 'legacy/alpha', '--project', self.project, '--authoring-root', self.source, '--expect-plan-hash', preview['data']['plan_hash'])
+        preview = self.call('source', 'dev-link', ALPHA, '--project', self.project, '--authoring-root', self.source, '--dry-run')
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--authoring-root', self.source, '--expect-plan-hash', preview['data']['plan_hash'])
         state = c.state(c.read_json(self.home / 'state.json'))
         self.assertEqual(state['projects'][str(self.project)]['mode'], 'dev-link')
         self.assertEqual(os.readlink(other / '.agents/skills/alpha'), old)
         self.assertFalse(self.call('project', 'show')['data']['reproducible'])
         self.assertFalse(self.call('inventory')['data']['complete'])
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'dev_link.active')
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'dev_link.active')
         (self.source / 'skills/alpha/local').write_text('later edit')
-        self.call('source', 'dev-link', 'legacy/alpha', '--project', self.project, '--to-pinned')
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--to-pinned')
         self.assertEqual(os.readlink(self.project / '.agents/skills/alpha'), old)
         self.assertEqual((self.source / 'skills/alpha/local').read_text(), 'later edit')
         self.assertFalse(self.call('apply')['changed'])
@@ -101,6 +109,9 @@ class UpdateTests(Fixture):
         (self.source / 'unrelated').write_text('staged elsewhere')
         self.git(self.source, 'add', 'unrelated')
         index = self.git(self.source, 'ls-files', '--stage')
+        # Publication hashes unfiltered working bytes; undo the Windows CRLF smudge of the committed LF fixture text.
+        skill = self.source / 'skills/alpha/SKILL.md'
+        skill.write_bytes(skill.read_bytes().replace(b'\r\n', b'\n'))
         (self.source / 'skills/alpha/published').write_bytes(b'raw\r\n')
         marker = self.base / 'executed-marker'
         helper = self.base / 'helper.sh'
@@ -124,19 +135,20 @@ class UpdateTests(Fixture):
         self.call('source', 'publish', 'publisher', '--paths', '../unrelated', '--commit', code=3)
 
     def test_fixed_commit_and_rebound_selector_updates(self):
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         original = c.read_json(self.project / '.mask.lock.json')['packages'][0]['commit']
         self.git(self.source, 'tag', 'release')
-        self.call('source', 'inspect', 'legacy', '--ref', 'refs/tags/release')
+        self.git(self.source, 'push', '-q', str(self.upstream), 'refs/tags/release')
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
         declaration = c.read_json(self.project / '.mask.json')
         declaration['skills'][0]['version'] = {'ref': 'refs/tags/release'}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
         self.call('update', '--project', self.project)
         (self.source / 'skills/alpha/new').write_text('new')
-        self.git(self.source, 'add', '.')
-        self.git(self.source, 'commit', '-m', 'tag moved')
+        self.publish('tag moved')
         self.git(self.source, 'tag', '-f', 'release')
-        self.call('source', 'inspect', 'legacy', '--ref', 'refs/tags/release')
+        self.git(self.source, 'push', '-q', '--force', str(self.upstream), 'refs/tags/release')
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
         self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'lock.ref_rebound')
         self.call('update', '--project', self.project, '--allow-ref-rebind')
         declaration['skills'][0]['version'] = {'commit': original}
@@ -147,11 +159,13 @@ class UpdateTests(Fixture):
 
 
 class LegacyUpdateTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100/0101 retires this behavior (no-name fetch and shared-checkout update)."""
+
     def test_empty_registry_and_unqualified_shared_update_remain_legacy(self):
         remote = self.base / 'AgentSkills.git'
         self.git(self.base, 'clone', '--bare', str(self.source), str(remote))
         self.git(self.source, 'remote', 'add', 'origin', str(remote))
-        self.init()
+        self.legacy_init()
         self.call('source', 'fetch')
         self.assertFalse(self.call('update', '--dry-run')['would_change'])
         self.declare()
@@ -160,8 +174,8 @@ class LegacyUpdateTests(Fixture):
         targeted = self.call('update', '--project', self.project)
         self.assertEqual(targeted['data']['scope']['affected'], [str(self.project)])
         self.assertNotIn('confirmation', targeted['data'])
-        self.assertEqual(self.call('update', '--project', self.project, '--skill', 'legacy/alpha', code=4)['error']['code'], 'migration.required')
-        clone = self.base / 'upstream'
+        self.assertEqual(self.call('update', '--project', self.project, '--skill', ALPHA, code=4)['error']['code'], 'migration.required')
+        clone = self.base / 'upstream clone'  # The fixture's tap upstream already occupies base/upstream.
         self.git(self.base, 'clone', str(remote), str(clone))
         self.git(clone, 'config', 'user.name', 'Fixture')
         self.git(clone, 'config', 'user.email', 'fixture@example.invalid')
@@ -190,7 +204,7 @@ class RecoveryUpdateTests(UpdateTests):
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
 
     def test_changed_selector_journal_binds_before_bytes(self):
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         commit = c.read_json(self.project / '.mask.lock.json')['packages'][0]['commit']
         declaration = c.read_json(self.project / '.mask.json')
         declaration['skills'][0]['version'] = {'commit': commit}
@@ -207,7 +221,7 @@ class RecoveryUpdateTests(UpdateTests):
 
     def test_development_recovery_binds_live_authoring_and_typed_extension(self):
         import copy
-        self.crash(['source', 'dev-link', 'legacy/alpha', '--project', str(self.project), '--authoring-root', str(self.source)], 'link_unlinked')
+        self.crash(['source', 'dev-link', ALPHA, '--project', str(self.project), '--authoring-root', str(self.source)], 'link_unlinked')
         journal = c.read_json(self.home / 'pending.json')
         bad = copy.deepcopy(journal)
         bad.pop('development')
@@ -224,9 +238,8 @@ class RecoveryUpdateTests(UpdateTests):
 
     def test_cold_update_metadata_and_source_effects_preserve_intent(self):
         (self.source / 'skills/alpha/mask-skill.json').write_text(json.dumps(dict(schema_version=1, agents='generic')))
-        self.git(self.source, 'add', '.')
-        self.git(self.source, 'commit', '-m', 'cold generic update')
-        self.call('source', 'fetch', 'legacy')
+        self.publish('cold generic update')
+        self.call('source', 'fetch', TAP)
         before = self.snapshot()
         preview = self.call('update', '--project', self.project, '--dry-run')
         self.assertEqual(before, self.snapshot())
@@ -240,7 +253,7 @@ class RecoveryUpdateTests(UpdateTests):
         mapping = self.source / 'mask-source.json'
         mapping.write_text(json.dumps(dict(schema_version=1, packages={'alpha': 'skills/alpha'})))
         before = self.snapshot()
-        self.assertEqual(self.call('source', 'publish', 'legacy', '--paths', 'skills/alpha', '--commit', code=4)['error']['code'], 'source.publish_index_required')
+        self.assertEqual(self.call('source', 'publish', TAP, '--paths', 'skills/alpha', '--commit', code=4)['error']['code'], 'source.publish_index_required')
         self.assertEqual(before, self.snapshot())
         self.git(self.source, 'add', 'mask-source.json')
         self.git(self.source, 'commit', '-m', 'selected committed mapping')
@@ -251,7 +264,7 @@ class RecoveryUpdateTests(UpdateTests):
                 c.fail('fixture.write_tree', 'Injected tree failure.', 5)
             return original(root, *args, **kwargs)
         parser, leaves = mask.make_parser()
-        args = parser.parse_args(['source', 'publish', 'legacy', '--paths', 'skills/alpha', '--commit', '--home', str(self.home)])
+        args = parser.parse_args(['source', 'publish', TAP, '--paths', 'skills/alpha', '--commit', '--home', str(self.home)])
         output = mask.result('source.publish')
         with patch.object(c, 'git', side_effect=fail), self.assertRaises(c.MaskError):
             mask.dispatch(args, output, leaves)
@@ -261,7 +274,7 @@ class RecoveryUpdateTests(UpdateTests):
         self.assertTrue(output['data']['temporary_worktree_removed'])
         self.assertIsNone(output['data']['created_commit'])
         self.assertEqual(output['data']['phase'], 'objects')
-        result = self.call('source', 'publish', 'legacy', '--paths', 'skills/alpha', '--commit')
+        result = self.call('source', 'publish', TAP, '--paths', 'skills/alpha', '--commit')
         self.assertIsNotNone(result['data']['created_commit'])
         self.assertFalse(result['data']['pushed'])
 

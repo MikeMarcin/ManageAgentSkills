@@ -5,14 +5,27 @@ from unittest.mock import patch
 
 import mask_core as c
 import mask_fs as fs
-from tests.support import Fixture, ENTRY
+from tests.support import Fixture, ENTRY, TAP
 
 
 class EnsureTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.declare()
+        self.call('source', 'fetch', TAP)
+        self.declare_pinned()
+
+    def declare_pinned(self, skills=('alpha',), root=None):
+        """A v2 declaration of the fixture tap, its lock and its hydrated store artifacts; nothing is registered or linked.
+
+        Hydration is part of the starting state (the legacy checkout already held the packages), so a refused
+        readiness call cannot pass off unlocked artifact preparation as a consumer effect.
+        """
+        root = root or self.project
+        (root / '.mask.json').write_text(json.dumps(dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id=identifier) for identifier in skills])) + '\n')
+        locked = self.call('lock', '--project', root)
+        self.call('source', 'fetch', '--locked', '--offline', '--project', root)
+        return locked
 
     def approve(self, *options):
         return self.call('integration', 'approve', '--project', self.project, *options)
@@ -32,7 +45,7 @@ class EnsureTests(Fixture):
         self.assertEqual(before, self.snapshot())
         result = self.call('ensure', '--offline')
         self.assertTrue(result['changed'])
-        self.assertEqual(result['data']['readiness'], 'ready_legacy_unpinned')
+        self.assertEqual(result['data']['readiness'], 'ready_pinned')
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
         before = self.snapshot()
         self.assertFalse(self.call('ensure')['changed'])
@@ -79,7 +92,7 @@ class EnsureTests(Fixture):
         self.assertEqual(self.call('ensure', '--event', 'post-commit', cwd=nested, code=4)['error']['code'], 'integration.approval_required')
         ordinary = self.base / 'ordinary'
         ordinary.mkdir()
-        (ordinary / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['beta'])))
+        self.declare_pinned(['beta'], root=ordinary)
         self.call('integration', 'approve', '--project', ordinary)
         self.call('ensure', '--project', ordinary)
         self.assertTrue((ordinary / '.agents/skills/beta').is_symlink())
@@ -87,7 +100,7 @@ class EnsureTests(Fixture):
     def test_linked_worktrees_and_root_replacement(self):
         self.git(self.project, 'config', 'user.name', 'Fixture')
         self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
-        self.git(self.project, 'add', '.mask.json')
+        self.git(self.project, 'add', '.mask.json', '.mask.lock.json')
         self.git(self.project, 'commit', '-m', 'declaration')
         self.approve('--linked-worktrees')
         linked = self.base / 'linked'
@@ -97,18 +110,8 @@ class EnsureTests(Fixture):
         moved = self.base / 'original'
         self.project.rename(moved)
         self.project.mkdir()
-        self.declare()
+        self.declare_pinned()
         self.call('ensure', '--project', self.project, code=4)
-
-    def test_selected_package_only_and_no_source_status_scan(self):
-        self.approve()
-        config = c.config(c.read_json(self.home / 'config.json'))
-        state = c.state(c.read_json(self.home / 'state.json'))
-        with patch.object(c, 'package', wraps=c.package) as packages, patch.object(c, 'git', wraps=c.git) as git:
-            planned = fs.plan(config, state, [self.project], register=[str(self.project)], home=self.home, source_status=False)
-        self.assertFalse(planned['blockers'])
-        self.assertEqual([call.args[1] for call in packages.call_args_list], ['alpha'])
-        self.assertFalse(any(call.args[1] == 'status' for call in git.call_args_list))
 
     def test_pending_and_busy_refuse(self):
         self.approve()
@@ -138,7 +141,7 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
     def test_repository_clone_boundary_identity_and_revocation(self):
         self.git(self.project, 'config', 'user.name', 'Fixture')
         self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
-        self.git(self.project, 'add', '.mask.json')
+        self.git(self.project, 'add', '.mask.json', '.mask.lock.json')
         self.git(self.project, 'commit', '-m', 'declaration')
         boundary = self.base / 'clones'
         boundary.mkdir()
@@ -166,22 +169,20 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         boundary.mkdir()
         clone = boundary / 'new'
         self.git(self.base, 'clone', str(self.source), str(clone))
-        (clone / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        self.declare_pinned(root=clone)
         self.call('ensure', '--project', clone, code=4)
         result = self.call('integration', 'approve', '--repository', 'https://user:secret@example.invalid/org/repo', '--under', boundary, code=3)
         self.assertNotIn('secret', json.dumps(result))
         self.call('integration', 'approve', '--repository', str(self.source), '--project', self.project, '--under', boundary, code=2)
 
-    def register_user(self, personal):
-        self.call('user', 'init')
-        self.call('user', 'require', 'alpha')
-        return self.call('user', 'register', '--user-home', personal, '--apply')
+    def register_user(self):
+        # The public install task registers and deploys the personal consumer at the redirected personal home.
+        return self.install('alpha', user=True)
 
     def test_explicit_scope_selects_the_personal_consumer_or_every_consumer(self):
         self.assertEqual(self.call('ensure', '--user', code=4)['error']['code'], 'user.not_registered')
-        personal = self.base / 'personal'
-        personal.mkdir()
-        self.register_user(personal)
+        personal = self.personal
+        self.register_user()
         # --user reconciles the personal consumer alone, from inside an unrelated project directory.
         result = self.call('ensure', '--user')
         self.assertEqual([row['root'] for row in result['data']['scope_readiness']], [str(personal)])
@@ -201,3 +202,28 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         # An explicit selection is exclusive and never falls back to the working directory.
         for conflict in (('--all', '--user'), ('--all', '--project', str(self.project)), ('--user', '--project', str(self.project))):
             self.assertEqual(self.call('ensure', *conflict, code=2)['error']['code'], 'invocation.invalid')
+
+
+class LegacyCheckoutPlanningTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100/0101/0102 retires this behavior.
+
+    The planner scans only the selected packages of the live checkout and never runs ``git status`` there.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.legacy_init()
+        self.declare()
+
+    def approve(self, *options):
+        return self.call('integration', 'approve', '--project', self.project, *options)
+
+    def test_selected_package_only_and_no_source_status_scan(self):
+        self.approve()
+        config = c.config(c.read_json(self.home / 'config.json'))
+        state = c.state(c.read_json(self.home / 'state.json'))
+        with patch.object(c, 'package', wraps=c.package) as packages, patch.object(c, 'git', wraps=c.git) as git:
+            planned = fs.plan(config, state, [self.project], register=[str(self.project)], home=self.home, source_status=False)
+        self.assertFalse(planned['blockers'])
+        self.assertEqual([call.args[1] for call in packages.call_args_list], ['alpha'])
+        self.assertFalse(any(call.args[1] == 'status' for call in git.call_args_list))

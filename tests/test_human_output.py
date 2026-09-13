@@ -11,6 +11,7 @@ import unittest
 import mask
 import mask_present as present
 from tests.public_support import PublicFixture, PACK
+from tests.support import TAP
 
 
 class RendererRegistry(unittest.TestCase):
@@ -108,6 +109,8 @@ class HumanTerminal(PublicFixture):
                 self.assertFalse(self.parses_as_result_envelope(run.stdout))
 
     def test_inventory_shows_three_skill_rows_with_separate_agent_states(self):
+        # Legacy live-checkout starting state until MASK-0102 retires legacy inventory rows (pinned inventory detail is not reported yet).
+        self.legacy_bootstrap()
         self.linked_consumer_with_stale_roles()
         self.assertTrue(self.machine('project', 'require', 'beta', '--project', self.project, '--apply')['ok'])
         run = self.human('inventory', '--project', self.project)
@@ -149,16 +152,17 @@ class HumanTerminal(PublicFixture):
     def test_change_commands_render_text_and_keep_json_effects_identical(self):
         self.assertTrue(self.machine('project', 'init')['ok'])
         self.assertTrue(self.machine('project', 'register')['ok'])
-        preview = self.human('project', 'require', 'alpha', '--apply', '--dry-run')
+        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])  # A dry run never fetches the tap.
+        preview = self.human('install', 'alpha', '--dry-run')
         self.assertEqual(preview.returncode, 0, preview.stderr)
         self.assertIn('would change (dry run)', preview.stdout)
         self.assertIn('link.create', preview.stdout)
         self.assertFalse((self.project / '.agents/skills/alpha').exists())
-        applied = self.human('project', 'require', 'alpha', '--apply')
+        applied = self.human('install', 'alpha')
         self.assertEqual(applied.returncode, 0, applied.stderr)
         self.assertIn('changed', applied.stdout.splitlines()[0])
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
-        again = self.machine('project', 'require', 'alpha', '--apply')
+        again = self.machine('install', 'alpha')
         self.assertFalse(again['changed'])
 
     def test_redirected_output_and_operands_keep_the_selected_format(self):

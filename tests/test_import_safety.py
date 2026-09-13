@@ -8,7 +8,7 @@ from unittest.mock import patch
 import mask_core as c
 import mask_packages as packages
 import mask_sources as sources
-from tests.support import Fixture, ENTRY
+from tests.support import TAP, Fixture, ENTRY
 
 
 class ImportSafetyTests(Fixture):
@@ -25,16 +25,23 @@ class ImportSafetyTests(Fixture):
     def validate(self, commit):
         return packages.validate(self.source, commit, 'skills/alpha', 'alpha')
 
+    def push_upstream(self):
+        """Publish the committed payload fixtures to the tap upstream; the public commands read only its fetched cache."""
+        self.git(self.source, 'push', '-q', str(self.upstream), 'HEAD:main')
+
+    def fetch(self):
+        self.push_upstream()
+        self.call('source', 'fetch', TAP)
+
     def prepare_public(self):
         self.init()
-        self.call('source', 'migrate')
-        self.call('source', 'fetch', 'legacy')
+        self.fetch()
 
     def limited_cli(self, policy, expected):
         script = ('import sys;sys.path.insert(0,' + repr(str(ENTRY.parent)) + ');'
                   'import mask_packages as p,mask;')
         script += ';'.join('p.' + key + '=' + str(value) for key, value in policy.items())
-        script += ';sys.argv=' + repr(['mask', 'skill', 'validate', 'legacy/alpha', '--home', str(self.home), '--json'])
+        script += ';sys.argv=' + repr(['mask', 'skill', 'validate', TAP + '/alpha', '--home', str(self.home), '--json'])
         script += ';raise SystemExit(mask.main())'
         result = subprocess.run([sys.executable, '-B', '-c', script], capture_output=True, text=True)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
@@ -50,10 +57,12 @@ class ImportSafetyTests(Fixture):
         self.git(self.source, 'commit', '-m', 'executable logical mode')
         commit = self.git(self.source, 'rev-parse', 'HEAD')
         command = sys.executable + ' ' + str(self.source / 'skills/alpha/install.py')
-        self.git(self.source, 'config', 'filter.hostile.smudge', command)
-        self.git(self.source, 'config', 'filter.hostile.required', 'true')
-        (self.source / '.git/hooks/post-checkout').write_text('#!/bin/sh\n' + command + '\n')
-        (self.source / '.git/hooks/post-checkout').chmod(0o755)
+        # Hostile repository configuration in the author checkout and in the tap upstream that MASK fetches from.
+        for repository, hooks in ((self.source, self.source / '.git/hooks'), (self.upstream, self.upstream / 'hooks')):
+            self.git(repository, 'config', 'filter.hostile.smudge', command)
+            self.git(repository, 'config', 'filter.hostile.required', 'true')
+            (hooks / 'post-checkout').write_text('#!/bin/sh\n' + command + '\n')
+            (hooks / 'post-checkout').chmod(0o755)
         payload = self.validate(commit)
         values = {item.path: item for item in payload.files}
         self.assertEqual(values['raw.bin'].data, b'\0\xff\r\n')
@@ -68,7 +77,7 @@ class ImportSafetyTests(Fixture):
         self.prepare_public()
         (self.source / 'skills/alpha/raw.bin').write_bytes(b'changed authoring')
         before = self.snapshot()
-        result = self.call('skill', 'validate', 'legacy/alpha')['data']
+        result = self.call('skill', 'validate', TAP + '/alpha')['data']
         self.assertEqual(result['commit'], commit)
         self.assertEqual(result['payload_digest'], payload.digest)
         self.assertEqual(result['validation'], 'payload')
@@ -79,12 +88,12 @@ class ImportSafetyTests(Fixture):
     def test_public_activation_and_lfs_refusals(self):
         self.frozen({'.claude-plugin/plugin.json': b'{}'})
         self.prepare_public()
-        self.assertEqual(self.call('skill', 'validate', 'legacy/alpha', code=4)['error']['code'],
+        self.assertEqual(self.call('skill', 'validate', TAP + '/alpha', code=4)['error']['code'],
                          'skill.activation_unsupported')
         (self.source / 'skills/alpha/.claude-plugin/plugin.json').unlink()
         self.frozen({'asset': b'version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12\n'})
-        self.call('source', 'fetch', 'legacy')
-        self.assertEqual(self.call('skill', 'validate', 'legacy/alpha', code=4)['error']['code'], 'skill.lfs_unsupported')
+        self.fetch()
+        self.assertEqual(self.call('skill', 'validate', TAP + '/alpha', code=4)['error']['code'], 'skill.lfs_unsupported')
 
     def test_frontmatter_and_dynamic_shell_forms_refuse_without_execution(self):
         marker = self.base / 'frontmatter-executed'
@@ -103,13 +112,13 @@ class ImportSafetyTests(Fixture):
                 ('', '```!\n' + command + '\n```')):
             with self.subTest(extra=extra, body=body):
                 self.frozen({'SKILL.md': ('---\nname: alpha\ndescription: Fixture skill\n' + extra + '---\n' + body).encode()})
-                self.call('source', 'fetch', 'legacy')
-                result = self.call('skill', 'validate', 'legacy/alpha', code=4)
+                self.fetch()
+                result = self.call('skill', 'validate', TAP + '/alpha', code=4)
                 self.assertIn(result['error']['code'], ('skill.activation_unsupported', 'skill.metadata_unsupported'))
                 self.assertFalse(marker.exists())
         self.frozen({'SKILL.md': b'---\nname: alpha\ndescription: "Passive description"\nlicense: MIT\ncompatibility: Python 3\nmetadata:\n  author: Example\n  version: "1.0"\n---\nInstructions.\n'})
-        self.call('source', 'fetch', 'legacy')
-        self.call('skill', 'validate', 'legacy/alpha')
+        self.fetch()
+        self.call('skill', 'validate', TAP + '/alpha')
 
     def test_public_resource_policy_checks_zero_and_multiple_files_before_reads(self):
         self.frozen({'a': b'12345678', 'b': b'abcdefgh', 'empty': b''})
@@ -158,17 +167,18 @@ class ImportSafetyTests(Fixture):
         (self.source / 'mask-source.json').write_text(json.dumps(dict(schema_version=1, packages={'alpha': 'skills/alpha'})))
         self.frozen()
         self.prepare_public()
-        entry = self.call('source', 'show', 'legacy')['data']['binding']
+        entry = self.call('source', 'show', TAP)['data']['binding']
         with patch.object(sources, 'tree_entries', side_effect=AssertionError('unrelated recursive scan')):
-            rows = sources.discover(Path(entry['cache']), 'legacy', entry, self.git(self.source, 'rev-parse', 'HEAD'), identifier='alpha')
+            rows = sources.discover(Path(entry['cache']), TAP, entry, self.git(self.source, 'rev-parse', 'HEAD'), identifier='alpha')
         self.assertEqual([row['id'] for row in rows], ['alpha'])
-        self.call('skill', 'validate', 'legacy/alpha')
+        self.call('skill', 'validate', TAP + '/alpha')
 
     def test_fetch_storage_refusal_preserves_selected_commit_and_reports_staging(self):
         self.frozen()
         self.prepare_public()
-        before = self.call('source', 'show', 'legacy')['data']['cached_revision']
+        before = self.call('source', 'show', TAP)['data']['cached_revision']
         self.frozen({'new': b'new payload'})
+        self.push_upstream()
         config = self.call('config', 'show')['data']['config']
         output = dict(data={})
         # Simulate growth visible only after a very fast fetch has completed.
@@ -182,12 +192,12 @@ class ImportSafetyTests(Fixture):
             return result
         with patch.object(c, 'git', side_effect=git), patch.object(sources, 'cache_bytes', side_effect=lambda root: sources.CACHE_BYTES + 1 if completed else 0):
             with self.assertRaises(c.MaskError) as error:
-                sources.fetch(self.home, 'legacy', config['sources']['legacy'], 30, output)
+                sources.fetch(self.home, TAP, config['sources'][TAP], 30, output)
         self.assertEqual(error.exception.code, 'source.fetch_limit')
         effects = output['data']['fetch_effects']
         self.assertFalse(effects['remote_refs_changed'])
         self.assertTrue(effects['retained_objects_possible'])
         self.assertTrue(effects['staging_ref'].startswith('refs/mask/acquiring/'))
-        self.assertEqual(self.call('source', 'show', 'legacy')['data']['cached_revision'], before)
-        self.assertEqual(self.git(Path(config['sources']['legacy']['cache']), 'rev-parse', effects['staging_ref']),
+        self.assertEqual(self.call('source', 'show', TAP)['data']['cached_revision'], before)
+        self.assertEqual(self.git(Path(config['sources'][TAP]['cache']), 'rev-parse', effects['staging_ref']),
                          self.git(self.source, 'rev-parse', 'HEAD'))

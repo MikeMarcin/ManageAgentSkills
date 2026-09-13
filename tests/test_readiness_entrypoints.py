@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 
-from tests.support import Fixture, ENTRY
+from tests.support import Fixture, ENTRY, TAP
 
 PACK = ENTRY.parent / 'docs/rfcs/assets/mask-corrective-ux-readiness'
 STATIC = PACK / 'fixtures/static-package'
@@ -39,18 +39,27 @@ def republish(package):
 
 
 class EntrypointFixture(Fixture):
+    bootstrap = Fixture.init
+
     def setUp(self):
         super().setUp()
-        self.init()
+        self.bootstrap()
 
     def add_package(self, name, package):
+        """Author a package and publish it to the tap upstream; MASK observes it only after a fetch."""
         shutil.copytree(package, self.source / 'skills' / name)
-        self.git(self.source, 'add', 'skills')
-        self.git(self.source, 'commit', '-q', '-m', f'add {name}')
+        return Fixture.publish(self, f'add {name}')
 
     def consumer(self, skills, targets=None):
+        """A registered, approved v2 consumer whose lock and store artifacts are prepared but not yet deployed."""
         shutil.copytree(CONTEXT, self.project / '.mask')
-        self.declare(skills, targets)
+        declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id=identifier) for identifier in skills])
+        if targets is not None:
+            declaration['default_agents'] = targets
+        (self.project / '.mask.json').write_text(json.dumps(declaration) + '\n')
+        self.call('source', 'fetch', TAP)
+        self.call('lock', '--project', self.project)
+        self.call('source', 'fetch', '--locked', '--offline', '--project', self.project)
         self.call('project', 'register', self.project)
         self.call('integration', 'approve', '--project', self.project)
 
@@ -202,7 +211,12 @@ class Launch(EntrypointFixture):
 
 
 class LegacyUpdate(EntrypointFixture):
-    """A legacy consumer whose shared source tracks a local bare remote (W16: requirements follow the selected candidate)."""
+    """A legacy consumer whose shared source tracks a local bare remote (W16: requirements follow the selected candidate).
+
+    Legacy live-checkout starting state until MASK-0101 retires this behavior (the shared-checkout update).
+    """
+
+    bootstrap = Fixture.legacy_init
 
     def setUp(self):
         super().setUp()

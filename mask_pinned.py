@@ -52,7 +52,9 @@ def target(link, config, home):
         return Path(link['dev']['root']) / link['dev']['path']
     if 'resolution' in link:
         return store.location(home, link['resolution']['payload_digest'], link['skill'])[1]
-    return Path(config['source']['root']) / 'skills' / link['skill']
+    if c.legacy_source(config) is None:
+        c.fail('migration.required', 'A legacy link record has no live checkout on a tap catalog machine; it must be migrated.', 4, skill=link['skill'])
+    return c.legacy_source(config) / 'skills' / link['skill']
 
 
 def simple_targets(declaration):
@@ -390,7 +392,9 @@ def prepare_dispatch(args, output, home):
             c.fail('migration.required', 'Existing legacy ownership requires explicit migration.', 4)
         if command == 'apply' and record is None:
             c.fail(scope + '.not_registered', 'Register this consumer explicitly before apply.', 4)
-        if command == 'ensure' and scope == 'project' and not readiness.authorized(root, policy) and not getattr(args, 'repair', False):
+        # Same rule as readiness itself: events need approval, while manual readiness reaches its one-time consent.
+        # An unapproved root still has no locked-fetch grant, so preparation can only use the local cache.
+        if command == 'ensure' and scope == 'project' and not readiness.authorized(root, policy) and not getattr(args, 'repair', False) and getattr(args, 'event', 'manual') != 'manual':
             c.fail('integration.approval_required', 'Approve the physical project before readiness.', 4)
         declaration, resolved = r.read_exact_lock(root, scope, home, config, verify=False)
         simple_targets(declaration)

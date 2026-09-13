@@ -7,7 +7,9 @@ from unittest.mock import patch
 import mask_core as c
 import mask_resolve as r
 import mask_sources as s
-from tests.support import Fixture
+from tests.support import TAP, Fixture
+
+ALPHA, BETA = TAP + '/alpha', TAP + '/beta'
 
 
 class ModelTests(unittest.TestCase):
@@ -53,9 +55,8 @@ class LockTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.call('source', 'migrate')
         self.git(self.source, 'config', 'core.autocrlf', 'false')
-        self.declaration = dict(schema_version=2, sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main')}, skills=[dict(source='legacy', id='alpha'), dict(source='legacy', id='beta', when={'platforms': ['windows']})])
+        self.declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha'), dict(source=TAP, id='beta', when={'platforms': ['windows']})])
         self.write_selection()
         self.target = self.project / '.mask.lock.json'
 
@@ -63,14 +64,20 @@ class LockTests(Fixture):
         (self.project / '.mask.json').write_text(json.dumps(self.declaration), encoding='utf-8')
 
     def fetch(self):
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
 
     def locked(self, *args, **kwargs):
         return self.call('lock', '--project', self.project, *args, **kwargs)
 
+    def push(self, *refs, force=False):
+        """Push the author's exact refs to the tap upstream (default main); MASK sees them only after a fetch."""
+        self.git(self.source, 'push', '-q', *(['--force'] if force else []), str(self.upstream), *(refs or ('HEAD:main',)))
+
     def commit(self, text='change'):
+        # Whole-tree add, not publish(): some tests commit a root source index and moved package roots outside skills/.
         self.git(self.source, 'add', '.')
         self.git(self.source, 'commit', '-m', text)
+        self.push()
         return self.git(self.source, 'rev-parse', 'HEAD')
 
     def test_public_offline_preview_raw_modes_digests_and_user_scope(self):
@@ -83,6 +90,7 @@ class LockTests(Fixture):
         self.git(self.source, 'add', '.')
         self.git(self.source, 'update-index', '--chmod=+x', 'skills/alpha/script.py')
         self.git(self.source, 'commit', '-m', 'raw mode fixture')
+        self.push()  # The exact commit: re-adding through publish() could reset the index-only executable bit on POSIX.
         commit = self.git(self.source, 'rev-parse', 'HEAD')
         before = self.snapshot()
         self.assertEqual(self.locked('--dry-run', code=4)['error']['code'], 'lock.resolution_required')
@@ -100,7 +108,7 @@ class LockTests(Fixture):
         self.assertEqual(rows[0]['provenance_digest'], c.digest((skill / '.mask-provenance.json').read_bytes()))
         config = c.config(c.read_json(self.home / 'config.json'))
         declaration, lock = r.read_exact_lock(self.project, home=self.home, config=config)
-        cache = s.cached(self.home, 'legacy', config['sources']['legacy'])
+        cache = s.cached(self.home, TAP, config['sources'][TAP])
         payload = r.frozen_payload(cache, rows[0])
         self.assertEqual(next(f.mode for f in payload.files if f.path == 'script.py'), '100755')
         self.assertEqual(next(f.data for f in payload.files if f.path == 'SKILL.md'), (skill / 'SKILL.md').read_bytes())
@@ -122,7 +130,7 @@ class LockTests(Fixture):
         self.fetch()
         self.assertFalse(self.locked()['changed'])
         self.assertEqual(self.target.read_bytes(), raw)
-        selected = self.locked('--refresh', '--skill', 'legacy/alpha')['data']['lock']
+        selected = self.locked('--refresh', '--skill', ALPHA)['data']['lock']
         self.assertEqual(selected['packages'][0]['commit'], next_commit)
         self.assertEqual(selected['packages'][1], first['packages'][1])
         self.declaration['skills'][0]['introduced_by'] = ['local profile']
@@ -130,28 +138,31 @@ class LockTests(Fixture):
         updated = self.locked()['data']['lock']
         self.assertEqual(updated['packages'], selected['packages'])
         self.assertNotEqual(updated['selection_digest'], selected['selection_digest'])
-        self.assertEqual(self.locked('--skill', 'legacy/alpha', code=2)['error']['code'], 'invocation.invalid')
+        self.assertEqual(self.locked('--skill', ALPHA, code=2)['error']['code'], 'invocation.invalid')
 
     def test_moved_annotated_tag_and_branch_rewrite_require_rebind(self):
         self.git(self.source, 'tag', '-a', 'release', '-m', 'release')
+        self.push('refs/tags/release')
         self.declaration['skills'][0]['version'] = {'ref': 'refs/tags/release'}
         self.write_selection()
         self.fetch()
-        self.call('source', 'inspect', 'legacy', '--ref', 'refs/tags/release')
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
         self.locked()
         (self.source / 'skills/alpha/data').write_text('next')
         next_commit = self.commit()
         self.git(self.source, 'tag', '-f', '-a', 'release', '-m', 'moved')
+        self.push('refs/tags/release', force=True)
         self.fetch()
-        self.call('source', 'inspect', 'legacy', '--ref', 'refs/tags/release')
-        self.assertEqual(self.locked('--refresh', '--skill', 'legacy/alpha', code=4)['error']['code'], 'lock.ref_rebound')
-        result = self.locked('--refresh', '--skill', 'legacy/alpha', '--allow-ref-rebind')
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
+        self.assertEqual(self.locked('--refresh', '--skill', ALPHA, code=4)['error']['code'], 'lock.ref_rebound')
+        result = self.locked('--refresh', '--skill', ALPHA, '--allow-ref-rebind')
         self.assertEqual(result['data']['lock']['packages'][0]['commit'], next_commit)
-        self.locked('--refresh', '--skill', 'legacy/beta')
+        self.locked('--refresh', '--skill', BETA)
         self.git(self.source, 'reset', '--hard', 'HEAD~1')
+        self.push(force=True)
         self.fetch()
-        self.assertEqual(self.locked('--refresh', '--skill', 'legacy/beta', code=4)['error']['code'], 'lock.ref_rebound')
-        self.locked('--refresh', '--skill', 'legacy/beta', '--allow-ref-rebind')
+        self.assertEqual(self.locked('--refresh', '--skill', BETA, code=4)['error']['code'], 'lock.ref_rebound')
+        self.locked('--refresh', '--skill', BETA, '--allow-ref-rebind')
 
     def test_exact_pin_never_moves_and_stale_preview_refuses(self):
         self.fetch()
@@ -159,7 +170,7 @@ class LockTests(Fixture):
         self.declaration['skills'][0]['version'] = {'commit': first['packages'][0]['commit']}
         self.write_selection()
         self.assertEqual(self.locked(code=4)['error']['code'], 'lock.stale')
-        self.locked('--refresh', '--skill', 'legacy/alpha')
+        self.locked('--refresh', '--skill', ALPHA)
         preview = self.locked('--refresh', '--dry-run')
         (self.source / 'skills/beta/next').write_text('next')
         self.commit()
@@ -170,7 +181,9 @@ class LockTests(Fixture):
         self.assertEqual(self.locked('--refresh')['data']['lock']['packages'][0], r.lock(json.loads(before))['packages'][0])
 
     def test_v2_missing_stale_coherent_guards_and_legacy_mutations(self):
-        self.assertEqual(self.call('ensure', code=4)['error']['code'], 'integration.approval_required')
+        # Events still need approval first; manual readiness needs none, so the missing lock is its first refusal.
+        self.assertEqual(self.call('ensure', '--event', 'startup', code=4)['error']['code'], 'integration.approval_required')
+        self.assertEqual(self.call('ensure', code=4)['error']['code'], 'lock.missing')
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'project.not_registered')
         for args in [('project', 'show'), ('project', 'set', '--clear'), ('project', 'register')]:
             self.assertEqual(self.call(*args, code=4)['error']['code'], 'lock.missing')
@@ -186,9 +199,7 @@ class LockTests(Fixture):
         self.call('ensure', '--offline')
         self.assertFalse(self.call('apply')['changed'])
         self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'selection.command_unsupported')
-        self.declare(['alpha'])
-        self.call('project', 'require', 'beta')
-        self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
+        # The v1 half (a v1 declaration still accepts project require) moved to LegacyLockTests.
 
     def test_tampered_identity_path_format_digests_and_metadata_refuse(self):
         self.fetch()
@@ -208,7 +219,7 @@ class LockTests(Fixture):
             with self.subTest(field=field), self.assertRaises(c.MaskError):
                 r.lock(bad)
         self.target.write_text(json.dumps(original))
-        self.declaration['sources']['legacy']['packages'] = 'other'
+        self.declaration['sources'][TAP]['packages'] = 'other'
         self.write_selection()
         self.assertEqual(self.locked(code=4)['error']['code'], 'source.identity_mismatch')
         with self.assertRaises(c.MaskError):
@@ -285,18 +296,37 @@ class LockTests(Fixture):
         self.commit()
         self.fetch()
         self.assertEqual(self.locked()['data']['lock'], first)
-        refreshed = self.locked('--refresh', '--skill', 'legacy/alpha')['data']['lock']
+        refreshed = self.locked('--refresh', '--skill', ALPHA)['data']['lock']
         self.assertEqual(refreshed['packages'][0]['path'], 'moved/alpha')
         bad = copy.deepcopy(refreshed)
         bad['packages'][0]['commit'] = '0' * 40
         self.target.write_text(json.dumps(bad))
         self.assertEqual(self.locked(code=4)['error']['code'], 'lock.resolution_required')
         self.target.write_text(json.dumps(refreshed))
+        # The legacy-state half (a mode-less record cannot carry a v2 selection) moved to LegacyLockTests.
+
+
+class LegacyLockTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 declarations and mode-less records)."""
+
+    def setUp(self):
+        super().setUp()
+        self.legacy_init()
+
+    def test_v1_declaration_still_accepts_project_require(self):
+        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations.
+        self.declare(['alpha'])
+        self.call('project', 'require', 'beta')
+        self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
+
+    def test_legacy_record_cannot_carry_a_v2_selection(self):
+        # Split from LockTests.test_frozen_index_missing_object_and_legacy_state_isolation.
+        declaration = dict(schema_version=2, sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main')}, skills=[dict(source='legacy', id='alpha'), dict(source='legacy', id='beta', when={'platforms': ['windows']})])
         self.declare(['beta'])
         self.call('project', 'register')
         state = c.read_json(self.home / 'state.json')
         record = state['projects'][str(self.project)]
-        record['last_manifest'] = self.declaration
-        record['last_manifest_digest'] = c.digest(self.declaration)
+        record['last_manifest'] = declaration
+        record['last_manifest_digest'] = c.digest(declaration)
         with self.assertRaises(c.MaskError):
             c.state(state)

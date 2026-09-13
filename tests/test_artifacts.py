@@ -11,7 +11,7 @@ import mask_packages as p
 import mask_resolve as r
 import mask_sources as s
 import mask_store as store
-from tests.support import Fixture
+from tests.support import TAP, Fixture
 
 
 class ArtifactTests(Fixture):
@@ -26,17 +26,18 @@ class ArtifactTests(Fixture):
         self.git(self.source, 'add', '.')
         self.git(self.source, 'update-index', '--chmod=+x', 'skills/alpha/run.py')
         self.git(self.source, 'commit', '-m', 'raw artifact fixture')
+        # Push the exact commit: re-adding through publish() could reset the index-only executable bit on POSIX.
+        self.git(self.source, 'push', '-q', str(self.upstream), 'HEAD:main')
         self.init()
-        self.call('source', 'migrate')
-        self.call('source', 'fetch', 'legacy')
-        self.declaration = dict(schema_version=2, sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main')}, skills=[dict(source='legacy', id='alpha')])
+        self.call('source', 'fetch', TAP)
+        self.declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha')])
         (self.project / '.mask.json').write_text(json.dumps(self.declaration))
         self.resolved = self.call('lock')['data']['lock']
         self.row = self.resolved['packages'][0]
         self.config = c.config(c.read_json(self.home / 'config.json'))
-        self.entry = self.config['sources']['legacy']
-        self.cache = s.cached(self.home, 'legacy', self.entry)
-        self.payload = r.verify_resolution(self.home, 'legacy', self.entry, self.row)
+        self.entry = self.config['sources'][TAP]
+        self.cache = s.cached(self.home, TAP, self.entry)
+        self.payload = r.verify_resolution(self.home, TAP, self.entry, self.row)
 
     def fetch_locked(self, *args, **kwargs):
         return self.call('source', 'fetch', '--locked', '--project', self.project, *args, **kwargs)
@@ -131,7 +132,7 @@ class ArtifactTests(Fixture):
         bad['packages'][0]['commit'] = '0'*40
         (self.project/'.mask.lock.json').write_text(json.dumps(bad))
         before = (self.cache/'mask-refs.json').read_bytes()
-        self.git(self.cache, 'config', 'url.https://invalid.example/rewrite.insteadOf', str(self.source))
+        self.git(self.cache, 'config', 'url.https://invalid.example/rewrite.insteadOf', self.entry['transport'])
         snapshot = self.snapshot()
         refused = self.fetch_locked(code=4)
         self.assertEqual(snapshot, self.snapshot())
@@ -168,7 +169,7 @@ class ArtifactTests(Fixture):
         row = dict(self.row, commit='a'*40)
         self.assertTrue(store.materialize(self.home, row, replace(self.payload,commit=row['commit']))['reused'])
         config = copy.deepcopy(self.config)
-        config['sources']['legacy']['repository'] = 'https://invalid.example/other'
+        config['sources'][TAP]['repository'] = 'https://invalid.example/other'
         with self.assertRaises(c.MaskError) as error:
             store.ensure(self.home, self.declaration, self.resolved, config)
         self.assertEqual(error.exception.code, 'source.identity_mismatch')
@@ -178,7 +179,7 @@ class ArtifactTests(Fixture):
         self.assertEqual(effects['artifacts'], [])
         self.assertFalse((self.home/'store').exists())
         with self.assertRaises(c.MaskError):
-            store.ensure(self.home, self.declaration, self.resolved, self.config, coordinates=['legacy/unknown'])
+            store.ensure(self.home, self.declaration, self.resolved, self.config, coordinates=[TAP + '/unknown'])
         import argparse
         output = dict(dry_run=False, changed=False, would_change=False)
         with patch.object(c, 'publish_directory', side_effect=c.MaskError('fixture.failure','fixture',4)), self.assertRaises(c.MaskError):
@@ -192,10 +193,10 @@ class ArtifactTests(Fixture):
         home = self.base / 'fresh-machine'
         home.mkdir()
         config = copy.deepcopy(self.config)
-        config['sources']['legacy'] = s.binding(home, 'legacy', str(self.source), authoring=str(self.source))
+        config['sources'][TAP] = s.binding(home, TAP, str(self.upstream))
         (home/'config.json').write_text(c.text_json(config))
         result = self.call('source', 'fetch', '--locked', '--project', self.project, '--home', home)
-        cache = s.cached(home, 'legacy', config['sources']['legacy'])
+        cache = s.cached(home, TAP, config['sources'][TAP])
         self.assertTrue(result['changed'])
         self.assertTrue(result['data']['effects']['acquisitions'][0]['cache_created'])
         self.assertFalse((cache/'mask-refs.json').exists())

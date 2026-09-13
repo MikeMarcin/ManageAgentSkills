@@ -7,14 +7,15 @@ from unittest.mock import patch
 import mask_core as c
 import mask_packages as packages
 import mask_provenance as provenance
-from tests.support import Fixture
+from tests.support import TAP, Fixture
 
 
 class ImportFixture(Fixture):
     def setUp(self):
         super().setUp()
-        self.init()
-        self.call('source', 'migrate')
+        # The import destination is the fixture tap with the author checkout approved for authoring; its origin names the tap.
+        self.git(self.source, 'remote', 'add', 'origin', str(self.upstream))
+        self.call('tap', 'add', TAP, self.upstream, '--checkout', self.source)
         self.author = self.base / 'vendor-author'
         self.author.mkdir()
         self.git(self.author, 'init', '-b', 'main')
@@ -43,7 +44,7 @@ class ImportFixture(Fixture):
         self.call('source', 'fetch', 'vendor')
 
     def import_call(self, *args, **kwargs):
-        return self.call('skill', 'import', 'vendor', '--mode', 'copy', '--into', 'legacy', '--path', 'skills/gamma', *args, **kwargs)
+        return self.call('skill', 'import', 'vendor', '--mode', 'copy', '--into', TAP, '--path', 'skills/gamma', *args, **kwargs)
 
     def advance(self):
         self.git(self.author, 'add', '.')
@@ -51,7 +52,7 @@ class ImportFixture(Fixture):
         self.git(self.author, 'push', 'origin', 'main')
 
     def direct_import(self):
-        args = argparse.Namespace(command='skill.import', url='vendor', mode='copy', into='legacy', path='skills/gamma')
+        args = argparse.Namespace(command='skill.import', url='vendor', mode='copy', into=TAP, path='skills/gamma')
         output = dict(data={}, dry_run=False, changed=False, would_change=False)
         provenance.dispatch(args, output, self.home)
         return output
@@ -185,4 +186,4 @@ class ImportTests(ImportFixture):
         second.mkdir()
         (second / 'SKILL.md').write_text('---\nname: delta\ndescription: Other fixture\n---\n')
         self.advance()
-        self.assertEqual(self.call('skill', 'import', str(self.remote), '--mode', 'copy', '--into', 'legacy', code=4)['error']['code'], 'import.selection_required')
+        self.assertEqual(self.call('skill', 'import', str(self.remote), '--mode', 'copy', '--into', TAP, code=4)['error']['code'], 'import.selection_required')

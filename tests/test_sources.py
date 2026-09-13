@@ -11,19 +11,22 @@ import threading
 
 import mask_core as c
 import mask_sources as sources
-from tests.support import Fixture, ENTRY
+from tests.support import TAP, Fixture, ENTRY
 
 
 class SourcesTests(Fixture):
+    """Tap tests start from ``init`` (the fixture tap); the ``legacy_init`` methods use the checkout's ``origin`` as their legacy binding."""
+
     def setUp(self):
         super().setUp()
         self.remote = self.base / 'private' / 'AgentSkills.git'
         self.remote.parent.mkdir()
         self.git(self.base, 'clone', '--bare', str(self.source), str(self.remote))
         self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
-        self.init()
 
     def test_migration_preserves_declarations_links_and_noncanonical_config(self):
+        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
+        self.legacy_init()
         self.declare()
         self.call('project', 'register', self.project, '--apply')
         state = (self.home / 'state.json').read_bytes()
@@ -39,12 +42,15 @@ class SourcesTests(Fixture):
         self.assertEqual(state, (self.home / 'state.json').read_bytes())
         self.assertEqual(before, self.snapshot(self.project))
         self.assertFalse(self.call('source', 'migrate')['changed'])
-        self.assertFalse(self.init()['changed'])
+        # init writes only an empty v3 catalog, so it leaves a migrated machine untouched by refusing.
+        migrated = path.read_bytes()
+        self.assertEqual(self.call('init', code=4)['error']['code'], 'config.already_initialized')
+        self.assertEqual(migrated, path.read_bytes())
         self.assertFalse(self.call('apply', '--project', self.project)['changed'])
         self.assertEqual(self.call('tap', 'remove', 'legacy', code=4)['error']['code'], 'source.referenced')
 
     def test_independent_taps_fetch_and_removal_are_catalog_only(self):
-        self.call('source', 'migrate')
+        self.init()
         other = self.base / 'public' / 'AgentSkills.git'
         other.parent.mkdir()
         self.git(self.base, 'clone', '--bare', str(self.source), str(other))
@@ -56,13 +62,13 @@ class SourcesTests(Fixture):
         self.assertFalse(self.call('tap', 'add', 'public', other)['changed'])
         self.assertEqual(self.call('tap', 'add', 'public', self.remote, code=4)['error']['code'], 'source.alias_conflict')
         before = self.snapshot()
-        for name in ('legacy', 'public'):
+        for name in (TAP, 'public'):
             observed = self.call('source', 'show', name)
             self.assertTrue(observed['data']['resolution_required'])
             self.assertFalse(self.call('source', 'fetch', name, '--dry-run')['data']['fetch_effects']['attempted'])
         self.assertEqual(before, self.snapshot())
         roots = []
-        for name in ('legacy', 'public'):
+        for name in (TAP, 'public'):
             fetched = self.call('source', 'fetch', name)
             roots.append(fetched['data']['binding']['cache'])
             self.assertTrue(fetched['data']['fetch_effects']['remote_refs_changed'])
@@ -75,6 +81,8 @@ class SourcesTests(Fixture):
         self.assertFalse((self.project / '.agents').exists())
 
     def test_full_identity_and_transport_rewrite_refuse_before_fetch(self):
+        # Legacy live-checkout starting state until MASK-0100/0101 retires this behavior: the legacy binding follows the checkout remote.
+        self.legacy_init()
         self.call('source', 'migrate')
         other = self.base / 'other' / 'AgentSkills.git'
         other.parent.mkdir()
@@ -84,13 +92,20 @@ class SourcesTests(Fixture):
             self.assertEqual(self.call(*command, code=4)['error']['code'], 'source.identity_mismatch')
         self.git(self.source, 'remote', 'set-url', 'origin', str(self.remote))
         self.call('source', 'fetch', 'legacy')
-        root = Path(self.call('source', 'show', 'legacy')['data']['binding']['cache'])
+
+    def test_cache_local_url_rewrite_refuses_before_fetch(self):
+        self.init()
+        other = self.base / 'other' / 'AgentSkills.git'
+        other.parent.mkdir()
+        self.git(self.base, 'clone', '--bare', str(self.source), str(other))
+        self.call('source', 'fetch', TAP)
+        root = Path(self.call('source', 'show', TAP)['data']['binding']['cache'])
         # Source cache-local URL rewrites must not inherit approval either.
-        self.git(root, 'config', 'url.' + str(other) + '.insteadOf', str(self.remote))
-        self.assertEqual(self.call('source', 'fetch', 'legacy', code=4)['error']['code'], 'source.identity_mismatch')
+        self.git(root, 'config', 'url.' + str(other) + '.insteadOf', str(self.upstream))
+        self.assertEqual(self.call('source', 'fetch', TAP, code=4)['error']['code'], 'source.identity_mismatch')
 
     def test_unsafe_urls_and_cache_collisions(self):
-        self.call('source', 'migrate')
+        self.init()
         for value in ('https://user:TOPSECRET@example.test/org/repo', 'https://TOPSECRET@example.test/a',
                       'ext::TOPSECRET', 'http://example.test/repo', 'ssh://git@example.test/../repo',
                       'https://example.test/%252e%252e/repo', '-TOPSECRET'):
@@ -106,6 +121,8 @@ class SourcesTests(Fixture):
         self.assertEqual((root / 'unrelated').read_text(), 'keep')
 
     def test_migration_and_plan_guards_are_explicit(self):
+        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
+        self.legacy_init()
         self.assertTrue(self.call('source', 'list')['data']['migration_required'])
         self.assertEqual(self.call('tap', 'add', 'extra', self.remote, code=4)['error']['code'], 'source.migration_required')
         self.call('source', 'migrate')
@@ -124,10 +141,13 @@ class SourcesTests(Fixture):
                 sources.repository(value)
 
     def test_capabilities_and_recovery_retain_config_v2(self):
+        # Legacy live-checkout starting state until MASK-0100 retires source migrate.
+        self.legacy_init()
         self.call('source', 'migrate')
         config = (self.home / 'config.json').read_bytes()
         caps = self.call('capabilities')['data']
-        self.assertEqual(caps['readable_versions']['machine'], [1, 2])
+        # Machine config v3 is readable beside v1 and v2 (RFC-MASK-0020, MASK-0099).
+        self.assertEqual(caps['readable_versions']['machine'], [1, 2, 3])
         commands = {item['name']: item for item in caps['commands']}
         self.assertFalse(commands['tap.add']['network'])
         self.assertTrue(commands['tap.add']['plan_guard'])
@@ -149,7 +169,7 @@ mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
         self.assertFalse(self.call('apply')['changed'])
 
     def test_scp_to_absolute_rewrite_refuses_without_a_second_ssh_connection(self):
-        self.call('source', 'migrate')
+        self.init()
         log = self.base / 'ssh-calls'
         shim = self.base / 'ssh-fixture.py'
         shim.write_text('import pathlib,subprocess,sys\n' +
@@ -196,7 +216,7 @@ mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
             config = self.base / 'fixture-git-config'
             config.write_text('[http "' + uri + '"]\nfollowRedirects = true\nsslVerify = false\n')
             env = {'GIT_CONFIG_GLOBAL': str(config), 'GIT_CONFIG_NOSYSTEM': '1'}
-            self.call('source', 'migrate')
+            self.init()
             self.call('tap', 'add', 'redirect', uri)
             result = self.call('source', 'fetch', 'redirect', env=env, code=4)
             self.assertEqual(result['error']['code'], 'source.redirect_policy')
@@ -206,7 +226,7 @@ mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
             self.assertEqual(self.call('source', 'fetch', 'redirect', env=env, code=5)['error']['code'], 'git.failed')
             self.assertTrue(requests)
             self.assertTrue(all(path.startswith('/approved.git/') for path in requests))
-            # The legacy fetch path uses the same effective policy guard.
+            # The checkout fetch path (legacy source fetch and mask_install) uses the same effective policy guard; it is called directly.
             requests.clear()
             config.write_text('[http "' + uri + '"]\nfollowRedirects = true\nsslVerify = false\n')
             self.git(self.source, 'remote', 'set-url', 'origin', uri)

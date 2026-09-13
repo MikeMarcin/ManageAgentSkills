@@ -13,16 +13,25 @@ import mask_fs as fs
 import mask_pinned as pinned
 import mask_resolve as r
 import mask_store as store
-from tests.support import Fixture, ENTRY
+from tests.support import Fixture, ENTRY, TAP
 
 
 class PinnedTests(Fixture):
+    # Legacy live-checkout starting state until MASK-0100/0102 retires this behavior: mode-less
+    # records beside pinned consumers exist only on a migrated v1/v2 machine, never on a tap-first one.
+    LEGACY = {'test_personal_scope_preserves_legacy_records_and_state3', 'test_saved_journal_legacy_records_beside_pinned_stay_unextended'}
+
     def setUp(self):
         super().setUp()
-        self.init()
-        self.call('source','migrate')
-        self.call('source','fetch','legacy')
-        self.declaration=dict(schema_version=2,sources={'legacy':dict(repository=self.source.as_uri(),ref='refs/heads/main')},skills=[dict(source='legacy',id='alpha')])
+        if self._testMethodName in self.LEGACY:
+            self.legacy_init()
+            self.call('source','migrate')
+            self.call('source','fetch','legacy')
+            self.declaration=dict(schema_version=2,sources={'legacy':dict(repository=self.source.as_uri(),ref='refs/heads/main')},skills=[dict(source='legacy',id='alpha')])
+        else:
+            self.init()
+            self.call('source','fetch',TAP)
+            self.declaration=dict(schema_version=2,sources=self.binding(),skills=[dict(source=TAP,id='alpha')])
         (self.project/'.mask.json').write_text(json.dumps(self.declaration))
         self.lock=self.call('lock')['data']['lock']
         self.row=self.lock['packages'][0]
@@ -57,9 +66,8 @@ mask.main(sys.argv[3:])
         other=self.base/'other-worktree'
         self.git(self.project,'worktree','add','-b','other',str(other))
         (self.source/'skills/alpha/version').write_bytes(b'new version\r\n')
-        self.git(self.source,'add','.')
-        self.git(self.source,'commit','-m','second version')
-        self.call('source','fetch','legacy')
+        self.publish('second version')
+        self.call('source','fetch',TAP)
         self.call('lock','--project',other,'--refresh')
         self.call('project','register','--project',other,'--apply')
         self.assertNotEqual(old,os.readlink(other/'.agents/skills/alpha'))
@@ -93,7 +101,11 @@ mask.main(sys.argv[3:])
         self.assertTrue((self.project/'.agents/skills/alpha').is_symlink())
 
     def test_readiness_exact_authority_and_no_inferred_network(self):
-        self.assertEqual(self.call('ensure',code=4)['error']['code'],'integration.approval_required')
+        # Events need approval first; manual JSON readiness gets a typed one-time proposal instead (MASK-0085).
+        self.assertEqual(self.call('ensure','--event','startup',code=4)['error']['code'],'integration.approval_required')
+        refused=self.call('ensure',code=4)
+        self.assertEqual(refused['error']['code'],'confirmation.required')
+        self.assertEqual(refused['data']['confirmation']['reason'],'integration.approval_required')
         self.call('integration','approve','--project',self.project)
         before=self.snapshot()
         self.call('ensure','--check',code=7)
@@ -101,9 +113,9 @@ mask.main(sys.argv[3:])
         ready=self.call('ensure','--offline')
         self.assertEqual(ready['data']['readiness'],'ready_pinned')
         self.assertFalse(self.call('ensure')['changed'])
-        self.call('integration','approve','--project',self.project,'--allow-locked-fetch','legacy')
+        self.call('integration','approve','--project',self.project,'--allow-locked-fetch',TAP)
         self.call('integration','approve','--project',self.project)
-        self.assertEqual(c.read_json(self.home/'integration.json')['approvals'][str(self.project)]['allow_locked_fetch'],['legacy'])
+        self.assertEqual(c.read_json(self.home/'integration.json')['approvals'][str(self.project)]['allow_locked_fetch'],[TAP])
         altered=copy.deepcopy(self.declaration);altered['skills'][0]['when']={'platforms':['windows']}
         (self.project/'.mask.json').write_text(json.dumps(altered))
         (self.project/'.mask.lock.json').write_text(c.text_json(dict(self.lock,selection_digest=r.selection_digest(altered))))
@@ -151,8 +163,8 @@ mask.main(sys.argv[3:])
         self.register(True)
         before_state=c.state(c.read_json(self.home/'state.json'))
         (self.source/'skills/alpha/next').write_text('next')
-        self.git(self.source,'add','.');self.git(self.source,'commit','-m','next')
-        self.call('source','fetch','legacy')
+        self.publish('next')
+        self.call('source','fetch',TAP)
         candidate=r.resolve_candidate(self.declaration,self.config,self.home,self.lock,refresh=True)
         store.ensure(self.home,self.declaration,candidate,self.config)
         planned=fs.plan(self.config,before_state,[self.project],home=self.home,lock_proposals={str(self.project):candidate})
@@ -203,18 +215,16 @@ mask.main(sys.argv[3:])
         self.assertEqual(os.readlink(leaf),raw)
 
     def test_public_hydration_needs_exact_scope_grant_and_retains_old_lock(self):
-        cache=Path(self.config['sources']['legacy']['cache'])
+        cache=Path(self.config['sources'][TAP]['cache'])
         cache.rename(self.base/'retained-cache')
         (self.source/'skills/alpha/new').write_text('upstream moved')
-        self.git(self.source,'add','.')
-        self.git(self.source,'commit','-m','new upstream')
-        newer=self.git(self.source,'rev-parse','HEAD')
+        newer=self.publish('new upstream')
         original=(self.project/'.mask.lock.json').read_bytes()
         self.call('integration','approve','--project',self.project)
         before=self.snapshot()
         self.assertEqual(self.call('ensure',code=4)['error']['code'],'artifact.unavailable')
         self.assertEqual(before,self.snapshot())
-        self.call('integration','approve','--project',self.project,'--allow-locked-fetch','legacy')
+        self.call('integration','approve','--project',self.project,'--allow-locked-fetch',TAP)
         before=self.snapshot()
         self.assertEqual(self.call('ensure','--offline',code=4)['error']['code'],'artifact.unavailable')
         self.assertEqual(before,self.snapshot())
@@ -228,7 +238,7 @@ mask.main(sys.argv[3:])
 
     def test_adoption_stale_and_malformed_pending_files_refuse(self):
         self.register()
-        self.declaration['skills'].append(dict(source='legacy',id='beta'))
+        self.declaration['skills'].append(dict(source=TAP,id='beta'))
         candidate=r.resolve_candidate(self.declaration,self.config,self.home,self.lock)
         (self.project/'.mask.json').write_text(c.text_json(self.declaration))
         (self.project/'.mask.lock.json').write_text(c.text_json(candidate))
@@ -261,10 +271,9 @@ mask.main(sys.argv[3:])
 
     def test_artifact_verification_per_link_is_linear(self):
         self.add_skill('gamma')
-        self.git(self.source,'add','.')
-        self.git(self.source,'commit','-m','third skill')
-        self.call('source','fetch','legacy')
-        self.declaration['skills']=[dict(source='legacy',id=name) for name in ('alpha','beta','gamma')]
+        self.publish('third skill')
+        self.call('source','fetch',TAP)
+        self.declaration['skills']=[dict(source=TAP,id=name) for name in ('alpha','beta','gamma')]
         (self.project/'.mask.json').write_text(c.text_json(self.declaration))
         self.call('lock','--refresh')
         self.register()
@@ -320,7 +329,7 @@ mask.main(sys.argv[3:])
         pending=fs.make_pending(planned,self.home)
         bad=copy.deepcopy(pending)
         record=bad['after_state']['projects'][str(self.project)]
-        record['last_manifest']['sources']['legacy']['repository']='https://invalid.example/rebound'
+        record['last_manifest']['sources'][TAP]['repository']='https://invalid.example/rebound'
         record['last_manifest_digest']=r.selection_digest(record['last_manifest'])
         record['last_lock']['selection_digest']=record['last_manifest_digest']
         for row in record['last_lock']['packages']:
@@ -381,6 +390,10 @@ mask.main(sys.argv[3:])
         abandon=fs.make_pending(fs.plan(self.config,state,[self.project],home=self.home,unregister=[str(self.project)],keep_links=True,operation='project.unregister'),self.home)
         self.assertNotIn('pinned',abandon)
         fs.validate_pending(abandon,self.home)
+
+    def test_saved_journal_legacy_records_beside_pinned_stay_unextended(self):
+        # Split from test_saved_journal_cannot_strip_pinned_extension: the legacy half needs a live-checkout record.
+        self.register()
         legacy=self.base/'legacy-selected';legacy.mkdir()
         (legacy/'.mask.json').write_text(c.text_json(dict(schema_version=1,skills=['beta'])))
         self.call('project','register','--project',legacy)
@@ -399,8 +412,8 @@ mask.main(sys.argv[3:])
             with self.subTest(mode=mode):
                 old=os.readlink(leaf)
                 (self.source/'skills/alpha/version').write_text(mode)
-                self.git(self.source,'add','.');self.git(self.source,'commit','-m',mode)
-                self.call('source','fetch','legacy')
+                self.publish(mode)
+                self.call('source','fetch',TAP)
                 candidate=r.resolve_candidate(self.declaration,self.config,self.home,self.lock,refresh=True)
                 store.ensure(self.home,self.declaration,candidate,self.config)
                 (self.project/'.mask.lock.json').write_text(c.text_json(candidate))

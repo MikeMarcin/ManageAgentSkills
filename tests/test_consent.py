@@ -8,20 +8,30 @@ approves the project, registers it or renders anything before the command under
 test; ``--json`` is injected only by the ``machine`` helper.
 """
 import argparse
-import json
 import os
 import subprocess
 import unittest
 
 import mask_consent as consent
 import mask_core as core
+from tests.legacy_support import write_json
 from tests.public_support import PublicFixture
+from tests.support import TAP
 
 
 class ConsentFixture(PublicFixture):
     def setUp(self):
         super().setUp()
-        (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n', encoding='utf-8')
+        self.declare('alpha')
+        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
+        self.assertTrue(self.machine('lock', '--project', self.project)['ok'])
+        # The locked package bytes are in the store, as the live checkout was; nothing is registered, approved or linked.
+        self.assertTrue(self.machine('source', 'fetch', '--locked', '--project', self.project)['ok'])
+
+    def declare(self, *skills):
+        """An unregistered v2 declaration of the fixture tap; its lock is written by the public ``lock`` command."""
+        write_json(self.project / '.mask.json', dict(schema_version=2, sources={TAP: dict(repository=self.upstream.as_uri(), packages='skills')},
+                                                     default_agents=['claude', 'codex'], skills=[dict(source=TAP, id=skill) for skill in skills]))
 
     def links(self):
         return sorted(path.relative_to(self.project).as_posix() for path in self.project.glob('.*/skills/*') if path.is_symlink())
@@ -64,7 +74,7 @@ class PipedConsentTests(ConsentFixture):
         done = self.machine('ensure', '--project', self.project, '--yes')
         self.assertTrue(done['changed'])
         self.assertEqual(done['data']['confirmation']['granted_by'], 'yes')
-        self.assertEqual(done['data']['readiness'], 'ready_legacy_unpinned')
+        self.assertEqual(done['data']['readiness'], 'ready_pinned')
         self.assertEqual(len(self.links()), 2)
         self.assertFalse((self.home / 'integration.json').exists())
         again = self.machine('ensure', '--project', self.project)
@@ -161,7 +171,8 @@ class TerminalConsentTests(ConsentFixture):
 
     def test_input_changed_after_the_prompt_is_a_stale_plan(self):
         def change_declaration():
-            (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha', 'beta'])) + '\n', encoding='utf-8')
+            self.declare('alpha', 'beta')
+            self.assertTrue(self.machine('lock', '--project', self.project)['ok'])
         code, text = self.terminal('ensure', '--project', self.project, answer=b'y\n', before_answer=change_declaration)
         self.assertEqual(code, 4, text)
         self.assertIn('plan.stale', text)

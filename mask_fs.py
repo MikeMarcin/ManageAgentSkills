@@ -37,7 +37,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
     dev_proposals = dev_proposals or {}
-    source = Path(config['source']['root'])
+    source = c.legacy_source(config)
     after = copy.deepcopy(state)
     links, files, actions, blockers, observations, packages = [], [], [], [], [], {}
     import mask_selection as selection
@@ -113,6 +113,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                             typed_files.append(dict(root=key, role=scope + '_' + role, before=before_raw, after=after_raw))
                             actions.append(dict(kind=role + '.write', status='planned', path=str(c.declaration_path(root, scope, home) if role == 'declaration' else resolve.lock_path(root, scope, home))))
             else:
+                if source is None:
+                    c.fail('migration.required', 'A v1 declaration or legacy record has no live checkout on a tap catalog machine; it must be migrated.', 4, root=key)
                 revision = candidate['revision'] if candidate else c.git(source, 'rev-parse', 'HEAD', optional=True)
                 dirty = (bool(c.git(source, 'status', '--porcelain', '--untracked-files=all', optional=True)) if source.is_dir() else False) if source_status else None
                 if key not in unregister:
@@ -200,7 +202,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if after != state:
         actions.append(dict(kind='state.record', status='planned'))
         after['generation'] = state['generation'] + 1
-    source_data = dict(root=str(source), revision=revision, dirty=dirty,
+    source_data = dict(root=str(source) if source is not None else None, revision=revision, dirty=dirty,
                        fingerprint=c.digest({key: value['fingerprint'] for key, value in sorted(packages.items())}))
     pinned_controls = dict(workspaces=pinned.observe(roots, state, home, user_root=user_root), config_text=c.read_text(home / 'config.json'), policy_text=c.read_text(home / 'integration.json', missing=True), selection_policy_text=selection.read_policy(home)[1], home_identity=c.identity(home)) if uses_pinned else None
     payload = dict(protocol=1, adapters=c.ADAPTERS, operation=operation, config=config, generation=state['generation'],
@@ -388,7 +390,6 @@ def validate_pending(pending, home):
             c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
     elif 'migration' not in pending and c.config(pending['config']) != c.config(current_config):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
-    source = Path(pending['config']['source']['root']) if pending['config'] else None
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
     selected = set(pending['selected'])
@@ -780,7 +781,7 @@ def recover(home, output, mode):
         from mask_git import recover_git
         recover_git(pending, home, output, mode)
     if mode == 'complete':
-        source = Path(pending['config']['source']['root']) if pending['config'] else None
+        source = c.legacy_source(pending['config'])
         for key in pending['selected']:
             record = c.consumer_records(pending['after_state']).get(key)
             if record and not pinned.is_pinned(record):

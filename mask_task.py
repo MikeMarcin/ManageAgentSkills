@@ -31,7 +31,7 @@ def machine(home):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     raw = c.read_json(home / 'config.json', default={})
     if not raw:
-        c.fail('config.missing', 'Select the skill source before managing skills.')
+        c.fail('config.missing', 'Add a skill source before managing skills.')
     return state, c.config(raw)
 
 
@@ -61,10 +61,17 @@ def consumer(args, state, home, *, creating):
 
 
 def fresh_declaration(config):
-    """New consumers follow the configured source mode: v2 selection on a catalog machine, v1 otherwise."""
+    """New consumers follow the configured source mode: a v2 selection on a catalog machine, v1 on a live-checkout machine."""
+    if config['schema_version'] == 3:
+        return r.selection(dict(schema_version=2, sources={}, default_agents=config['default_targets'], skills=[]))
     if config['schema_version'] == 2:
         return pinned.migrated_selection(dict(schema_version=1, skills=[]), config)
     return dict(schema_version=1, skills=[])
+
+
+def require_live_checkout(config, path):
+    if c.legacy_source(config) is None:
+        c.fail('migration.required', 'A v1 declaration has no live checkout on a tap catalog machine; it must be migrated to a v2 declaration.', 4, path=str(path))
 
 
 def parse_request(identifiers):
@@ -196,7 +203,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
             entry = sources.selected(config, alias)
             if alias not in proposal['sources']:
                 binding = dict(repository=entry['repository'], packages=entry['packages'])
-                if alias == legacy_alias(config):
+                if config['schema_version'] == 2 and alias == legacy_alias(config):
                     binding['ref'] = 'refs/heads/' + config['source']['branch']
                 proposal['sources'][alias] = binding
             binding = dict(source=alias, id=identifier)
@@ -249,6 +256,7 @@ def mutate(args, output, home):
     if declaration['schema_version'] == 2:
         proposal, lock, changed, unchanged, payload_views = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
     else:
+        require_live_checkout(config, path)
         proposal, lock, changed, unchanged, payload_views = v1_proposal(args, declaration, config, requested, output)
     acquisitions = output['data'].get('acquisitions', [])
     task = dict(root=key, scope=scope, declaration_path=str(path), registered=record is not None, declaration_created=bool(created),
@@ -345,6 +353,7 @@ def listing(args, output, home):
         data['source'] = dict(mode='pinned', sources=sorted(declaration['sources']))
         bindings = [(r.coordinate(binding), binding['id'], binding['source'], rows.get(r.coordinate(binding))) for binding in declaration['skills']]
     else:
+        require_live_checkout(config, path)
         source = Path(config['source']['root'])
         data['source'] = dict(mode='legacy', alias=legacy_alias(config), root=str(source), revision=planned['source'].get('revision'), dirty=planned['source'].get('dirty'))
         data['limitations'].append('Legacy live-source content is not version-pinned.')

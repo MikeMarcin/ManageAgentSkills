@@ -4,12 +4,10 @@ from pathlib import Path
 import subprocess
 import sys
 from tests.support import Fixture, ENTRY
+from tests.test_manifest_registry import declare_pinned
 
 
-class RecoveryTests(Fixture):
-    def setUp(self):
-        super().setUp(); self.init(); self.declare(); self.call('project', 'register', self.project)
-
+class CrashFixture(Fixture):
     def crash(self, label, *command):
         script = """
 import sys,os
@@ -21,6 +19,12 @@ mask.main(sys.argv[3:])
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, *(command or ('apply',)), '--project', str(self.project), '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, (run.stdout, run.stderr))
         self.assertTrue((self.home / 'pending.json').is_file())
+
+
+class RecoveryTests(CrashFixture):
+    """Tap-first: crash, rollback, doctor and busy-lock behavior on a registered, not yet applied v2 consumer."""
+    def setUp(self):
+        super().setUp(); self.init(); declare_pinned(self); self.call('project', 'register', self.project)
 
     def test_crash_complete_and_inspect_are_explicit(self):
         self.crash('link')
@@ -43,24 +47,6 @@ mask.main(sys.argv[3:])
         (leaf / 'mine').unlink(); leaf.rmdir()  # test-owned collision only
         self.call('recover', '--rollback')
         self.assertFalse(leaf.is_symlink())
-
-    def test_restart_after_manifest_and_state(self):
-        for label in ('manifest', 'state'):
-            with self.subTest(label=label):
-                self.crash(label, 'project', 'require', 'beta', '--apply')
-                self.call('recover', '--complete')
-                self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
-                self.call('project', 'unrequire', 'beta', '--apply')
-
-    def test_adopt_exact_link_without_replacing_it(self):
-        leaf = self.project / '.agents/skills/alpha'; leaf.parent.mkdir(parents=True)
-        relative = os.path.relpath(self.source / 'skills/alpha', leaf.parent)
-        leaf.symlink_to(relative, target_is_directory=True)
-        before = os.readlink(leaf)
-        preview = self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--dry-run')
-        self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--expect-plan-hash', preview['data']['plan_hash'])
-        self.assertEqual(before, os.readlink(leaf))
-        self.call('apply'); self.assertEqual(before, os.readlink(leaf))
 
     def test_doctor_is_observational_and_check_detects_drift(self):
         before = self.snapshot()
@@ -87,6 +73,30 @@ with mask_core.writer_lock(Path(sys.argv[2])):
         finally:
             process.communicate('')
         self.call('apply')
+
+
+class LegacyRecoveryTests(CrashFixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 require crash, clone-path adoption)."""
+    def setUp(self):
+        super().setUp(); self.legacy_init(); self.declare(); self.call('project', 'register', self.project)
+
+    def test_restart_after_manifest_and_state(self):
+        for label in ('manifest', 'state'):
+            with self.subTest(label=label):
+                self.crash(label, 'project', 'require', 'beta', '--apply')
+                self.call('recover', '--complete')
+                self.assertEqual(self.call('project', 'show')['data']['manifest']['skills'], ['alpha', 'beta'])
+                self.call('project', 'unrequire', 'beta', '--apply')
+
+    def test_adopt_exact_link_without_replacing_it(self):
+        leaf = self.project / '.agents/skills/alpha'; leaf.parent.mkdir(parents=True)
+        relative = os.path.relpath(self.source / 'skills/alpha', leaf.parent)
+        leaf.symlink_to(relative, target_is_directory=True)
+        before = os.readlink(leaf)
+        preview = self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--dry-run')
+        self.call('link', 'adopt', '--project', self.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', self.source / 'skills/alpha', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.assertEqual(before, os.readlink(leaf))
+        self.call('apply'); self.assertEqual(before, os.readlink(leaf))
 
     def test_mid_apply_external_manifest_edit_is_preserved(self):
         script = """

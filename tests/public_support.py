@@ -4,9 +4,12 @@ Unlike ``tests.support.Fixture.call``, nothing here appends ``--json``. Three
 helpers are kept separate on purpose: ``raw`` returns the completed process,
 ``machine`` requests the JSON protocol explicitly, and ``human`` is the plain
 terminal invocation whose output is the thing under test. Starting states are
-prepared only up to the one-time source prerequisite; no helper registers a
+prepared only up to the one-time source prerequisite, which is ``tap add`` of a
+local bare upstream on an empty MASK_HOME (RFC-MASK-0020); no helper registers a
 consumer, approves readiness, renders roles or applies a change on behalf of the
-command under test.
+command under test. A subclass that exercises retired live-checkout behavior sets
+``bootstrap = PublicFixture.legacy_bootstrap`` to start from the schema-true v1
+bytes instead.
 """
 import json
 import os
@@ -18,7 +21,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
+
+from tests.support import TAP
 
 ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
 PACK = Path(__file__).resolve().parents[1] / 'docs/rfcs/assets/mask-corrective-ux-readiness'
@@ -50,10 +56,32 @@ class PublicFixture(unittest.TestCase):
         shutil.copytree(STATIC_PACKAGE, self.source / 'skills/implement-rfc')
         self.git(self.source, 'add', 'skills')
         self.git(self.source, 'commit', '-m', 'fixture skills')
+        self.upstream = self.base / 'upstream' / 'AgentSkills.git'
+        self.upstream.parent.mkdir()
+        self.git(self.base, 'init', '-q', '--bare', '-b', 'main', str(self.upstream))
+        self.git(self.source, 'push', '-q', str(self.upstream), 'main')
         self.project = self.base / 'project with ü spaces'
         self.project.mkdir()
         self.git(self.project, 'init', '-b', 'main')
-        self.assertTrue(self.machine('init', '--source', self.source)['ok'])
+        self.bootstrap()
+
+    def bootstrap(self):
+        """The one-time source prerequisite: approve the fixture upstream as a tap on an empty MASK_HOME."""
+        self.assertTrue(self.machine('tap', 'add', TAP, self.upstream)['ok'])
+
+    def legacy_bootstrap(self):
+        """A v1 live-checkout machine over ``self.source``: the files the retired ``init --source`` wrote, including its writer lock."""
+        from tests.legacy_support import legacy_state, v1_config, write_json
+        write_json(self.home / 'config.json', v1_config(SimpleNamespace(clone=self.source)))
+        write_json(self.home / 'state.json', legacy_state())
+        (self.home / 'operation.lock').write_bytes(b'\0' if os.name == 'nt' else b'')
+
+    def publish(self, message='fixture change', *, force=False):
+        """Commit the author's skill edits and push them to the tap upstream; MASK sees them only after a fetch."""
+        self.git(self.source, 'add', '-A', 'skills')
+        self.git(self.source, 'commit', '-q', '--allow-empty', '-m', message)
+        self.git(self.source, 'push', '-q', *(['--force'] if force else []), str(self.upstream), 'HEAD:main')
+        return self.git(self.source, 'rev-parse', 'HEAD')
 
     def git(self, root, *args):
         return subprocess.run(['git', '-C', str(root), *args], capture_output=True, encoding='utf-8', check=True).stdout.strip()
@@ -146,9 +174,7 @@ class PublicFixture(unittest.TestCase):
         bytes. The old role state is deliberately retained, not repaired.
         """
         shutil.copytree(CONSUMER_CONTEXT, self.project / '.mask')
-        self.assertTrue(self.machine('project', 'init', '--project', self.project)['ok'])
-        self.assertTrue(self.machine('project', 'register', '--project', self.project)['ok'])
-        self.assertTrue(self.machine('project', 'require', 'alpha', 'implement-rfc', '--project', self.project, '--apply')['ok'])
+        self.assertTrue(self.machine('install', 'alpha', 'implement-rfc', '--project', self.project)['ok'])
         self.assertTrue(self.machine('integration', 'approve', '--project', self.project)['ok'])
         # Since MASK-0088 the engine deploys declared static roles with the links; the
         # old-host starting state is then restored by hand: the integrator role is absent

@@ -39,7 +39,7 @@ def dispatch(args, output, home):
         roots = [str(root)]
     rows, consumers, observations = [], [], []
     counts = dict(declarations_read=0, declaration_bytes_read=0, payload_files_read=0, directories_enumerated=0, leaves_inspected=0)
-    source = Path(config['source']['root'])
+    source = c.legacy_source(config)
     for key in roots:
         scope = c.consumer_scope(state, key)
         if getattr(args, 'scope', None) not in (None, scope):

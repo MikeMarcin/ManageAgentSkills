@@ -45,7 +45,7 @@ class LauncherTests(Fixture):
         author = self.base / 'program author'
         self.git(self.base, 'clone', '--branch', 'main', str(remote), str(author))
         self.git(author, 'config', 'user.name', 'Fixture'); self.git(author, 'config', 'user.email', 'fixture@example.invalid')
-        self.init(); self.declare(); self.call('project', 'register', self.project, '--apply')
+        self.init(); self.install('alpha')
         source_head = self.git(self.source, 'rev-parse', 'HEAD'); before = self.snapshot(self.project)
         state_before = (self.home / 'state.json').read_bytes()
         with (author / 'mask.py').open('a') as handle: handle.write('\n# compatible fixture update\n')

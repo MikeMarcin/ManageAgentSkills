@@ -47,7 +47,7 @@ def result(command='', dry_run=False):
 # One registration table drives argparse and public capability descriptors.
 COMMANDS = {
     'capabilities': (False, False, []),
-    'init': (True, False, [('source', 'required'), ('remote', 'value'), ('branch', 'value'), ('target', 'repeat')]),
+    'init': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
     'config.show': (False, False, []),
     'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
     'skill.list': (False, False, []),
@@ -197,8 +197,8 @@ def capabilities(leaves):
         descriptors.append(dict(name=command, implemented=command in IMPLEMENTED, arguments=arguments,
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
-    return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=2, state=3, pending=3),
-                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
+    return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
+                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2, 3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
                 workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
@@ -286,8 +286,8 @@ def diagnostics(args, output, home):
     if core.kind(home / 'pending.json') != 'missing':
         issues.append(MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict())
     try:
-        if any(not fs.pinned.is_pinned(core.consumer_records(state).get(str(root))) for root in roots):
-            core.checkout(Path(config['source']['root']))
+        if core.legacy_source(config) is not None and any(not fs.pinned.is_pinned(core.consumer_records(state).get(str(root))) for root in roots):
+            core.checkout(core.legacy_source(config))
     except MaskError as error:
         issues.append(error.as_dict())
     try:
@@ -363,10 +363,21 @@ def project_dispatch(args, output, home):
             declaration = core.selection_manifest(core.read_json(path, 'manifest'))
             output['data'] = dict(root=key, manifest=declaration)
             return
-        output['data'] = dict(root=key, manifest=dict(schema_version=1, skills=[]))
+        created = {path: dict(schema_version=1, skills=[])}
+        if config is not None and config['schema_version'] == 3:
+            # A tap catalog machine creates a v2 selection and its empty lock, as install does for a new consumer.
+            import mask_resolve
+            import mask_task
+            fresh = mask_task.fresh_declaration(config)
+            created = {path: fresh}
+            lock_path = mask_resolve.lock_path(root, scope, home)
+            if core.kind(lock_path) == 'missing':
+                created[lock_path] = dict(schema_version=1, resolver='mask-lock-v1', selection_digest=mask_resolve.selection_digest(fresh), packages=[])
+        output['data'] = dict(root=key, manifest=created[path])
         output['would_change'] = True
         if not output['dry_run']:
-            core.atomic_text(path, core.text_json(output['data']['manifest']), None)
+            for control, value in created.items():
+                core.atomic_text(control, core.text_json(value), None)
             output.update(changed=True, transaction='committed')
         return
     if command == 'project.unregister':
@@ -404,7 +415,7 @@ def project_dispatch(args, output, home):
         import mask_pinned
         output['data'].update(mode=(record or {}).get('mode', 'pinned'), reproducible=(record or {}).get('mode') != 'dev-link', fleet_eligible=(record or {}).get('mode') != 'dev-link', requested_targets=mask_pinned.simple_targets(declaration), effective_targets=None)
     if command == 'project.show':
-        output['data']['source'] = config['source'] if config else None
+        output['data']['source'] = dict(config.get('source', {})) if config else None
         output['data']['ownership'] = record['links'] if record else {}
         if config:
             inspection = fs.plan(config, state, [root], register=[] if record else [key], home=home, user_root=root if scope == 'user' else None)
@@ -421,8 +432,10 @@ def project_dispatch(args, output, home):
         output['data']['host_load'] = 'not_verified'
         return
     if config is None:
-        core.fail('config.missing', 'Initialize the machine source before this operation.')
-    source = Path(config['source']['root'])
+        core.fail('config.missing', 'Add a skill source before this operation.')
+    source = core.legacy_source(config)
+    if source is None and declaration['schema_version'] == 1:
+        core.fail('migration.required', 'A v1 declaration has no live checkout on a tap catalog machine; it must be migrated to a v2 declaration.', 4, path=str(path))
     if getattr(args, 'apply', False):
         if record is None and command != 'project.register':
             core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
@@ -522,20 +535,16 @@ def local_dispatch(args, output, leaves):
     if command in ('ensure', 'workspace.forget') or command.startswith('integration.'):
         return ensure_ops.dispatch(args, output, home)
     if command == 'init':
-        source = Path(args.source).expanduser().resolve()
-        core.checkout(source)
-        if source == PROGRAM_ROOT or home.is_relative_to(source / 'skills') or source.is_relative_to(home):
-            core.fail('config.invalid', 'Source, program and machine state must have distinct non-overlapping write locations.')
-        proposal = core.config(dict(schema_version=1, source=dict(root=str(source), remote=getattr(args, 'remote', 'origin'), branch=getattr(args, 'branch', 'main')),
-                                    default_targets=getattr(args, 'target', list(adapters.BY_ID)), git_timeout_seconds=30))
-        if core.git(source, 'check-ref-format', '--branch', proposal['source']['branch'], optional=True) is None or core.git(source, 'check-ref-format', 'refs/remotes/' + proposal['source']['remote'] + '/mask-check', optional=True) is None:
-            core.fail('config.invalid', 'Invalid Git remote or branch name.')
+        # An empty v3 tap catalog; taps are approved separately with tap add, which also bootstraps a missing machine.
+        proposal = core.empty_config(getattr(args, 'target', None), getattr(args, 'git_timeout', 30))
         core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
         existing = core.read_json(home / 'config.json', default={})
-        if existing and core.config(existing)['schema_version'] == 2:
-            proposal.update(schema_version=2, legacy_source=existing['legacy_source'], sources=existing['sources'])
-        if existing and core.config(existing) != proposal:
-            core.fail('config.already_initialized', 'Machine already has a different configuration.', 4)
+        if existing:
+            current = core.config(existing)
+            explicit = [key for key, option in (('default_targets', 'target'), ('git_timeout_seconds', 'git_timeout')) if hasattr(args, option)]
+            if current['schema_version'] != 3 or any(current[key] != proposal[key] for key in explicit):
+                core.fail('config.already_initialized', 'Machine already has a different configuration.', 4, schema_version=current['schema_version'])
+            proposal = current
         output['data'] = dict(config=proposal, program_root=str(PROGRAM_ROOT))
         if not existing:
             output['would_change'] = True
@@ -565,9 +574,15 @@ def local_dispatch(args, output, leaves):
     if command.startswith(('project.', 'user.')):
         return project_dispatch(args, output, home)
     config = machine_config(home)
-    source = Path(config['source']['root'])
-    if config['schema_version'] == 2 and command in ('skill.list', 'skill.show', 'skill.validate'):
+    source = core.legacy_source(config)
+    if config['schema_version'] in (2, 3) and command in ('skill.list', 'skill.show', 'skill.validate'):
         return sources_ops.query(args, output, home)
+    if source is None and command == 'update':
+        # No pinned consumer was selected and a tap catalog has no shared checkout to update.
+        output['warnings'].append(dict(code='project.empty_registry', message='No registered consumers selected.'))
+        return
+    if source is None and command in ('source.status', 'source.fetch'):
+        core.fail('source.legacy_absent', 'This machine has no live checkout; name the tap to fetch.', 4)
     if command == 'source.status':
         output['data'] = git_ops.status(source, config['source']['remote'], config['source']['branch'], config['git_timeout_seconds'])
     elif command == 'source.fetch':

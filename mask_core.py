@@ -46,7 +46,7 @@ REMEDIATION = {
     'workflow.role_invalid': 'The native role content uses unsupported or mismatched fields; correct the package asset or role file.',
     'project.not_registered': "Register the project first: 'mask project register PATH'.",
     'manifest.missing': "Create the declaration first: 'mask project init' or 'mask user init'.",
-    'config.missing': "Select the skill source first: 'mask init --source DIR'.",
+    'config.missing': "Add a skill source first: 'mask tap add NAME URL'.",
     'state.drift': "Review the reported drift, then reconcile with 'mask apply' or 'mask ensure'.",
     'integration.approval_required': "Approve the project once with 'mask integration approve --project ROOT', then rerun.",
     'confirmation.required': "Answer the question in a terminal, add --yes for this ordinary one-time effect, or pass the reported --expect-plan-hash from automation.",
@@ -460,26 +460,42 @@ def checkout(root):
 
 
 def config(value):
-    required = ('schema_version', 'source', 'default_targets', 'git_timeout_seconds')
-    if isinstance(value, dict) and value.get('schema_version') == 2:
-        required += ('sources', 'legacy_source')
-    fields(value, required, versions=(1, 2))
-    source = value['source']
-    fields(source, ('root', 'remote', 'branch'))
-    if not isinstance(source['root'], str) or not Path(source['root']).is_absolute():
-        fail('config.invalid', 'Source root must be an absolute path.')
-    for key in ('remote', 'branch'):
-        item = source[key]
-        if not isinstance(item, str) or not item or item.startswith('-') or any(c.isspace() for c in item) or any(c in item for c in ':\\~^?*[\x00') or '..' in item or '@{' in item:
-            fail('config.invalid', 'Unsafe remote or branch name.', field=key)
+    """Machine configuration: v3 is a tap catalog; v1 (live checkout) and v2 (catalog plus legacy binding) stay readable."""
+    version = value.get('schema_version') if isinstance(value, dict) else None
+    if version == 3:
+        fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), versions=(1, 2, 3))
+    else:
+        required = ('schema_version', 'source', 'default_targets', 'git_timeout_seconds')
+        if version == 2:
+            required += ('sources', 'legacy_source')
+        fields(value, required, versions=(1, 2, 3))
+        source = value['source']
+        fields(source, ('root', 'remote', 'branch'))
+        if not isinstance(source['root'], str) or not Path(source['root']).is_absolute():
+            fail('config.invalid', 'Source root must be an absolute path.')
+        for key in ('remote', 'branch'):
+            item = source[key]
+            if not isinstance(item, str) or not item or item.startswith('-') or any(c.isspace() for c in item) or any(c in item for c in ':\\~^?*[\x00') or '..' in item or '@{' in item:
+                fail('config.invalid', 'Unsafe remote or branch name.', field=key)
     targets = string_set(value['default_targets'], 'config', targets=True)
     timeout = value['git_timeout_seconds']
     if type(timeout) is not int or not 1 <= timeout <= 600:
         fail('config.invalid', 'Git timeout must be an integer from 1 through 600.')
-    if value['schema_version'] == 2:
+    if value['schema_version'] in (2, 3):
         from mask_sources import validate_config
         validate_config(value)
     return dict(value, default_targets=targets)
+
+
+def empty_config(targets=None, timeout=30):
+    """The v3 machine configuration that ``init`` and a bootstrapping ``tap add`` write: no taps yet."""
+    return config(dict(schema_version=3, default_targets=list(ADAPTERS) if targets is None else targets,
+                       git_timeout_seconds=timeout, sources={}))
+
+
+def legacy_source(value):
+    """The live checkout of a v1/v2 machine, or None on a v3 tap catalog."""
+    return Path(value['source']['root']) if value is not None and 'source' in value else None
 
 
 def identity(root):
@@ -687,7 +703,8 @@ def registration_safe(root, source, home, value, scope):
         fail('target.overlap', 'The root is already registered in another scope.', 4, root=str(root))
     for adapter in adapters.paths(scope).values():
         destination = root / adapter
-        if source.is_relative_to(destination) or (home is not None and home.is_relative_to(destination)) or destination.is_relative_to(source / 'skills') or root == home:
+        overlaps_source = source is not None and (source.is_relative_to(destination) or destination.is_relative_to(source / 'skills'))
+        if overlaps_source or (home is not None and home.is_relative_to(destination)) or root == home:
             fail('config.invalid', 'Managed source, state and destination locations overlap.')
         parents_safe(root, destination / 'mask-registration-check')
         for known in consumer_records(value):

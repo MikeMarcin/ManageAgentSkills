@@ -15,9 +15,10 @@ from tests.support import Fixture, ENTRY
 
 
 class MigrationTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100/0102 retires this behavior (migrate --to-pinned)."""
     def setUp(self):
         super().setUp()
-        self.init()
+        self.legacy_init()
         self.declare()
         self.call('project', 'register', '--apply')
 
@@ -42,7 +43,7 @@ class MigrationTests(Fixture):
         record = state['projects'][str(self.project)]
         self.assertEqual(record['last_manifest']['default_agents'], ['claude', 'codex'])
         leaf = self.project / '.agents/skills/alpha'
-        self.assertIn('/store/v1/', str(fs.normalized_link(leaf, os.readlink(leaf))))
+        self.assertIn('/store/v1/', fs.normalized_link(leaf, os.readlink(leaf)).as_posix())
         self.assertFalse(self.call('apply')['changed'])
 
     def test_exact_rollback_at_typed_effects_and_completion(self):

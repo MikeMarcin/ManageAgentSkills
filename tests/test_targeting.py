@@ -4,7 +4,9 @@ from unittest.mock import patch
 import mask
 import mask_core as c
 import mask_selection as selection
-from tests.support import Fixture
+from tests.support import TAP, Fixture
+
+ALPHA = TAP + '/alpha'
 
 
 def remove_tree(path):
@@ -19,9 +21,7 @@ class TargetingTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.declare()
-        self.call('project', 'register', '--apply')
-        self.call('migrate', '--to-pinned')
+        self.install('alpha')
         self.call('project', 'set-targets', '--inherit', '--apply')
 
     def test_independent_agents_inheritance_noop_and_declaration_only(self):
@@ -31,19 +31,19 @@ class TargetingTests(Fixture):
         (self.home / 'user.lock.json').write_bytes((self.project / '.mask.lock.json').read_bytes())
         self.call('user', 'register', '--user-home', personal, '--apply')
         original_lock = c.read_json(self.project / '.mask.lock.json')['packages']
-        self.call('project', 'set-agents', 'legacy/alpha', 'codex')
+        self.call('project', 'set-agents', ALPHA, 'codex')
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
         self.call('apply')
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
         self.assertTrue((personal / '.claude/skills/alpha').is_symlink())
-        self.call('user', 'set-agents', 'legacy/alpha', 'claude', '--apply')
+        self.call('user', 'set-agents', ALPHA, 'claude', '--apply')
         self.assertFalse((personal / '.agents/skills/alpha').exists())
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
         self.assertEqual(original_lock, c.read_json(self.project / '.mask.lock.json')['packages'])
         before = self.snapshot()
-        self.assertFalse(self.call('project', 'set-agents', 'legacy/alpha', 'codex', '--apply')['changed'])
+        self.assertFalse(self.call('project', 'set-agents', ALPHA, 'codex', '--apply')['changed'])
         self.assertEqual(before, self.snapshot())
-        self.call('project', 'set-agents', 'legacy/alpha', '--inherit', '--apply')
+        self.call('project', 'set-agents', ALPHA, '--inherit', '--apply')
         self.assertNotIn('agents', c.read_json(self.project / '.mask.json')['skills'][0])
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
 
@@ -52,26 +52,26 @@ class TargetingTests(Fixture):
         other.mkdir()
         (other / '.mask.json').write_bytes((self.project / '.mask.json').read_bytes())
         (other / '.mask.lock.json').write_bytes((self.project / '.mask.lock.json').read_bytes())
-        self.assertEqual(self.call('project', 'set-agents', 'legacy/alpha', 'codex', '--project', other, code=4)['error']['code'], 'project.not_registered')
-        self.call('project', 'set-agents', 'legacy/alpha', 'codex', '--apply')
+        self.assertEqual(self.call('project', 'set-agents', ALPHA, 'codex', '--project', other, code=4)['error']['code'], 'project.not_registered')
+        self.call('project', 'set-agents', ALPHA, 'codex', '--apply')
         leaf = self.project / '.claude/skills/alpha'
         leaf.mkdir()
         (leaf / 'mine').write_text('preserve')
         before = self.snapshot()
-        self.call('project', 'set-agents', 'legacy/alpha', '--all', '--apply', code=4)
+        self.call('project', 'set-agents', ALPHA, '--all', '--apply', code=4)
         self.assertEqual(before, self.snapshot())
         (leaf / 'mine').unlink()
         leaf.rmdir()
-        preview = self.call('project', 'set-agents', 'legacy/alpha', '--all', '--apply', '--dry-run')
+        preview = self.call('project', 'set-agents', ALPHA, '--all', '--apply', '--dry-run')
         self.call('selection-policy', 'set', '--agent', 'codex')
-        self.call('project', 'set-agents', 'legacy/alpha', '--all', '--apply', '--expect-plan-hash', preview['data']['plan_hash'], code=4)
+        self.call('project', 'set-agents', ALPHA, '--all', '--apply', '--expect-plan-hash', preview['data']['plan_hash'], code=4)
         self.assertEqual(c.read_json(self.project / '.mask.json')['skills'][0]['agents'], ['codex'])
 
     def test_false_when_skips_cold_package_and_preserves_lock(self):
         declaration = c.read_json(self.project / '.mask.json')
         declaration['skills'][0]['when'] = {'platforms': ['windows' if selection.device()['platform'] != 'windows' else 'linux']}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.call('update', '--project', self.project)
         remove_tree(self.home / 'store')
         remove_tree(self.home / 'sources')
@@ -123,7 +123,7 @@ class TargetingTests(Fixture):
         self.assertEqual(before, self.snapshot())
         self.assertEqual({row['status'] for row in result['data']['outcomes']}, {'selected'})
         self.assertTrue(all(not row['target_verified'] for row in result['data']['outcomes']))
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.call('apply')
         leaf = (self.project / '.agents/skills/alpha').resolve() / 'SKILL.md'
         leaf.chmod(0o600)
@@ -136,8 +136,10 @@ class TargetingTests(Fixture):
 
 
 class LegacyPolicyTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 set-targets beside selection policy)."""
+
     def test_empty_registry_policy_and_legacy_targets_remain_explicit(self):
-        self.init()
+        self.legacy_init()
         self.call('selection-policy', 'set', '--agent', 'codex')
         self.assertEqual(c.read_json(self.home / 'selection-policy.json')['enabled_agents'], ['codex'])
         self.call('selection-policy', 'clear')

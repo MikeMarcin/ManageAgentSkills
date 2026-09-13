@@ -7,8 +7,10 @@ from tests.support import Fixture, ENTRY
 
 
 class UpdateTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0101 retires this behavior (shared-checkout update)."""
     def setUp(self):
         super().setUp()
+        # The checkout's own origin, distinct from the fixture's tap upstream at self.upstream.
         self.remote = self.base / 'AgentSkills.git'
         self.git(self.base, 'init', '--bare', str(self.remote))
         self.git(self.source, 'remote', 'add', 'origin', str(self.remote))
@@ -16,16 +18,17 @@ class UpdateTests(Fixture):
         self.author = self.base / 'author'
         self.git(self.base, 'clone', '--branch', 'main', str(self.remote), str(self.author))
         self.git(self.author, 'config', 'user.name', 'Fixture'); self.git(self.author, 'config', 'user.email', 'fixture@example.invalid')
-        self.init(); self.declare(); self.call('project', 'register', self.project, '--apply')
+        self.legacy_init(); self.declare(); self.call('project', 'register', self.project, '--apply')
 
-    def upstream(self, text='Updated instructions.'):
+    # Named apart from the fixture's self.upstream bare-repository attribute, which would shadow a method of that name.
+    def push_upstream(self, text='Updated instructions.'):
         path = self.author / 'skills/alpha/SKILL.md'
         path.write_text(path.read_text() + '\n' + text + '\n')
         self.git(self.author, 'add', 'skills'); self.git(self.author, 'commit', '-m', 'upstream change'); self.git(self.author, 'push', 'origin', 'main')
         return self.git(self.author, 'rev-parse', 'HEAD')
 
     def test_fetch_preview_guard_update_noop(self):
-        old = self.git(self.source, 'rev-parse', 'HEAD'); candidate = self.upstream()
+        old = self.git(self.source, 'rev-parse', 'HEAD'); candidate = self.push_upstream()
         before = self.snapshot()
         preview = self.call('update', '--dry-run')
         self.assertEqual(before, self.snapshot()); self.assertEqual(self.git(self.source, 'rev-parse', 'HEAD'), old)
@@ -56,9 +59,9 @@ class UpdateTests(Fixture):
 
     def test_guard_binds_the_previewed_candidate_without_fetching(self):
         # RFC-MASK-0018 contract section 4: --expect-plan-hash never fetches a different candidate before applying.
-        reviewed = self.upstream(); self.call('source', 'fetch')
+        reviewed = self.push_upstream(); self.call('source', 'fetch')
         preview = self.call('update', '--dry-run')
-        newer = self.upstream('Another revision')
+        newer = self.push_upstream('Another revision')
         done = self.call('update', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertFalse(done['data']['fetch_effects']['attempted'])
         self.assertEqual(reviewed, self.git(self.source, 'rev-parse', 'HEAD'))
@@ -68,7 +71,7 @@ class UpdateTests(Fixture):
         self.assertEqual(self.call('update')['data']['source_after'], newer)
 
     def test_post_advance_crash_recovers_without_git_rollback(self):
-        candidate = self.upstream()
+        candidate = self.push_upstream()
         script = """
 import sys,os
 sys.path.insert(0,sys.argv[1])
@@ -98,7 +101,7 @@ raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
             self.assertEqual(head, self.git(self.source, 'rev-parse', 'HEAD'))
 
     def test_hooks_suppressed_and_late_apply_failure_retains_intent(self):
-        candidate = self.upstream()
+        candidate = self.push_upstream()
         marker = self.base / 'hook-ran'
         hook = self.source / '.git/hooks/post-merge'
         hook.write_text('#!/bin/sh\necho unsafe > "' + str(marker) + '"\n')
@@ -122,7 +125,7 @@ raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
         self.call('recover', '--complete')
 
     def test_diverged_and_unavailable_preflight(self):
-        self.upstream()
+        self.push_upstream()
         self.git(self.source, 'commit', '--allow-empty', '-m', 'local divergence')
         self.assertEqual(self.call('update', code=4)['error']['code'], 'source.diverged')
         # No fetch is attempted for an unavailable registered consumer.
@@ -133,7 +136,7 @@ raise SystemExit(mask.main(['update','--home',sys.argv[2],'--json']))
         self.assertNotIn('fetch_effects', result['data'])
 
     def test_checkout_failure_retains_journal_without_reset(self):
-        self.upstream()
+        self.push_upstream()
         old = self.git(self.source, 'rev-parse', 'HEAD')
         script = """
 import sys

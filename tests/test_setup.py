@@ -17,10 +17,13 @@ import sys
 import time
 import unittest
 
+from tests.legacy_support import write_json
 from tests.public_support import CONSUMER_CONTEXT, ENTRY, PACK, PublicFixture
+from tests.support import TAP
 
 GENERATED = PACK / 'fixtures/generated-package'
-SUBJECT = 'legacy/implement-rfc:prepare-roles'
+COORDINATE = TAP + '/implement-rfc'
+SUBJECT = COORDINATE + ':prepare-roles'
 
 SCRIPT = '''#!/usr/bin/env python3
 """Test variant of the retained fixture generator: records each launch, then stages roles."""
@@ -66,7 +69,7 @@ def render(role):
 
 
 class SetupFixture(PublicFixture):
-    """Source whose implement-rfc is the generated package (setup action), plus an approved, declared consumer."""
+    """Tap whose implement-rfc is the generated package (setup action), plus an approved, declared, pinned consumer without links."""
 
     def setUp(self):
         super().setUp()
@@ -75,13 +78,42 @@ class SetupFixture(PublicFixture):
         shutil.copytree(GENERATED, self.package)
         self.sentinel = self.base / 'setup-launches.txt'
         self.write_script()
-        self.commit('generated package')
+        self.publish('generated package')
         shutil.copytree(CONSUMER_CONTEXT, self.project / '.mask')
-        self.assertTrue(self.machine('project', 'init', '--project', self.project)['ok'])
-        self.assertTrue(self.machine('project', 'register', '--project', self.project)['ok'])
-        self.assertTrue(self.machine('project', 'require', 'implement-rfc', '--project', self.project)['ok'])
+        self.declare_consumer(self.project, ['implement-rfc'])
         self.assertTrue(self.machine('integration', 'approve', '--project', self.project)['ok'])
         self.lock = self.project / '.mask/generated/implement-rfc/native-roles.lock.json'
+
+    def declare_consumer(self, root, skills, *, user=False):
+        """A registered v2 consumer of the fixture tap with a lock and no links: declaration, fetch, lock, hydrate, register.
+
+        The locked package bytes are placed in the store, as the live checkout used to exist, so a dry-run preview
+        examines the same package the applying run does; nothing is linked, approved or run.
+        """
+        write_json(self.home / 'user.json' if user else root / '.mask.json',
+                   dict(schema_version=2, sources={TAP: dict(repository=self.upstream.as_uri(), packages='skills')},
+                        default_agents=['claude', 'codex'], skills=[dict(source=TAP, id=skill) for skill in skills]))
+        scope = ['--user'] if user else ['--project', root]
+        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
+        self.assertTrue(self.machine('lock', *scope)['ok'])
+        self.assertTrue(self.machine('source', 'fetch', '--locked', *scope)['ok'])
+        self.assertTrue(self.machine('user', 'register')['ok'] if user else self.machine('project', 'register', '--project', root)['ok'])
+
+    def deployed(self):
+        """The locked implement-rfc package in the store: setup freezes and runs these bytes, never the author checkout."""
+        row = next(row for row in json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'] if row['id'] == 'implement-rfc')
+        return self.home / 'store/v1' / row['payload_digest'].removeprefix('sha256:') / 'payload/implement-rfc'
+
+    def written_bytecode(self):
+        """Bytecode in the deployed package that its locked commit does not contain; MASK writes none of its own."""
+        commit = next(row['commit'] for row in json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'] if row['id'] == 'implement-rfc')
+        committed = set()
+        for line in self.git(self.source, 'ls-tree', '-r', '--name-only', commit, 'skills/implement-rfc').splitlines():
+            parts = line.split('/')[2:]
+            committed.update('/'.join(parts[:index]) for index in range(1, len(parts) + 1))
+        root = self.deployed()
+        return sorted(relative for relative in (path.relative_to(root).as_posix() for path in root.rglob('*')
+                      if '__pycache__' in path.parts or path.suffix in ('.pyc', '.pyo')) if relative not in committed)
 
     def write_script(self, before='', after='', timeout=None):
         (self.package / 'scripts/prepare_fixture_roles.py').write_text(SCRIPT.format(sentinel=str(self.sentinel), before=before, after=after), encoding='utf-8')
@@ -94,8 +126,10 @@ class SetupFixture(PublicFixture):
         descriptor.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
 
     def commit(self, message):
-        self.git(self.source, 'add', '-A')
-        self.git(self.source, 'commit', '-q', '-m', message)
+        """Publish the package edit and adopt it: fetch the tap, then the pinned update of the consumer (it never runs setup)."""
+        self.publish(message)
+        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
+        return self.machine('update', '--project', self.project)
 
     def launches(self):
         return len(self.sentinel.read_text(encoding='utf-8').splitlines()) if self.sentinel.exists() else 0
@@ -119,10 +153,11 @@ class SetupFixture(PublicFixture):
         self.assertEqual(self.roles(), ['.claude/agents/rfc-integrator.md', '.codex/agents/rfc-integrator.toml'])
         self.assertEqual((self.project / '.codex/agents/rfc-integrator.toml').read_text(encoding='utf-8'), 'name = "rfc-integrator"\nmodel = "fixture-model-do-not-run"\n')
         lock = json.loads(self.lock.read_text(encoding='utf-8'))
-        self.assertEqual((lock['schema'], lock['coordinate'], len(lock['roles'])), ('mask.native-role-lock.v1', 'legacy/implement-rfc', 2))
+        self.assertEqual((lock['schema'], lock['coordinate'], len(lock['roles'])), ('mask.native-role-lock.v1', COORDINATE, 2))
         self.assertFalse((self.home / 'pending.json').exists())
         self.assertFalse((self.home / 'staging').exists())
         self.assertFalse(list(self.package.glob('**/__pycache__')))
+        self.assertEqual(self.written_bytecode(), [])
         if result is not None:
             self.assertTrue(result['ok'], result)
             self.assertEqual(result['data']['scope_readiness'][0]['workflow'], 'complete')
@@ -170,7 +205,7 @@ class NoninteractiveSetupTests(SetupFixture):
         self.assertEqual([(row['state'], row['subject'], row['granted_by']) for row in rows], [('consent_required', SUBJECT, None)])
         proposal = result['data']['setup']['confirmation']
         self.assertEqual((proposal['kind'], proposal['reason'], proposal['subjects'], proposal['plan_hash']), ('package.setup', 'setup.required', [SUBJECT], result['data']['plan_hash']))
-        self.assertEqual(proposal['actions'][0]['path'], str(self.package / 'scripts/prepare_fixture_roles.py'))
+        self.assertEqual(proposal['actions'][0]['path'], str(self.deployed() / 'scripts/prepare_fixture_roles.py'))
         self.assertIn('--allow-setup', result['error']['remediation'][0]['message'])
         self.assertEqual(self.launches(), 0)
         self.assert_nothing_published()
@@ -201,7 +236,7 @@ class NoninteractiveSetupTests(SetupFixture):
                 self.assert_nothing_published()
         human = self.human('ensure', '--project', self.project, stdin=subprocess.DEVNULL)
         self.assertEqual(human.returncode, 4, human.stderr)
-        self.assertIn('setup legacy/implement-rfc:prepare-roles in ', human.stderr)
+        self.assertIn(f'setup {SUBJECT} in ', human.stderr)
         self.assertIn(': consent_required', human.stderr)
         self.assertIn('not sandboxed', human.stderr)
         self.assertNotIn('[y/N]', human.stderr)
@@ -245,9 +280,9 @@ raise SystemExit(mask.main(sys.argv[2:]))
         plan_hash = self.machine('ensure', '--project', self.project)['data']['plan_hash']
         # Foreign or partial grants name nothing.
         for options in (['--expect-plan-hash', plan_hash], ['--allow-setup', SUBJECT],
-                        ['--expect-plan-hash', plan_hash, '--allow-setup', 'legacy/other:prepare-roles'],
+                        ['--expect-plan-hash', plan_hash, '--allow-setup', f'{TAP}/other:prepare-roles'],
                         ['--expect-plan-hash', plan_hash, '--allow-setup', 'other/implement-rfc:prepare-roles'],
-                        ['--expect-plan-hash', plan_hash, '--allow-setup', 'legacy/implement-rfc:other']):
+                        ['--expect-plan-hash', plan_hash, '--allow-setup', f'{COORDINATE}:other']):
             with self.subTest(options=options):
                 result = self.machine('ensure', '--project', self.project, *options)
                 self.assertEqual(result['error']['code'], 'workflow.incomplete')
@@ -505,12 +540,12 @@ class TerminalSetupTests(SetupFixture):
         self.assertEqual(code, 0, text)
         self.assertIn('confirmation needed (setup.required)', text)
         self.assertIn('implement-rfc needs consumer-specific native role setup.', text)
-        self.assertIn('Source: legacy/implement-rfc (content fingerprint ', text)
-        self.assertIn(f"Run: Python {self.package / 'scripts/prepare_fixture_roles.py'}", text)
+        self.assertIn(f'Source: {COORDINATE} (content fingerprint ', text)
+        self.assertIn(f"Run: Python {self.deployed() / 'scripts/prepare_fixture_roles.py'}", text)
         self.assertIn('This runs package code with your user permissions; it is not sandboxed.', text)
         self.assertIn('Run this setup? [y/N]', text)
         self.assertNotIn('sha256:', text)
-        self.assertIn('setup legacy/implement-rfc:prepare-roles in ', text)
+        self.assertIn(f'setup {SUBJECT} in ', text)
         self.assertIn(': published', text)
         self.assertIn('implement-rfc: ready', text)
         self.assertNotIn('python3 ', text.split('Run this setup?')[1], 'no copy/paste command instruction')
@@ -524,7 +559,7 @@ class TerminalSetupTests(SetupFixture):
                 code, text = self.terminal('ensure', '--project', self.project, answer=answer)
                 self.assertEqual(code, 4, text)
                 self.assertIn('workflow.incomplete', text)
-                self.assertIn('setup legacy/implement-rfc:prepare-roles in ', text)
+                self.assertIn(f'setup {SUBJECT} in ', text)
                 self.assertIn(': declined', text)
                 self.assertEqual(len(self.links()), 2)
                 self.assertEqual(self.launches(), 0)

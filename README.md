@@ -13,7 +13,7 @@ Python or Git. From the checkouts' parent directory on macOS or Linux:
 ```sh
 mkdir -p "$HOME/.local/bin"
 python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
-"$HOME/.local/bin/mask" init --source "$PWD/AgentSkills"
+"$HOME/.local/bin/mask" tap add agentskills https://github.com/MikeMarcin/AgentSkills.git
 ```
 
 Add that bin directory to PATH, or keep using the printed absolute launcher path.

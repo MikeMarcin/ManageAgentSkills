@@ -7,6 +7,9 @@
     },
     {
       "$ref": "machine-v2.schema.json"
+    },
+    {
+      "$ref": "machine-v3.schema.json"
     }
   ]
 }

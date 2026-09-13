@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 
-from tests.support import Fixture, ENTRY
+from tests.support import Fixture, ENTRY, TAP
 
 PACK = ENTRY.parent / 'docs/rfcs/assets/mask-corrective-ux-readiness'
 STATIC = PACK / 'fixtures/static-package'
@@ -30,13 +30,23 @@ class WorkflowFixture(Fixture):
         self.init()
 
     def add_package(self, name, package):
+        """Author a package and publish it to the tap upstream; MASK observes it only after a fetch."""
         shutil.copytree(package, self.source / 'skills' / name)
-        self.git(self.source, 'add', 'skills')
-        self.git(self.source, 'commit', '-q', '-m', f'add {name}')
+        return self.publish(f'add {name}')
+
+    def selection(self, skills, targets=None):
+        declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id=identifier) for identifier in skills])
+        if targets is not None:
+            declaration['default_agents'] = targets
+        return declaration
 
     def consumer(self, skills, targets=None):
+        """A registered, approved v2 consumer whose lock and store artifacts are prepared but not yet deployed."""
         shutil.copytree(CONTEXT, self.project / '.mask')
-        self.declare(skills, targets)
+        (self.project / '.mask.json').write_text(json.dumps(self.selection(skills, targets)) + '\n')
+        self.call('source', 'fetch', TAP)
+        self.call('lock', '--project', self.project)
+        self.call('source', 'fetch', '--locked', '--offline', '--project', self.project)
         self.call('project', 'register', self.project)
         self.call('integration', 'approve', '--project', self.project)
 
@@ -93,7 +103,7 @@ class StaticRoles(WorkflowFixture):
         self.assertEqual(again['error']['details']['workflow'], ['implement-rfc codex/rfc-worker: modified'])
         stale.unlink()
         ready = self.call('ensure')
-        self.assertEqual(ready['data']['readiness'], 'ready_legacy_unpinned')
+        self.assertEqual(ready['data']['readiness'], 'ready_pinned')
         self.assertEqual(ready['data']['scope_readiness'][0]['workflow'], 'complete')
         self.assertEqual(stale.read_bytes(), (STATIC / 'runtime/roles/codex/rfc-worker.toml').read_bytes())
         before = self.snapshot()
@@ -129,10 +139,14 @@ class StaticRoles(WorkflowFixture):
         self.git(origin, 'config', 'user.name', 'Fixture')
         self.git(origin, 'config', 'user.email', 'fixture@example.invalid')
         shutil.copytree(CONTEXT, origin / '.mask')
-        (origin / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['implement-rfc'])) + '\n')
+        (origin / '.mask.json').write_text(json.dumps(self.selection(['implement-rfc'])) + '\n')
+        self.call('source', 'fetch', TAP)
+        self.call('lock', '--project', origin)  # The committed controls are the v2 declaration and its lock.
         for agent, suffix in (('codex', 'toml'), ('claude', 'md')):
             shutil.copytree(STATIC / f'runtime/roles/{agent}', origin / f'.{agent}/agents')
         (origin / 'README.md').write_text('consumer docs\n')
+        # Committed roles are exact bytes; the readiness guide excludes them from autocrlf normalization.
+        (origin / '.gitattributes').write_text('.codex/agents/** -text\n.claude/agents/** -text\n')
         self.git(origin, 'add', '-A')
         self.git(origin, 'commit', '-q', '-m', 'checked-in roles')
         clone = self.base / 'clone'
@@ -153,16 +167,16 @@ class StaticRoles(WorkflowFixture):
         self.call('ensure', '--project', clone, '--check', cwd=clone)
         self.assertEqual(before, self.snapshot(clone))
         # Removing the skill keeps repository-owned roles.
-        self.call('project', 'unrequire', 'implement-rfc', '--project', clone, '--apply', cwd=clone)
+        self.call('remove', 'implement-rfc', '--project', clone, cwd=clone)
         self.assertTrue((clone / '.codex/agents/rfc-integrator.toml').is_file())
-        self.assertEqual(sorted(line.split()[-1] for line in self.git(clone, 'status', '--porcelain', '--untracked-files=no').splitlines()), ['.mask.json', 'README.md'])
+        self.assertEqual(sorted(line.split()[-1] for line in self.git(clone, 'status', '--porcelain', '--untracked-files=no').splitlines()), ['.mask.json', '.mask.lock.json', 'README.md'])
 
     def test_unrequire_retires_unchanged_managed_roles_and_releases_edited_ones(self):
         self.consumer(['alpha', 'implement-rfc'])
         self.call('ensure')
         edited = self.project / '.codex/agents/rfc-scout.toml'
         edited.write_text('# my local scout\n', encoding='utf-8')
-        result = self.call('project', 'unrequire', 'implement-rfc', '--apply')
+        result = self.call('remove', 'implement-rfc')
         removed = [a for a in result['actions'] if a['kind'] == 'native_role.remove']
         self.assertEqual(len(removed), 15)
         self.assertEqual([w['code'] for w in result['warnings']], ['native_role.released'])
@@ -207,8 +221,14 @@ mask.main(sys.argv[3:])
         asset = self.source / 'skills/implement-rfc/runtime/roles/codex/rfc-integrator.toml'
         descriptor = self.source / 'skills/implement-rfc/mask-workflow.json'
         original = asset.read_bytes()
+
+        def candidate(code):
+            # Package bytes reach a pinned consumer only through publish, an explicit fetch and a pinned update.
+            self.publish('workflow candidate')
+            self.call('source', 'fetch', TAP)
+            return self.call('update', '--project', self.project, code=code)
         asset.write_bytes(original + b'# drifted\n')
-        self.assertEqual(self.call('ensure', code=4)['error']['code'], 'workflow.invalid')
+        self.assertEqual(candidate(4)['error']['code'], 'workflow.invalid')
         self.assertFalse((self.project / '.agents/skills/implement-rfc').exists())
         value = json.loads(descriptor.read_text(encoding='utf-8'))
 
@@ -219,14 +239,15 @@ mask.main(sys.argv[3:])
                     role['asset']['sha256'] = sha256(data)
             descriptor.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
         republish(original + b'[hooks]\nenabled = true\n')
-        refused = self.call('ensure', code=4)
+        refused = candidate(4)
         self.assertEqual(refused['error']['code'], 'workflow.role_invalid')
         self.assertEqual(refused['error']['details']['field'], 'hooks')
         republish(original.replace(b'name = "rfc-integrator"', b'name = "rfc-critical-integrator"'))
-        drift = self.call('ensure', code=4)
+        drift = candidate(4)
         self.assertEqual(drift['error']['code'], 'workflow.role_invalid')
         self.assertEqual(drift['error']['details']['declared'], 'rfc-critical-integrator')
         republish(original)
+        candidate(0)
         self.assertEqual(self.call('ensure')['data']['scope_readiness'][0]['workflow'], 'complete')
 
     def test_two_skills_with_different_role_bytes_collide_and_are_preserved(self):
@@ -240,8 +261,7 @@ mask.main(sys.argv[3:])
         value['native_roles'] = [role for role in value['native_roles'] if role['asset']['path'].endswith('codex/rfc-integrator.toml')]
         value['native_roles'][0]['asset']['sha256'] = sha256(data)
         (other / 'mask-workflow.json').write_text(json.dumps(value) + '\n', encoding='utf-8')
-        self.git(self.source, 'add', 'skills')
-        self.git(self.source, 'commit', '-q', '-m', 'second workflow')
+        self.publish('second workflow')
         self.consumer(['implement-rfc', 'other-flow'])
         result = self.call('ensure', code=4)
         self.assertEqual(result['error']['code'], 'workflow.incomplete')

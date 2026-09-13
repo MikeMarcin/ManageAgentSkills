@@ -21,7 +21,8 @@ def device():
 def policy(value=None):
     if value is None:
         return dict(schema_version=1, enabled_agents=sorted(c.ADAPTERS), overrides=[])
-    r.canonical(value, 'selection_policy')
+    # Override identities are local stat numbers: Windows reports 64-bit volume serials and inodes up to 128 bits.
+    r.canonical(value, 'selection_policy', integer_limit=2 ** 128 - 1)
     c.fields(value, ('schema_version', 'enabled_agents', 'overrides'), family='selection_policy')
     enabled = r.strings(value['enabled_agents'], 'selection_policy', choices=set(c.ADAPTERS), empty=True)
     overrides = value['overrides']

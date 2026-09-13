@@ -4,11 +4,13 @@ import subprocess
 import unittest
 from pathlib import Path
 from tests.support import Fixture
+from tests.test_manifest_registry import declare_pinned
 
 
 class PlannerTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 planner)."""
     def setUp(self):
-        super().setUp(); self.init(); self.declare(); self.call('project', 'register', self.project)
+        super().setUp(); self.legacy_init(); self.declare(); self.call('project', 'register', self.project)
 
     def test_pure_plan_supporting_bytes_and_unmanaged_links(self):
         before = self.snapshot()
@@ -22,6 +24,22 @@ class PlannerTests(Fixture):
         self.assertEqual(plan['data']['blockers'][0]['code'], 'target.unmanaged_link')
         self.assertTrue(target.is_symlink())
 
+    def test_all_unavailable_and_poisoned_state(self):
+        moved = self.base / 'moved'; self.project.rename(moved)
+        plan = self.call('plan', '--all', cwd=self.base)
+        self.assertFalse(plan['data']['applicable'])
+        self.assertEqual(plan['data']['blockers'][0]['code'], 'project.unavailable')
+        path = self.home / 'state.json'; data = json.loads(path.read_text(encoding='utf-8'))
+        data['projects'][str(self.project)]['links']['../../outside'] = dict(skill='alpha', target='codex', link_text='/wrong')
+        path.write_text(json.dumps(data))
+        self.assertEqual(self.call('plan', '--all', cwd=self.base, code=3)['error']['code'], 'state.invalid')
+
+
+class PinnedPlannerTests(Fixture):
+    """Tap-first: a registered, not yet applied v2 consumer of the fixture tap."""
+    def setUp(self):
+        super().setUp(); self.init(); declare_pinned(self); self.call('project', 'register', self.project)
+
     def test_collision_and_linked_parent(self):
         target = self.project / '.claude/skills/alpha'; target.mkdir(parents=True)
         marker = target / 'mine'; marker.write_text('preserve')
@@ -31,16 +49,6 @@ class PlannerTests(Fixture):
         before = self.snapshot()
         self.assertFalse(self.call('plan')['data']['applicable'])
         self.assertEqual(before, self.snapshot())
-
-    def test_all_unavailable_and_poisoned_state(self):
-        moved = self.base / 'moved'; self.project.rename(moved)
-        plan = self.call('plan', '--all', cwd=self.base)
-        self.assertFalse(plan['data']['applicable'])
-        self.assertEqual(plan['data']['blockers'][0]['code'], 'project.unavailable')
-        path = self.home / 'state.json'; data = json.loads(path.read_text())
-        data['projects'][str(self.project)]['links']['../../outside'] = dict(skill='alpha', target='codex', link_text='/wrong')
-        path.write_text(json.dumps(data))
-        self.assertEqual(self.call('plan', '--all', cwd=self.base, code=3)['error']['code'], 'state.invalid')
 
     def test_case_aliases_on_case_insensitive_filesystem(self):
         alias = self.project.with_name(self.project.name.upper())

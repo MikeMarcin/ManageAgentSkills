@@ -9,6 +9,7 @@ import json
 import shutil
 
 from tests.public_support import PublicFixture, CONSUMER_CONTEXT
+from tests.support import TAP
 
 
 def links(root):
@@ -22,9 +23,12 @@ class FreshScopes(PublicFixture):
         run = self.human('install', 'alpha')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
-        self.assertIn('added: alpha', run.stdout)
+        self.assertIn(f'added: {TAP}/alpha', run.stdout)
         self.assertEqual(links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
-        self.assertEqual(json.loads((self.project / '.mask.json').read_text(encoding='utf-8')), dict(schema_version=1, skills=['alpha']))
+        # RFC-MASK-0020: a fresh declaration on a tap catalog machine is a v2 selection of the fixture tap.
+        self.assertEqual(json.loads((self.project / '.mask.json').read_text(encoding='utf-8')),
+                         dict(schema_version=2, sources={TAP: dict(repository=self.upstream.as_uri(), packages='skills')},
+                              default_agents=['claude', 'codex'], skills=[dict(source=TAP, id='alpha')]))
         registered = self.machine('project', 'list')['data']['projects']
         self.assertEqual([entry['root'] for entry in registered], [str(self.project)])
         listing = self.human('list')
@@ -33,6 +37,8 @@ class FreshScopes(PublicFixture):
         self.assertIn('2 of 2 managed links in place', listing.stdout)
 
     def test_dry_run_from_fresh_project_writes_nothing(self):
+        # A dry run never fetches; the machine's tap cache is acquired first, as the live checkout used to exist. The scope stays fresh.
+        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
         run = self.machine('install', 'alpha', '--dry-run')
         self.assertTrue(run['would_change'])
         self.assertFalse(run['changed'])
@@ -46,9 +52,9 @@ class FreshScopes(PublicFixture):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
         self.assertFalse((self.project / '.mask.json').exists())
-        self.assertEqual(json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills'], ['alpha'])
+        self.assertEqual(json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills'], [dict(source=TAP, id='alpha')])
         listing = self.machine('list', '--user', cwd=self.base)['data']
-        self.assertEqual([row['skill'] for row in listing['skills']], ['alpha'])
+        self.assertEqual([row['skill'] for row in listing['skills']], [TAP + '/alpha'])
         self.assertEqual(listing['links'], dict(expected=2, linked=2))
 
     def test_reinstall_and_second_scope_are_independent_no_ops(self):
@@ -58,14 +64,14 @@ class FreshScopes(PublicFixture):
         again = self.machine('install', 'alpha')
         self.assertFalse(again['changed'])
         self.assertFalse(again['would_change'])
-        self.assertEqual(again['data']['already'], ['alpha'])
+        self.assertEqual(again['data']['already'], [TAP + '/alpha'])
         self.assertEqual((self.home / 'state.json').read_text(encoding='utf-8'), state_before)
         self.assertEqual(links(self.personal), ['.agents/skills/beta', '.claude/skills/beta'])
         removed = self.machine('remove', 'alpha')
         self.assertTrue(removed['changed'])
         self.assertEqual(links(self.project), [])
         self.assertEqual(links(self.personal), ['.agents/skills/beta', '.claude/skills/beta'])
-        self.assertEqual(json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills'], ['beta'])
+        self.assertEqual(json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills'], [dict(source=TAP, id='beta')])
 
     def test_remove_without_registration_and_unknown_skill_are_precise(self):
         run = self.human('remove', 'alpha')
@@ -91,9 +97,9 @@ class PinnedScopes(PublicFixture):
     """C03/C05: v2 pins and per-binding targets are retained; bare names never pick a first match."""
 
     def pinned_project(self):
+        # On a tap catalog machine a fresh install is already pinned; no migration is needed to reach v2 pins.
         self.assertTrue(self.machine('install', 'alpha', 'beta')['ok'])
-        self.assertTrue(self.machine('migrate', '--to-pinned', '--project', self.project)['ok'])
-        self.assertTrue(self.machine('project', 'set-agents', 'legacy/alpha', 'codex', '--apply')['ok'])
+        self.assertTrue(self.machine('project', 'set-agents', TAP + '/alpha', 'codex', '--apply')['ok'])
         return json.loads((self.project / '.mask.json').read_text(encoding='utf-8')), json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))
 
     def rows(self):
@@ -114,8 +120,8 @@ class PinnedScopes(PublicFixture):
         self.assertEqual(bindings['implement-rfc'].get('agents'), ['claude'])
         listing = self.machine('list')['data']
         states = {row['skill']: row['states'] for row in listing['skills']}
-        self.assertEqual(states['legacy/alpha'], dict(claude='excluded', codex='linked'))
-        self.assertEqual(states['legacy/implement-rfc'], dict(claude='linked', codex='excluded'))
+        self.assertEqual(states[TAP + '/alpha'], dict(claude='excluded', codex='linked'))
+        self.assertEqual(states[TAP + '/implement-rfc'], dict(claude='linked', codex='excluded'))
         again = self.machine('install', 'implement-rfc')
         self.assertFalse(again['would_change'])
         self.assertEqual(bindings['implement-rfc'], {row['id']: row for row in json.loads((self.project / '.mask.json').read_text(encoding='utf-8'))['skills']}['implement-rfc'])
@@ -156,8 +162,9 @@ class PinnedScopes(PublicFixture):
         self.assertFalse((self.home / 'user.json').exists())
         ambiguous = self.machine('install', 'alpha', '--user', cwd=self.base)
         self.assertEqual(ambiguous['error']['code'], 'skill.ambiguous')
-        self.assertEqual(ambiguous['error']['details']['choices'], ['legacy/alpha', 'other/alpha'])
-        self.assertEqual(sorted(item['source'] for item in ambiguous['data']['acquisitions']), ['legacy', 'other'])
+        self.assertEqual(ambiguous['error']['details']['choices'], [TAP + '/alpha', 'other/alpha'])
+        # Acquisitions are the taps fetched by this resolution: the fixture tap's cache is already warm from the pinned install.
+        self.assertEqual(sorted(item['source'] for item in ambiguous['data']['acquisitions']), ['other'])
         self.assertFalse((self.home / 'user.json').exists())
         self.assertEqual(links(self.personal), [])
         qualified = self.machine('install', 'other/alpha', '--user', cwd=self.base)

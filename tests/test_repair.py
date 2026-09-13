@@ -48,13 +48,10 @@ class Repair(SetupFixture):
         broken = self.base / 'aaa broken project'
         broken.mkdir()
         self.git(broken, 'init', '-b', 'main')
-        self.machine('project', 'init', '--project', broken)
-        self.machine('project', 'register', '--project', broken)
+        self.declare_consumer(broken, [])
         (broken / '.mask.json').write_text('invalid json', encoding='utf-8')
         shutil.copytree(CONSUMER_CONTEXT, self.personal / '.mask')
-        self.machine('user', 'init')
-        self.machine('user', 'register')
-        self.machine('user', 'require', 'implement-rfc')
+        self.declare_consumer(self.personal, ['implement-rfc'], user=True)
         result = self.machine('ensure', '--all', '--repair')
         self.assertEqual(result['error']['code'], 'repair.incomplete')
         rows = {row['root']: row for row in result['data']['repair_results']}
@@ -154,9 +151,7 @@ class StaticRepair(WorkflowFixture):
 class PinnedRepair(Fixture):
     def test_explicit_repair_works_without_persistent_approval_for_pinned_consumer(self):
         self.init()
-        self.declare()
-        self.call('project', 'register', '--apply')
-        self.call('migrate', '--to-pinned')
+        self.install('alpha')  # A fresh install on a tap catalog machine is already pinned.
         result = self.call('ensure', '--project', self.project, '--repair')
         self.assertTrue(result['ok'], result)
         self.assertEqual(result['data']['approval'], 'not_approved')

@@ -4,7 +4,7 @@ import unittest
 import mask_core as c
 import mask_resolve as r
 import mask_selection as selection
-from tests.support import Fixture
+from tests.support import TAP, Fixture
 
 
 def contribution(origin, *, source='vendor', repository='https://example.invalid/skills', agents='all', commit='a' * 40, payload='1' * 64, when=None):
@@ -82,16 +82,14 @@ class PublicConflictTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.call('source', 'migrate')
         second = self.base / 'second source'
-        self.git(self.base, 'clone', '--no-hardlinks', str(self.source), str(second))
+        self.git(self.base, 'clone', '--no-hardlinks', str(self.upstream), str(second))
         self.call('tap', 'add', 'other', str(second))
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.call('source', 'fetch', 'other')
         self.declaration = dict(schema_version=2,
-                                sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main'),
-                                         'other': dict(repository=second.as_uri(), ref='refs/heads/main')},
-                                skills=[dict(source='legacy', id='alpha', agents=['codex']),
+                                sources=dict(self.binding(), other=dict(repository=second.as_uri(), ref='refs/heads/main')),
+                                skills=[dict(source=TAP, id='alpha', agents=['codex']),
                                         dict(source='other', id='alpha', agents=['claude'])])
         (self.project / '.mask.json').write_text(json.dumps(self.declaration))
         self.call('lock')
@@ -108,7 +106,7 @@ class PublicConflictTests(Fixture):
         result = self.call('project', 'set-agents', 'other/alpha', 'codex', '--apply', code=4)
         self.assertEqual(result['error']['code'], 'target.collision')
         candidates = result['error']['details']['conflicts'][0]['candidates']
-        self.assertEqual({row['coordinate'] for row in candidates}, {'legacy/alpha', 'other/alpha'})
+        self.assertEqual({row['coordinate'] for row in candidates}, {TAP + '/alpha', 'other/alpha'})
         self.assertTrue(all(row['resolution']['payload_digest'].startswith('sha256:') for row in candidates))
         self.assertEqual(before, self.snapshot())
         self.assertFalse(self.call('apply')['changed'])
@@ -147,9 +145,9 @@ class PublicConflictTests(Fixture):
         second = self.base / 'second source'
         (second / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Divergent fixture skill\n---\n\nOther instructions.\n')
         self.git(second, 'add', '-A')
-        self.git(second, 'commit', '-q', '-m', 'diverge alpha')
+        self.git(second, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'diverge alpha')
         self.call('source', 'fetch', 'other')
-        # The project takes codex/alpha from 'legacy'; the personal scope takes the same name from 'other'.
+        # The project takes codex/alpha from the fixture tap; the personal scope takes the same name from 'other'.
         (self.home / 'user.json').write_text(json.dumps(dict(self.declaration, skills=[dict(source='other', id='alpha', agents=['codex'])])))
         self.call('lock', '--user')
         result = self.call('user', 'register', '--user-home', personal, '--apply')

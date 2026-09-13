@@ -10,23 +10,32 @@ import mask_core as c
 import mask_fs as fs
 import mask_resolve as r
 import mask_selection as selection
-from tests.support import ENTRY, Fixture
+from tests.support import ENTRY, TAP, Fixture
+
+ALPHA = TAP + '/alpha'
+
+
+def authoring_init(fixture):
+    """Bootstrap the fixture tap with ``fixture.source`` as its approved authoring checkout; its origin names the tap identity."""
+    fixture.git(fixture.source, 'remote', 'add', 'origin', str(fixture.upstream))
+    return fixture.call('tap', 'add', TAP, fixture.upstream, '--checkout', fixture.source)
 
 
 class CompatibilityTests(Fixture):
+    # Development links need an approved authoring checkout on the tap; every other test starts from init().
+    AUTHORING = {'test_live_dev_metadata_is_used_and_duplicate_destinations_refuse'}
+
     def setUp(self):
         super().setUp()
-        self.init()
-        self.call('source', 'migrate')
-        self.declaration = dict(schema_version=2, sources={'legacy': dict(repository=self.source.as_uri(), ref='refs/heads/main')}, skills=[dict(source='legacy', id='alpha')])
+        authoring_init(self) if self._testMethodName in self.AUTHORING else self.init()
+        self.declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha')])
         (self.project / '.mask.json').write_text(json.dumps(self.declaration))
 
     def prepare(self, metadata=None, apply=False):
         if metadata is not None:
             (self.source / 'skills/alpha/mask-skill.json').write_text(json.dumps(metadata))
-            self.git(self.source, 'add', '.')
-            self.git(self.source, 'commit', '-m', 'publisher metadata')
-        self.call('source', 'fetch', 'legacy')
+            self.publish('publisher metadata')
+        self.call('source', 'fetch', TAP)
         self.call('lock')
         if apply:
             self.call('project', 'register', '--apply')
@@ -44,7 +53,7 @@ class CompatibilityTests(Fixture):
         self.call('project', 'register', '--apply', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
         before = self.snapshot()
-        blocked = self.call('project', 'set-agents', 'legacy/alpha', 'claude', '--apply', code=4)
+        blocked = self.call('project', 'set-agents', ALPHA, 'claude', '--apply', code=4)
         self.assertEqual(blocked['error']['code'], 'compatibility.unsupported')
         self.assertEqual(before, self.snapshot())
 
@@ -56,7 +65,7 @@ class CompatibilityTests(Fixture):
         facts = dict(platform='linux', architecture='x86_64')
         def evaluate(metadata, contributions=None):
             with patch('shutil.which', side_effect=AssertionError('must not detect executables')):
-                return selection.evaluate(contributions or [contribution], {'legacy/alpha': metadata}, facts=facts,
+                return selection.evaluate(contributions or [contribution], {ALPHA: metadata}, facts=facts,
                                           enabled_agents=['claude', 'codex'], scope='project', root=self.project, identity=c.identity(self.project))
         for metadata, expected in [(None, 'unspecified'), (dict(schema_version=1, agents='generic'), 'generic_asserted'), (dict(schema_version=1, platforms=['linux']), 'specific_asserted')]:
             result = evaluate(metadata)
@@ -75,24 +84,24 @@ class CompatibilityTests(Fixture):
         for name in ('.mask.json', '.mask.lock.json'):
             (other / name).write_bytes((self.project / name).read_bytes())
         self.call('project', 'register', '--project', other, '--apply')
-        preview = self.call('compatibility', 'override', 'legacy/alpha', '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use', '--dry-run')
+        preview = self.call('compatibility', 'override', ALPHA, '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use', '--dry-run')
         self.assertEqual(preview['data']['affected_scopes'], [str(self.project)])
-        result = self.call('compatibility', 'override', 'legacy/alpha', '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use', '--expect-plan-hash', preview['data']['plan_hash'])
+        result = self.call('compatibility', 'override', ALPHA, '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
         self.assertFalse((other / '.claude/skills/alpha').exists())
         self.assertIn('overridden', {row['status'] for row in result['data']['outcomes']})
-        self.call('compatibility', 'override', 'legacy/alpha', '--project', other, '--agent', 'claude', '--reason', 'Second scope')
+        self.call('compatibility', 'override', ALPHA, '--project', other, '--agent', 'claude', '--reason', 'Second scope')
         policy_bytes = (self.home / 'selection-policy.json').read_bytes()
-        self.assertFalse(self.call('compatibility', 'override', 'legacy/alpha', '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use')['changed'])
+        self.assertFalse(self.call('compatibility', 'override', ALPHA, '--project', self.project, '--agent', 'claude', '--reason', 'Reviewed local use')['changed'])
         self.assertEqual(policy_bytes, (self.home / 'selection-policy.json').read_bytes())
-        self.call('compatibility', 'override', 'legacy/alpha', '--project', self.project, '--agent', 'unknown', '--reason', 'cannot grant adapter', code=4)
+        self.call('compatibility', 'override', ALPHA, '--project', self.project, '--agent', 'unknown', '--reason', 'cannot grant adapter', code=4)
         self.assertEqual(policy_bytes, (self.home / 'selection-policy.json').read_bytes())
         self.call('selection-policy', 'set', '--agent', 'codex')
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
-        self.call('project', 'set-agents', 'legacy/alpha', 'claude', '--apply', code=4)
+        self.call('project', 'set-agents', ALPHA, 'claude', '--apply', code=4)
         self.call('selection-policy', 'clear')
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
-        self.call('compatibility', 'clear', 'legacy/alpha', '--project', self.project)
+        self.call('compatibility', 'clear', ALPHA, '--project', self.project)
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
         self.assertTrue((other / '.claude/skills/alpha').is_symlink())
         remaining = c.read_json(self.home / 'selection-policy.json')['overrides']
@@ -122,16 +131,16 @@ class CompatibilityTests(Fixture):
     def test_live_dev_metadata_is_used_and_duplicate_destinations_refuse(self):
         self.prepare(apply=True)
         (self.source / 'skills/alpha/mask-skill.json').write_text(json.dumps(dict(schema_version=1, agents=['codex'])))
-        self.call('source', 'dev-link', 'legacy/alpha', '--project', self.project, '--authoring-root', self.source)
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--authoring-root', self.source)
         self.assertFalse((self.project / '.claude/skills/alpha').exists())
         self.assertEqual(self.call('project', 'show')['data']['mode'], 'dev-link')
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'dev_link.active')
-        self.call('source', 'dev-link', 'legacy/alpha', '--project', self.project, '--to-pinned')
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--to-pinned')
         self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
-        self.call('tap', 'add', 'second', str(self.source))
+        self.call('tap', 'add', 'second', str(self.upstream))
         self.call('source', 'fetch', 'second')
         declaration = c.read_json(self.project / '.mask.json')
-        declaration['sources']['second'] = dict(declaration['sources']['legacy'])
+        declaration['sources']['second'] = dict(declaration['sources'][TAP])
         declaration['skills'].append(dict(source='second', id='alpha'))
         (self.project / '.mask.json').write_text(json.dumps(declaration))
         self.call('update', '--project', self.project, code=4)
@@ -141,7 +150,7 @@ class CompatibilityTests(Fixture):
     def test_recovery_rederives_links_from_effective_after_policy(self):
         self.prepare(dict(schema_version=1, agents=['codex']), apply=True)
         script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label=='intent' else None;mask.main(sys.argv[2:])"
-        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'compatibility', 'override', 'legacy/alpha', '--project', str(self.project), '--agent', 'claude', '--reason', 'Reviewed', '--home', str(self.home), '--json'], capture_output=True, text=True)
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'compatibility', 'override', ALPHA, '--project', str(self.project), '--agent', 'claude', '--reason', 'Reviewed', '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
         journal = c.read_json(self.home / 'pending.json')
         bad = copy.deepcopy(journal)
@@ -176,7 +185,7 @@ class CompatibilityTests(Fixture):
                 self.assertTrue(output['changed'])
                 self.assertEqual((self.home / 'selection-policy.json').read_text(), altered)
                 journal = c.read_json(self.home / 'pending.json')
-                (self.home / 'selection-policy.json').write_text(journal['selection_change']['policy_after'])
+                (self.home / 'selection-policy.json').write_bytes(journal['selection_change']['policy_after'].encode('utf-8'))
                 self.call('recover', '--rollback')
                 self.assertFalse((self.home / 'selection-policy.json').exists())
                 self.assertTrue((self.project / '.claude/skills/alpha').is_symlink())
@@ -193,6 +202,9 @@ class PolicyModelTests(unittest.TestCase):
         override = dict(root=root, identity=c.identity(ENTRY.parent), coordinate='vendor/alpha', reason='Reviewed', agents=['codex'])
         valid = dict(schema_version=1, enabled_agents=['codex'], overrides=[override])
         self.assertEqual(selection.policy(valid), valid)
+        wide = copy.deepcopy(valid)
+        wide['overrides'][0]['identity'] = dict(device=2 ** 64 - 1, inode=2 ** 64 - 1)
+        self.assertEqual(selection.policy(wide), wide)
         for field, value in [('root', root + '/../escape'), ('reason', ''), ('agents', ['unknown']), ('identity', dict(device=1.0, inode=2))]:
             bad = copy.deepcopy(valid)
             bad['overrides'][0][field] = value

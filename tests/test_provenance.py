@@ -2,40 +2,43 @@ import json
 
 import mask_core as c
 import mask_provenance as provenance
+from tests.support import TAP
 from tests.test_imports import ImportFixture
+
+GAMMA = TAP + '/gamma'
 
 
 class ProvenanceTests(ImportFixture):
     def test_direct_git_verification_and_explicit_adaptation_history(self):
         self.import_call()
         before = self.snapshot()
-        observed = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        observed = self.call('skill', 'provenance', GAMMA)['data']
         self.assertEqual(observed['verification'], 'verified_git_objects')
         self.assertEqual(observed['record_trust'], 'local_assertions')
         self.assertFalse(observed['unrecorded_adaptations'])
         self.assertEqual(before, self.snapshot())
         (self.target / 'raw.bin').write_bytes(b'adapted locally')
-        observed = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        observed = self.call('skill', 'provenance', GAMMA)['data']
         self.assertTrue(observed['unrecorded_adaptations'])
         before = self.snapshot()
-        preview = self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'Adapted binary fixture', '--dry-run')
+        preview = self.call('skill', 'record-adaptation', GAMMA, '--note', 'Adapted binary fixture', '--dry-run')
         self.assertEqual(before, self.snapshot())
-        result = self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'Adapted binary fixture', '--expect-plan-hash', preview['data']['plan_hash'])
+        result = self.call('skill', 'record-adaptation', GAMMA, '--note', 'Adapted binary fixture', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertEqual(result['data']['changed_paths'], [str(self.target / provenance.RECORD)])
-        observed = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        observed = self.call('skill', 'provenance', GAMMA)['data']
         self.assertFalse(observed['unrecorded_adaptations'])
         self.assertEqual(observed['record']['adaptations'][0]['note'], 'Adapted binary fixture')
         self.assertEqual(observed['record']['upstream']['commit'], self.commit)
-        self.assertFalse(self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'No change')['changed'])
+        self.assertFalse(self.call('skill', 'record-adaptation', GAMMA, '--note', 'No change')['changed'])
 
     def test_missing_history_and_missing_cache_never_invent_verified_origin(self):
-        absent = self.call('skill', 'provenance', 'legacy/alpha')['data']
+        absent = self.call('skill', 'provenance', TAP + '/alpha')['data']
         self.assertEqual(absent['history'], 'absent')
         self.assertIsNone(absent['upstream'])
-        self.assertEqual(self.call('skill', 'record-adaptation', 'legacy/alpha', '--note', 'Unknown history', code=4)['error']['code'], 'provenance.absent')
+        self.assertEqual(self.call('skill', 'record-adaptation', TAP + '/alpha', '--note', 'Unknown history', code=4)['error']['code'], 'provenance.absent')
         self.import_call()
         self.call('tap', 'remove', 'vendor')
-        observed = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        observed = self.call('skill', 'provenance', GAMMA)['data']
         self.assertEqual(observed['verification'], 'recorded_only')
         self.assertIsNone(observed['verified_git_facts'])
 
@@ -49,7 +52,7 @@ class ProvenanceTests(ImportFixture):
         next(item for item in record['curated']['files'] if item['path'] == name)['sha256'] = '0' * 64
         record['curated']['content_digest'] = c.digest(record['curated']['files'])
         path.write_text(c.text_json(record))
-        observed = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        observed = self.call('skill', 'provenance', GAMMA)['data']
         self.assertEqual(observed['verification'], 'mismatch')
         self.assertIsNone(observed['verified_git_facts'])
 
@@ -57,16 +60,16 @@ class ProvenanceTests(ImportFixture):
         self.import_call()
         path = self.target / 'raw.bin'
         path.write_bytes(b'first edit')
-        preview = self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'First edit', '--dry-run')
+        preview = self.call('skill', 'record-adaptation', GAMMA, '--note', 'First edit', '--dry-run')
         path.write_bytes(b'second edit')
-        self.assertEqual(self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'First edit', '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'], 'plan.stale')
+        self.assertEqual(self.call('skill', 'record-adaptation', GAMMA, '--note', 'First edit', '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'], 'plan.stale')
         record = json.loads((self.target / provenance.RECORD).read_bytes())
         self.assertEqual(record['adaptations'], [])
         unrelated = self.base / 'private-file'
         unrelated.write_bytes(b'do not read through link')
         path.unlink()
         path.symlink_to(unrelated)
-        self.assertEqual(self.call('skill', 'provenance', 'legacy/gamma', code=4)['error']['code'], 'skill.entry_unsupported')
+        self.assertEqual(self.call('skill', 'provenance', GAMMA, code=4)['error']['code'], 'skill.entry_unsupported')
         self.assertEqual(unrelated.read_bytes(), b'do not read through link')
 
     def test_tap_queries_use_frozen_cache_and_treat_embedded_records_as_assertions(self):
@@ -77,19 +80,23 @@ class ProvenanceTests(ImportFixture):
         self.assertEqual(absent['history'], 'absent')
         self.assertEqual(before, self.snapshot())
         self.import_call()
-        self.git(self.source, 'add', 'skills/gamma')
-        self.git(self.source, 'commit', '-m', 'fixture curated import')
+        # Commit the curated import and push it to the tap upstream, so both taps can fetch it.
+        self.publish('fixture curated import')
         self.call('tap', 'add', 'published', self.source)
         self.call('source', 'fetch', 'published')
         published = self.call('skill', 'provenance', 'published/gamma')['data']
         self.assertEqual(published['record_trust'], 'publisher_assertions')
         self.assertEqual(published['verification'], 'verified_git_objects')
         self.assertEqual(published['observation'], 'frozen_cache')
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.git(self.source, 'checkout', '-b', 'other')
-        alternate = self.call('skill', 'provenance', 'legacy/gamma')['data']
+        alternate = self.call('skill', 'provenance', GAMMA)['data']
         self.assertEqual(alternate['observation'], 'frozen_cache')
-        self.assertEqual(self.call('skill', 'record-adaptation', 'legacy/gamma', '--note', 'Wrong branch', code=4)['error']['code'], 'source.detached')
+        # The authoring checkout has an origin naming the tap, so a wrong branch is an identity mismatch and a detached HEAD is detached.
+        self.assertEqual(self.call('skill', 'record-adaptation', GAMMA, '--note', 'Wrong branch', code=4)['error']['code'], 'source.identity_mismatch')
+        self.git(self.source, 'checkout', '-q', '--detach')
+        self.assertEqual(self.call('skill', 'provenance', GAMMA)['data']['observation'], 'frozen_cache')
+        self.assertEqual(self.call('skill', 'record-adaptation', GAMMA, '--note', 'Wrong branch', code=4)['error']['code'], 'source.detached')
 
     def test_root_skill_provenance_works_in_cached_and_authoring_scopes(self):
         (self.author / 'SKILL.md').write_text('---\nname: rootitem\ndescription: Root fixture\n---\n')

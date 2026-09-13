@@ -5,11 +5,13 @@ import sys
 import unittest
 from tests.support import ENTRY
 from tests.support import Fixture
+from tests.test_manifest_registry import declare_pinned
 
 
 class ApplyTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100 retires this behavior (v1 planner and engine)."""
     def setUp(self):
-        super().setUp(); self.init(); self.declare(); self.call('project', 'register', self.project)
+        super().setUp(); self.legacy_init(); self.declare(); self.call('project', 'register', self.project)
 
     def test_convergence_guard_noop_owned_removal(self):
         preview = self.call('plan')
@@ -46,11 +48,6 @@ class ApplyTests(Fixture):
         source = self.source / 'skills/alpha'; source.rename(self.source / 'removed')
         self.call('project', 'unrequire', 'alpha', '--apply')
         self.assertFalse(leaf.is_symlink())
-
-    def test_unregister_preserves_declaration(self):
-        self.call('apply'); self.call('project', 'unregister', self.project)
-        self.assertTrue((self.project / '.mask.json').is_file())
-        self.assertFalse((self.project / '.agents/skills/alpha').is_symlink())
 
     def test_late_failure_rolls_back_links_but_reports_retained_directories(self):
         code = """
@@ -95,11 +92,25 @@ raise SystemExit(mask.main(['apply', '--project', sys.argv[2], '--home', sys.arg
                 mask_fs.set_link(entry, 'after')
         self.assertEqual(caught.exception.code, 'target.symlink_unsupported')
 
+
+class PinnedApplyTests(Fixture):
+    """Tap-first: a registered, not yet applied v2 consumer of the fixture tap."""
+    def setUp(self):
+        super().setUp(); self.init(); declare_pinned(self); self.call('project', 'register', self.project)
+
+    def test_unregister_preserves_declaration(self):
+        self.call('apply'); self.call('project', 'unregister', self.project)
+        self.assertTrue((self.project / '.mask.json').is_file())
+        self.assertFalse((self.project / '.agents/skills/alpha').is_symlink())
+
     def test_all_projects_preflight_before_first_effect(self):
         other = self.base / 'second-project'; other.mkdir()
-        (other / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])))
+        declare_pinned(self, other, fetch=False)
         self.call('project', 'register', other)
         collision = other / '.claude/skills/alpha'; collision.mkdir(parents=True)
+        # Warm the content store first: apply prepares artifacts outside the writer, and this test is about consumer effects.
+        for root in (self.project, other):
+            self.call('source', 'fetch', '--locked', '--project', root)
         before = self.snapshot()
         self.call('apply', '--all', code=4)
         self.assertEqual(before, self.snapshot())

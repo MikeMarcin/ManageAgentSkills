@@ -12,7 +12,6 @@ import re
 import mask_core as c
 import mask_packages as p
 import mask_sources as s
-from mask_provenance import regular_bytes
 
 MODEL_BYTES = 4 * 1024 * 1024
 BINDINGS = 4096
@@ -27,7 +26,13 @@ def invalid(family, message):
     c.fail(family + '.invalid', message, 4)
 
 
-def canonical(value, family='selection'):
+def regular_bytes(pathname, limit):
+    # Imported on use: mask_provenance imports this module indirectly, so a top-level import is circular when it loads first.
+    from mask_provenance import regular_bytes as read
+    return read(pathname, limit)
+
+
+def canonical(value, family='selection', integer_limit=2 ** 53 - 1):
     """Canonical UTF-8 bytes; callers validate closed schemas before hashing."""
     def walk(item, depth=0):
         if depth > 32:
@@ -35,7 +40,7 @@ def canonical(value, family='selection'):
         if item is None or type(item) is bool:
             return
         if type(item) is int:
-            if not 0 <= item <= 2 ** 53 - 1:
+            if not 0 <= item <= integer_limit:
                 invalid(family, 'Integers must be nonnegative JSON-safe integers.')
         elif isinstance(item, str):
             try:

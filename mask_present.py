@@ -716,7 +716,7 @@ EVERYDAY = [
 def compact_help(version, groups):
     lines = [f'mask {version} - Manage Agent Skills', 'usage: mask COMMAND [OPTIONS]',
              'Link shared skills into Claude Code and Codex projects.', '',
-             'Start here:', '  mask init --source /path/to/AgentSkills   # select your skill checkout once',
+             'Start here:', '  mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a skill source once',
              '  mask skill list                         # find a skill ID',
              '  mask install implement-rfc              # add it to the current project',
              '  mask ensure                             # finish any required setup',
@@ -746,7 +746,7 @@ def compact_help(version, groups):
 
 # Parser-owned help uses these descriptions without changing the command grammar.
 COMMAND_HELP = {
-    'init': ('Select the local checkout that supplies your skills.', 'mask init --source /path/to/AgentSkills'),
+    'init': ('Create an empty machine tap catalog. mask tap add creates it automatically when it is missing.', 'mask init\nmask init --target codex --git-timeout 60'),
     'install': ('Add skills and deploy their links. Uses the current project unless --project or --user is supplied. Other selections are kept.', 'mask install implement-rfc\nmask install wizard --user\nmask install wizard --project /path/to/project --dry-run'),
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),

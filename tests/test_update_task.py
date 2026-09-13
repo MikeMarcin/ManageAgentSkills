@@ -17,7 +17,12 @@ from tests.public_support import ENTRY, PublicFixture
 
 
 class SharedSourceFixture(PublicFixture):
-    """A source tracking a local bare remote, one upstream author clone and one legacy consumer."""
+    """A source tracking a local bare remote, one upstream author clone and one legacy consumer.
+
+    Legacy live-checkout starting state until MASK-0101 retires the shared-checkout update.
+    """
+
+    bootstrap = PublicFixture.legacy_bootstrap
 
     def setUp(self):
         super().setUp()
@@ -32,7 +37,8 @@ class SharedSourceFixture(PublicFixture):
         installed = self.human('install', 'alpha')
         self.assertEqual(installed.returncode, 0, installed.stderr)
 
-    def upstream(self, text='Updated instructions.'):
+    def push_upstream(self, text='Updated instructions.'):
+        # Named apart from PublicFixture.upstream, the tap's bare repository path.
         path = self.author / 'skills/alpha/SKILL.md'
         path.write_text(path.read_text(encoding='utf-8') + '\n' + text + '\n', encoding='utf-8')
         self.git(self.author, 'add', 'skills')
@@ -59,7 +65,7 @@ class NormalUpdate(SharedSourceFixture):
     """C16: fetch, freeze, impact, activation and verification in one plain invocation."""
 
     def test_plain_update_fetches_and_activates_in_one_invocation(self):
-        candidate = self.upstream()
+        candidate = self.push_upstream()
         run = self.human('update')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
@@ -75,7 +81,7 @@ class NormalUpdate(SharedSourceFixture):
         self.assertIn('no change needed', again.stdout)
 
     def test_json_reports_the_same_effects_as_one_document(self):
-        candidate = self.upstream()
+        candidate = self.push_upstream()
         done = self.machine('update')
         self.assertTrue(done['changed'])
         self.assertEqual(done['data']['source_after'], candidate)
@@ -88,7 +94,7 @@ class PreviewAndGuard(SharedSourceFixture):
 
     def test_dry_run_and_offline_do_not_fetch(self):
         old = self.head()
-        self.upstream()
+        self.push_upstream()
         preview = self.machine('update', '--dry-run')
         self.assertFalse(preview['data']['fetch_effects']['attempted'])
         self.assertTrue(preview['data']['requires_fetch'])
@@ -101,11 +107,11 @@ class PreviewAndGuard(SharedSourceFixture):
         self.assertEqual(self.tracking(), old)
 
     def test_guard_applies_the_previewed_candidate_even_after_the_remote_moves(self):
-        reviewed = self.upstream()
+        reviewed = self.push_upstream()
         self.assertTrue(self.machine('source', 'fetch')['ok'])
         preview = self.machine('update', '--dry-run')
         self.assertTrue(preview['would_change'])
-        newer = self.upstream('Later revision')
+        newer = self.push_upstream('Later revision')
         done = self.machine('update', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertTrue(done['changed'])
         self.assertFalse(done['data']['fetch_effects']['attempted'])
@@ -123,7 +129,7 @@ class ExpandedScope(SharedSourceFixture):
     def setUp(self):
         super().setUp()
         self.other = self.second_project()
-        self.upstream()
+        self.push_upstream()
 
     def affected(self):
         return sorted([str(self.project), str(self.other)])
@@ -161,7 +167,7 @@ class ExpandedScope(SharedSourceFixture):
         self.assertEqual(done['data']['confirmation']['granted_by'], 'expect-plan-hash')
         self.assertEqual(sorted(done['data']['scope']['affected']), self.affected())
         self.assertEqual(self.head(), self.tracking())
-        self.upstream('Second change')
+        self.push_upstream('Second change')
         everything = self.machine('update', '--all')
         self.assertTrue(everything['changed'])
         self.assertNotIn('confirmation', everything['data'])
@@ -172,7 +178,7 @@ class RecoveryAndBusy(SharedSourceFixture):
     """C20: pending recovery and a busy writer keep their existing exits; nothing is forced."""
 
     def test_pending_journal_refuses_before_any_fetch(self):
-        self.upstream()
+        self.push_upstream()
         pending = self.home / 'pending.json'
         pending.write_text('{"schema_version": 3}\n', encoding='utf-8')
         run = self.human('update')
@@ -184,7 +190,7 @@ class RecoveryAndBusy(SharedSourceFixture):
     @unittest.skipUnless(os.name == 'posix', 'fcntl writer lock')
     def test_busy_writer_is_reported_not_bypassed(self):
         import fcntl
-        self.upstream()
+        self.push_upstream()
         old = self.head()
         with (self.home / 'operation.lock').open('a+b') as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -201,7 +207,7 @@ class TerminalExpandedScope(SharedSourceFixture):
     def setUp(self):
         super().setUp()
         self.other = self.second_project()
-        self.candidate = self.upstream()
+        self.candidate = self.push_upstream()
 
     def terminal(self, *args, answer):
         import pty

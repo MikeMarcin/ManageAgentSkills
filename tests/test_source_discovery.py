@@ -3,7 +3,7 @@ from pathlib import Path
 
 import mask_core as c
 import mask_sources as sources
-from tests.support import Fixture
+from tests.support import TAP, Fixture
 
 
 def skill(name):
@@ -14,7 +14,6 @@ class DiscoveryTests(Fixture):
     def setUp(self):
         super().setUp()
         self.init()
-        self.call('source', 'migrate')
 
     def tap(self, name, files, layout='.', object_format='sha1'):
         author = self.base / (name + '-author')
@@ -43,10 +42,10 @@ class DiscoveryTests(Fixture):
         for remote in (root_remote, nested_remote):
             self.assertTrue(self.call('source', 'inspect', remote, '--dry-run')['data']['resolution_required'])
         self.assertEqual(before, self.snapshot())
-        for name in ('legacy', 'root', 'nested'):
+        for name in (TAP, 'root', 'nested'):
             self.call('source', 'fetch', name)
         before = self.snapshot()
-        self.assertEqual(self.call('skill', 'show', 'alpha', code=4)['error']['details']['choices'], ['legacy/alpha', 'root/alpha'])
+        self.assertEqual(self.call('skill', 'show', 'alpha', code=4)['error']['details']['choices'], [TAP + '/alpha', 'root/alpha'])
         self.assertIn('Instructions.', self.call('skill', 'show', 'root/alpha', '--content')['data']['content'])
         nested = self.call('skill', 'show', 'gamma')['data']
         self.assertEqual(nested['coordinate'], 'nested/gamma')
@@ -147,6 +146,6 @@ class DiscoveryTests(Fixture):
         _, remote = self.tap('active', {'SKILL.md': skill('active'), 'mask-source.json': json.dumps({
             'schema_version': 1, 'packages': {'active': '.'}, 'hooks': {'command': 'never-run'}})})
         self.assertEqual(self.call('source', 'inspect', remote, code=3)['error']['code'], 'source.invalid')
-        self.call('source', 'fetch', 'legacy')
+        self.call('source', 'fetch', TAP)
         self.assertEqual(self.call('skill', 'show', 'alpha', code=4)['error']['code'], 'source.resolution_required')
-        self.assertEqual(self.call('skill', 'show', 'legacy/alpha')['data']['id'], 'alpha')
+        self.assertEqual(self.call('skill', 'show', TAP + '/alpha')['data']['id'], 'alpha')

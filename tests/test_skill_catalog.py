@@ -6,19 +6,21 @@ from tests.support import Fixture
 
 class CatalogTests(Fixture):
     def test_init_dry_run_and_noop(self):
+        # init on an empty MASK_HOME writes an empty v3 tap catalog; it no longer selects a checkout.
         before = self.snapshot()
-        preview = self.call('init', '--source', self.source, '--dry-run')
+        preview = self.call('init', '--dry-run')
         self.assertFalse(preview['changed']); self.assertTrue(preview['would_change'])
         self.assertEqual(before, self.snapshot())
-        self.assertTrue(self.init()['changed'])
+        self.assertTrue(self.call('init')['changed'])
         before = self.snapshot()
-        self.assertFalse(self.init()['changed'])
+        self.assertFalse(self.call('init')['changed'])
         self.assertEqual(before, self.snapshot())
-        self.assertEqual(self.call('config', 'show')['data']['config']['source']['root'], str(self.source))
+        self.assertEqual(self.call('config', 'show')['data']['config']['sources'], {})
         self.assertNotEqual(self.call('config', 'show')['data']['program_root'], str(self.source))
 
     def test_inspection_is_passive(self):
-        self.init()
+        # Legacy live-checkout starting state until MASK-0100 retires the v1 catalog.
+        self.legacy_init()
         (self.source / 'skills/alpha/install.py').write_text('raise RuntimeError("never execute")')
         before = self.snapshot()
         self.assertEqual(len(self.call('skill', 'list')['data']['skills']), 2)
@@ -28,7 +30,8 @@ class CatalogTests(Fixture):
         self.assertEqual(before, self.snapshot())
 
     def test_source_links_and_unsupported_metadata(self):
-        self.init()
+        # Legacy live-checkout starting state until MASK-0100 retires the v1 catalog.
+        self.legacy_init()
         link = self.source / 'skills/alpha/support'
         link.symlink_to(self.project, target_is_directory=True)
         self.assertEqual(self.call('skill', 'show', 'alpha', code=3)['error']['code'], 'skill.path_escape')

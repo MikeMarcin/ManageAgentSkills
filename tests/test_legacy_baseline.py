@@ -7,10 +7,12 @@ and the current parsers accept every byte unchanged. Later doctor-migration test
 start from these states.
 
 ``LiveCheckoutBaseline`` records the defect RFC-MASK-0020 removes, through the
-public CLI of the base program, and proves the builder writes what that program
-wrote. It describes retired behavior. MASK-0099 (``init``), MASK-0100 (clone
-links, ``source migrate``, ``migrate``) and MASK-0101 (fetching ``update``) replace
-these assertions when they land. Evidence: docs/development/tap-cutover-baseline.md.
+public CLI, and proves the builder writes what the program wrote. It describes
+retired behavior. MASK-0099 removed ``init --source``: its bytes were compared with
+``v1_config`` at 82b4200 and the machine configuration now comes from the builder,
+while the program still writes everything after it. MASK-0100 (clone links,
+``source migrate``, ``migrate``) and MASK-0101 (fetching ``update``) replace the
+remaining assertions when they land. Evidence: docs/development/tap-cutover-baseline.md.
 """
 import json
 import os
@@ -119,6 +121,10 @@ class LiveCheckoutBaseline(LegacyFixture):
     def written(self):
         return snapshot(self.roots.base, self.roots.home, self.roots.project, self.roots.personal)
 
+    def live_checkout_machine(self):
+        """The v1 configuration and empty state that the retired ``init --source CLONE`` wrote (compared at 82b4200)."""
+        write_machine(self.roots, 1, project_skills=None, user_skills=None, straggler_skills=None)
+
     def assert_builder_reproduces(self, version, **options):
         """Remove only what the program wrote, let the builder write that state again and compare every byte and link."""
         observed = self.written()
@@ -137,9 +143,9 @@ class LiveCheckoutBaseline(LegacyFixture):
         git(self.roots.clone, 'push', '-q', 'origin', 'main')
         return git(self.roots.clone, 'rev-parse', 'HEAD')
 
-    def test_init_source_and_install_link_project_and_personal_scope_into_the_clone(self):
+    def test_legacy_install_links_project_and_personal_scope_into_the_clone(self):
         roots = self.roots
-        self.machine('init', '--source', roots.clone)
+        self.live_checkout_machine()
         self.assertEqual((roots.home / 'config.json').read_bytes().decode('utf-8'), text_json(v1_config(roots)))
         self.machine('install', 'alpha', '--project', roots.project)
         self.machine('install', 'beta', '--user')
@@ -154,7 +160,7 @@ class LiveCheckoutBaseline(LegacyFixture):
 
     def test_source_migrate_keeps_the_clone_as_the_legacy_binding(self):
         roots = self.roots
-        self.machine('init', '--source', roots.clone)
+        self.live_checkout_machine()
         self.machine('install', 'alpha', '--project', roots.project)
         self.machine('install', 'beta', '--user')
         links = self.clone_links()
@@ -171,7 +177,7 @@ class LiveCheckoutBaseline(LegacyFixture):
     def test_empty_registry_and_remote_less_clone_match_the_builder(self):
         roots = self.roots
         git(roots.clone, 'remote', 'remove', 'origin')
-        self.machine('init', '--source', roots.clone)
+        self.live_checkout_machine()
         self.assertEqual((roots.home / 'state.json').read_bytes().decode('utf-8'), text_json(legacy_state()))
         self.machine('source', 'migrate')
         self.assertEqual((roots.home / 'config.json').read_bytes().decode('utf-8'), text_json(v2_config(roots, extra_tap=False)))
@@ -184,7 +190,7 @@ class LiveCheckoutBaseline(LegacyFixture):
         def locked():
             return json.loads(lock.read_text(encoding='utf-8'))['packages'][0]['commit']
 
-        self.machine('init', '--source', roots.clone)
+        self.live_checkout_machine()
         self.machine('install', 'alpha', '--project', roots.project)
         self.machine('source', 'migrate')
         self.machine('migrate', '--to-pinned', '--project', roots.project)

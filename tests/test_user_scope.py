@@ -9,9 +9,10 @@ from tests.test_git_update import UpdateTests
 
 
 class UserScopeTests(Fixture):
+    """Legacy live-checkout starting state until MASK-0100/0102 retires this behavior (v1 personal-scope engine)."""
     def setUp(self):
         super().setUp()
-        self.init()
+        self.legacy_init()
         self.personal = self.base / 'personal ü home'
         self.personal.mkdir()
 
@@ -45,7 +46,9 @@ mask.main(sys.argv[3:])
         self.register_user('alpha')
         self.assertFalse((self.personal / '.mask.json').exists())
         self.assertFalse((self.personal / '.agents').exists())
-        shown = self.call('user', 'show', cwd=self.base, env={'HOME': str(self.base / 'different')})['data']
+        # Path.home() reads USERPROFILE on Windows and HOME on POSIX; move both to prove the registered home wins.
+        different = str(self.base / 'different')
+        shown = self.call('user', 'show', cwd=self.base, env={'HOME': different, 'USERPROFILE': different})['data']
         self.assertEqual(shown['root'], str(self.personal))
         self.assertEqual(shown['manifest_path'], str(self.home / 'user.json'))
         self.assertEqual(shown['scope'], 'user')
@@ -193,7 +196,10 @@ mask.main(sys.argv[3:])
 
 
 class UserUpdateTests(UpdateTests):
-    """Run existing update scenarios with a second, independently declared consumer."""
+    """Run existing update scenarios with a second, independently declared consumer.
+
+    Legacy live-checkout starting state until MASK-0101 retires this behavior (shared-checkout update).
+    """
     def setUp(self):
         super().setUp()
         self.personal = self.base / 'personal'
@@ -213,7 +219,7 @@ class UserUpdateTests(UpdateTests):
 
     def test_unavailable_user_blocks_before_fetch(self):
         self.personal.rename(self.base / 'moved-personal')
-        self.upstream()
+        self.push_upstream()
         before = self.snapshot()
         self.call('update', code=4)
         self.assertEqual(before, self.snapshot())
