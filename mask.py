@@ -578,7 +578,13 @@ def local_dispatch(args, output, leaves):
     if config['schema_version'] in (2, 3) and command in ('skill.list', 'skill.show', 'skill.validate'):
         return sources_ops.query(args, output, home)
     if source is None and command == 'update':
-        # No pinned consumer was selected and a tap catalog has no shared checkout to update.
+        # Pinned updates never reach this point. A tap catalog has no shared checkout, so a selected legacy record
+        # refuses instead of being skipped silently; only an empty selection is a no-op.
+        state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
+        records = core.consumer_records(state)
+        legacy = [str(root) for root in selected_roots(args, state, all_default=True) if not fs.pinned.is_pinned(records.get(str(root)))]
+        if legacy:
+            core.fail('migration.required', 'A legacy consumer has no live checkout on a tap catalog machine; it must be migrated before update.', 4, roots=legacy)
         output['warnings'].append(dict(code='project.empty_registry', message='No registered consumers selected.'))
         return
     if source is None and command in ('source.status', 'source.fetch'):

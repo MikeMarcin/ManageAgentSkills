@@ -825,6 +825,8 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
         expected = store.verify(home, wanted['resolution'])
         package = wanted['resolution']
     else:
+        if c.legacy_source(config) is None:
+            c.fail('migration.required', 'A legacy consumer has no live checkout on a tap catalog machine; migrate it before adopting links.', 4, root=str(root))
         declaration = c.consumer_manifest(root, scope, home)
         if identifier not in declaration['skills'] or target not in declaration.get('targets', config['default_targets']):
             c.fail('target.unmanaged_link', 'Adoption requires a declared skill and enabled target.', 4)

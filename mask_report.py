@@ -48,6 +48,11 @@ def dispatch(args, output, home):
         if record.get('mode') in ('pinned', 'dev-link'):
             consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_pinned_selection', error=dict(code='inventory.pinned_unsupported', message='Pinned inventory detail awaits the reporting implementation.'), mode=record['mode'], reproducible=record['mode']=='pinned', fleet_eligible=record['mode']=='pinned'))
             continue
+        if source is None:
+            # A legacy record on a tap catalog machine has no live checkout to compare its links with.
+            consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_declaration',
+                                  error=c.MaskError('migration.required', 'Legacy consumer ownership has no live checkout on a tap catalog machine; migrate it first.', 4, details=dict(root=key)).as_dict()))
+            continue
         declaration = record['last_manifest']
         basis, consumer_error = 'live_declaration', None
         available = True

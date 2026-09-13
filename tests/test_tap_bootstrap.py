@@ -15,6 +15,7 @@ import tempfile
 import unittest
 
 import mask_core as c
+from tests.legacy_support import LegacyFixture, snapshot
 
 ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
 TAP = 'agentskills'
@@ -187,6 +188,30 @@ class TapBootstrap(unittest.TestCase):
         self.assertEqual((schema['properties']['schema_version']['const'], sorted(schema['required'])), (3, ['default_targets', 'git_timeout_seconds', 'schema_version', 'sources']))
         union = json.loads((ENTRY.parent / 'schemas/machine.schema.json').read_text(encoding='utf-8'))
         self.assertIn({'$ref': 'machine-v3.schema.json'}, union['oneOf'])
+
+
+class LegacyRecordsOnATapCatalog(LegacyFixture):
+    """A v1 machine whose config.json is replaced by a bootstrapping tap add keeps its legacy records; they refuse typed."""
+
+    def test_legacy_records_refuse_migration_required_and_write_nothing(self):
+        roots = self.legacy_machine(1, straggler_skills=None)
+        (roots.home / 'config.json').unlink()
+        self.assertEqual([a['kind'] for a in self.machine('tap', 'add', TAP, roots.upstream)['actions']], ['config.create', 'source.catalog'])
+        tapped = roots.base / 'tap project'
+        tapped.mkdir()
+        git(tapped, 'init', '-q', '-b', 'main')
+        self.machine('install', 'alpha', '--project', tapped)
+        observed = snapshot(roots.base, roots.home, roots.project, roots.personal, tapped)
+        for args in (('update',), ('update', '--project', roots.project), ('update', '--user')):
+            refused = self.machine(*args, code=4)
+            self.assertEqual(refused['error']['code'], 'migration.required', args)
+        self.assertIn(str(roots.project), self.machine('update', code=4)['error']['details']['roots'])
+        adopt = self.machine('link', 'adopt', '--project', roots.project, '--skill', 'alpha', '--target', 'codex',
+                             '--expect-source', roots.clone / 'skills/alpha', code=4)
+        self.assertEqual(adopt['error']['code'], 'migration.required')
+        inventory = self.machine('inventory', '--project', roots.project)['data']
+        self.assertEqual((inventory['rows'], inventory['complete'], inventory['consumers'][0]['error']['code']), ([], False, 'migration.required'))
+        self.assertEqual(snapshot(roots.base, roots.home, roots.project, roots.personal, tapped), observed)
 
 
 if __name__ == '__main__':
