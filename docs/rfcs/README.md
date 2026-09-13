@@ -42,4 +42,4 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 |---|---|---|
 | RFC-MASK-0018 | Auto-Verified | Task-oriented CLI and human output |
 | RFC-MASK-0019 | Accepted | Complete workflow readiness and checked-in native roles |
-| RFC-MASK-0020 | Implementing | Personal-scope workflow readiness for external implement-rfc state |
+| RFC-MASK-0020 | Auto-Verified | Personal-scope workflow readiness for external implement-rfc state |
