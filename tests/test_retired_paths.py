@@ -8,7 +8,8 @@ import json
 import subprocess
 import sys
 
-from tests.legacy_support import ENTRY, LegacyFixture, snapshot, write_json
+from tests.legacy_support import ENTRY, LegacyFixture, git, snapshot, write_json
+from tests.support import TAP
 
 REMEDIATION = ['mask', 'doctor', '--migrate', '--dry-run']
 EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover', 'self.status', 'self.install', 'self.update'}
@@ -121,3 +122,28 @@ class MigrationGate(LegacyFixture):
                     refused = self.machine('recover', mode, code=8)['error']
                     self.assertEqual((refused['code'], refused['details']['retired']), ('recovery.conflict', reason))
                 self.assertEqual(snapshot(roots.base, roots.base), before)
+
+
+class LegacyConsumerRemediation(LegacyFixture):
+    """A v3 machine still holding a mode-less record: every consumer-level migration.required names the doctor remediation argv."""
+
+    def test_consumer_refusals_carry_the_doctor_remediation(self):
+        roots = self.legacy_machine(1, straggler_skills=None)
+        (roots.home / 'config.json').unlink()
+        self.machine('tap', 'add', TAP, roots.upstream)
+        tapped = roots.base / 'tap project'
+        tapped.mkdir()
+        git(tapped, 'init', '-q', '-b', 'main')
+        self.machine('install', 'alpha', '--project', tapped)
+        # The legacy project keeps its mode-less record and clone links but now declares the same pinned v2 selection.
+        for name in ('.mask.json', '.mask.lock.json'):
+            (roots.project / name).write_bytes((tapped / name).read_bytes())
+        before = snapshot(roots.base, roots.base)
+        for args in (('update',), ('apply', '--project', roots.project),
+                     ('source', 'dev-link', TAP + '/alpha', '--project', roots.project, '--to-pinned')):
+            with self.subTest(args=args):
+                error = self.machine(*args, code=4)['error']
+                self.assertEqual((error['code'], error['details']['remediation']), ('migration.required', REMEDIATION))
+        consumers = self.machine('inventory', '--project', roots.project)['data']['consumers']
+        self.assertEqual([(item['error']['code'], item['error']['details']['remediation']) for item in consumers], [('migration.required', REMEDIATION)])
+        self.assertEqual(snapshot(roots.base, roots.base), before)

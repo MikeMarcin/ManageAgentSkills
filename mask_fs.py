@@ -53,7 +53,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     for root in sorted(roots, key=str):
         key = str(root)
         record = c.consumer_records(state).get(key)
-        scope = 'user' if user_root == root else c.consumer_scope(state, root)
+        # A registration plans the scope it requests: a root recorded in the other scope refuses target.overlap, never a retarget.
+        scope = 'user' if user_root == root else 'project' if key in register else c.consumer_scope(state, root)
         manifest_path = c.declaration_path(root, scope, home)
         try:
             if record is not None and not pinned.is_pinned(record) and not allow_migration:
@@ -682,11 +683,15 @@ def execute(planned, home, output, *, pending=None):
         return
     pending = pending or make_pending(planned, home)
     validate_pending(pending, home)
+    journaled = c.kind(home / 'pending.json') != 'missing'
+    if not journaled and 'pinned' in pending:
+        # Recovery verifies both artifact sides (RFC-MASK-0008); one that cannot be verified refuses typed before any journal exists.
+        pinned.verify_transition(pending, home, journaled=False)
     from mask_repair import backup_records
     backups = backup_records(pending, home)
     if backups:
         output['data'].setdefault('backups', []).extend(backups)
-    if c.kind(home / 'pending.json') == 'missing':
+    if not journaled:
         c.atomic_text(home / 'pending.json', c.text_json(pending), None)
     checkpoint('intent')
     try:

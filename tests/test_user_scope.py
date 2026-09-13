@@ -140,12 +140,22 @@ class UserScopeTests(Fixture):
         self.install(ALPHA, user=True)
         self.call('project', 'init', '--project', self.personal)
         self.assertEqual(self.call('project', 'register', self.personal, code=4)['error']['code'], 'target.overlap')
+        # A project install into the personal home is an overlap: the personal declaration, lock, links and state stay exact.
+        before = self.snapshot()
+        self.assertEqual(self.call('install', BETA, '--project', self.personal, code=4)['error']['code'], 'target.overlap')
+        self.assertEqual(before, self.snapshot())
         nested = self.personal / '.agents/skills/nested'
         nested.mkdir(parents=True)
         self.call('project', 'init', '--project', nested)
         for args in (('project', 'register', nested), ('install', BETA, '--project', nested)):
             self.assertEqual(self.call(*args, code=4)['error']['code'], 'target.overlap', args)
         self.assertEqual(self.call('user', 'register', '--user-home', self.project, code=4)['error']['code'], 'user.already_registered')
+        # The symmetric proposal: a personal install into a home registered as a project refuses the same way.
+        self.call('user', 'unregister')
+        self.call('project', 'register', self.personal)
+        before = self.snapshot()
+        self.assertEqual(self.call('install', ALPHA, '--user', code=4)['error']['code'], 'target.overlap')
+        self.assertEqual(before, self.snapshot())
 
     def test_stale_preview_and_observational_reads(self):
         self.install(ALPHA, user=True)
@@ -243,9 +253,20 @@ class UserScopeTests(Fixture):
         self.assertEqual((shown['registered'], shown['manifest']['skills']), (False, [dict(source=TAP, id='alpha')]))
         self.call('user', 'register', '--user-home', self.personal, '--apply')
         self.assertEqual(links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
+        # A moved project selected beside the healthy personal scope refuses typed before unlocked preparation observes it.
+        self.install(BETA)
+        parked = self.project.rename(self.base / 'moved project')
+        before = self.snapshot()
+        for args in (('apply', '--all'), ('ensure', '--all')):
+            refused = self.call(*args, code=4, cwd=self.base)['error']
+            self.assertEqual((refused['code'], refused['details']['root']), ('project.unavailable', str(self.project)), args)
+        self.assertEqual(before, self.snapshot())
+        parked.rename(self.project)
         moved = self.personal.rename(self.base / 'moved home')
         before = self.snapshot()
-        for args in (('update', '--user'), ('update',), ('user', 'set-agents', ALPHA, 'codex', '--apply'), ('user', 'unregister')):
+        for args in (('update', '--user'), ('update',), ('user', 'set-agents', ALPHA, 'codex', '--apply'), ('user', 'unregister'),
+                     ('apply', '--user'), ('apply', '--all'), ('ensure', '--user'), ('ensure', '--all'),
+                     ('source', 'dev-link', ALPHA, '--user', '--to-pinned')):
             refused = self.call(*args, code=4)['error']
             self.assertEqual((refused['code'], refused['details']['root']), ('user.unavailable', str(self.personal)), args)
         self.assertEqual([blocker['code'] for blocker in self.call('plan', '--user')['data']['blockers']], ['user.unavailable'])

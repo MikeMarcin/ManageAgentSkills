@@ -14,12 +14,15 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
 
 from tests.support import ENTRY, TAP, Fixture
 
+READINESS = ENTRY.parent / 'docs/rfcs/assets/mask-corrective-ux-readiness/fixtures'
+GENERATED, CONTEXT = READINESS / 'generated-package', READINESS / 'consumer/.mask'
 SECOND = 'second'
 ALPHA, BETA, GAMMA = TAP + '/alpha', TAP + '/beta', SECOND + '/gamma'
 NO_FETCH = {TAP: 0, SECOND: 0}
@@ -414,6 +417,23 @@ class UpdateSafetyOnTaps(UpdateFixture):
         self.assertFalse((self.home / 'pending.json').exists())
         self.assert_store_links()
         self.assertEqual(self.statuses(self.call('update')), ['updated', 'updated', 'unchanged'])
+
+    def test_blocked_consumer_keeps_update_incomplete_beside_incomplete_workflow_roles(self):
+        # Product check: mask_update.dispatch ends update.incomplete with the blocked roots plus the workflow details the shared
+        # final status raised for the applied consumers; workflow.incomplete no longer masks the blocked consumer.
+        shutil.copytree(GENERATED, self.source / 'skills/implement-rfc')
+        self.publish('add a package whose integrator role needs setup')
+        self.call('source', 'fetch', TAP)
+        shutil.copytree(CONTEXT, self.project / '.mask')
+        self.assertEqual(self.call('install', TAP + '/implement-rfc', '--project', self.project, code=4)['error']['code'], 'workflow.incomplete')
+        self.second.rename(self.second.with_name('Second moved away.git'))
+        result = self.call('update', code=4)
+        error = result['error']
+        self.assertEqual((error['code'], error['details']['blocked'], result['transaction']), ('update.incomplete', [str(self.other)], 'committed'))
+        self.assertIn('implement-rfc codex/rfc-integrator: setup_required', error['details']['workflow'])
+        self.assertEqual(result['data']['workflow'][str(self.project)], 'incomplete')
+        self.assertEqual(self.statuses(result), ['updated', 'updated', 'blocked'])
+        self.assert_store_links()
 
     def test_unavailable_consumer_refuses_before_any_fetch(self):
         # Product check: mask_update.dispatch checks every selected registered root (mask_core.registered_root) before the fetch phase.

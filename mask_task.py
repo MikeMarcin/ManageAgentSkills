@@ -184,7 +184,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
         else:
             rows.append(resolve_row(home, proposal, binding, entries[binding['source']], config, args, output, payload_views))
     lock = r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(proposal), packages=rows), proposal)
-    return proposal, lock, changed, unchanged, payload_views
+    return proposal, lock, changed, unchanged, payload_views, previous
 
 
 def mutate(args, output, home):
@@ -208,7 +208,7 @@ def mutate(args, output, home):
         created[r.lock_path(root, scope, home)] = c.text_json(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(fresh), packages=[]))
     declaration = c.selection_manifest(c.parse_json(text if text is not None else created[path], 'manifest'))
     require_v2(declaration, path)
-    proposal, lock, changed, unchanged, payload_views = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
+    proposal, lock, changed, unchanged, payload_views, previous = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
     acquisitions = output['data'].get('acquisitions', [])
     task = dict(root=key, scope=scope, declaration_path=str(path), registered=record is not None, declaration_created=bool(created),
                 mode=(record or {}).get('mode', 'pinned'),
@@ -232,7 +232,7 @@ def mutate(args, output, home):
             # The shared planner and journal replace existing controls; new files are removed again unless the task commits.
             c.atomic_text(control, content, None)
         before = pinned.snapshot(home, consumers)
-        planned = fs.plan(config, state, [root], proposals={key: proposal}, lock_proposals={key: lock} if lock is not None else None,
+        planned = fs.plan(config, state, [root], proposals={key: proposal}, lock_proposals={key: lock},
                           register=[key] if record is None else (), operation=args.command, home=home,
                           user_root=root if scope == 'user' else None, payload_views=payload_views)
         fs.public_plan(planned, output)
@@ -242,10 +242,16 @@ def mutate(args, output, home):
         fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
         if output['dry_run']:
             return
-        if lock is not None:
-            observation = dict(root=key, effects={})
-            output['data']['preparation'] = [observation]
-            store.ensure(home, proposal, lock, config, offline=True, coordinates=selection.applicable_coordinates(proposal), effects=observation['effects'])
+        observation = dict(root=key, effects={})
+        output['data']['preparation'] = [observation]
+        store.ensure(home, proposal, lock, config, offline=True, coordinates=selection.applicable_coordinates(proposal), effects=observation['effects'])
+        kept = {r.coordinate(row) for row in lock['packages']}
+        retired = [coordinate for coordinate in selection.applicable_coordinates(declaration) if coordinate not in kept] if previous is not None else []
+        if retired:
+            # The journal verifies the removed links' old artifacts as well; prepare them offline from the approved cache too.
+            removal = dict(root=key, effects={})
+            output['data']['preparation'].append(removal)
+            store.ensure(home, declaration, previous, config, offline=True, coordinates=retired, effects=removal['effects'])
         with c.writer_lock(home):
             if c.kind(home / 'pending.json') != 'missing':
                 c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)

@@ -372,16 +372,21 @@ def prepare_dispatch(args, output, home):
             selected.append((root, scope))
     if not selected:
         return None
+    records = c.consumer_records(state)
+    for root, scope in consumers:
+        if str(root) in records:
+            # A moved or replaced registered root refuses typed, as plan, doctor and update do, before it is observed.
+            c.registered_root(root, records[str(root)], scope)
     before = snapshot(home, consumers)
     config = c.config(c.parse_json(before['controls']['config.json']))
     policy = readiness.policy(home)
     effects = output['data']['preparation'] = []
     for root, scope in selected:
-        record = c.consumer_records(state).get(str(root))
+        record = records.get(str(root))
         if record is not None and record.get('mode') == 'dev-link':
             c.fail('dev_link.active', 'Return to pins explicitly before ordinary reconciliation.', 4)
         if record is not None and not is_pinned(record):
-            c.fail('migration.required', 'Existing legacy ownership requires explicit migration.', 4)
+            c.migration_required('Existing legacy ownership requires explicit migration.', root=str(root))
         if command == 'apply' and record is None:
             c.fail(scope + '.not_registered', 'Register this consumer explicitly before apply.', 4)
         # Same rule as readiness itself: events need approval, while manual readiness reaches its one-time consent.
@@ -411,8 +416,11 @@ def recheck_preparation(preparation, home):
         c.fail('plan.stale', 'Consumer, generation, root, branch or authority changed during unlocked preparation.', 4)
 
 
-def verify_transition(pending, home, entry=None):
-    """Deduplicate a complete preflight, or verify only one link's old/new bytes."""
+def verify_transition(pending, home, entry=None, *, journaled=True):
+    """Deduplicate a complete preflight, or verify only one link's old/new bytes.
+
+    Before its journal exists (``journaled=False``) an unverifiable artifact refuses with its own typed error.
+    """
     import mask_store as store
     seen = set()
     try:
@@ -433,6 +441,8 @@ def verify_transition(pending, home, entry=None):
                         store.verify(home, row)
                         seen.add(key)
     except c.MaskError as error:
+        if not journaled:
+            raise
         c.fail('recovery.conflict', 'A retained old/new artifact failed integrity verification; pending effects remain recoverable after explicit repair.', 8, cause=error.as_dict())
 
 
@@ -559,7 +569,8 @@ def dev_dispatch(args, output, home):
     scope = c.consumer_scope(state, root)
     record = c.consumer_records(state).get(str(root))
     if not is_pinned(record):
-        c.fail('migration.required', 'Migrate the selected legacy consumer before adding a scope-local development exception.', 4)
+        c.migration_required('Migrate the selected legacy consumer before adding a scope-local development exception.', root=str(root))
+    c.registered_root(root, record, scope)
     declaration, locked = r.read_exact_lock(root, scope, home, config, verify=False)
     if args.id not in {r.coordinate(row) for row in locked['packages']}:
         c.fail('skill.unknown', 'Development binding is outside the selected lock.', 4)

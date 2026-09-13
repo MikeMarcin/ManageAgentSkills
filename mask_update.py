@@ -90,7 +90,7 @@ def dispatch(args, output, home):
     roots = mask.selected_roots(args, state, all_default=True)
     legacy = [str(root) for root in roots if not pinned.is_pinned(records[str(root)])]
     if legacy:
-        c.fail('migration.required', 'A legacy consumer has no live checkout on a tap catalog machine; migrate it before update.', 4, roots=legacy)
+        c.migration_required('A legacy consumer has no live checkout on a tap catalog machine; migrate it before update.', roots=legacy)
     requested = getattr(args, 'skill', None) or []
     consumers, declared = [], set()
     for root in roots:
@@ -187,6 +187,12 @@ def dispatch(args, output, home):
         if pinned.snapshot(home, observed) != before:
             c.fail('plan.stale', 'Consumer controls, registry or configuration changed during the update; nothing was applied.', 4)
         fs.execute(planned, home, output)
-    readiness.final_status(output)
+    workflow = {}
+    try:
+        readiness.final_status(output)
+    except c.MaskError as error:
+        if error.code != 'workflow.incomplete' or not blocked:
+            raise
+        workflow = error.details  # The applied consumers' workflow verdict joins the blocked roots instead of masking them.
     if blocked:
-        c.fail('update.incomplete', 'Some selected consumers were blocked and not updated; the others were applied.', 4, blocked=blocked)
+        c.fail('update.incomplete', 'Some selected consumers were blocked and not updated; the others were applied.', 4, blocked=blocked, **workflow)

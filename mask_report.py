@@ -116,8 +116,10 @@ def dispatch(args, output, home):
             continue
         root, record = Path(key), records[key]
         if not pinned.is_pinned(record):
-            consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_declaration',
-                                  error=c.MaskError('migration.required', 'Legacy consumer ownership has no live checkout on a tap catalog machine; migrate it first.', 4, details=dict(root=key)).as_dict()))
+            try:
+                c.migration_required('Legacy consumer ownership has no live checkout on a tap catalog machine; migrate it first.', root=key)
+            except c.MaskError as error:
+                consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_declaration', error=error.as_dict()))
             continue
         consumer = dict(root=key, scope=scope, available=True, declaration_basis='live_declaration', error=None,
                         mode=record['mode'], reproducible=record['mode'] == 'pinned')

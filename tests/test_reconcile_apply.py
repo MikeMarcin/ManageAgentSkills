@@ -8,7 +8,7 @@ import unittest
 import mask_core as c
 import mask_resolve as r
 import mask_store as store
-from tests.support import ENTRY
+from tests.support import ENTRY, TAP
 from tests.support import Fixture
 
 
@@ -76,6 +76,33 @@ class ApplyTests(Fixture):
         self.call('remove', 'alpha', '--project', self.project)
         self.assertFalse(leaf.is_symlink())
         self.assertFalse((self.home / 'pending.json').exists())
+
+    def test_dangling_owned_link_with_an_uncached_commit_refuses_without_a_journal(self):
+        self.call('apply'); leaf = self.project / '.agents/skills/alpha'
+        self.artifact()[0].rename(self.base / 'retained-artifact')
+        # The approved cache no longer holds the locked commit: the whole tap cache is gone.
+        Path(c.read_json(self.home / 'config.json')['sources'][TAP]['cache']).rename(self.base / 'retained-cache')
+        before = self.snapshot()
+        refused = self.call('remove', 'alpha', '--project', self.project, code=4)
+        self.assertEqual((refused['error']['code'], refused['transaction']), ('artifact.unavailable', 'not_started'))
+        self.assertEqual(before, self.snapshot())
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.assertTrue(leaf.is_symlink())
+
+    def test_unverifiable_old_artifact_refuses_before_any_journal(self):
+        # Recovery verifies both artifact sides (RFC-MASK-0008), so apply refuses the old side's typed error before pending.json exists.
+        self.call('apply'); leaf = self.project / '.agents/skills/alpha'
+        self.artifact()[0].rename(self.base / 'retained-artifact')
+        # Both controls drop alpha coherently; apply prepares only the new (empty) lock, so only the journal preflight sees the old side.
+        declaration = dict(c.read_json(self.project / '.mask.json'), skills=[])
+        lock = dict(c.read_json(self.project / '.mask.lock.json'), packages=[], selection_digest=r.selection_digest(declaration))
+        (self.project / '.mask.json').write_text(json.dumps(declaration) + '\n')
+        (self.project / '.mask.lock.json').write_text(c.text_json(lock))
+        before = self.snapshot()
+        self.assertEqual(self.call('apply', code=4)['error']['code'], 'artifact.unavailable')
+        self.assertEqual(before, self.snapshot())
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.assertTrue(leaf.is_symlink())
 
     def test_late_failure_rolls_back_links_but_reports_retained_directories(self):
         code = """
