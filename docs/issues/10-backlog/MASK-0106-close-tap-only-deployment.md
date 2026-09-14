@@ -16,7 +16,26 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d7` checkpoint (milestone `qualification` in progress; start of dispatch).**
+**Dispatch `d7` checkpoint 2 (milestone `qualification` in progress).**
+- **MASK-0104 qualifier:** committed at `f9c7fbc` (script sha256 `d565fe34…`), implemented by W1.
+  - On this Windows 11 host against MASK `1afd8b1` (product sources equal `4285146`), the guarded run passed 61 of 61 steps: tap lab 47, legacy lab 6, owner rehearsal 8. The guard receipt passed, and eight live files (the owner's `~/.mask` and AgentSkills `.git`) were unchanged.
+  - The report, guard receipt and logs are in the session scratchpad under `d7-w1/`.
+  - This is a development run, not the recorded qualification. That run will use the final d7 candidate. macOS is still unavailable.
+- **MASK-0107 review, d7-R1 (fourth attempt):** `rfc-reviewer-critical` failed before output with HTTP 429 "You've reached your Fable limit" (`claude-fable-5-1`). Q6 stays open with the owner.
+- **MASK-0105 premise is stale.** Read-only inspection of the owner's `~/.mask` found:
+  - `state.json` (v1) registers one legacy project: this repository, `C:\code\git\ManageAgentSkills`. Its record carries 8 links into the AgentSkills clone and `native_roles`.
+  - `launchers` holds the `mask.cmd` record, and `integration.json` holds one approval for this repository.
+  - The migration will therefore convert this repository's tracked `.mask.json` to v2, add `.mask.lock.json` and retarget the links. It is not configuration-only.
+  - Other facts: the clone is at `origin/main` `16192b7`, and the personal skill roots hold no entries MASK would collide with.
+- **MASK-0105 expectation gap** (W1 rehearsal): after `install implement-rfc --user`, `update` exits 4 and `doctor --check` exits 7, with only `workflow.incomplete`. The personal implement-rfc context and consented role setup are missing, so the card's `doctor --check` 0 needs an owner decision.
+- `doctor --check` failures report the documented umbrella `state.drift` (exit 7), with specific codes in the issue rows. That is not a defect.
+- **Active children:**
+  - W2 (MASK-0108, worktree `.claude/worktrees/agent-a666a6d85807aff8e`): resumed after its turn limit.
+  - W3 (MASK-0109 and MASK-0110, worktree `.claude/worktrees/agent-a89371c0e6c3ffec8`): resumed to finish its runs.
+  - W1b: a disposable replica of the owner's exact state, rehearsing the MASK-0105 sequence. Evidence only, under the scratchpad `d7-w1b/`.
+- The structure gate reports 0 violations.
+
+**Dispatch `d7` checkpoint 1 (start of dispatch; superseded by checkpoint 2 where they differ).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d7`, mandate revision `4`. The mandate is unchanged.
   - No push or publication is authorized. The owner's real `~/.mask` and global install are not changed. MASK-0105 is prepared but not run.
 - **Binding** (`coordinator_handoff.py assign --milestone qualification`, with `baseline` to `truth` passed as accepted):
