@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0103"
 title: "Make help, docs and capabilities describe only the tap model"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0100", "MASK-0101", "MASK-0102"]
 priority: "P1"
