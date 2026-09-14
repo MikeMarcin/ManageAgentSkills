@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0105"
 title: "Migrate the owner's real machine and personal scope (attended)"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0102", "MASK-0103", "MASK-0107"]
 priority: "P1"

@@ -16,24 +16,48 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d6` checkpoint (milestone `truth` in progress; refreshed before slice dispatch).**
+**Dispatch `d6` record (milestone `truth` accepted; MASK-0103 Done).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, mandate revision `4`. The mandate is unchanged.
   - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
-- **Binding** for `truth`, computed with `--accepted-milestone` baseline, bootstrap, engine and migration:
+- **Accepted milestone `truth`:**
+  - MASK-0103 was claimed at `cf8c725` and implemented at `4285146`; Done at `410733a` (evidence record `78f68c7`).
+  - The d6 checkpoint is `b00d107`. MASK-0104 and MASK-0105 were promoted to Ready in the commit that records this frontier.
+  - **Exit 1** (README recipes replay verbatim): `tests.test_readme_journeys`. It pins every fenced block and Everyday row and replays them through the launcher of a disposable program clone on a fixture tap. It fails against the README of `b00d107`.
+  - **Exit 2** (the retired-spelling test passes): `tests.test_retired_spellings`. At `cf8c725` it had 6 failures (docs, the old-command table, dead presentation entries); at `4285146` it passes.
+  - **Full suite on `4285146`:** guarded per-module run with 4 workers: 49 of 49 modules, 438 tests, 16 skipped, 2439 s. HEAD, tree status and the owner profile snapshot were unchanged. Only Windows 11 was exercised (Python 3.14.6, Git 2.55.0.windows.3), and this was not the literal single-process run. The summary is `d6-suite/out/summary.json` in the d6 session scratchpad.
+  - Evidence: the [MASK-0103 execution record](../60-done/MASK-0103-help-docs-and-capabilities-truth.md#execution-record). The structure gate reports 0 violations.
+- **Binding** (unchanged from dispatch to finish):
   - definition `sha256:71edb75ce31f56f93508fd3e51215f3258d810d56e932d2d7b8b22d62c5066eb`
   - obligation `sha256:36e421d5640b89b8d365caf8e3bc9cd2d8fa5c128cc74377a75857339a3d2e60`
   - prerequisite `sha256:8ab8bfb6f05b93d38cae2665c74bbd1b284a3204f882aa796c764ff11445d497`
-  - The assignment is `d6-assignment.json` in the ignored run directory.
-- **Claim:** MASK-0103 is In Progress at `cf8c725`.
-- **Retired-spelling test:** `tests/test_retired_spellings.py` (integrator-owned). It covers every help page, the presentation tables, public `--help`/`capabilities`, and current Markdown.
-  - Exemptions are the historical records: `docs/rfcs/`, the board's cards under `docs/issues/`, `docs/releases/`, and two named baseline evidence reports under `docs/development/`.
-  - Inside the migration guide, only the table under an "Old commands" heading is exempt.
-- **Slices** (rfc-worker, no model or effort override):
-  - `d6-W1`: help and the Q4 refusal (`mask.py`, `mask_present.py`, help tests).
-  - `d6-W2`: README, guides, README replay.
-  - `d6-W3`: CLI contract, state and recovery, test boundaries.
-  - `d6-R1`: `rfc-reviewer-critical` on MASK-0107 (`6496967..4c0549f`), a third attempt after d5's two HTTP 429 failures.
-- **Next discriminating step:** collect the slices, integrate, run the focused modules and the structure gate, then finish MASK-0103.
+  - The assignment, the finish decision and the return are in the ignored run directory as `d6-*`.
+- **Product state the next milestone inherits:**
+  - Help, README, guides, CLI contract and state/recovery architecture describe only taps, the fetching update and doctor migration.
+  - The migration guide ("Migrating from a live checkout") holds the only old-command table.
+  - `project/user set|require|unrequire` refuse `selection.command_unsupported` and point to `install`/`remove` (Q4).
+  - `tests/test_retired_spellings.py` guards help, `capabilities` and current Markdown. Its historical exemptions are `docs/rfcs/`, `docs/issues/`, `docs/releases/` and two baseline reports under `docs/development/`.
+- **For MASK-0104:** `scripts/qualify_real_package.py` still uses the retired `init --source` (d2 note) and `project unrequire` (lines 315 and 331), which now refuses on v2 declarations.
+- **Contract notes for the closeout:**
+  - The RFC rollout sentence is historical. `b92372f` fails `config.invalid` on a v3 machine, and the previous tap-era program refuses `line_endings` entries (`source.invalid`). Neither recovers this program's `update` journal, and the contract says so.
+  - On a tap machine, the consumer-level `migration.required` remediation omits the `--project PATH --alias NAME` it needs there. It is left as is under Q5.
+- **Review:**
+  - **MASK-0103:** no independent review. It is a presentation, documentation and refusal-message change with no persistence, authority or destructive risk, and no reviewer route is available.
+  - **MASK-0107:** the d6-R1 `rfc-reviewer-critical` retry, the third attempt, failed before output with "You've reached your Fable limit" (HTTP 429, `claude-fable-5-1`). Both reviewer roles bind that model, and no fallback is authorized.
+    - **Judgment:** the review remains warranted. MASK-0107 changes persisted tap policy and the refusal before `source publish`, which can commit and push, and the owner's clone migrates as an exact tap in MASK-0105.
+    - It should run before the attended MASK-0105 migration: retry when the Fable limit resets, or get the owner's authorization for another reviewer route.
+- **Route observations:**
+  - This integrator session exposes model `claude-opus-5[1m]` with runtime reasoning effort `40`, against the configured xhigh. That difference is unresolved.
+  - Every leaf was dispatched by generated role with no model or effort override.
+  - Banners: W1, W2, W4 and W5 `claude-opus-5`, xhigh; W3 `claude-opus-5[1m]`, effort `40`. R1 was served as `claude-fable-5-1` and failed with HTTP 429.
+- **Execution state:**
+  - Every d6 child (W1 to W5, R1) has returned or failed terminally.
+  - The guarded suite command finished, and no d6 command or child is active.
+  - Logs are in the d6 session scratchpad (`d6-w1` to `d6-w5`, `d6-integ`, `d6-suite`).
+  - `git worktree list` shows only the main checkout. R1 created no scratch directory.
+- **Next:** start a fresh integrator context for milestone `qualification` (MASK-0104, MASK-0105; both Ready).
+  - MASK-0104 needs native Windows 11 and macOS lanes against the real AgentSkills repository as a tap.
+  - MASK-0105 is the attended migration of the owner's real machine.
+  - Before MASK-0105, resolve the MASK-0107 review. The authorized follow-ups MASK-0108 to MASK-0110 remain eligible independent work.
 
 **Dispatch `d5` record (historical; MASK-0107 accepted and Done; its next milestone `truth` is d6's).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d5`, mandate revision `3`. Amendment r4 arrived during the dispatch.
