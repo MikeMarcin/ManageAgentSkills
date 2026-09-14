@@ -256,3 +256,66 @@ The ExampleWinHost lane directory, bundles and scripts were removed after the re
 were recorded; the registered station checkout (`3456e39`) and user profile were
 not touched. Two older `mask-native-*` temporary directories from earlier lanes
 remain in that `%TEMP%` and were not created by this run.
+
+## Real-package qualification on taps (RFC-MASK-0020, MASK-0104)
+
+Run on September 14, 2026 in dispatch `d7` of run `mask-rfc0020-2026-09-12-a`.
+- **Driver:** `scripts/qualify_real_package.py` as committed at `f9c7fbc`, sha256 `d565fe3453872338f0451774ab399c87d3a2a40595e416f439edd4b15b0a63c2`.
+- **Package:** the real AgentSkills repository at `16192b76ec1bbaee001c718d3e82d447db4f25c5`. The committed `skills/implement-rfc/mask-workflow.json` has sha256 `9575dc4fa8a69900236bd8d68634fdca5759124d91acf3cf8c22c6e83e4d70f1`.
+- **MASK under test:** a disposable clone at `8ea0fe595489fe702a51b446f7ed1c6ec106de8f`. Every call had a private `MASK_HOME`, `HOME` and `USERPROFILE`.
+- **Guard:** the implement-rfc qualification guard wrapped the run and passed. These files were byte-identical afterwards:
+  - the owner's `~/.mask` `config.json`, `state.json` and `integration.json`;
+  - the AgentSkills `.git` `HEAD`, `index`, `packed-refs`, `refs/heads/main` and `config`;
+  - this repository's `.mask.json`.
+
+  The AgentSkills HEAD and `status --porcelain` were also unchanged.
+
+| Lane | Host | MASK revision | Result |
+|---|---|---|---|
+| Windows | Windows 11 Home (Core) 10.0.26200, AMD64, native. Python 3.14.6; Git 2.55.0.windows.3, with `core.autocrlf=true` from the system gitconfig | `8ea0fe5` | 61/61 steps |
+| macOS | Not run. The [station registry](remote-stations.md) names no macOS station, and this dispatch ran on Windows | — | Pending |
+
+The steps ran in three sections.
+
+**Tap lab (47 steps).**
+- **Bootstrap:** on an empty `MASK_HOME`, `tap add agentskills <disposable bare clone>` writes config v3 with one exact-bytes tap and fetches nothing. `capabilities` reports the tap deployment model and `workflow_readiness_v1`.
+- **Consumers:** `install implement-rfc --project` runs for two consumers.
+  - Each gets a v2 declaration and lock at the upstream revision, with store links.
+  - The first install fetches once into one bare cache.
+  - Each exits 4 `workflow.incomplete` while roles are missing.
+- **RFC-MASK-0019 journey:** it passes unchanged on taps. This covers consent, roles, `launch` refusal and invocation with a fake host, tamper, the fresh clone and addenda.
+- **Removal:** `remove implement-rfc` replaces `project unrequire`.
+  - On the fresh clone it keeps the repository-owned roles.
+  - On the first consumer it removes the 15 unchanged managed roles and releases the edited one.
+- **Push, then update:** a candidate is committed in the authoring clone and pushed to the bare upstream.
+  - `update --dry-run` does not fetch it.
+  - A plain `update` fetches the tap once and moves the lock and store links to the pushed commit. It exits 4 `workflow.incomplete` with the roles back at `setup_required`, and no package code runs.
+  - A fresh consent completes again, and the deployed bytes equal the upstream generator's output.
+
+**Legacy lab (6 steps).** It uses a v1 machine from `tests/legacy_support.py`, with a legacy project, a legacy personal scope and an unregistered declaration.
+- `doctor --check` exits 7 with `migration.required`.
+- `doctor --migrate --dry-run` discloses the tap and both consumers, and writes nothing.
+- `doctor --migrate` commits:
+  - config v3, with the clone as the `authoring` checkout of `agentskills` and `line_endings: exact`;
+  - v2 declarations, locks at the clone HEAD, and store links;
+  - no change to the unregistered declaration.
+- `doctor --check` then exits 0.
+- `update` fetches from the clone's remote and changes nothing.
+- The clone's HEAD, index and status are unchanged.
+
+**Owner-shape rehearsal (8 steps).** It uses a v1 configuration over a CRLF working copy of AgentSkills with a local bare origin and an empty registry.
+- `doctor` reports the migration, and the dry run writes nothing.
+- `doctor --migrate` converts the configuration only.
+- `install implement-rfc --user` fetches the tap and links the personal scope from the store. It exits 4 `workflow.incomplete`, because the personal implement-rfc context and role setup are missing.
+- `list --user` shows the links.
+- `update` fetches and changes nothing, with the same verdict.
+- `doctor --check` exits 7 with only `workflow.incomplete`.
+- The clone and its origin are unchanged.
+
+Limitations:
+- **macOS** was not exercised, so RFC-MASK-0020-AC07 and MASK-0104 stay open.
+- **Network:** every remote is a disposable local bare repository, so no network fetch or SSH authentication was exercised.
+- **Console consent:** `--console prepare` and `verify` ran during development, but nobody typed an answer at a prompt.
+- **Host loading** of the deployed roles is still `not_verified`.
+- **Earlier runs:** development runs of the same script at `1afd8b1` also passed 61/61, but the `8ea0fe5` run above is the recorded evidence.
+- **Artifacts:** the report, guard receipt and log are kept in the dispatch session scratchpad (`d7-final/qualifier/`), not in the repository.
