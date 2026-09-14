@@ -16,6 +16,27 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
+**Dispatch `d7` checkpoint (milestone `qualification` in progress; start of dispatch).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d7`, mandate revision `4`. The mandate is unchanged.
+  - No push or publication is authorized. The owner's real `~/.mask` and global install are not changed. MASK-0105 is prepared but not run.
+- **Binding** (`coordinator_handoff.py assign --milestone qualification`, with `baseline` to `truth` passed as accepted):
+  - definition `sha256:aa93e809be657bee51b52964c541773e113e7fd308c172d9a51c3b24e6c5534f`
+  - obligation `sha256:9f77f7a7a5220b905d239cf6f968f11e52b5c0ca7070e9c477d6eca1f37d5f2b`
+  - prerequisite `sha256:dbbeb5f755f54376c25b2e6b4eaeab4ee3c9825debe46321a34226dd0b641875`
+  - The assignment is `d7-assignment.json` in the ignored run directory. Without `--accepted-milestone`, `assign` answers `reconcile`.
+- **Board:** MASK-0108 to MASK-0110 promoted at `7bd13fe`. Claims: MASK-0104 `c354a59`, MASK-0108 `72f13e2`, MASK-0109 `47a5105`, MASK-0110 `4e8af51`. MASK-0105 stays Ready until its attended ask is prepared.
+- **Facts found:**
+  - The global launcher `%LOCALAPPDATA%\Programs\MASK\mask.cmd` runs `C:\code\git\ManageAgentSkills\mask.py`, this main checkout. The owner's `mask` therefore runs whatever the main working tree holds. Product slices work in separate worktrees, and MASK-0105 must run on a clean tree at the recorded candidate.
+  - The host is `JaegAW`: Windows 11 Home 10.0.26200, Python 3.14.6, Git 2.55.0.windows.3, system `core.autocrlf=true`. It is not the registered station host ExampleWinHost.
+  - The station registry authorizes only the Windows station `mask-win-example-win-host` and names no macOS station. The earlier macOS evidence was run from an integrator on a Mac. No macOS path is authorized from this host.
+  - The real AgentSkills clone is at `16192b76ec1bbaee001c718d3e82d447db4f25c5` on `main`, clean, with origin `git@github.com:MikeMarcin/AgentSkills.git`. The qualifier only clones it.
+- **Planned slices:**
+  - W1 `rfc-worker`: the MASK-0104 qualifier rewrite, `scripts/qualify_real_package.py` only. It runs against disposable clones.
+  - W2 `rfc-worker`, worktree: MASK-0108.
+  - W3 `rfc-worker`, worktree: MASK-0109 and MASK-0110 together, because they share the cold-store preparation and result-reporting code.
+  - R1 `rfc-reviewer-critical`: a retry of the MASK-0107 review on the configured route. Q6 (an alternate reviewer route) stays with the owner.
+- **Next:** collect W1 to W3 and R1, integrate on main, then run the Windows qualifier on the final candidate. macOS stays pending. Then prepare the MASK-0105 ask.
+
 **Dispatch `d6` record (milestone `truth` accepted; MASK-0103 Done).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, mandate revision `4`. The mandate is unchanged.
   - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
