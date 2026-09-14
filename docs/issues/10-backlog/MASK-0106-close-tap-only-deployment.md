@@ -16,7 +16,60 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d7` checkpoint 2 (milestone `qualification` in progress).**
+**Dispatch `d7` record (milestone `qualification`: human-pending; no eligible unattended work remains).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d7`, mandate revision `4`. The mandate is unchanged.
+  - Nothing was pushed or published.
+  - The guard confirmed these were unchanged: the owner's real `~/.mask`, the global install, the AgentSkills clone and this checkout's live declaration.
+- **Binding** (unchanged from dispatch to finish; `d7-assignment.json` and `d7-assignment-recheck.json` in the ignored run directory):
+  - definition `sha256:aa93e809be657bee51b52964c541773e113e7fd308c172d9a51c3b24e6c5534f`
+  - obligation `sha256:9f77f7a7a5220b905d239cf6f968f11e52b5c0ca7070e9c477d6eca1f37d5f2b`
+  - prerequisite `sha256:dbbeb5f755f54376c25b2e6b4eaeab4ee3c9825debe46321a34226dd0b641875`
+  - `assign` needs `--accepted-milestone` for `baseline`, `bootstrap`, `engine`, `migration` and `truth`.
+- **Candidate:** product revision `8ea0fe5` on `main`. Commits:
+  - Board: MASK-0108 to MASK-0110 promoted at `7bd13fe`. Claims: MASK-0104 `c354a59`, MASK-0108 `72f13e2`, MASK-0109 `47a5105`, MASK-0110 `4e8af51`, MASK-0105 `f685595`.
+  - Implementation: the qualifier at `f9c7fbc`, MASK-0108 at `2848f6d`, MASK-0109 and MASK-0110 at `8ea0fe5`.
+  - Checkpoints: `1afd8b1`, `853f7d4`, `3f67278`.
+  - Finishes: MASK-0108 `f2eac16`, MASK-0109 `a558024` and MASK-0110 `42bb3b8` are Done. MASK-0104 `c13ddfe` and MASK-0105 `024bd4d` are Parked for human review.
+- **Exit 1** (the qualifier passes on native Windows 11 and macOS): Windows passes; macOS is pending.
+  - **Windows:** a guarded run against `8ea0fe5` and AgentSkills `16192b7` passed 61/61 steps. That covers the tap lab (47, including push-then-update), the legacy lab (6) and the owner rehearsal (8). Record: [readiness acceptance](../../development/readiness-acceptance.md#real-package-qualification-on-taps-rfc-mask-0020-mask-0104).
+  - **macOS:** not run. The station registry names no macOS station. The exact ask is on the [MASK-0104 execution record](../40-parked/MASK-0104-real-package-qualifier-on-taps.md#execution-record).
+- **Exit 2** (the owner's v1 machine is migrated with the transcript recorded): pending, attended. The prepared ask is on the [MASK-0105 execution record](../40-parked/MASK-0105-owner-machine-migration-dogfood.md#execution-record).
+  - **Attended-review session** `384b30444ee74b3bfc30a7f0d86f5e40` is in this checkout with registry `.mask/attended-review/registry`. Pass `--registry` on every command, because the default registry lives under the owner's `~/.mask`.
+    - Its three candidates are ready and protected: `MASK-0105-attended-run`, `MASK-0105-doctor-check` and `MASK-0105-migrated-declaration`.
+    - The offline page `d7-mask-0105-review.html` and the manifest are in the run directory. No server or wait is running.
+  - **Replica rehearsal on `8ea0fe5`** (session scratchpad `d7-final/rehearsal/`): nothing refuses.
+    - `doctor --check` ends at 7 with only `workflow.incomplete`.
+    - Migration stops vouching for this repository's 16 roles, whose lock digest dates from the CRLF era.
+    - It leaves `M .mask.json` and `?? .mask.lock.json`.
+- **Independent work done:** MASK-0108, MASK-0109 and MASK-0110 are Done, each with an execution record.
+- **Integration pass on `8ea0fe5`:** a guarded per-module suite with 3 workers.
+  - Result: 52/52 modules, 460 tests, 17 skipped, 0 failures, no reruns, 3313 s.
+  - The clone and the owner's live files were unchanged, and the structure gate reports 0 violations.
+  - Limits: Windows 11 only, and not the literal single-process run.
+  - Summary: session scratchpad `d7-suite/out/summary.json`.
+- **Review:** no independent review happened in d7. Each `rfc-reviewer-critical` attempt failed before producing output with HTTP 429 on `claude-fable-5-1`:
+  - R1 and R2 for MASK-0107, the fourth and fifth attempts overall;
+  - R3 for MASK-0108.
+  - Q6 stays with the owner and now also covers reviews of MASK-0108 to MASK-0110.
+- **Pending asks:**
+  1. **Q6** (the coordinator holds it): the reviewer route for MASK-0107, and optionally for MASK-0108 to MASK-0110. The owner can authorize an alternate route or have the reviews retried after the limit resets.
+  2. **MASK-0105 decisions** in the attended-review session: go or not now, how `doctor --check` should reach its acceptance, and what to do with the migrated declaration.
+  3. **MASK-0104 on macOS:** a macOS qualifier report, or authorization of a macOS station.
+- **Route observations:**
+  - The integrator session exposes model `claude-opus-5[1m]` with runtime effort `40`, against the configured xhigh. That difference is unresolved.
+  - Leaves were dispatched by generated role with no model or effort override.
+  - Banners: W1 and W1b `claude-opus-5[1m]`, effort 40; W2 and W3 `claude-opus-5`, xhigh. R1 to R3 were served `claude-fable-5-1` and got HTTP 429.
+- **Execution state:**
+  - Children: W1, W1b, W2 and W3 have returned; R1, R2 and R3 failed terminally.
+  - Commands: the qualifier, rehearsal and suite runs have completed.
+  - Cleanup: the worktrees, their branches and the disposable `%TEMP%\mq7-*` roots are removed.
+  - The ignored attended-review session files are kept on purpose.
+- **Next:** wait for the owner's answers.
+  - Then run MASK-0105 attended, in a fresh integrator context, on a clean checkout at `8ea0fe5` or a later commit that only adds records.
+  - Collect the MASK-0104 macOS report.
+  - Then run milestone `closeout` (MASK-0106). AC08 also needs the macOS full suite.
+
+**Dispatch `d7` checkpoint 2 (historical; superseded by the d7 record above).**
 - **MASK-0104 qualifier:** committed at `f9c7fbc` (script sha256 `d565fe34…`), implemented by W1.
   - On this Windows 11 host against MASK `1afd8b1` (product sources equal `4285146`), the guarded run passed 61 of 61 steps: tap lab 47, legacy lab 6, owner rehearsal 8. The guard receipt passed, and eight live files (the owner's `~/.mask` and AgentSkills `.git`) were unchanged.
   - The report, guard receipt and logs are in the session scratchpad under `d7-w1/`.
