@@ -16,7 +16,44 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d4` record (milestone `migration` accepted).**
+**Dispatch `d5` record (MASK-0107 accepted and Done).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d5`, mandate revision `3`. Amendment r4 arrived during the dispatch.
+  - The mandate is unchanged. No push or publication is authorized.
+  - The owner's real machine changes only through attended MASK-0105.
+- **Plan position:** MASK-0107 (`rfcs: []`) is outside the adopted plan.
+  - `milestone_plan.py discover --target MASK-0107` reports `absent`, and `coordinator_handoff.py assign` refuses without a plan.
+  - `check-amendment` refuses adding MASK-0107 to the scope ("cannot change plan identity or authorized scope") and to `unplanned_work` ("must preserve every obligation").
+  - It therefore ran as mandate-authorized work against its own card acceptance. The plan is unchanged.
+  - The probe record is `d5-plan-position.json` in the ignored run directory.
+- **Accepted MASK-0107:** claim `6496967`, implementation `4c0549f`, and Done in the finish commit that follows `0be6b26`.
+  - Evidence and limitations: the [MASK-0107 execution record](../60-done/MASK-0107-tap-line-endings-exact-bytes.md#execution-record).
+  - **Checks (Windows 11 only):**
+    - `tests/test_tap_line_endings.py` passes 16 tests on the committed content, and every `tests/test_*.py` module passes.
+    - Negative controls on an archive of `6496967` fail (publish previews `would_change: true`; the module gets 7 failures and 22 errors).
+    - The structure gate reports 0 violations.
+  - **Independent review was not performed.** `rfc-reviewer-critical` (`claude-fable-5-1`) hit an account usage limit (HTTP 429) on both attempts, and no model fallback is authorized.
+- **Product state the next milestone inherits:**
+  - Tap entries carry `line_endings`: `exact` by default, `autocrlf` only through `tap add --autocrlf`. `doctor --migrate` writes `exact`.
+  - For an exact tap, `source publish` and a new `source dev-link` refuse `source.line_endings_converted` for Git-converted unedited files. `tap add --checkout` warns `source.line_endings_conversion`.
+  - The remediation is to set `core.autocrlf false` in the checkout, delete the reported files, then run `git checkout -- PATH`. `checkout-index --force` leaves a stat-clean converted file in place.
+  - `source dev-link` reports `data.development[].payload_digest`. Test fixtures author LF bytes.
+  - For MASK-0104 and MASK-0105: the owner's AgentSkills clone migrates as an exact tap. Its CRLF working copies would refuse publishing and new dev links until restored or re-registered with `--autocrlf`. The migration steps themselves do not publish.
+- **Owner decisions r4** (recorded at `0be6b26` on the RFC and on [MASK-0103](../20-ready/MASK-0103-help-docs-and-capabilities-truth.md#owner-decisions-mandate-r4-september-13-2026)):
+  - **Q4:** v2 set/require/unrequire are not implemented. The refusal remains, and MASK-0103 points it, the help and the contract to `install`/`remove`.
+  - **Q5:** migration is best effort. The AC05 gate is unchanged, and MASK-0103 briefly documents restoring an unconvertible consumer on disk.
+  - d4's migration notes are closed unless they block MASK-0105. No acceptance text is narrowed.
+  - No owner question remains open.
+- **Route observations:**
+  - This integrator session exposes runtime reasoning effort `40` against the configured xhigh, an unresolved observation carried over from d4.
+  - `d5-B1` was dispatched as `rfc-worker` with no model or effort override, and its banner reads `claude-opus-5`/xhigh. It stopped at its 56-turn limit, was resumed once, and completed.
+  - `d5-R1` and `d5-R1b` were dispatched as `rfc-reviewer-critical` with no override. Both failed before producing output.
+- **Execution state:**
+  - Every d5 child has returned or failed terminally, and every d5 background command has completed.
+  - No worker shell or `unittest` process remains.
+  - Logs are in the d5 session scratchpad.
+- **Next:** start a fresh integrator context for milestone `truth` (MASK-0103, Ready), which r4 unblocks. `qualification` (MASK-0104, MASK-0105) waits on it.
+
+**Dispatch `d4` record (historical; its recommended next objective, MASK-0107, was completed by d5).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d4`, mandate revision `3`.
   - The mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no added stop conditions.
   - r3 places no restriction on implementing MASK-0107 to MASK-0110.
@@ -122,7 +159,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - `legacy_init`, `declare` and `legacy_bootstrap` are gone.
   - `tests/test_pin_migration.py` and `tests/test_git_update.py` are removed. Coverage of the self update checkout journal moved to `tests/test_launcher.py`.
 - **Owner decisions (r2 and r3):**
-  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../30-in-progress/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
+  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../60-done/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
   2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads with this decision.
   3. The d2 follow-ups are filed as MASK-0108 to MASK-0110, outside this RFC.
 - **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0103 describes these commands):**
