@@ -33,6 +33,17 @@ def checkout_conversion(root):
     return value if value is not None and value.lower() in ('true', 'input', 'yes', 'on', '1') else None
 
 
+def authoring_branch(root, ref):
+    """The configured branch an authoring checkout must be on; it refuses the same way with or without an origin (MASK-0108)."""
+    branch = ref.removeprefix('refs/heads/')
+    current = c.git(root, 'symbolic-ref', '--short', 'HEAD', optional=True)
+    if current is None:
+        c.fail('source.detached', 'Authoring checkout is detached; check out its configured branch.', 4, configured_branch=branch)
+    if current != branch:
+        c.fail('source.identity_mismatch', 'Authoring checkout is not on its configured branch.', 4, branch=current, configured_branch=branch)
+    return branch
+
+
 def cache_bytes(root):
     if c.kind(root / 'objects') != 'directory':
         c.fail('source.cache_invalid', 'Cache object storage must be a real directory.', 4)
@@ -370,6 +381,7 @@ def dispatch(args, output, home):
         if entry['authoring'] is not None:
             root = Path(entry['authoring']).expanduser().resolve()
             c.checkout(root)
+            authoring_branch(root, entry['ref'])
             remote = c.git(root, 'remote', 'get-url', 'origin', optional=True) or str(root)
             if repository(remote) != entry['repository']:
                 c.fail('source.identity_mismatch', 'Authoring checkout does not match the source identity.', 4)
@@ -764,6 +776,7 @@ def publication(args, output, home):
         c.fail('source.authoring_required', 'Publishing requires an approved authoring checkout.', 4)
     root = Path(entry['authoring'])
     c.checkout(root)
+    authoring_branch(root, entry['ref'])
     head = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}')
     committed_record = exact_entry(root, head, 'mask-source.json')
     committed_index = source_index(root, {'mask-source.json': committed_record} if committed_record else {})

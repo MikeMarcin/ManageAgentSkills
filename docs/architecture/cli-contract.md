@@ -88,7 +88,7 @@ The live-checkout model's commands are not registered: the checkout-binding opti
 
 ### Taps, payloads and caches
 
-Machine configuration v3 ([schema](../../schemas/machine-v3.schema.json)) holds `schema_version` 3, `default_targets`, `git_timeout_seconds` and `sources`, a catalog of 0 to 256 taps. A tap entry has `repository` (normalized credential-free identity), `transport`, `cache` (`MASK_HOME/sources/<alias>-<16 hex>.git`), `ref` (the update selector), `packages`, `authoring` (absolute checkout path or `null`) and `line_endings` (`exact` or `autocrlf`; absent means `exact`). Every cache is a MASK-owned bare repository. `tap add --checkout PATH` binds an authoring checkout whose `origin` must normalize to the tap identity (`source.identity_mismatch`); curated imports, provenance, `source publish` and `source dev-link` use it, and install, list, ensure and update never read it. `tap add` never fetches. A fetch never checks out or activates payloads; reads and previews never fetch. Missing cached resolution is reported as `resolution_required`. Approved identities
+Machine configuration v3 ([schema](../../schemas/machine-v3.schema.json)) holds `schema_version` 3, `default_targets`, `git_timeout_seconds` and `sources`, a catalog of 0 to 256 taps. A tap entry has `repository` (normalized credential-free identity), `transport`, `cache` (`MASK_HOME/sources/<alias>-<16 hex>.git`), `ref` (the update selector), `packages`, `authoring` (absolute checkout path or `null`) and `line_endings` (`exact` or `autocrlf`; absent means `exact`). Every cache is a MASK-owned bare repository. `tap add --checkout PATH` binds an authoring checkout whose `origin` must normalize to the tap identity (`source.identity_mismatch`); a checkout without an origin is identified by its own path. Curated imports, provenance, `source publish` and `source dev-link` use it, and install, list, ensure and update never read it. Whether or not the checkout has an origin, `tap add --checkout`, an import destination, `skill record-adaptation`, `source publish` and `source dev-link` refuse before any effect when it is on a branch other than the tap's configured one (`source.identity_mismatch`, exit 4, with `details.branch` and `details.configured_branch`) or has a detached HEAD (`source.detached`, exit 4). `tap add` never fetches. A fetch never checks out or activates payloads; reads and previews never fetch. Missing cached resolution is reported as `resolution_required`. Approved identities
 normalize scheme/host/default port while preserving repository case and `.git`
 suffixes. HTTPS and SSH stay distinct; scp home-relative paths retain that
 distinction from absolute SSH paths. Passwords, tokens, unsupported protocols,
@@ -162,7 +162,8 @@ support `--expect-plan-hash`, binding config, selected objects, notice content,
 destination HEAD/root/parent identity, source index and Git index entries.
 
 The destination requires an approved authoring checkout on its configured
-branch, with no in-progress Git operation. Unrelated working/staged changes are
+branch, with no in-progress Git operation; it is observed before any fetch
+([branch refusals](#taps-payloads-and-caches)). Unrelated working/staged changes are
 preserved. A source index must already map the ID to a nonoverlapping path;
 without an index the destination is `<packages>/<id>`. Its parent must exist.
 Existing HEAD/index/worktree content refuses, including tracked deleted files.

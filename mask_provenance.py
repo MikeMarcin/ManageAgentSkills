@@ -66,21 +66,23 @@ def source_path(root, entry, identifier, *, existing=False):
     return path, c.digest(raw) if raw is not None else None
 
 
-def destination(config, name, identifier, *, new=False):
+def authoring_checkout(config, name):
+    """A tap's approved authoring checkout and its HEAD; observational.
+
+    The branch comes first, so another branch or a detached HEAD refuses the same way whether or not the checkout has an origin (MASK-0108).
+    """
     entry = s.selected(config, name)
     if entry['authoring'] is None:
         c.fail('import.authoring_required', 'The destination source needs an approved authoring checkout.', 4)
     root = Path(entry['authoring'])
     c.parents_safe(Path(root.anchor), root)
     c.checkout(root)
-    branch = entry['ref'].removeprefix('refs/heads/')
+    branch = s.authoring_branch(root, entry['ref'])
     origin = c.git(root, 'remote', 'get-url', 'origin', optional=True)
     if origin is None:
         if s.repository(str(root)) != entry['repository']:
             c.fail('source.identity_mismatch', 'Authoring checkout does not match its approved local identity.', 4)
         head = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}')
-        if c.git(root, 'symbolic-ref', '--short', 'HEAD', optional=True) != branch:
-            c.fail('source.detached', 'Authoring checkout must be on its configured branch.', 4)
         for marker in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
             marker_path = Path(c.git(root, 'rev-parse', '--path-format=absolute', '--git-path', marker))
             if c.kind(marker_path) != 'missing':
@@ -92,6 +94,11 @@ def destination(config, name, identifier, *, new=False):
             c.fail('source.identity_mismatch', 'Configured remote differs from its approved repository.', 4)
         s.endpoint(root, origin, entry['repository'])
         head = observed['revision']
+    return entry, root, head
+
+
+def destination(config, name, identifier, *, new=False):
+    entry, root, head = authoring_checkout(config, name)
     path, index_digest = source_path(root, entry, identifier, existing=not new)
     target = root / path
     c.parents_safe(root, target)
@@ -178,7 +185,8 @@ def record_for(payload, row, name, snapshot, files, notices):
 def prepared_import(args, output, home, config):
     if args.mode != 'copy':
         c.fail('invocation.invalid', 'Only explicit --mode copy is supported.', 2)
-    s.selected(config, args.into)
+    # Observe the destination checkout before the upstream fetch, so its refusals write nothing.
+    authoring_checkout(config, args.into)
     s.inspect(args, output, home)
     if output['data']['resolution_required']:
         output['data']['operation'] = 'copy_import'
