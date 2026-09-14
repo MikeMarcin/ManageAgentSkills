@@ -52,7 +52,7 @@ copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
 consumers deploy isolated store artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. [RFC-MASK-0020](../rfcs/RFC-MASK-0020-tap-only-deployment.md) retires the live-checkout mode:
+remains pending. [RFC-MASK-0021](../rfcs/RFC-MASK-0021-tap-only-deployment.md) retires the live-checkout mode:
 `mask update` fetches taps and `mask doctor --migrate` converts live-checkout machines; its closeout records what
 is qualified. Scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not

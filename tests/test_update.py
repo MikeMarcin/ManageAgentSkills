@@ -1,4 +1,4 @@
-"""Fetching, isolated update through the public CLI (RFC-MASK-0020 AC03; MASK-0101; retained-pack ACCEPTANCE.md U01-U09).
+"""Fetching, isolated update through the public CLI (RFC-MASK-0021 AC03; MASK-0103; retained-pack ACCEPTANCE.md U01-U09).
 
 Two local bare repositories are ``file`` taps. Three consumers start through the public
 ``install`` task: the project selects agentskills/alpha, the personal scope selects

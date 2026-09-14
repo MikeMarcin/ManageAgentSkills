@@ -20,7 +20,7 @@ class CatalogTests(Fixture):
         self.assertNotEqual(self.call('config', 'show')['data']['program_root'], str(self.source))
 
     def test_inspection_is_passive(self):
-        # skill list/show/validate read the fetched tap cache (RFC-MASK-0020): nothing is written and package code never runs.
+        # skill list/show/validate read the fetched tap cache (RFC-MASK-0021): nothing is written and package code never runs.
         self.init()
         marker = self.base / 'package-script-ran'
         (self.source / 'skills/alpha/install.py').write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("executed")\n')

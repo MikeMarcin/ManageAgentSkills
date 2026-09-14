@@ -852,7 +852,7 @@ COMMAND_HELP = {
     'user.set-targets': ('Replace personal agent targets, or restore inherited defaults.', None),
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
-# Owner decision Q4 (RFC-MASK-0020): only install and remove edit a v2 declaration; set, require and unrequire refuse.
+# Owner decision Q4 (RFC-MASK-0021): only install and remove edit a v2 declaration; set, require and unrequire refuse.
 COMMAND_HELP.update({f'{scope}.{action}': (
     'Does not edit v2 declarations: it refuses with selection.command_unsupported. '
     f'Add skills with mask install ID{flag} and remove them with mask remove ID{flag}; other selections are kept.',

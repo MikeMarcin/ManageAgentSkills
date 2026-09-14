@@ -1,4 +1,4 @@
-"""A pinned ensure preview on a cold store binds the plan hash of the run that applies (MASK-0109).
+"""A pinned ensure preview on a cold store binds the plan hash of the run that applies (MASK-0111).
 
 Every case runs ``mask`` as a subprocess. The tap cache holds the locked commit (``source fetch`` and ``lock``) and
 the store holds no artifact, as on a machine that has not yet deployed a committed declaration and lock. The static

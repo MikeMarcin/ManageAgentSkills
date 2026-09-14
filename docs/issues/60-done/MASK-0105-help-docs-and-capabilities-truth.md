@@ -1,18 +1,18 @@
 ---
 schema: "implement-rfc.card.v1"
-id: "MASK-0103"
+id: "MASK-0105"
 title: "Make help, docs and capabilities describe only the tap model"
 status: "Done"
-rfcs: ["RFC-MASK-0020"]
-depends_on: ["MASK-0100", "MASK-0101", "MASK-0102"]
+rfcs: ["RFC-MASK-0021"]
+depends_on: ["MASK-0102", "MASK-0103", "MASK-0104"]
 priority: "P1"
 metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"help-docs-and-capabilities-truth","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 acceptance: [{"criterion":"README recipes execute verbatim through the tap-first fixtures (milestone truth exit 1)","outcome":"pass","revision":"4285146","evidence":{"kind":"command","detail":"python -B -m unittest tests.test_readme_journeys: ReadmeText pins every fenced README block and Everyday row; ReadmeRecipes replays them through the launcher of a disposable program clone on a local fixture tap (substitutions named in the module docstring; mask self update updates only that clone); pty prompt case skipped on Windows. Negative controls: ReadmeText fails against the README of b00d107 and for one changed Everyday row. Guarded per-module suite on 4285146: 49/49 modules, 438 tests, 16 skipped, 2439 s, HEAD/tree/owner profile unchanged (d6 session scratchpad d6-suite/out/summary.json). Windows 11 only (Python 3.14.6, Git 2.55.0.windows.3)."}},{"criterion":"Help output for every registered command renders and names no retired command","outcome":"pass","revision":"4285146","evidence":{"kind":"command","detail":"tests.test_retired_spellings.HelpAndCapabilities: root, every group and every leaf page through mask.help_text; public --help, update --help and doctor --help; presentation tables name only registered commands (failed at cf8c725 on dead migrate, source.migrate and source.status entries). tests.test_human_output help cases."}},{"criterion":"The documentation test finds retired spellings only under docs/rfcs/assets, in historical RFC text and in the migration guide's old-command table (milestone truth exit 2)","outcome":"pass","revision":"4285146","evidence":{"kind":"command","detail":"tests.test_retired_spellings.CurrentDocumentation: failed at cf8c725 for cli-contract.md, installation.md, migration-and-pins.md, sources-and-updates.md and the missing Old commands table; passes at 4285146. Historical exemptions: docs/rfcs/, docs/issues/ card records, docs/releases/ and two named baseline evidence reports under docs/development/."}},{"criterion":"capabilities reflects the final command table","outcome":"pass","revision":"4285146","evidence":{"kind":"command","detail":"tests.test_retired_spellings.HelpAndCapabilities.test_public_help_and_capabilities compares capabilities --json command names with mask.COMMANDS; tests.test_retired_paths shows retired commands absent; the CLI contract inventory was cross-checked against capabilities with no missing or extra row."}},{"criterion":"Owner decision Q4: set/require/unrequire refusal, help and contract point to install and remove","outcome":"pass","revision":"4285146","evidence":{"kind":"command","detail":"tests.test_human_output: test_selection_setter_help_points_to_install_and_remove (six help pages) and test_v2_selection_setters_refuse_and_point_to_install_and_remove (exit 4, stderr names selection.command_unsupported, install and remove; declaration, lock, user.json and state.json bytes unchanged). CLI contract inventory rows for project/user set|require|unrequire."}},{"criterion":"Owner decision Q5: migration guide briefly documents restoring an unconvertible consumer on disk; gate unchanged; no migration features","outcome":"pass","revision":"4285146","evidence":{"kind":"observation","detail":"docs/guides/migration-and-pins.md 'Convert the machine' states restore on disk and that project unregister --keep-links and workspace forget stay refused until migration; CLI contract migration gate subsection; no migration code changed in 4285146 (diff touches mask.py, mask_present.py and mask_resolve.py help/refusal text only)."}},{"criterion":"Bounded work: help for init, tap add, install, update, source fetch and doctor --migrate; README and installation guide on the tap bootstrap; sources guide on fetching updates; migration guide with old-command table; CLI contract inventory and state/recovery architecture for doctor.migrate","outcome":"pass","revision":"4285146","evidence":{"kind":"artifact","detail":"commit 4285146 (18 paths); tests.test_human_output help phrases; structure gate 0 violations; link/anchor check 0 problems over 23 current Markdown files; integrator review of every slice diff with two corrections (authoring checkout users; previous-program refusal wording)."}}]
 ---
 
-# MASK-0103: Make help, docs and capabilities describe only the tap model
+# MASK-0105: Make help, docs and capabilities describe only the tap model
 
-Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md). Live IDs confirmed by the committed pack reservation `b92372f`; original packet retained under RFC assets ([LIVE_IMPORT](../../rfcs/assets/mask-corrective-managed-taps.LIVE_IMPORT.md)). Retained-pack ACCEPTANCE.md: [assets/mask-corrective-managed-taps/ACCEPTANCE.md](../../rfcs/assets/mask-corrective-managed-taps/ACCEPTANCE.md).
+Governing RFC: [RFC-MASK-0021](../../rfcs/RFC-MASK-0021-tap-only-deployment.md). Live IDs reconciled after rebase; the reservation is `f81155a`; original packet retained under RFC assets ([LIVE_IMPORT](../../rfcs/assets/mask-corrective-managed-taps.LIVE_IMPORT.md)). Retained-pack ACCEPTANCE.md: [assets/mask-corrective-managed-taps/ACCEPTANCE.md](../../rfcs/assets/mask-corrective-managed-taps/ACCEPTANCE.md).
 
 ## Objective and owned paths
 
@@ -27,7 +27,7 @@ Rewrite the start-here text, everyday table and command help for `init`, `tap ad
 - **Q4**, verbatim: "point users to install and remove".
   - v2 `project/user set|require|unrequire` are not implemented; they keep refusing `selection.command_unsupported`.
   - This card makes that refusal, its help and the CLI contract point to `install` and `remove`. The refusal text is in `mask.py`, which this decision adds to the owned paths.
-  - It also supersedes the RFC-MASK-0020 Retirement sentence that says these commands "remain for v2 declarations".
+  - It also supersedes the RFC-MASK-0021 Retirement sentence that says these commands "remain for v2 declarations".
 - **Q5**, verbatim: "just make migration best effort, we're going to run migration on a single machine and then drop it entirely so dont put a lot into it".
   - The AC05 gate is unchanged: `project unregister --keep-links` and `workspace forget` stay refused on a v1 or v2 machine.
   - The migration guide says briefly that a consumer `doctor --migrate` cannot convert must be restored on disk before migrating.
@@ -37,7 +37,7 @@ Rewrite the start-here text, everyday table and command help for `init`, `tap ad
 
 README recipes execute verbatim through the tap-first fixtures. Help output for every registered command renders and names no retired command. The documentation test finds the retired spellings only under `docs/rfcs/assets`, in historical RFC text and in the migration guide's old-command table. `capabilities` reflects the final command table.
 
-Criterion coverage: RFC-MASK-0020-AC05, RFC-MASK-0020-AC06.
+Criterion coverage: RFC-MASK-0021-AC05, RFC-MASK-0021-AC06.
 
 ## Focused verification
 
@@ -87,7 +87,7 @@ Dispatch `d6` of run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, 
 | Owner decision Q4 | `tests.test_human_output`: `test_selection_setter_help_points_to_install_and_remove` covers six help pages. `test_v2_selection_setters_refuse_and_point_to_install_and_remove`: exit 4, stderr names the code, install and remove, and the declaration, lock, `user.json` and `state.json` bytes are unchanged | Pass |
 | Owner decision Q5 | Migration guide "Convert the machine"; the migration gate subsection of the CLI contract | Pass (documentation) |
 
-- **What "historical" means in the documentation test.** RFC-MASK-0020 keeps historical RFCs and evidence unchanged, so these are exempt:
+- **What "historical" means in the documentation test.** RFC-MASK-0021 keeps historical RFCs and evidence unchanged, so these are exempt:
   - `docs/rfcs/`: retained packets, RFC text and plans;
   - `docs/issues/`: the card records of RFC work, including this closeout;
   - `docs/releases/`;
@@ -108,7 +108,7 @@ Dispatch `d6` of run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, 
   - **Tap-machine remediation:** a consumer-level `migration.required` on a tap machine names `mask doctor --migrate --dry-run`, which needs `--project PATH --alias NAME` there. The contract documents the full form. Left unchanged under Q5.
   - **Doctor network flag:** `capabilities` reports `doctor` `network: false`, but the tap-machine conversion can fetch. The contract says so.
   - **Previous programs:** the RFC rollout sentence is historical. `b92372f` cannot read a v3 configuration (`config.invalid`), and the previous tap-era program refuses a tap entry carrying `line_endings` (`source.invalid`). Neither recovers this program's `update` journal. The contract documents this.
-  - **Qualifier (MASK-0104):** `scripts/qualify_real_package.py` still calls `project unrequire` (lines 315 and 331), which refuses on v2 declarations, as well as the retired `init --source` noted by d2.
+  - **Qualifier (MASK-0106):** `scripts/qualify_real_package.py` still calls `project unrequire` (lines 315 and 331), which refuses on v2 declarations, as well as the retired `init --source` noted by d2.
   - **Help wrapping:** argparse still wraps option-help lines at hyphens.
 - **Limitations:**
   - Only Windows 11 was exercised; macOS was not run.

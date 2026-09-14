@@ -1,22 +1,22 @@
 ---
 schema: "implement-rfc.card.v1"
-id: "MASK-0107"
+id: "MASK-0109"
 title: "Keep exact bytes on taps unless line-ending conversion is opted in at tap registration"
 status: "Done"
 rfcs: []
-depends_on: ["MASK-0100", "MASK-0101"]
+depends_on: ["MASK-0102", "MASK-0103"]
 priority: "P1"
-metadata: {"origin":"RFC-MASK-0020 owner decision, mandate r2 (2026-09-13)","follow_up_of":"MASK-0099","sequenced_before":["MASK-0104","MASK-0105"]}
+metadata: {"origin":"RFC-MASK-0021 owner decision, mandate r2 (2026-09-13)","follow_up_of":"MASK-0101","sequenced_before":["MASK-0106","MASK-0107"]}
 acceptance: [{"criterion":"A1 exact tap: unchanged LF package publishes no change; a changed file publishes exact bytes","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"python -B -m unittest tests.test_tap_line_endings: ExactTap.test_unchanged_lf_package_publishes_no_change_and_an_edit_publishes_exact_bytes; session scratchpad d5/final-module/tests.test_tap_line_endings.log (16 tests OK, 514 s, Windows 11, Git 2.55.0.windows.3, system core.autocrlf=true)"}},{"criterion":"A2 source dev-link of an unchanged package observes the locked payload digest","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"ExactTap.test_dev_link_of_an_unchanged_package_observes_the_locked_payload_digest and AutocrlfTap.test_a_converted_clone_publishes_no_change_and_dev_links_the_locked_digest compare data.development[].payload_digest with the lock; session scratchpad d5/final-module/tests.test_tap_line_endings.log (16 tests OK, 514 s, Windows 11, Git 2.55.0.windows.3, system core.autocrlf=true)"}},{"criterion":"A3 with the opt-in, conversion follows core.autocrlf=true and is disclosed","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"AutocrlfTap (4 tests: disclosure without warning, no change on a converted clone, CRLF edit equals git hash-object oracle, attribute refusal) and AutocrlfFidelity (new-file and committed-copy cases against git hash-object and git add); session scratchpad d5/final-module/tests.test_tap_line_endings.log (16 tests OK, 514 s, Windows 11, Git 2.55.0.windows.3, system core.autocrlf=true)"}},{"criterion":"A4 configurations written before this card keep working","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"EntryWrittenBeforeThePolicy (entry without line_endings: show, install, update, publish, dev-link, identical tap add keeps config bytes, --autocrlf conflicts); every tests/test_*.py module passes (worker post/rerun logs and d5 integ run)"}},{"criterion":"A5 machine v3 schema, CLI contract, help and capabilities describe the policy","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"PolicySurfaces (capabilities line_endings and --autocrlf flag, tap add --help, schema enum not required); docs/architecture/cli-contract.md Tap line endings; python scripts/verify_documentation.py --root . reports 0 structural violations"}},{"criterion":"Bounded work: doctor --migrate writes the exact default","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"MigrationWritesTheDefault (v1, v2 kept and extra, v2 renamed; report, dry run and written config) and tests.test_doctor_migration 22 OK"}},{"criterion":"Bounded work: an exact tap over a Git-converted checkout no longer republishes CRLF","outcome":"pass","revision":"4c0549fd6b1d1183557d0b4418bfc402eec3d4c3","evidence":{"kind":"command","detail":"ExactTap.test_exact_tap_over_a_converted_clone_warns_then_refuses_before_any_effect (warning, refusal before any effect for publish, publish --commit, dev-link dry run and apply; delete-and-checkout remediation); negative control on an archive of 6496967: publish previews would_change true and the module fails 7 failures and 22 errors"}}]
 ---
 
-# MASK-0107: Keep exact bytes on taps unless line-ending conversion is opted in at tap registration
+# MASK-0109: Keep exact bytes on taps unless line-ending conversion is opted in at tap registration
 
 Owner decision (September 13, 2026, run `mask-rfc0020-2026-09-12-a`, mandate revision r2, verbatim): "we should disable autocrlf on taps by default unless explicitly requested keeping exact bytes and only if a user explicitly opts in during tap registration should wee use autocrlf true". Filing was authorized with "sure file"; implementation is not restricted (r3).
 
 ## Evidence
 
-[MASK-0099 execution record](MASK-0099-machine-v3-and-tap-bootstrap.md#contract-notes-and-follow-up-candidates): under `core.autocrlf=true`, `source publish` hashes working bytes without filters, so it republishes LF blobs as CRLF. Tests now disable conversion by hand (for example a `* -text` publisher attribute). The owner's Windows machine uses `core.autocrlf=true`.
+[MASK-0101 execution record](MASK-0101-machine-v3-and-tap-bootstrap.md#contract-notes-and-follow-up-candidates): under `core.autocrlf=true`, `source publish` hashes working bytes without filters, so it republishes LF blobs as CRLF. Tests now disable conversion by hand (for example a `* -text` publisher attribute). The owner's Windows machine uses `core.autocrlf=true`.
 
 ## Objective and owned paths
 
@@ -27,7 +27,7 @@ Tap registration, catalog entry, and every MASK Git operation on a tap's cache o
 - By default, a tap keeps exact bytes. MASK disables Git line-ending conversion for its operations on that tap and for its authoring checkout, so published blobs, development payloads and locked payload digests agree.
 - Only an explicit opt-in at `tap add` enables `core.autocrlf` for that tap. The opt-in is recorded in the catalog entry and disclosed in output.
 - Existing v3 entries without the field mean exact bytes. `doctor --migrate` writes the default.
-- Record the amendment to the RFC-MASK-0020 tap entry shape in the RFC and the machine v3 schema.
+- Record the amendment to the RFC-MASK-0021 tap entry shape in the RFC and the machine v3 schema.
 
 ## Acceptance
 
@@ -40,7 +40,7 @@ On a host whose Git configuration has `core.autocrlf=true`:
 
 ## Sequencing
 
-MASK-0104 (native real-package qualification) and MASK-0105 (owner machine migration) depend on this card. Both run on the owner's `core.autocrlf=true` Windows host and should exercise the final byte policy.
+MASK-0106 (native real-package qualification) and MASK-0107 (owner machine migration) depend on this card. Both run on the owner's `core.autocrlf=true` Windows host and should exercise the final byte policy.
 
 ## Execution record
 

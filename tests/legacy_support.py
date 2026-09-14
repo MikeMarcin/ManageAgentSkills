@@ -1,4 +1,4 @@
-"""Schema-true legacy starting states for RFC-MASK-0020 (MASK-0098).
+"""Schema-true legacy starting states for RFC-MASK-0021 (MASK-0100).
 
 The live-checkout program at RFC_BASE_SHA ``b92372f`` wrote these files. The
 builder writes the same bytes directly, without running MASK, so doctor-migration

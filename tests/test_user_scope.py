@@ -1,4 +1,4 @@
-"""Personal scope beside project scope through the public CLI on a tap-first machine (RFC-MASK-0020; MASK-0100, MASK-0101).
+"""Personal scope beside project scope through the public CLI on a tap-first machine (RFC-MASK-0021; MASK-0102, MASK-0103).
 
 A personal consumer is a v2 declaration in MASK_HOME/user.json with its lock. It starts through ``install --user`` (or
 ``user init`` and ``user register``); membership changes use ``install``/``remove`` and agent changes use ``set-agents``.
@@ -277,7 +277,7 @@ class UserScopeTests(Fixture):
 
 
 class UserUpdateTests(Fixture):
-    """A personal consumer beside a project consumer on the fixture tap; the fetching update validates and preflights both (MASK-0101)."""
+    """A personal consumer beside a project consumer on the fixture tap; the fetching update validates and preflights both (MASK-0103)."""
 
     def setUp(self):
         super().setUp()

@@ -257,7 +257,7 @@ were recorded; the registered station checkout (`3456e39`) and user profile were
 not touched. Two older `mask-native-*` temporary directories from earlier lanes
 remain in that `%TEMP%` and were not created by this run.
 
-## Real-package qualification on taps (RFC-MASK-0020, MASK-0104)
+## Real-package qualification on taps (RFC-MASK-0021, MASK-0106)
 
 Run on September 14, 2026 in dispatch `d7` of run `mask-rfc0020-2026-09-12-a`.
 - **Driver:** `scripts/qualify_real_package.py` as committed at `f9c7fbc`, sha256 `d565fe3453872338f0451774ab399c87d3a2a40595e416f439edd4b15b0a63c2`.
@@ -313,7 +313,7 @@ The steps ran in three sections.
 - The clone and its origin are unchanged.
 
 Limitations:
-- **macOS** was not exercised, so RFC-MASK-0020-AC07 and MASK-0104 stay open.
+- **macOS** was not exercised, so RFC-MASK-0021-AC07 and MASK-0106 stay open.
 - **Network:** every remote is a disposable local bare repository, so no network fetch or SSH authentication was exercised.
 - **Console consent:** `--console prepare` and `verify` ran during development, but nobody typed an answer at a prompt.
 - **Host loading** of the deployed roles is still `not_verified`.

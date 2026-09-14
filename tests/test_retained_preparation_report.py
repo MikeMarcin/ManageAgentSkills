@@ -1,4 +1,4 @@
-"""A refusal after retained store preparation reports no consumer transaction (MASK-0110).
+"""A refusal after retained store preparation reports no consumer transaction (MASK-0112).
 
 ``apply``, ``ensure``, ``install`` and ``update`` prepare MASK-owned store artifacts, and may acquire exact cache
 objects, before their writer lock and before any consumer effect. A command that then refuses keeps

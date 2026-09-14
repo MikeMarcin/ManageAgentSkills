@@ -1,4 +1,4 @@
-"""Qualify the real AgentSkills implement-rfc package through MASK's public CLI only, on taps (RFC-MASK-0019 MASK-0092; RFC-MASK-0020 MASK-0104).
+"""Qualify the real AgentSkills implement-rfc package through MASK's public CLI only, on taps (RFC-MASK-0019 MASK-0092; RFC-MASK-0021 MASK-0106).
 
     python3 -B scripts/qualify_real_package.py --mask /disposable/ManageAgentSkills/mask.py --agentskills /path/to/AgentSkills \
         --work /short/disposable/root --fake-host posix|windows|none --report report.json
@@ -10,7 +10,7 @@ authoring clone commits and pushes candidates to it. No helper renders roles: ro
 MASK's consented setup or from files a consumer committed after such a run; the upstream renderer is
 imported read-only at the end to compare deployed bytes. Three independent machines run in order: the
 tap lab (bootstrap, consent, roles, fresh clone, removal, push-then-update), a v1 legacy lab built by the
-MASK under test's tests/legacy_support.py, and a small owner-shape rehearsal of MASK-0105 (a v1
+MASK under test's tests/legacy_support.py, and a small owner-shape rehearsal of MASK-0107 (a v1
 configuration over a checked-out AgentSkills clone whose origin is a local bare repository, with an empty
 registry). Keep --work short on Windows: a tap cache ref path beyond MAX_PATH fails as an untyped git.failed.
 This is an evidence tool for the closeout record, not part of the program or its test suite.
@@ -511,7 +511,7 @@ def legacy_lab(args, facts):
 
 
 def owner_rehearsal(args, facts):
-    """A small MASK-0105 rehearsal: v1 config over a checked-out AgentSkills clone with a local bare origin and an empty registry."""
+    """A small MASK-0107 rehearsal: v1 config over a checked-out AgentSkills clone with a local bare origin and an empty registry."""
     legacy = load_legacy_support(args.mask)
     roots = legacy.layout(Path(args.work).resolve() / 'owner')
     roots.personal.mkdir(parents=True)
@@ -571,7 +571,7 @@ def owner_rehearsal(args, facts):
     run, data = machine.run('doctor', '--check')
     issues = body(data).get('issues') or []
     facts['doctor_check'] = dict(exit=run.returncode, issues=issues)
-    # MASK-0105 expects exit 0 here; without personal implement-rfc context and consented setup the documented verdict is 7.
+    # MASK-0107 expects exit 0 here; without personal implement-rfc context and consented setup the documented verdict is 7.
     step('owner rehearsal: doctor --check exits 7 with only workflow.incomplete (personal context and role setup missing; no migration issue)',
          run.returncode == 7 and codes(issues) == ['workflow.incomplete'] and personal_verdict(issues[0].get('details')), **facts['doctor_check'])
     after = checkout_facts(roots.clone)

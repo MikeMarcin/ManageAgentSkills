@@ -1,4 +1,4 @@
-"""Every link text MASK can produce names a store payload or an explicit dev link (RFC-MASK-0020 AC02, B07, U09; MASK-0100).
+"""Every link text MASK can produce names a store payload or an explicit dev link (RFC-MASK-0021 AC02, B07, U09; MASK-0102).
 
 ``LinkProducers`` enumerates every call in the product modules that creates a link or computes a link text, and
 every directory ``mask_pinned.target`` can derive, against allowlists that name each target derivation.

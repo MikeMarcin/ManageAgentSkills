@@ -1,4 +1,4 @@
-"""Retired live-checkout commands in help, capabilities and current documentation (RFC-MASK-0020 AC05/AC06; cases D01, D03; MASK-0103).
+"""Retired live-checkout commands in help, capabilities and current documentation (RFC-MASK-0021 AC05/AC06; cases D01, D03; MASK-0105).
 
 The retired spellings are the four the retained contract names (``contracts/CLI.md``, "Help and documentation"),
 the other removed ``init`` options and the removed top-level ``migrate`` command. Current documentation is every
@@ -29,7 +29,7 @@ CONTRACT_SPELLINGS = ('init --source', 'source status', 'source migrate', 'migra
 HISTORICAL_ROOTS = ('docs/rfcs/', 'docs/issues/', 'docs/releases/')
 HISTORICAL = {
     'docs/development/corrective-baseline.md': 'RFC-MASK-0018 public baseline evidence, recorded on the live-checkout program',
-    'docs/development/tap-cutover-baseline.md': 'RFC-MASK-0020 pre-implementation baseline evidence (MASK-0098)',
+    'docs/development/tap-cutover-baseline.md': 'RFC-MASK-0021 pre-implementation baseline evidence (MASK-0100)',
 }
 MIGRATION_GUIDE = 'docs/guides/migration-and-pins.md'
 OLD_COMMANDS = re.compile(r'^#{2,4} Old commands\b.*$', re.M)

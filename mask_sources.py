@@ -14,7 +14,7 @@ import mask_core as c
 
 FETCH_BYTES = 256 * 1024 * 1024
 CACHE_BYTES = 1024 * 1024 * 1024
-# A tap keeps exact bytes unless it opted in to Git's core.autocrlf=true conversion at tap add (MASK-0107).
+# A tap keeps exact bytes unless it opted in to Git's core.autocrlf=true conversion at tap add (MASK-0109).
 LINE_ENDINGS = ('exact', 'autocrlf')
 
 
@@ -34,7 +34,7 @@ def checkout_conversion(root):
 
 
 def authoring_branch(root, ref):
-    """The configured branch an authoring checkout must be on; it refuses the same way with or without an origin (MASK-0108)."""
+    """The configured branch an authoring checkout must be on; it refuses the same way with or without an origin (MASK-0110)."""
     branch = ref.removeprefix('refs/heads/')
     current = c.git(root, 'symbolic-ref', '--short', 'HEAD', optional=True)
     if current is None:

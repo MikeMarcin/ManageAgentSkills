@@ -3,18 +3,18 @@
   "id": "tap-only-deployment",
   "scope": {
     "rfcs": [
-      "RFC-MASK-0020"
+      "RFC-MASK-0021"
     ],
     "issues": [
-      "MASK-0098",
-      "MASK-0099",
       "MASK-0100",
       "MASK-0101",
       "MASK-0102",
       "MASK-0103",
       "MASK-0104",
       "MASK-0105",
-      "MASK-0106"
+      "MASK-0106",
+      "MASK-0107",
+      "MASK-0108"
     ]
   },
   "milestones": [
@@ -23,7 +23,7 @@
       "outcome": "The live-checkout defect is recorded as evidence and a schema-true legacy machine fixture exists for later migration tests.",
       "work": [
         {
-          "issue": "MASK-0098"
+          "issue": "MASK-0100"
         }
       ],
       "depends_on": [],
@@ -38,7 +38,7 @@
       "outcome": "A machine bootstraps from one tap and every test fixture starts that way.",
       "work": [
         {
-          "issue": "MASK-0099"
+          "issue": "MASK-0101"
         }
       ],
       "depends_on": [
@@ -55,10 +55,10 @@
       "outcome": "The live-checkout engine is gone and update fetches every referenced tap.",
       "work": [
         {
-          "issue": "MASK-0100"
+          "issue": "MASK-0102"
         },
         {
-          "issue": "MASK-0101"
+          "issue": "MASK-0103"
         }
       ],
       "depends_on": [
@@ -76,7 +76,7 @@
       "outcome": "doctor detects and migrates v1 and v2 machines, projects and personal scopes with recovery.",
       "work": [
         {
-          "issue": "MASK-0102"
+          "issue": "MASK-0104"
         }
       ],
       "depends_on": [
@@ -93,7 +93,7 @@
       "outcome": "Help, documentation and capabilities describe only the tap model.",
       "work": [
         {
-          "issue": "MASK-0103"
+          "issue": "MASK-0105"
         }
       ],
       "depends_on": [
@@ -111,10 +111,10 @@
       "outcome": "The real AgentSkills package and the owner's machine are exercised natively through taps.",
       "work": [
         {
-          "issue": "MASK-0104"
+          "issue": "MASK-0106"
         },
         {
-          "issue": "MASK-0105"
+          "issue": "MASK-0107"
         }
       ],
       "depends_on": [
@@ -128,10 +128,10 @@
     },
     {
       "id": "closeout",
-      "outcome": "RFC-MASK-0020 is closed with direct evidence for every criterion.",
+      "outcome": "RFC-MASK-0021 is closed with direct evidence for every criterion.",
       "work": [
         {
-          "issue": "MASK-0106"
+          "issue": "MASK-0108"
         }
       ],
       "depends_on": [

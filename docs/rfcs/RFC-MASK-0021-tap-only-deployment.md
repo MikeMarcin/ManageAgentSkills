@@ -1,5 +1,5 @@
 ---
-id: "RFC-MASK-0020"
+id: "RFC-MASK-0021"
 title: "Tap-only deployment, fetching updates and doctor migration"
 status: "Implementing"
 owner: "MikeMarcin"
@@ -7,18 +7,18 @@ created: "2026-09-12"
 metadata: {"milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
 ---
 
-# RFC-MASK-0020: Tap-only deployment, fetching updates and doctor migration
+# RFC-MASK-0021: Tap-only deployment, fetching updates and doctor migration
 
-**Corrective proposal; not implemented or qualified by this pack.** Live import of packet `RFC-MASK-0020` (no renumber needed; live RFCs ended at RFC-MASK-0019). Retained packet: [assets/mask-corrective-managed-taps/](assets/mask-corrective-managed-taps/README.md); import record: [LIVE_IMPORT](assets/mask-corrective-managed-taps.LIVE_IMPORT.md).
+**Corrective proposal; not implemented or qualified by this pack.** Live import of packet `RFC-MASK-0020`, renumbered to RFC-MASK-0021 after the upstream personal-readiness RFC took RFC-MASK-0020. Retained packet: [assets/mask-corrective-managed-taps/](assets/mask-corrective-managed-taps/README.md); import record: [LIVE_IMPORT](assets/mask-corrective-managed-taps.LIVE_IMPORT.md).
 
-**Accepted for implementation (September 12, 2026)** by the owner's `/implement-rfc RFC-MASK-0020` direction; implementing from RFC_BASE_SHA `b92372f` under the adopted plan [plans/tap-only-deployment](plans/tap-only-deployment/milestone-plan.json). Current frontier and per-criterion evidence: closeout [MASK-0106](../issues/10-backlog/MASK-0106-close-tap-only-deployment.md). Nothing is qualified until that closeout records it.
+**Accepted for implementation (September 12, 2026)** by the owner's `/implement-rfc RFC-MASK-0020` direction (the ID at the time); implementing from the rebased RFC_BASE_SHA `f81155a` under the adopted plan [plans/tap-only-deployment](plans/tap-only-deployment/milestone-plan.json). The original pre-rebase baseline was `b92372f`. Current frontier and per-criterion evidence: closeout [MASK-0108](../issues/10-backlog/MASK-0108-close-tap-only-deployment.md). Nothing is qualified until that closeout records it.
 
 **Owner decisions (September 13, 2026; run `mask-rfc0020-2026-09-12-a`, mandate revisions r2, r3 and r4).**
 - An offline install of a bare ID before its only tap is fetched refuses `source.unresolved`, naming the tap. `lock.resolution_required` is the offline refusal for a qualified `SOURCE/ID`. Retained case B04 is read with this decision; the retained packet is unchanged.
-- Taps keep exact bytes. MASK disables Git line-ending conversion for tap operations by default; only an explicit opt-in at tap registration enables `core.autocrlf`. It was implemented at `4c0549f` by [MASK-0107](../issues/60-done/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it.
-- The remaining d2 follow-up candidates are filed outside this RFC as [MASK-0108](../issues/60-done/MASK-0108-authoring-checkout-branch-refusal.md), [MASK-0109](../issues/60-done/MASK-0109-ensure-cold-dry-run-plan-hash.md) and [MASK-0110](../issues/60-done/MASK-0110-refusal-after-retained-preparation.md).
-- Mandate r4, Q4 ("point users to install and remove"): v2 declarations get no `project/user set|require|unrequire`. Those commands keep refusing `selection.command_unsupported`, and the refusal, help and documentation point to `install` and `remove`. This supersedes the Retirement sentence below that says the four commands "remain for v2 declarations". [MASK-0103](../issues/60-done/MASK-0103-help-docs-and-capabilities-truth.md) carries it.
-- Mandate r4, Q5 ("just make migration best effort, we're going to run migration on a single machine and then drop it entirely so dont put a lot into it"): `doctor --migrate` is best effort. The AC05 gate is unchanged, so `project unregister --keep-links` and `workspace forget` stay refused on a v1 or v2 machine. A consumer that migration cannot convert is restored on disk first, and MASK-0103 documents that briefly. No further migration features or hardening are planned. The recorded migration notes are closed unless they block the owner's machine migration ([MASK-0105](../issues/40-parked/MASK-0105-owner-machine-migration-dogfood.md)). No acceptance criterion text is narrowed.
+- Taps keep exact bytes. MASK disables Git line-ending conversion for tap operations by default; only an explicit opt-in at tap registration enables `core.autocrlf`. It was implemented at `4c0549f` by [MASK-0109](../issues/60-done/MASK-0109-tap-line-endings-exact-bytes.md), and MASK-0106 and MASK-0107 depend on it.
+- The remaining d2 follow-up candidates are filed outside this RFC as [MASK-0110](../issues/60-done/MASK-0110-authoring-checkout-branch-refusal.md), [MASK-0111](../issues/60-done/MASK-0111-ensure-cold-dry-run-plan-hash.md) and [MASK-0112](../issues/60-done/MASK-0112-refusal-after-retained-preparation.md).
+- Mandate r4, Q4 ("point users to install and remove"): v2 declarations get no `project/user set|require|unrequire`. Those commands keep refusing `selection.command_unsupported`, and the refusal, help and documentation point to `install` and `remove`. This supersedes the Retirement sentence below that says the four commands "remain for v2 declarations". [MASK-0105](../issues/60-done/MASK-0105-help-docs-and-capabilities-truth.md) carries it.
+- Mandate r4, Q5 ("just make migration best effort, we're going to run migration on a single machine and then drop it entirely so dont put a lot into it"): `doctor --migrate` is best effort. The AC05 gate is unchanged, so `project unregister --keep-links` and `workspace forget` stay refused on a v1 or v2 machine. A consumer that migration cannot convert is restored on disk first, and MASK-0105 documents that briefly. No further migration features or hardening are planned. The recorded migration notes are closed unless they block the owner's machine migration ([MASK-0107](../issues/40-parked/MASK-0107-owner-machine-migration-dogfood.md)). No acceptance criterion text is narrowed.
 
 Amends applicable current behavior from RFC-MASK-0003 (`init --source`, shared
 checkout `update`), RFC-MASK-0007 (a v2 catalog that still requires a legacy
@@ -77,7 +77,7 @@ The normative contracts are `assets/mask-corrective-managed-taps/contracts/CLI.m
 **Machine config v3.** `schema_version: 3`, `default_targets`,
 `git_timeout_seconds`, `sources` (0 to 256 tap entries; the entry shape of v2
 plus the optional `line_endings` policy, `exact` or `autocrlf`, that the owner's
-exact-bytes decision above adds through MASK-0107; absent means `exact`). No
+exact-bytes decision above adds through MASK-0109; absent means `exact`). No
 `source` block and no `legacy_source`. `mask_core.config` still
 parses v1 and v2 for migration only; every command other than `capabilities`,
 `config show`, `doctor`, `recover` and `self *` refuses a v1/v2 configuration with
@@ -160,20 +160,20 @@ branch.
 
 ## Acceptance criteria
 
-**RFC-MASK-0020-AC01** — **Tap-first bootstrap.** On an empty `MASK_HOME`,
+**RFC-MASK-0021-AC01** — **Tap-first bootstrap.** On an empty `MASK_HOME`,
 `mask tap add agentskills URL` followed by `mask install implement-rfc --project P`
 exits 0, creates machine config v3 with one tap and one bare cache under
 `MASK_HOME/sources`, writes a v2 `.mask.json` and `.mask.lock.json`, and links
 every enabled agent path, with no `init --source` step and no working checkout
 anywhere on disk.
 
-**RFC-MASK-0020-AC02** — **Links target the store only.** Every owned link
+**RFC-MASK-0021-AC02** — **Links target the store only.** Every owned link
 recorded in `state.json` and observed on disk, for project and personal scopes,
 before and after `update`, resolves under `MASK_HOME/store/v1/`; no planner,
 adoption or recovery path can produce a link text into a Git checkout except an
 explicit `source dev-link`, and `tap add --checkout` never changes a link target.
 
-**RFC-MASK-0020-AC03** — **Fetching, isolated updates.** `mask update` fetches
+**RFC-MASK-0021-AC03** — **Fetching, isolated updates.** `mask update` fetches
 each referenced tap exactly once, applies all selected consumers' lock and link
 changes in one journal with per-consumer disclosed diffs, continues for consumers
 on healthy taps when another tap is unreachable (blocked roots named,
@@ -181,7 +181,7 @@ on healthy taps when another tap is unreachable (blocked roots named,
 `--allow-ref-rebind`, and never fetches under `--dry-run`, `--offline` or
 `--expect-plan-hash`.
 
-**RFC-MASK-0020-AC04** — **Doctor migrates legacy installs.** On fixture v1 and
+**RFC-MASK-0021-AC04** — **Doctor migrates legacy installs.** On fixture v1 and
 v2 machines holding a legacy project, a legacy personal scope and an unregistered
 v1 declaration, `mask doctor` reports `migration.required` (`--check` exits 7),
 `--migrate --dry-run` writes nothing, `--migrate` yields a v3 config with the
@@ -190,26 +190,26 @@ and pinned records, a crash at every journal checkpoint recovers with
 `recover --rollback` to exact prior bytes and links or with `--complete`, and a
 machine with an empty registry migrates its configuration only.
 
-**RFC-MASK-0020-AC05** — **Retired paths refuse precisely.** `capabilities` no
+**RFC-MASK-0021-AC05** — **Retired paths refuse precisely.** `capabilities` no
 longer lists `init --source`, `source status`, `source migrate` or `migrate`;
 invoking them exits 2 `invocation.invalid`; and on a v1 or v2 configuration
 every command other than `capabilities`, `config show`, `doctor`, `recover` and
 `self *` exits 4 `migration.required` with a `doctor --migrate` remediation.
 
-**RFC-MASK-0020-AC06** — **Truthful help and documentation.** `mask --help`,
+**RFC-MASK-0021-AC06** — **Truthful help and documentation.** `mask --help`,
 `mask update --help`, `mask doctor --help`, README, the guides, the CLI contract
 and the state/recovery architecture describe only the tap model and doctor
 migration, and a documentation test finds no retired command spelling outside
 `docs/rfcs/assets`, historical RFC text and the migration guide's old-command
 table.
 
-**RFC-MASK-0020-AC07** — **Native real-package qualification.**
+**RFC-MASK-0021-AC07** — **Native real-package qualification.**
 `scripts/qualify_real_package.py` passes on native Windows 11 and macOS against
 the real AgentSkills repository added as a tap, including an upstream push
 followed by `mask update` and a legacy-lab doctor migration, and the owner's real
 v1 machine is migrated by `doctor --migrate` with the transcript recorded.
 
-**RFC-MASK-0020-AC08** — **Structure and suite gates.**
+**RFC-MASK-0021-AC08** — **Structure and suite gates.**
 `python scripts/verify_documentation.py --root .` reports zero violations with
 this RFC, its nine cards and their reservation, and the full
 `python -B -m unittest` suite passes on Windows and macOS with the tap-first

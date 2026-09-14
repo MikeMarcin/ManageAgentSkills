@@ -1,4 +1,4 @@
-"""Tap-first inventory and where-used over pinned records (MASK-0100; RFC-MASK-0011-AC01, RFC-MASK-0020).
+"""Tap-first inventory and where-used over pinned records (MASK-0102; RFC-MASK-0011-AC01, RFC-MASK-0021).
 
 Every case drives the public CLI as a subprocess on a machine bootstrapped from local bare
 upstreams approved as ``file`` taps, and every observation proves that the whole fixture

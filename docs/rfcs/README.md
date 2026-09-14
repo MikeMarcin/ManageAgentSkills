@@ -48,4 +48,4 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 
 | RFC | Status | Title |
 |---|---|---|
-| RFC-MASK-0020 | Implementing | Tap-only deployment, fetching updates and doctor migration |
+| RFC-MASK-0021 | Implementing | Tap-only deployment, fetching updates and doctor migration |

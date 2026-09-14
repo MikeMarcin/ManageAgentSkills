@@ -465,7 +465,7 @@ def merge_preparation(output, *, completed):
     """Retained preparation effects survive every consumer failure boundary.
 
     MASK-owned store and cache effects set ``changed`` and are summarized in ``data.retained_preparation``, apart from the
-    consumer transaction (MASK-0110): a completed consumer no-op becomes ``committed``, a refusal before any consumer
+    consumer transaction (MASK-0112): a completed consumer no-op becomes ``committed``, a refusal before any consumer
     effect stays ``not_started`` (no journal, nothing to recover), and ``committed``, ``rolled_back`` or ``partial`` is kept.
     """
     effects = output.get('data', {}).get('preparation', [])
@@ -612,7 +612,7 @@ def dev_dispatch(args, output, home):
         if Path(args.authoring_root).expanduser().resolve() != authoring:
             c.fail('source.identity_mismatch', 'Explicit development root must match approved authoring identity.', 4)
         devs[args.id] = dict(source=name, id=identifier, root=str(authoring), identity=c.identity(authoring), path=observation['path'])
-        # A new development link of an exact tap refuses Git-converted copies of committed files (MASK-0107).
+        # A new development link of an exact tap refuses Git-converted copies of committed files (MASK-0109).
         observe_dev(devs[args.id], config, guard=True)
     planned = fs.plan(config, state, [root], home=home, operation='source.dev-link', dev_proposals={str(root): devs})
     fs.public_plan(planned, output)

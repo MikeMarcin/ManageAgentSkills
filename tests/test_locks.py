@@ -310,7 +310,7 @@ class RetiredLockInputTests(Fixture):
     """Retired live-checkout inputs beside locks: a v1 declaration refuses, and a mode-less record never carries a v2 selection."""
 
     def test_v1_declaration_refuses_project_require(self):
-        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations; v1 string mutation is retired (RFC-MASK-0020).
+        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations; v1 string mutation is retired (RFC-MASK-0021).
         self.init()
         (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n')
         before = self.snapshot()

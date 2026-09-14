@@ -25,7 +25,7 @@ class FreshScopes(PublicFixture):
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
         self.assertIn(f'added: {TAP}/alpha', run.stdout)
         self.assertEqual(links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
-        # RFC-MASK-0020: a fresh declaration on a tap catalog machine is a v2 selection of the fixture tap.
+        # RFC-MASK-0021: a fresh declaration on a tap catalog machine is a v2 selection of the fixture tap.
         self.assertEqual(json.loads((self.project / '.mask.json').read_text(encoding='utf-8')),
                          dict(schema_version=2, sources={TAP: dict(repository=self.upstream.as_uri(), packages='skills')},
                               default_agents=['claude', 'codex'], skills=[dict(source=TAP, id='alpha')]))

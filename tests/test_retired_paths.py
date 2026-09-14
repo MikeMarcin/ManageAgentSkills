@@ -1,4 +1,4 @@
-"""Retired live-checkout commands and the migration gate through the public CLI (RFC-MASK-0020 AC05, B08-B10; MASK-0100).
+"""Retired live-checkout commands and the migration gate through the public CLI (RFC-MASK-0021 AC05, B08-B10; MASK-0102).
 
 Legacy machines come from the schema-true builder in ``tests.legacy_support``. Every invocation uses a private
 MASK_HOME and personal home, and every refusal is compared with a snapshot of the whole disposable base: machine

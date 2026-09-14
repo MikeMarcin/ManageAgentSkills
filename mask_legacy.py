@@ -1,4 +1,4 @@
-"""Read-only detection of retired live-checkout inputs for doctor migration (RFC-MASK-0020 AC04; contracts/MIGRATION.md).
+"""Read-only detection of retired live-checkout inputs for doctor migration (RFC-MASK-0021 AC04; contracts/MIGRATION.md).
 
 This module reads what the live-checkout program left behind: a v1 or v2 machine configuration, mode-less
 consumer records and v1 declarations. It never writes, fetches, checks out, stashes or resets; the legacy
@@ -122,7 +122,7 @@ def proposed_tap(config, home, alias, observed):
         if identity != legacy['repository']:
             c.fail('source.identity_mismatch', "The checkout's remote no longer matches the approved legacy source identity.", 4,
                    source=config['legacy_source'], observed=identity, approved=legacy['repository'])
-        # The migrated tap keeps exact bytes, the policy every v2 entry had implicitly (MASK-0107).
+        # The migrated tap keeps exact bytes, the policy every v2 entry had implicitly (MASK-0109).
         entry = dict(legacy, line_endings='exact')
         if alias != config['legacy_source']:
             entry = sources.binding(home, alias, legacy['transport'], legacy['ref'], legacy['packages'], legacy['authoring'])

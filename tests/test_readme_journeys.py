@@ -1,4 +1,4 @@
-"""README recipes replayed verbatim through the public CLI (RFC-MASK-0020 AC06; MASK-0103; case D02).
+"""README recipes replayed verbatim through the public CLI (RFC-MASK-0021 AC06; MASK-0105; case D02).
 
 ``ReadmeText`` pins the replayed strings to README.md: it fails when a fenced command block or an Everyday command
 changes and this file does not follow. ``ReadmeRecipes`` runs exactly those strings on a fresh machine, with no

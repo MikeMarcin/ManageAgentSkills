@@ -34,7 +34,7 @@ def verify(program):
             return sorted(path.relative_to(project).as_posix() for path in project.rglob('*') if path.is_symlink())
         capabilities = call('capabilities')['data']
         assert capabilities['deployment_model'] == 'taps' and capabilities['schemas']['machine'] == 3
-        # Tap-first bootstrap (RFC-MASK-0020): approving the local bare upstream creates machine config v3 and state.
+        # Tap-first bootstrap (RFC-MASK-0021): approving the local bare upstream creates machine config v3 and state.
         call('tap', 'add', 'agentskills', remote)
         call('config', 'show'); call('source', 'fetch')
         call('project', 'init', '--project', project); call('project', 'register', project)

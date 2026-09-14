@@ -1,4 +1,4 @@
-"""Doctor detection and migration of live-checkout machines and consumers (RFC-MASK-0020 AC04, cases M01-M12; MASK-0102).
+"""Doctor detection and migration of live-checkout machines and consumers (RFC-MASK-0021 AC04, cases M01-M12; MASK-0104).
 
 Legacy starting states come from the schema-true builder in ``tests.legacy_support``. Every invocation is a
 subprocess with a private MASK_HOME and personal home. Observational cases compare a snapshot of the whole
@@ -71,7 +71,7 @@ class DoctorReport(LegacyFixture):
         roots = self.legacy_machine(2)
         migration = self.report()['data']['migration']
         self.assertEqual((migration['machine'], migration['migratable']), ('legacy_v2', True))
-        # The v2 binding predates the tap line-ending policy; the proposal adds its exact default (MASK-0107).
+        # The v2 binding predates the tap line-ending policy; the proposal adds its exact default (MASK-0109).
         self.assertEqual(migration['proposed_tap'], dict(alias='legacy', **roots.config['sources']['legacy'], line_endings='exact'))
         self.assertEqual(len(migration['consumers']), 2)
 
@@ -277,7 +277,7 @@ class MachineMigration(MigrationFixture):
         roots = self.legacy_machine(2)
         self.machine('doctor', '--migrate')
         config = self.assert_migrated('legacy', git(roots.clone, 'rev-parse', 'HEAD'))
-        # Every kept tap is unchanged except for the exact line-ending default migration writes (MASK-0107).
+        # Every kept tap is unchanged except for the exact line-ending default migration writes (MASK-0109).
         self.assertEqual(config['sources'], dict(legacy=dict(roots.config['sources']['legacy'], line_endings='exact'),
                                                  extra=dict(roots.config['sources']['extra'], line_endings='exact')))
 

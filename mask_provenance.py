@@ -69,7 +69,7 @@ def source_path(root, entry, identifier, *, existing=False):
 def authoring_checkout(config, name):
     """A tap's approved authoring checkout and its HEAD; observational.
 
-    The branch comes first, so another branch or a detached HEAD refuses the same way whether or not the checkout has an origin (MASK-0108).
+    The branch comes first, so another branch or a detached HEAD refuses the same way whether or not the checkout has an origin (MASK-0110).
     """
     entry = s.selected(config, name)
     if entry['authoring'] is None:
@@ -351,7 +351,7 @@ NONPRINTABLE = bytes((*range(1, 8), 11, *range(14, 27), *range(28, 32), 127))
 
 
 def authoring_payload(root, target, identifier, *, commit, path, committed, policy, source=None):
-    """Package bytes MASK derives from an authoring checkout under its tap's line-ending policy (MASK-0107).
+    """Package bytes MASK derives from an authoring checkout under its tap's line-ending policy (MASK-0109).
 
     ``committed`` maps package-relative paths to the files committed at ``commit``. An exact tap reads raw bytes;
     given ``source``, it refuses files whose bytes differ from their committed copies only in line endings, which

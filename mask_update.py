@@ -1,4 +1,4 @@
-"""Fetching, isolated updates of selected consumers (RFC-MASK-0020 AC03; contracts/CLI.md, Update semantics).
+"""Fetching, isolated updates of selected consumers (RFC-MASK-0021 AC03; contracts/CLI.md, Update semantics).
 
 ``dispatch`` owns the whole ``update`` command: select consumers, fetch each referenced tap
 once, resolve every remaining consumer from the cache, disclose per-consumer lock changes

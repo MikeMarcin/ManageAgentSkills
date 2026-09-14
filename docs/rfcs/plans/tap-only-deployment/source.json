@@ -1,5 +1,16 @@
 {
-  "mapping": {},
+  "mapping": {
+    "MASK-0098": "MASK-0100",
+    "MASK-0099": "MASK-0101",
+    "MASK-0100": "MASK-0102",
+    "MASK-0101": "MASK-0103",
+    "MASK-0102": "MASK-0104",
+    "MASK-0103": "MASK-0105",
+    "MASK-0104": "MASK-0106",
+    "MASK-0105": "MASK-0107",
+    "MASK-0106": "MASK-0108",
+    "RFC-MASK-0020": "RFC-MASK-0021"
+  },
   "plan_path": "docs/rfcs/plans/tap-only-deployment/milestone-plan.json",
   "schema": "implement-rfc.plan-source.v1",
   "source_sha256": "635e655472592ee0c1437ad1bd2b6a765d0d734c298e66e6851f3954bc4a6664"

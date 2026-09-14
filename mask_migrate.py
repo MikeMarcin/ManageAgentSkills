@@ -1,6 +1,6 @@
 """doctor --migrate: convert a live-checkout machine and its consumers to taps through one recoverable journal.
 
-RFC-MASK-0020 AC04; contracts/MIGRATION.md. Detection and the shared declaration mapping live in ``mask_legacy``.
+RFC-MASK-0021 AC04; contracts/MIGRATION.md. Detection and the shared declaration mapping live in ``mask_legacy``.
 
 On a v1 or v2 machine the command is unscoped: the machine configuration and every registered legacy (mode-less)
 consumer convert in one ``doctor.migrate`` journal, all or nothing. The clone HEAD is acquired into the tap cache
@@ -49,7 +49,7 @@ def migrated_config(config_before, home, alias, *, transport=None):
     default the checkout path itself. v2: ``source`` and ``legacy_source`` are dropped and every other tap is kept;
     the legacy binding stays under its alias and another alias renames it (the cache path follows the alias). An
     alias already naming a different tap refuses ``source.alias_conflict``. Every migrated tap is written with the
-    exact-bytes line-ending policy (MASK-0107).
+    exact-bytes line-ending policy (MASK-0109).
     """
     before = c.config(config_before, legacy=True)
     home = Path(home)
@@ -58,7 +58,7 @@ def migrated_config(config_before, home, alias, *, transport=None):
         root = str(Path(before['source']['root']))
         catalog = {alias: sources.binding(home, alias, transport or root, before['source']['branch'], 'skills', authoring=root)}
     elif before['schema_version'] == 2:
-        # Migration writes each tap's line-ending policy; a v2 entry predates it and keeps exact bytes (MASK-0107).
+        # Migration writes each tap's line-ending policy; a v2 entry predates it and keeps exact bytes (MASK-0109).
         catalog = {name: dict(value, line_endings='exact') for name, value in before['sources'].items()}
         entry = catalog.pop(before['legacy_source'])
         if alias != before['legacy_source']:

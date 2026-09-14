@@ -1,12 +1,12 @@
-"""Legacy starting states and the retired live-checkout paths for RFC-MASK-0020 (MASK-0098, MASK-0100).
+"""Legacy starting states and the retired live-checkout paths for RFC-MASK-0021 (MASK-0100, MASK-0102).
 
 ``LegacyFixtureBytes`` is durable. The schema-true builder in ``tests.legacy_support`` writes v1 and v2 machines
 with a registered legacy project, a registered legacy personal scope and an unregistered v1 declaration. The
 current parsers accept every byte unchanged; machine configuration parses only with ``legacy=True`` and the
 default refuses it with ``migration.required``. Later doctor-migration tests start from these states.
 
-``LiveCheckoutBaseline`` recorded, through the public CLI, the defect RFC-MASK-0020 removes and proved that the
-builder writes what the base program wrote (observed at 82b4200 and b92372f). Since MASK-0100 it is a retired-path
+``LiveCheckoutBaseline`` recorded, through the public CLI, the defect RFC-MASK-0021 removes and proved that the
+builder writes what the base program wrote (observed at 82b4200 and b92372f). Since MASK-0102 it is a retired-path
 baseline over the same builder states: every command that linked into or extended the clone now refuses before any
 effect. Evidence: docs/development/tap-cutover-baseline.md.
 """
@@ -98,7 +98,7 @@ class LegacyFixtureBytes(LegacyFixture):
         self.assertEqual(config['sources']['legacy']['repository'], roots.upstream.as_uri())
         self.assertIsNone(config['sources']['extra']['authoring'])
         for name, entry in config['sources'].items():
-            # A v2 entry never carries the tap line-ending policy the current binding adds (MASK-0107); otherwise they are equal.
+            # A v2 entry never carries the tap line-ending policy the current binding adds (MASK-0109); otherwise they are equal.
             current = sources.binding(roots.home, name, entry['transport'], entry['ref'], entry['packages'], entry['authoring'])
             self.assertEqual((current.pop('line_endings'), 'line_endings' in entry, current), ('exact', False, entry))
         state = self.canonical(roots.home / 'state.json', c.state)

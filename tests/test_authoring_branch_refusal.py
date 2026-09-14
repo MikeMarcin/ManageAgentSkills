@@ -1,4 +1,4 @@
-"""Authoring-checkout branch refusals through the public CLI (MASK-0108).
+"""Authoring-checkout branch refusals through the public CLI (MASK-0110).
 
 Every command that observes a tap's authoring checkout runs as a subprocess against disposable checkouts and local
 repositories: ``tap add --checkout`` (a new alias, and a bootstrap of a fresh MASK_HOME), a curated import destination,
@@ -56,7 +56,7 @@ class AuthoringFixture(Fixture):
         """The fixture tree, and what an observation could leave in the authoring repository besides its working tree.
 
         Any refused mutator on an empty MASK_HOME leaves its writer's ``operation.lock`` there, as the program did before
-        MASK-0108 for an origin naming another repository. The fresh bootstrap home may hold that lock, never configuration or state.
+        MASK-0110 for an origin naming another repository. The fresh bootstrap home may hold that lock, never configuration or state.
         """
         lock = (self.fresh.name, str(Path(self.fresh.name) / 'operation.lock'))
         tree = {key: value for key, value in self.snapshot().items() if key not in lock}

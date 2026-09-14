@@ -1,18 +1,18 @@
 ---
 schema: "implement-rfc.card.v1"
-id: "MASK-0106"
+id: "MASK-0108"
 title: "Verify and close tap-only deployment"
 status: "Backlog"
-rfcs: ["RFC-MASK-0020"]
-depends_on: ["MASK-0104", "MASK-0105"]
+rfcs: ["RFC-MASK-0021"]
+depends_on: ["MASK-0106", "MASK-0107"]
 priority: "P1"
 metadata: {"packet":"mask-corrective-managed-taps","provisional_id":false,"packet_key":"close-tap-only-deployment","milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/tap-only-deployment/milestone-plan.json"}}
-closeout_for: ["RFC-MASK-0020"]
+closeout_for: ["RFC-MASK-0021"]
 ---
 
-# MASK-0106: Verify and close tap-only deployment
+# MASK-0108: Verify and close tap-only deployment
 
-Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md). Live IDs confirmed by the committed pack reservation `b92372f`; original packet retained under RFC assets ([LIVE_IMPORT](../../rfcs/assets/mask-corrective-managed-taps.LIVE_IMPORT.md)). Retained-pack ACCEPTANCE.md: [assets/mask-corrective-managed-taps/ACCEPTANCE.md](../../rfcs/assets/mask-corrective-managed-taps/ACCEPTANCE.md).
+Governing RFC: [RFC-MASK-0021](../../rfcs/RFC-MASK-0021-tap-only-deployment.md). Live IDs reconciled after rebase; the reservation is `f81155a`; original packet retained under RFC assets ([LIVE_IMPORT](../../rfcs/assets/mask-corrective-managed-taps.LIVE_IMPORT.md)). Retained-pack ACCEPTANCE.md: [assets/mask-corrective-managed-taps/ACCEPTANCE.md](../../rfcs/assets/mask-corrective-managed-taps/ACCEPTANCE.md).
 
 ## Current frontier
 
@@ -26,35 +26,35 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - prerequisite `sha256:dbbeb5f755f54376c25b2e6b4eaeab4ee3c9825debe46321a34226dd0b641875`
   - `assign` needs `--accepted-milestone` for `baseline`, `bootstrap`, `engine`, `migration` and `truth`.
 - **Candidate:** product revision `8ea0fe5` on `main`. Commits:
-  - Board: MASK-0108 to MASK-0110 promoted at `7bd13fe`. Claims: MASK-0104 `c354a59`, MASK-0108 `72f13e2`, MASK-0109 `47a5105`, MASK-0110 `4e8af51`, MASK-0105 `f685595`.
-  - Implementation: the qualifier at `f9c7fbc`, MASK-0108 at `2848f6d`, MASK-0109 and MASK-0110 at `8ea0fe5`.
+  - Board: MASK-0110 to MASK-0112 promoted at `7bd13fe`. Claims: MASK-0106 `c354a59`, MASK-0110 `72f13e2`, MASK-0111 `47a5105`, MASK-0112 `4e8af51`, MASK-0107 `f685595`.
+  - Implementation: the qualifier at `f9c7fbc`, MASK-0110 at `2848f6d`, MASK-0111 and MASK-0112 at `8ea0fe5`.
   - Checkpoints: `1afd8b1`, `853f7d4`, `3f67278`.
-  - Finishes: MASK-0108 `f2eac16`, MASK-0109 `a558024` and MASK-0110 `42bb3b8` are Done. MASK-0104 `c13ddfe` and MASK-0105 `024bd4d` are Parked for human review.
+  - Finishes: MASK-0110 `f2eac16`, MASK-0111 `a558024` and MASK-0112 `42bb3b8` are Done. MASK-0106 `c13ddfe` and MASK-0107 `024bd4d` are Parked for human review.
 - **Exit 1** (the qualifier passes on native Windows 11 and macOS): Windows passes; macOS is pending.
   - **Windows:** a guarded run against `8ea0fe5` and AgentSkills `16192b7` passed 61/61 steps. That covers the tap lab (47, including push-then-update), the legacy lab (6) and the owner rehearsal (8). Record: [readiness acceptance](../../development/readiness-acceptance.md#real-package-qualification-on-taps-rfc-mask-0020-mask-0104).
-  - **macOS:** not run. The station registry names no macOS station. The exact ask is on the [MASK-0104 execution record](../40-parked/MASK-0104-real-package-qualifier-on-taps.md#execution-record).
-- **Exit 2** (the owner's v1 machine is migrated with the transcript recorded): pending, attended. The prepared ask is on the [MASK-0105 execution record](../40-parked/MASK-0105-owner-machine-migration-dogfood.md#execution-record).
+  - **macOS:** not run. The station registry names no macOS station. The exact ask is on the [MASK-0106 execution record](../40-parked/MASK-0106-real-package-qualifier-on-taps.md#execution-record).
+- **Exit 2** (the owner's v1 machine is migrated with the transcript recorded): pending, attended. The prepared ask is on the [MASK-0107 execution record](../40-parked/MASK-0107-owner-machine-migration-dogfood.md#execution-record).
   - **Attended-review session** `384b30444ee74b3bfc30a7f0d86f5e40` is in this checkout with registry `.mask/attended-review/registry`. Pass `--registry` on every command, because the default registry lives under the owner's `~/.mask`.
-    - Its three candidates are ready and protected: `MASK-0105-attended-run`, `MASK-0105-doctor-check` and `MASK-0105-migrated-declaration`.
+    - Its three candidates are ready and protected: `MASK-0107-attended-run`, `MASK-0107-doctor-check` and `MASK-0107-migrated-declaration`.
     - The offline page `d7-mask-0105-review.html` and the manifest are in the run directory. No server or wait is running.
   - **Replica rehearsal on `8ea0fe5`** (session scratchpad `d7-final/rehearsal/`): nothing refuses.
     - `doctor --check` ends at 7 with only `workflow.incomplete`.
     - Migration stops vouching for this repository's 16 roles, whose lock digest dates from the CRLF era.
     - It leaves `M .mask.json` and `?? .mask.lock.json`.
-- **Independent work done:** MASK-0108, MASK-0109 and MASK-0110 are Done, each with an execution record.
+- **Independent work done:** MASK-0110, MASK-0111 and MASK-0112 are Done, each with an execution record.
 - **Integration pass on `8ea0fe5`:** a guarded per-module suite with 3 workers.
   - Result: 52/52 modules, 460 tests, 17 skipped, 0 failures, no reruns, 3313 s.
   - The clone and the owner's live files were unchanged, and the structure gate reports 0 violations.
   - Limits: Windows 11 only, and not the literal single-process run.
   - Summary: session scratchpad `d7-suite/out/summary.json`.
 - **Review:** no independent review happened in d7. Each `rfc-reviewer-critical` attempt failed before producing output with HTTP 429 on `claude-fable-5-1`:
-  - R1 and R2 for MASK-0107, the fourth and fifth attempts overall;
-  - R3 for MASK-0108.
-  - Q6 stays with the owner and now also covers reviews of MASK-0108 to MASK-0110.
+  - R1 and R2 for MASK-0109, the fourth and fifth attempts overall;
+  - R3 for MASK-0110.
+  - Q6 stays with the owner and now also covers reviews of MASK-0110 to MASK-0112.
 - **Pending asks:**
-  1. **Q6** (the coordinator holds it): the reviewer route for MASK-0107, and optionally for MASK-0108 to MASK-0110. The owner can authorize an alternate route or have the reviews retried after the limit resets.
-  2. **MASK-0105 decisions** in the attended-review session: go or not now, how `doctor --check` should reach its acceptance, and what to do with the migrated declaration.
-  3. **MASK-0104 on macOS:** a macOS qualifier report, or authorization of a macOS station.
+  1. **Q6** (the coordinator holds it): the reviewer route for MASK-0109, and optionally for MASK-0110 to MASK-0112. The owner can authorize an alternate route or have the reviews retried after the limit resets.
+  2. **MASK-0107 decisions** in the attended-review session: go or not now, how `doctor --check` should reach its acceptance, and what to do with the migrated declaration.
+  3. **MASK-0106 on macOS:** a macOS qualifier report, or authorization of a macOS station.
 - **Route observations:**
   - The integrator session exposes model `claude-opus-5[1m]` with runtime effort `40`, against the configured xhigh. That difference is unresolved.
   - Leaves were dispatched by generated role with no model or effort override.
@@ -65,22 +65,22 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - Cleanup: the worktrees, their branches and the disposable `%TEMP%\mq7-*` roots are removed.
   - The ignored attended-review session files are kept on purpose.
 - **Next:** wait for the owner's answers.
-  - Then run MASK-0105 attended, in a fresh integrator context, on a clean checkout at `8ea0fe5` or a later commit that only adds records.
-  - Collect the MASK-0104 macOS report.
-  - Then run milestone `closeout` (MASK-0106). AC08 also needs the macOS full suite.
+  - Then run MASK-0107 attended, in a fresh integrator context, on a clean checkout at `8ea0fe5` or a later commit that only adds records.
+  - Collect the MASK-0106 macOS report.
+  - Then run milestone `closeout` (MASK-0108). AC08 also needs the macOS full suite.
 
 **Dispatch `d7` checkpoint 2 (historical; superseded by the d7 record above).**
-- **MASK-0104 qualifier:** committed at `f9c7fbc` (script sha256 `d565fe34…`), implemented by W1.
+- **MASK-0106 qualifier:** committed at `f9c7fbc` (script sha256 `d565fe34…`), implemented by W1.
   - On this Windows 11 host against MASK `1afd8b1` (product sources equal `4285146`), the guarded run passed 61 of 61 steps: tap lab 47, legacy lab 6, owner rehearsal 8. The guard receipt passed, and eight live files (the owner's `~/.mask` and AgentSkills `.git`) were unchanged.
   - The report, guard receipt and logs are in the session scratchpad under `d7-w1/`.
   - This is a development run, not the recorded qualification. That run will use the final d7 candidate. macOS is still unavailable.
-- **MASK-0107 review, d7-R1 (fourth attempt):** `rfc-reviewer-critical` failed before output with HTTP 429 "You've reached your Fable limit" (`claude-fable-5-1`). Q6 stays open with the owner.
-- **MASK-0105 premise is stale.** Read-only inspection of the owner's `~/.mask` found:
+- **MASK-0109 review, d7-R1 (fourth attempt):** `rfc-reviewer-critical` failed before output with HTTP 429 "You've reached your Fable limit" (`claude-fable-5-1`). Q6 stays open with the owner.
+- **MASK-0107 premise is stale.** Read-only inspection of the owner's `~/.mask` found:
   - `state.json` (v1) registers one legacy project: this repository, `C:\code\git\ManageAgentSkills`. Its record carries 8 links into the AgentSkills clone and `native_roles`.
   - `launchers` holds the `mask.cmd` record, and `integration.json` holds one approval for this repository.
   - The migration will therefore convert this repository's tracked `.mask.json` to v2, add `.mask.lock.json` and retarget the links. It is not configuration-only.
   - Other facts: the clone is at `origin/main` `16192b7`, and the personal skill roots hold no entries MASK would collide with.
-- **MASK-0105 expectation gap** (W1 rehearsal): after `install implement-rfc --user`, `update` exits 4 and `doctor --check` exits 7, with only `workflow.incomplete`. The personal implement-rfc context and consented role setup are missing, so the card's `doctor --check` 0 needs an owner decision.
+- **MASK-0107 expectation gap** (W1 rehearsal): after `install implement-rfc --user`, `update` exits 4 and `doctor --check` exits 7, with only `workflow.incomplete`. The personal implement-rfc context and consented role setup are missing, so the card's `doctor --check` 0 needs an owner decision.
 - `doctor --check` failures report the documented umbrella `state.drift` (exit 7), with specific codes in the issue rows. That is not a defect.
 - **W1b owner-state replica rehearsal** (MASK `f9c7fbc`; guard passed; the owner's files, the real clone and the real checkout's 8 link texts unchanged; evidence in scratchpad `d7-w1b/`):
   - The card's exact sequence ran with no refusals. Exits: `doctor` 0; `--migrate --dry-run` 0, writing nothing; `--migrate` 0, committed; `install implement-rfc --user` 4; `list --user` 0; `update` 4, fetching and no-op; `doctor --check` 7.
@@ -89,43 +89,43 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - **Finding 2:** the personal scope has no implement-rfc context and needs role setup, so `install --user`, `update` and `doctor --check` exit 4, 4 and 7.
   - **Finding 3:** migration leaves this main checkout with `M .mask.json` (v2) and `?? .mask.lock.json` (4 rows at `16192b7`).
   - Not reproduced: the SSH GitHub origin (the replica used a local bare origin) and the exact interpreter path.
-- **Integrated:** MASK-0108 (W2) cherry-picked onto main at `2848f6d`, structure gate 0 violations. Its worktree and branch are removed. The card's finish waits for the integration pass.
+- **Integrated:** MASK-0110 (W2) cherry-picked onto main at `2848f6d`, structure gate 0 violations. Its worktree and branch are removed. The card's finish waits for the integration pass.
 - **Active children:**
-  - W3 (MASK-0109 and MASK-0110, worktree `.claude/worktrees/agent-a89371c0e6c3ffec8`): resumed to finish its runs.
+  - W3 (MASK-0111 and MASK-0112, worktree `.claude/worktrees/agent-a89371c0e6c3ffec8`): resumed to finish its runs.
   - W1, W1b and W2 have returned. R1 failed terminally.
 - The structure gate reports 0 violations.
 
 **Dispatch `d7` checkpoint 1 (start of dispatch; superseded by checkpoint 2 where they differ).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d7`, mandate revision `4`. The mandate is unchanged.
-  - No push or publication is authorized. The owner's real `~/.mask` and global install are not changed. MASK-0105 is prepared but not run.
+  - No push or publication is authorized. The owner's real `~/.mask` and global install are not changed. MASK-0107 is prepared but not run.
 - **Binding** (`coordinator_handoff.py assign --milestone qualification`, with `baseline` to `truth` passed as accepted):
   - definition `sha256:aa93e809be657bee51b52964c541773e113e7fd308c172d9a51c3b24e6c5534f`
   - obligation `sha256:9f77f7a7a5220b905d239cf6f968f11e52b5c0ca7070e9c477d6eca1f37d5f2b`
   - prerequisite `sha256:dbbeb5f755f54376c25b2e6b4eaeab4ee3c9825debe46321a34226dd0b641875`
   - The assignment is `d7-assignment.json` in the ignored run directory. Without `--accepted-milestone`, `assign` answers `reconcile`.
-- **Board:** MASK-0108 to MASK-0110 promoted at `7bd13fe`. Claims: MASK-0104 `c354a59`, MASK-0108 `72f13e2`, MASK-0109 `47a5105`, MASK-0110 `4e8af51`. MASK-0105 stays Ready until its attended ask is prepared.
+- **Board:** MASK-0110 to MASK-0112 promoted at `7bd13fe`. Claims: MASK-0106 `c354a59`, MASK-0110 `72f13e2`, MASK-0111 `47a5105`, MASK-0112 `4e8af51`. MASK-0107 stays Ready until its attended ask is prepared.
 - **Facts found:**
-  - The global launcher `%LOCALAPPDATA%\Programs\MASK\mask.cmd` runs `C:\code\git\ManageAgentSkills\mask.py`, this main checkout. The owner's `mask` therefore runs whatever the main working tree holds. Product slices work in separate worktrees, and MASK-0105 must run on a clean tree at the recorded candidate.
+  - The global launcher `%LOCALAPPDATA%\Programs\MASK\mask.cmd` runs `C:\code\git\ManageAgentSkills\mask.py`, this main checkout. The owner's `mask` therefore runs whatever the main working tree holds. Product slices work in separate worktrees, and MASK-0107 must run on a clean tree at the recorded candidate.
   - The host is `JaegAW`: Windows 11 Home 10.0.26200, Python 3.14.6, Git 2.55.0.windows.3, system `core.autocrlf=true`. It is not the registered station host ExampleWinHost.
   - The station registry authorizes only the Windows station `mask-win-example-win-host` and names no macOS station. The earlier macOS evidence was run from an integrator on a Mac. No macOS path is authorized from this host.
   - The real AgentSkills clone is at `16192b76ec1bbaee001c718d3e82d447db4f25c5` on `main`, clean, with origin `git@github.com:MikeMarcin/AgentSkills.git`. The qualifier only clones it.
 - **Planned slices:**
-  - W1 `rfc-worker`: the MASK-0104 qualifier rewrite, `scripts/qualify_real_package.py` only. It runs against disposable clones.
-  - W2 `rfc-worker`, worktree: MASK-0108.
-  - W3 `rfc-worker`, worktree: MASK-0109 and MASK-0110 together, because they share the cold-store preparation and result-reporting code.
-  - R1 `rfc-reviewer-critical`: a retry of the MASK-0107 review on the configured route. Q6 (an alternate reviewer route) stays with the owner.
-- **Next:** collect W1 to W3 and R1, integrate on main, then run the Windows qualifier on the final candidate. macOS stays pending. Then prepare the MASK-0105 ask.
+  - W1 `rfc-worker`: the MASK-0106 qualifier rewrite, `scripts/qualify_real_package.py` only. It runs against disposable clones.
+  - W2 `rfc-worker`, worktree: MASK-0110.
+  - W3 `rfc-worker`, worktree: MASK-0111 and MASK-0112 together, because they share the cold-store preparation and result-reporting code.
+  - R1 `rfc-reviewer-critical`: a retry of the MASK-0109 review on the configured route. Q6 (an alternate reviewer route) stays with the owner.
+- **Next:** collect W1 to W3 and R1, integrate on main, then run the Windows qualifier on the final candidate. macOS stays pending. Then prepare the MASK-0107 ask.
 
-**Dispatch `d6` record (milestone `truth` accepted; MASK-0103 Done).**
+**Dispatch `d6` record (milestone `truth` accepted; MASK-0105 Done).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, mandate revision `4`. The mandate is unchanged.
-  - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
+  - No push or publication is authorized. The owner's real machine changes only through attended MASK-0107.
 - **Accepted milestone `truth`:**
-  - MASK-0103 was claimed at `cf8c725` and implemented at `4285146`; Done at `410733a` (evidence record `78f68c7`).
-  - The d6 checkpoint is `b00d107`. MASK-0104 and MASK-0105 were promoted to Ready in the commit that records this frontier.
+  - MASK-0105 was claimed at `cf8c725` and implemented at `4285146`; Done at `410733a` (evidence record `78f68c7`).
+  - The d6 checkpoint is `b00d107`. MASK-0106 and MASK-0107 were promoted to Ready in the commit that records this frontier.
   - **Exit 1** (README recipes replay verbatim): `tests.test_readme_journeys`. It pins every fenced block and Everyday row and replays them through the launcher of a disposable program clone on a fixture tap. It fails against the README of `b00d107`.
   - **Exit 2** (the retired-spelling test passes): `tests.test_retired_spellings`. At `cf8c725` it had 6 failures (docs, the old-command table, dead presentation entries); at `4285146` it passes.
   - **Full suite on `4285146`:** guarded per-module run with 4 workers: 49 of 49 modules, 438 tests, 16 skipped, 2439 s. HEAD, tree status and the owner profile snapshot were unchanged. Only Windows 11 was exercised (Python 3.14.6, Git 2.55.0.windows.3), and this was not the literal single-process run. The summary is `d6-suite/out/summary.json` in the d6 session scratchpad.
-  - Evidence: the [MASK-0103 execution record](../60-done/MASK-0103-help-docs-and-capabilities-truth.md#execution-record). The structure gate reports 0 violations.
+  - Evidence: the [MASK-0105 execution record](../60-done/MASK-0105-help-docs-and-capabilities-truth.md#execution-record). The structure gate reports 0 violations.
 - **Binding** (unchanged from dispatch to finish):
   - definition `sha256:71edb75ce31f56f93508fd3e51215f3258d810d56e932d2d7b8b22d62c5066eb`
   - obligation `sha256:36e421d5640b89b8d365caf8e3bc9cd2d8fa5c128cc74377a75857339a3d2e60`
@@ -136,15 +136,15 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - The migration guide ("Migrating from a live checkout") holds the only old-command table.
   - `project/user set|require|unrequire` refuse `selection.command_unsupported` and point to `install`/`remove` (Q4).
   - `tests/test_retired_spellings.py` guards help, `capabilities` and current Markdown. Its historical exemptions are `docs/rfcs/`, `docs/issues/`, `docs/releases/` and two baseline reports under `docs/development/`.
-- **For MASK-0104:** `scripts/qualify_real_package.py` still uses the retired `init --source` (d2 note) and `project unrequire` (lines 315 and 331), which now refuses on v2 declarations.
+- **For MASK-0106:** `scripts/qualify_real_package.py` still uses the retired `init --source` (d2 note) and `project unrequire` (lines 315 and 331), which now refuses on v2 declarations.
 - **Contract notes for the closeout:**
   - The RFC rollout sentence is historical. `b92372f` fails `config.invalid` on a v3 machine, and the previous tap-era program refuses `line_endings` entries (`source.invalid`). Neither recovers this program's `update` journal, and the contract says so.
   - On a tap machine, the consumer-level `migration.required` remediation omits the `--project PATH --alias NAME` it needs there. It is left as is under Q5.
 - **Review:**
-  - **MASK-0103:** no independent review. It is a presentation, documentation and refusal-message change with no persistence, authority or destructive risk, and no reviewer route is available.
-  - **MASK-0107:** the d6-R1 `rfc-reviewer-critical` retry, the third attempt, failed before output with "You've reached your Fable limit" (HTTP 429, `claude-fable-5-1`). Both reviewer roles bind that model, and no fallback is authorized.
-    - **Judgment:** the review remains warranted. MASK-0107 changes persisted tap policy and the refusal before `source publish`, which can commit and push, and the owner's clone migrates as an exact tap in MASK-0105.
-    - It should run before the attended MASK-0105 migration: retry when the Fable limit resets, or get the owner's authorization for another reviewer route.
+  - **MASK-0105:** no independent review. It is a presentation, documentation and refusal-message change with no persistence, authority or destructive risk, and no reviewer route is available.
+  - **MASK-0109:** the d6-R1 `rfc-reviewer-critical` retry, the third attempt, failed before output with "You've reached your Fable limit" (HTTP 429, `claude-fable-5-1`). Both reviewer roles bind that model, and no fallback is authorized.
+    - **Judgment:** the review remains warranted. MASK-0109 changes persisted tap policy and the refusal before `source publish`, which can commit and push, and the owner's clone migrates as an exact tap in MASK-0107.
+    - It should run before the attended MASK-0107 migration: retry when the Fable limit resets, or get the owner's authorization for another reviewer route.
 - **Route observations:**
   - This integrator session exposes model `claude-opus-5[1m]` with runtime reasoning effort `40`, against the configured xhigh. That difference is unresolved.
   - Every leaf was dispatched by generated role with no model or effort override.
@@ -154,22 +154,22 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - The guarded suite command finished, and no d6 command or child is active.
   - Logs are in the d6 session scratchpad (`d6-w1` to `d6-w5`, `d6-integ`, `d6-suite`).
   - `git worktree list` shows only the main checkout. R1 created no scratch directory.
-- **Next:** start a fresh integrator context for milestone `qualification` (MASK-0104, MASK-0105; both Ready).
-  - MASK-0104 needs native Windows 11 and macOS lanes against the real AgentSkills repository as a tap.
-  - MASK-0105 is the attended migration of the owner's real machine.
-  - Before MASK-0105, resolve the MASK-0107 review. The authorized follow-ups MASK-0108 to MASK-0110 remain eligible independent work.
+- **Next:** start a fresh integrator context for milestone `qualification` (MASK-0106, MASK-0107; both Ready).
+  - MASK-0106 needs native Windows 11 and macOS lanes against the real AgentSkills repository as a tap.
+  - MASK-0107 is the attended migration of the owner's real machine.
+  - Before MASK-0107, resolve the MASK-0109 review. The authorized follow-ups MASK-0110 to MASK-0112 remain eligible independent work.
 
-**Dispatch `d5` record (historical; MASK-0107 accepted and Done; its next milestone `truth` is d6's).**
+**Dispatch `d5` record (historical; MASK-0109 accepted and Done; its next milestone `truth` is d6's).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d5`, mandate revision `3`. Amendment r4 arrived during the dispatch.
   - The mandate is unchanged. No push or publication is authorized.
-  - The owner's real machine changes only through attended MASK-0105.
-- **Plan position:** MASK-0107 (`rfcs: []`) is outside the adopted plan.
-  - `milestone_plan.py discover --target MASK-0107` reports `absent`, and `coordinator_handoff.py assign` refuses without a plan.
-  - `check-amendment` refuses adding MASK-0107 to the scope ("cannot change plan identity or authorized scope") and to `unplanned_work` ("must preserve every obligation").
+  - The owner's real machine changes only through attended MASK-0107.
+- **Plan position:** MASK-0109 (`rfcs: []`) is outside the adopted plan.
+  - `milestone_plan.py discover --target MASK-0109` reports `absent`, and `coordinator_handoff.py assign` refuses without a plan.
+  - `check-amendment` refuses adding MASK-0109 to the scope ("cannot change plan identity or authorized scope") and to `unplanned_work` ("must preserve every obligation").
   - It therefore ran as mandate-authorized work against its own card acceptance. The plan is unchanged.
   - The probe record is `d5-plan-position.json` in the ignored run directory.
-- **Accepted MASK-0107:** claim `6496967`, implementation `4c0549f`, and Done in the finish commit that follows `0be6b26`.
-  - Evidence and limitations: the [MASK-0107 execution record](../60-done/MASK-0107-tap-line-endings-exact-bytes.md#execution-record).
+- **Accepted MASK-0109:** claim `6496967`, implementation `4c0549f`, and Done in the finish commit that follows `0be6b26`.
+  - Evidence and limitations: the [MASK-0109 execution record](../60-done/MASK-0109-tap-line-endings-exact-bytes.md#execution-record).
   - **Checks (Windows 11 only):**
     - `tests/test_tap_line_endings.py` passes 16 tests on the committed content, and every `tests/test_*.py` module passes.
     - Negative controls on an archive of `6496967` fail (publish previews `would_change: true`; the module gets 7 failures and 22 errors).
@@ -180,11 +180,11 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - For an exact tap, `source publish` and a new `source dev-link` refuse `source.line_endings_converted` for Git-converted unedited files. `tap add --checkout` warns `source.line_endings_conversion`.
   - The remediation is to set `core.autocrlf false` in the checkout, delete the reported files, then run `git checkout -- PATH`. `checkout-index --force` leaves a stat-clean converted file in place.
   - `source dev-link` reports `data.development[].payload_digest`. Test fixtures author LF bytes.
-  - For MASK-0104 and MASK-0105: the owner's AgentSkills clone migrates as an exact tap. Its CRLF working copies would refuse publishing and new dev links until restored or re-registered with `--autocrlf`. The migration steps themselves do not publish.
-- **Owner decisions r4** (recorded at `0be6b26` on the RFC and on [MASK-0103](../60-done/MASK-0103-help-docs-and-capabilities-truth.md#owner-decisions-mandate-r4-september-13-2026)):
-  - **Q4:** v2 set/require/unrequire are not implemented. The refusal remains, and MASK-0103 points it, the help and the contract to `install`/`remove`.
-  - **Q5:** migration is best effort. The AC05 gate is unchanged, and MASK-0103 briefly documents restoring an unconvertible consumer on disk.
-  - d4's migration notes are closed unless they block MASK-0105. No acceptance text is narrowed.
+  - For MASK-0106 and MASK-0107: the owner's AgentSkills clone migrates as an exact tap. Its CRLF working copies would refuse publishing and new dev links until restored or re-registered with `--autocrlf`. The migration steps themselves do not publish.
+- **Owner decisions r4** (recorded at `0be6b26` on the RFC and on [MASK-0105](../60-done/MASK-0105-help-docs-and-capabilities-truth.md#owner-decisions-mandate-r4-september-13-2026)):
+  - **Q4:** v2 set/require/unrequire are not implemented. The refusal remains, and MASK-0105 points it, the help and the contract to `install`/`remove`.
+  - **Q5:** migration is best effort. The AC05 gate is unchanged, and MASK-0105 briefly documents restoring an unconvertible consumer on disk.
+  - d4's migration notes are closed unless they block MASK-0107. No acceptance text is narrowed.
   - No owner question remains open.
 - **Route observations:**
   - This integrator session exposes runtime reasoning effort `40` against the configured xhigh, an unresolved observation carried over from d4.
@@ -194,18 +194,18 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - Every d5 child has returned or failed terminally, and every d5 background command has completed.
   - No worker shell or `unittest` process remains.
   - Logs are in the d5 session scratchpad.
-- **Next:** start a fresh integrator context for milestone `truth` (MASK-0103, Ready), which r4 unblocks. `qualification` (MASK-0104, MASK-0105) waits on it.
+- **Next:** start a fresh integrator context for milestone `truth` (MASK-0105, Ready), which r4 unblocks. `qualification` (MASK-0106, MASK-0107) waits on it.
 
-**Dispatch `d4` record (historical; its recommended next objective, MASK-0107, was completed by d5).**
+**Dispatch `d4` record (historical; its recommended next objective, MASK-0109, was completed by d5).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d4`, mandate revision `3`.
-  - The mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no added stop conditions.
-  - r3 places no restriction on implementing MASK-0107 to MASK-0110.
-- No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
+  - The mandate is unchanged: `/implement-rfc RFC-MASK-0021`, with no added stop conditions.
+  - r3 places no restriction on implementing MASK-0109 to MASK-0112.
+- No push or publication is authorized. The owner's real machine changes only through attended MASK-0107.
 
 - **Accepted milestone `migration`:**
-  - MASK-0102 is Done at `645b3c0`.
+  - MASK-0104 is Done at `645b3c0`.
   - Implementation: `e28d615` (doctor report), `5215741` (machine migration), `fe9c13a` (tap-machine path and review hardening). The evidence record is `d621bdc`.
-  - MASK-0103 and MASK-0107 were promoted to Ready at `6e2326f`; the links that promotion repaired are committed with this record.
+  - MASK-0105 and MASK-0109 were promoted to Ready at `6e2326f`; the links that promotion repaired are committed with this record.
   - **Exit 1** (the fixture crash matrix recovers with rollback or complete at every checkpoint):
     - `tests.test_doctor_migration` `test_crash_at_every_checkpoint_rolls_back_exactly_or_completes` covers seven checkpoints.
     - `tests.test_doctor_straggler` `LegacyRecordOnTapMachine` covers the tap-machine journal.
@@ -216,7 +216,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
     - guarded per-module run, 4 workers: 47 of 47 modules, 413 tests, 16 skipped, 2687 s;
     - HEAD, tree status, tracked index and owner profile were unchanged;
     - only Windows 11 was exercised, and this was not the literal single-process run.
-  - Evidence: the [MASK-0102 execution record](../60-done/MASK-0102-doctor-migration.md#execution-record).
+  - Evidence: the [MASK-0104 execution record](../60-done/MASK-0104-doctor-migration.md#execution-record).
 - **Binding** (unchanged from dispatch to finish; each recomputed assignment matched every value):
   - definition `sha256:445ea1fc2709589c20b25ad52d356075f62b7cd3f2a22f9772a393e571d964f6`
   - obligation `sha256:3b1373c09a1afd12769793c33ca42785edfe4f6b256cdcc32135d0439faab981`
@@ -231,17 +231,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - **Tap machine:** `doctor --migrate --project PATH --alias NAME` (or `--user --alias NAME`) converts an unregistered v1 declaration, or a registered legacy record with a v1 declaration, using install semantics.
   - **Surfaces:**
     - `capabilities` publishes `migration: doctor`, and `doctor` is plan-guarded.
-    - `mask doctor --help` names `--migrate`. README, the guides and other help still name retired commands (MASK-0103).
-  - **MASK-0107:** migrated tap entries don't carry a line-ending field yet. That card should make migration write its exact-bytes default.
+    - `mask doctor --help` names `--migrate`. README, the guides and other help still name retired commands (MASK-0105).
+  - **MASK-0109:** migrated tap entries don't carry a line-ending field yet. That card should make migration write its exact-bytes default.
 - **Pending owner decisions:**
-  - **Q4 (unchanged):** implement v2 `project/user set|require|unrequire`, or amend the contract to keep `selection.command_unsupported` and point to `install`/`remove`? Details below; needed before MASK-0103 describes these commands.
+  - **Q4 (unchanged):** implement v2 `project/user set|require|unrequire`, or amend the contract to keep `selection.command_unsupported` and point to `install`/`remove`? Details below; needed before MASK-0105 describes these commands.
   - **Q5 (new):** on a v1/v2 machine, the AC05 gate refuses the MIGRATION.md blocker remediations (`project unregister --keep-links`, `workspace forget`).
     - The ask: exempt them from the gate, which amends AC05? Or keep the gate, and document that a consumer which can't be migrated must first be restored on disk?
-    - The gate is unchanged. This blocks nothing accepted. It affects MASK-0103's documentation, and MASK-0105 only if the owner's machine held such a consumer; its registry is empty.
+    - The gate is unchanged. This blocks nothing accepted. It affects MASK-0105's documentation, and MASK-0107 only if the owner's machine held such a consumer; its registry is empty.
 - **Notes for later cards** (from review R1 and worker B2):
   - Plain `doctor` on a legacy record with a v2 declaration and no lock stops at `lock.missing` before reporting, because of guard order.
   - Completing a migration rechecks the clone's HEAD, index, branch and remote, but not worktree cleanliness.
-  - After preparation, `plan.stale` reports `transaction: partial`, because retained cache and store effects are merged in. MASK-0103 should document this.
+  - After preparation, `plan.stale` reports `transaction: partial`, because retained cache and store effects are merged in. MASK-0105 should document this.
   - `diverged` refuses `source.identity_mismatch` with reason `diverged`.
   - A legacy record with a v2 declaration refuses with the new code `migration.declaration_unsupported`.
 - **Route observations:**
@@ -252,17 +252,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - Every d4 child (B1, B2, R1) has returned, and every background command was consumed. No command or child from d4 is active.
   - Logs remain in the session scratchpad (`b1/`, `b2/`, `r1/`, `integ/`).
 - **Next:** a fresh integrator context.
-  - Recommended first: MASK-0107 (exact-byte taps). It is Ready, independent of Q4 and Q5, and required before qualification.
-  - Then milestone `truth` (MASK-0103, Ready), once Q4 is answered.
+  - Recommended first: MASK-0109 (exact-byte taps). It is Ready, independent of Q4 and Q5, and required before qualification.
+  - Then milestone `truth` (MASK-0105, Ready), once Q4 is answered.
 
 **Dispatch `d3` record (historical; its next milestone `migration` was accepted by d4).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
-- The mandate is still `/implement-rfc RFC-MASK-0020` with no added stop conditions. The coordinator's amendments r2 and r3 answered the three decisions d2 left open; see Owner decisions below.
-- No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
+- The mandate is still `/implement-rfc RFC-MASK-0021` with no added stop conditions. The coordinator's amendments r2 and r3 answered the three decisions d2 left open; see Owner decisions below.
+- No push or publication is authorized. The owner's real machine changes only through attended MASK-0107.
 
 - **Accepted milestone `engine`:**
-  - MASK-0100 is Done at `e8c3052` and MASK-0101 at `de45c37`.
-  - Implementation runs from `d61d4be` to `a62f7c4`, and MASK-0102 was promoted to Ready at `c254bc2`.
+  - MASK-0102 is Done at `e8c3052` and MASK-0103 at `de45c37`.
+  - Implementation runs from `d61d4be` to `a62f7c4`, and MASK-0104 was promoted to Ready at `c254bc2`.
   - **Exit 1** (no link producer targets a checkout except `source dev-link`): `tests.test_link_producers`.
     - A static allowlist of every link spelling: `symlink_to`, `os.symlink`, `link_to`, `hardlink_to`, `CreateSymbolicLink` and `mklink`.
     - A CLI journey through every public link producer.
@@ -275,7 +275,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
     - literal `python -B -m unittest`: exit 0, 386 tests in 8694 s, OK with 16 skipped;
     - HEAD, tree and the code-tree guard were unchanged, and the owner profile snapshot was identical.
     - Only Windows 11 Home 10.0.26200 (Python 3.14.6, Git 2.55.0.windows.3) was exercised.
-  - Evidence: the execution records on [MASK-0100](../60-done/MASK-0100-retire-live-checkout-engine.md#execution-record) and [MASK-0101](../60-done/MASK-0101-update-fetch-and-isolation.md#execution-record).
+  - Evidence: the execution records on [MASK-0102](../60-done/MASK-0102-retire-live-checkout-engine.md#execution-record) and [MASK-0103](../60-done/MASK-0103-update-fetch-and-isolation.md#execution-record).
 - **Binding** (unchanged; the recomputed assignment matched every value):
   - definition `sha256:e41ecb8e391879ede6dbc0126096ab78d5e8d489dfdb9bb6f48980538036a517`
   - obligation `sha256:ca9ace464b531dd11759bc20c98e3fed090a0e15ae26d3bb9b0ec13db457c20f`
@@ -287,7 +287,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
     - `config show` reports `migration_required`.
   - **Retired paths:**
     - `source status`, `source migrate` and `migrate` exit 2.
-    - The `migrate --to-pinned` machinery is gone; MASK-0102 ports it from `0658a40` (`mask_pinned` migration helpers, `mask_sources.migrated_config`, `tests/test_pin_migration.py`).
+    - The `migrate --to-pinned` machinery is gone; MASK-0104 ports it from `0658a40` (`mask_pinned` migration helpers, `mask_sources.migrated_config`, `tests/test_pin_migration.py`).
     - `pinned.target` refuses legacy link records, so doctor migration must derive the old clone targets itself and re-add the `migration` journal field, the `machine_config` role and the pending `doctor.migrate` operation.
     - A retired journal (`migrate`, a `migration` field, a source-scope git entry, legacy ownership) is shown by `recover --inspect` and refused `recovery.conflict`.
   - **Update:** `mask_update.py` owns `update` and no-name `source fetch`. The journal keeps `operation: update`.
@@ -302,37 +302,37 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - `legacy_init`, `declare` and `legacy_bootstrap` are gone.
   - `tests/test_pin_migration.py` and `tests/test_git_update.py` are removed. Coverage of the self update checkout journal moved to `tests/test_launcher.py`.
 - **Owner decisions (r2 and r3):**
-  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../60-done/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
-  2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads with this decision.
-  3. The d2 follow-ups are filed as MASK-0108 to MASK-0110, outside this RFC.
-- **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0103 describes these commands):**
+  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0109](../60-done/MASK-0109-tap-line-endings-exact-bytes.md), and MASK-0106 and MASK-0107 depend on it. Recommended order: after `migration`, before `qualification`.
+  2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0021 records how retained case B04 reads with this decision.
+  3. The d2 follow-ups are filed as MASK-0110 to MASK-0112, outside this RFC.
+- **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0105 describes these commands):**
   - Retained `contracts/CLI.md` and the RFC Retirement paragraph say `project/user set|require|unrequire` "remain for v2 declarations" and write a v2 declaration and lock.
   - The product has refused them for v2 declarations with `selection.command_unsupported` since before this RFC, and d3 kept that behavior.
   - The ask: implement v2 set/require/unrequire, or amend the contract to keep the refusal and point to `install`/`remove`?
 - **Contract notes for the closeout and later cards:**
   - The RFC rollout sentence is false: the previous program completes a crashed tap-fetching `update` journal with the same outcome instead of refusing it.
-  - The update fetch holds the writer lock for the network round (MASK-0103 should document this).
+  - The update fetch holds the writer lock for the network round (MASK-0105 should document this).
   - A resolution error other than `lock.resolution_required` or `lock.ref_rebound` refuses the whole update (CLI.md step 6).
   - `skill show` no longer refuses a linked package entry (`validate` and `install` do), and `skill.path_escape` has no test.
-  - On Windows, a long scratch path gives an untyped `git.failed` when a cache ref path exceeds MAX_PATH (MASK-0104).
-  - The `MIGRATION.md` remediations `project unregister --keep-links` and `workspace forget` are gated on v1/v2 machines (MASK-0102).
-  - `capabilities.migration: doctor` and the `doctor` plan guard land with MASK-0102.
-  - `doctor --project <unregistered>` answers `project.not_registered` before any migration report (MASK-0102).
-  - Help, README and guides still name retired commands (MASK-0103).
+  - On Windows, a long scratch path gives an untyped `git.failed` when a cache ref path exceeds MAX_PATH (MASK-0106).
+  - The `MIGRATION.md` remediations `project unregister --keep-links` and `workspace forget` are gated on v1/v2 machines (MASK-0104).
+  - `capabilities.migration: doctor` and the `doctor` plan guard land with MASK-0104.
+  - `doctor --project <unregistered>` answers `project.not_registered` before any migration report (MASK-0104).
+  - Help, README and guides still name retired commands (MASK-0105).
   - Reviewing a tag- or branch-pinned consumer after a no-name `source fetch` still needs `source inspect --ref`.
 - **Execution state:** every d3 child has returned (retirement, update module, inventory, three porting slices, corrections, and the critical review with its follow-up). No command or child from d3 is active, and the consumed worktrees were removed.
-- **Next milestone:** `migration` (MASK-0102), in a fresh integrator context.
+- **Next milestone:** `migration` (MASK-0104), in a fresh integrator context.
 
-**Dispatch `d2` record (historical; its next milestone `engine` was accepted by d3).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
+**Dispatch `d2` record (historical; its next milestone `engine` was accepted by d3).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0021`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0107.
 
-- **Accepted milestone `bootstrap`:** MASK-0099 is Done at `eb2eff8`. The implementation is `01b2ae3` plus the review fix `94d4f1c`. MASK-0100 and MASK-0101 were promoted to Ready at `5ea6f13`.
+- **Accepted milestone `bootstrap`:** MASK-0101 is Done at `eb2eff8`. The implementation is `01b2ae3` plus the review fix `94d4f1c`. MASK-0102 and MASK-0103 were promoted to Ready at `5ea6f13`.
   - Exit 1: `tests.test_tap_bootstrap` passes 6 tests. On an empty `MASK_HOME`, `tap add` followed by `install` deploys v2 consumers from the store, with one bare cache and no checkout anywhere on disk. Negative controls: the pre-implementation product fails 5 of 5, and a retained author checkout fails the no-checkout assertion.
   - Exit 2: on `94d4f1c`, the literal `python -B -m unittest` ran 391 tests OK (19 skipped) in 6477 s, and the per-module run passed all 44 modules. Tree hashes and the owner profile were unchanged across both. Only Windows 11 was exercised.
-  - Evidence: [MASK-0099 execution record](../60-done/MASK-0099-machine-v3-and-tap-bootstrap.md#execution-record) and the complete reference in [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md#runs).
+  - Evidence: [MASK-0101 execution record](../60-done/MASK-0101-machine-v3-and-tap-bootstrap.md#execution-record) and the complete reference in [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md#runs).
 - **Binding** (unchanged from dispatch to finish):
   - definition `sha256:4ffc77d27810b0f701a145961f84312dda7c289c56fad62d42261c1b2c20f0d8`
   - obligation `sha256:ea9a3810366abb09d53d794db32643b9c48d85ae82ed10845bde1288776632b2`
-  - MASK-0099 source `sha256:9c05f5be4d20237474037f41814bc40bf7c115e67eaf0c7640d0661cca425717`
+  - MASK-0101 source `sha256:9c05f5be4d20237474037f41814bc40bf7c115e67eaf0c7640d0661cca425717`
   - prerequisite `sha256:256c0a53f234c928aa94807fde2efc3ba3352a9c71bece6414d5effed374f87b`
   - The assignment and v2 return are in the ignored `.mask/generated/implement-rfc/runs/mask-rfc0020-2026-09-12-a/`.
   - Card evidence goes under a trailing `## Execution record` heading, which leaves bound text unchanged. The installed helper hashes raw bytes, so a CRLF checkout of a card computes a different source fingerprint.
@@ -346,49 +346,49 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - Manual pinned `ensure` reaches its one-time consent; events still need approval.
 - **Test state:**
   - `tests/support.py` and `tests/public_support.py` start tap-first, providing `TAP`, `self.upstream`, `publish()`, `install()` and `binding()`.
-  - Tests of retired behavior start from `legacy_init` or `legacy_bootstrap` and carry a comment naming MASK-0100, MASK-0101 or MASK-0102. MASK-0100 ports or drops them, and should consolidate the local helper variants (`declare_pinned`, `authoring_init`, `push`).
+  - Tests of retired behavior start from `legacy_init` or `legacy_bootstrap` and carry a comment naming MASK-0102, MASK-0103 or MASK-0104. MASK-0102 ports or drops them, and should consolidate the local helper variants (`declare_pinned`, `authoring_init`, `push`).
   - `tests/test_tap_bootstrap.py` holds the bootstrap journey and the refusals for legacy records on v3.
-- **Board:** MASK-0100 and MASK-0101 are Ready. MASK-0102 to MASK-0106 wait on their dependencies. The criterion rows below stay Not run.
-  - MASK-0099 records fixture evidence toward AC01, the `init --source` refusal toward AC05, and the Windows suite toward AC08.
+- **Board:** MASK-0102 and MASK-0103 are Ready. MASK-0104 to MASK-0108 wait on their dependencies. The criterion rows below stay Not run.
+  - MASK-0101 records fixture evidence toward AC01, the `init --source` refusal toward AC05, and the Windows suite toward AC08.
   - Still open: native qualification (AC07), the macOS suite, and the retirement work.
-- **Open notes for later cards** (not accepted scope; details are on MASK-0099):
+- **Open notes for later cards** (not accepted scope; details are on MASK-0101):
   - retained-pack case B04 names a different refusal code than the product returns;
   - `source publish` republishes LF blobs as CRLF under `core.autocrlf`;
   - a wrong-branch authoring checkout reports different codes with and without an origin;
   - the plan hash of pinned `ensure --dry-run` on a cold store differs from the applying run;
   - a refused `apply`, and a consent refusal after store hydration, both report `partial`;
   - `project init` without machine config still writes v1;
-  - `scripts/qualify_real_package.py` still calls `init --source` (MASK-0104);
-  - README prose and the guides still describe the checkout journey (MASK-0103).
+  - `scripts/qualify_real_package.py` still calls `init --source` (MASK-0106);
+  - README prose and the guides still describe the checkout journey (MASK-0105).
 - **Tooling notes:**
   - The installed `milestone_plan.py adopt` Windows separator defect recorded by d1 is unchanged.
   - Helper scripts need `PYTHONUTF8=1`.
   - A full Windows suite run needs `MASK_HOME`, `USERPROFILE` and `HOME` redirected, because some `Fixture` tests exercise personal scope.
 - **Execution state:** all d2 children have returned: the scout, the diagnosis worker, five conversion workers and the critical reviewer. No command or child from d2 is active.
-- **Next milestone:** `engine` (MASK-0100 and MASK-0101), in a fresh integrator context. It should retire the live-checkout engine, remove retired commands from `capabilities` so they exit 2, gate v1/v2 configuration with `migration.required`, and make `update` fetch each referenced tap once, with isolation and one journal.
+- **Next milestone:** `engine` (MASK-0102 and MASK-0103), in a fresh integrator context. It should retire the live-checkout engine, remove retired commands from `capabilities` so they exit 2, gate v1/v2 configuration with `migration.required`, and make `update` fetch each referenced tap once, with isolation and one journal.
 
-**Dispatch `d1` record (historical; its next milestone and carried obligations were completed by d2).** Refreshed at the end of dispatch `d1`, run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d1`, mandate revision `1`. The owner's mandate is `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized. The owner's real machine is changed only by attended MASK-0105.
+**Dispatch `d1` record (historical; its next milestone and carried obligations were completed by d2).** Refreshed at the end of dispatch `d1`, run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d1`, mandate revision `1`. The owner's mandate is `/implement-rfc RFC-MASK-0021`, with no extra stop conditions. No push or publication is authorized. The owner's real machine is changed only by attended MASK-0107.
 
 - **Accepted milestone `baseline`:**
-  - MASK-0098 is Done at `b294552`; implementation is `82b4200`.
+  - MASK-0100 is Done at `b294552`; implementation is `82b4200`.
   - Exit 1: the RFC_BASE_SHA below is a real pre-implementation revision. Product sources are identical to it through `82b4200`.
   - Exit 2: `python -B -m unittest tests.test_legacy_baseline -v` passed 7 tests on Windows 11.
-  - Evidence: the [MASK-0098 verified outcome](../60-done/MASK-0098-intake-and-legacy-baseline.md#verified-outcome) and [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md).
-- **Board:** MASK-0099 is Ready (`f670371`). MASK-0100 to MASK-0105 wait on dependencies, and this closeout is Backlog. Every criterion row below stays Not run; the baseline only supplies fixtures and defect evidence toward AC04 and AC08.
-- **Plan and binding:** the [plan](../../rfcs/plans/tap-only-deployment/milestone-plan.json) was adopted at `8a9ea21`. The d1 assignment used `coordinator_handoff.py assign --target RFC-MASK-0020 --milestone baseline` with the identity above.
+  - Evidence: the [MASK-0100 verified outcome](../60-done/MASK-0100-intake-and-legacy-baseline.md#verified-outcome) and [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md).
+- **Board:** MASK-0101 is Ready (`f670371`). MASK-0102 to MASK-0107 wait on dependencies, and this closeout is Backlog. Every criterion row below stays Not run; the baseline only supplies fixtures and defect evidence toward AC04 and AC08.
+- **Plan and binding:** the [plan](../../rfcs/plans/tap-only-deployment/milestone-plan.json) was adopted at `8a9ea21`. The d1 assignment used `coordinator_handoff.py assign --target RFC-MASK-0021 --milestone baseline` with the identity above.
   - Unchanged since dispatch: definition `sha256:3b9c167aa01b554e2a17f288d0def0d19d7833507fff8319367cbecf6164043a` and prerequisite `sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a`.
   - Changed: obligation `sha256:229b3a9dbe595dc04d948a6425a7ee0a0cf6dd1971426790bc28a30a666f19fd` at dispatch is now `sha256:e9312d222eeaca3547ffef202943ac00af2c8f3285a92387e45601c5527bd434`.
-  - Cause: a card's bound requirement text runs from `## Acceptance` to the end of the card unless an `## Execution record` heading ends it. MASK-0098 has no such heading, so replacing its `## Run record` with the verified outcome changed its source fingerprint (`d1dfe28f…` to `a8f03244…`). Its Acceptance text is byte-identical.
+  - Cause: a card's bound requirement text runs from `## Acceptance` to the end of the card unless an `## Execution record` heading ends it. MASK-0100 has no such heading, so replacing its `## Run record` with the verified outcome changed its source fingerprint (`d1dfe28f…` to `a8f03244…`). Its Acceptance text is byte-identical.
   - Action: renew the assignment before checking the d1 return. Evidence written under any other heading will change later bindings the same way.
 - **Windows reference suite:** incomplete; it was stopped after 32 minutes. The first 155 results ran on unchanged code and include six failing existing tests, listed in [tap-cutover-baseline.md](../../development/tap-cutover-baseline.md#runs). Later results are a stop artefact. The owner profile snapshot was unchanged. No command or child from this dispatch is active.
 - **Upstream note:** the installed `milestone_plan.py adopt` builds its receipt path with a Windows separator. Adoption was run under WSL; see [LIVE_IMPORT](../../rfcs/assets/mask-corrective-managed-taps.LIVE_IMPORT.md).
-- **Next milestone:** `bootstrap` (MASK-0099), in a fresh integrator context:
+- **Next milestone:** `bootstrap` (MASK-0101), in a fresh integrator context:
   - config v3 alongside v1 and v2
   - `init` without `--source`
   - `tap add` bootstrap on an empty `MASK_HOME`
   - tap-first cutover of `tests/support.py` and `tests/public_support.py`
   - the full suite green while legacy code still exists
-- **Carried obligations for MASK-0099:**
+- **Carried obligations for MASK-0101:**
   - Replace the `LiveCheckoutBaseline` tests that call `init --source`; their evidence is recorded at `82b4200`. `LegacyFixtureBytes` stays.
   - Establish a complete Windows full-suite reference that separates the six existing failures from regressions.
 
@@ -398,13 +398,13 @@ This RFC, its closeout, current affected docs and exact native evidence referenc
 
 ## Bounded work
 
-Reconcile every RFC-MASK-0020 criterion against direct evidence: fixture journeys, native qualifier reports, the owner migration transcript, the structure gate and the full suite on both platforms. Confirm no link producer remains that targets a checkout, no retired command survives in help or capabilities, and no migration path resets or deletes user data.
+Reconcile every RFC-MASK-0021 criterion against direct evidence: fixture journeys, native qualifier reports, the owner migration transcript, the structure gate and the full suite on both platforms. Confirm no link producer remains that targets a checkout, no retired command survives in help or capabilities, and no migration path resets or deletes user data.
 
 ## Acceptance
 
 Every criterion has direct actual evidence and an implementation revision; every linked card is Done. Pack validation, fixture success and documentation edits are not acceptance. A missing native lane or an unrun owner migration keeps this closeout open.
 
-Criterion coverage: RFC-MASK-0020-AC01, RFC-MASK-0020-AC02, RFC-MASK-0020-AC03, RFC-MASK-0020-AC04, RFC-MASK-0020-AC05, RFC-MASK-0020-AC06, RFC-MASK-0020-AC07, RFC-MASK-0020-AC08.
+Criterion coverage: RFC-MASK-0021-AC01, RFC-MASK-0021-AC02, RFC-MASK-0021-AC03, RFC-MASK-0021-AC04, RFC-MASK-0021-AC05, RFC-MASK-0021-AC06, RFC-MASK-0021-AC07, RFC-MASK-0021-AC08.
 
 ## Focused verification
 
@@ -422,20 +422,20 @@ asserted by this card's existence.
 
 ## Durable closeout anchor
 
-RFC_BASE_SHA: b92372f224c04368b6f76d50c0312d95f8035ff3
+RFC_BASE_SHA: f81155aafc89196a192551a6baf77d168b8bacc6
 
-Planned cards: MASK-0098, MASK-0099, MASK-0100, MASK-0101, MASK-0102, MASK-0103, MASK-0104, MASK-0105.
+Planned cards: MASK-0100, MASK-0101, MASK-0102, MASK-0103, MASK-0104, MASK-0105, MASK-0106, MASK-0107.
 
 | Acceptance | Direct check / observation | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0020-AC01 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC02 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC03 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC04 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC05 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC06 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC07 | Pending actual implementation evidence | Not run | Not recorded |
-| RFC-MASK-0020-AC08 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC01 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC02 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC03 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC04 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC05 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC06 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC07 | Pending actual implementation evidence | Not run | Not recorded |
+| RFC-MASK-0021-AC08 | Pending actual implementation evidence | Not run | Not recorded |
 
 Closeout review runtime: Not recorded. Required native and owner-machine boundaries remain
 open until their actual evidence is linked. Do not invent a PASS to close the board.

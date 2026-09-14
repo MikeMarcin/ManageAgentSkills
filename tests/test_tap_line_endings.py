@@ -1,4 +1,4 @@
-"""Tap line-ending policy through the public CLI under a core.autocrlf=true Git configuration (MASK-0107).
+"""Tap line-ending policy through the public CLI under a core.autocrlf=true Git configuration (MASK-0109).
 
 Every test first points GIT_CONFIG_GLOBAL at a disposable file that sets core.autocrlf=true. The fixture's own Git
 and every MASK subprocess read it, so the cases mean the same on Windows, macOS and Linux; the real global and system
@@ -92,7 +92,7 @@ class LineEndingFixture(AutocrlfGit, Fixture):
 
 
 class ExactTap(LineEndingFixture):
-    """A1, A2 and the MASK-0099 defect: a tap added without the opt-in keeps exact bytes."""
+    """A1, A2 and the MASK-0101 defect: a tap added without the opt-in keeps exact bytes."""
 
     def test_unchanged_lf_package_publishes_no_change_and_an_edit_publishes_exact_bytes(self):
         added = self.authoring_init()

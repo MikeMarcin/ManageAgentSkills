@@ -149,7 +149,7 @@ mask.main(sys.argv[3:])
         self.assertFalse((self.project/'.agents/skills/alpha').is_symlink())
         self.assertFalse((self.home/'pending.json').exists())
         self.assertTrue(output['changed'])
-        self.assertEqual(output['transaction'],'not_started') # MASK-0110: retained preparation is not a consumer transaction.
+        self.assertEqual(output['transaction'],'not_started') # MASK-0112: retained preparation is not a consumer transaction.
         self.assertTrue(output['data']['preparation'][0]['effects']['artifacts'][0]['created'])
         self.assertEqual(output['data']['retained_preparation']['artifacts'],[output['data']['preparation'][0]['effects']['artifacts'][0]['path']])
 
@@ -316,7 +316,7 @@ mask.main(sys.argv[3:])
         with patch.object(mask,'local_dispatch',side_effect=fail),self.assertRaises(c.MaskError):
             mask.dispatch(args,output,leaves)
         self.assertTrue(output['changed'])
-        self.assertEqual(output['transaction'],'not_started') # MASK-0110: retained preparation is not a consumer transaction.
+        self.assertEqual(output['transaction'],'not_started') # MASK-0112: retained preparation is not a consumer transaction.
         self.assertTrue(output['data']['preparation'][0]['effects']['artifacts'][0]['created'])
         self.assertEqual(output['data']['retained_preparation']['artifacts'],[output['data']['preparation'][0]['effects']['artifacts'][0]['path']])
 

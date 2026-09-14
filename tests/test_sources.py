@@ -18,7 +18,7 @@ from tests.support import TAP, Fixture, ENTRY
 class SourcesTests(Fixture):
     """Tap tests start from ``init`` (the fixture tap); ``self.remote`` is a second bare copy that the checkout names as its ``origin``.
 
-    ``source migrate`` and its guards are retired (RFC-MASK-0020 AC05); tests/test_retired_paths.py covers their refusal.
+    ``source migrate`` and its guards are retired (RFC-MASK-0021 AC05); tests/test_retired_paths.py covers their refusal.
     """
 
     def setUp(self):
@@ -147,7 +147,7 @@ class SourcesTests(Fixture):
         self.init()
         config = (self.home / 'config.json').read_bytes()
         caps = self.call('capabilities')['data']
-        # Machine config v3 is written; v1 and v2 stay readable for migration only (RFC-MASK-0020, MASK-0099).
+        # Machine config v3 is written; v1 and v2 stay readable for migration only (RFC-MASK-0021, MASK-0101).
         self.assertEqual((caps['schemas']['machine'], caps['readable_versions']['machine'], caps['deployment_model']), (3, [1, 2, 3], 'taps'))
         commands = {item['name']: item for item in caps['commands']}
         self.assertFalse(commands['tap.add']['network'])

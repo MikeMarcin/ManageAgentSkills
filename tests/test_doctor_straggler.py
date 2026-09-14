@@ -1,4 +1,4 @@
-"""doctor --migrate on a tap machine (RFC-MASK-0020 AC04, case M11; MASK-0102).
+"""doctor --migrate on a tap machine (RFC-MASK-0021 AC04, case M11; MASK-0104).
 
 A v3 machine created by ``tap add`` over the fixture upstream still holds a straggler: an unregistered v1 declaration
 (project or personal), or a registered legacy (mode-less) record whose v1 declaration and clone links the live-checkout

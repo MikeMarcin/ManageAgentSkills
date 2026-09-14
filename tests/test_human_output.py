@@ -101,7 +101,7 @@ class HumanTerminal(PublicFixture):
         self.assertIn('mask doctor --migrate --dry-run', root)
 
     def test_v2_selection_setters_refuse_and_point_to_install_and_remove(self):
-        # Owner decision Q4 (RFC-MASK-0020, MASK-0103): only install and remove edit a v2 declaration.
+        # Owner decision Q4 (RFC-MASK-0021, MASK-0105): only install and remove edit a v2 declaration.
         shown = self.human('project', 'require', '--help')
         self.assertEqual(shown.returncode, 0, shown.stderr)
         for phrase in ('selection.command_unsupported', 'mask install ID', 'mask remove ID'):
@@ -139,7 +139,7 @@ class HumanTerminal(PublicFixture):
                 self.assertFalse(self.parses_as_result_envelope(run.stdout))
 
     def test_inventory_shows_three_pinned_skill_rows_with_separate_agent_states(self):
-        # Tap-first pinned rows (MASK-0100): one line per SOURCE/ID with a per-agent state column.
+        # Tap-first pinned rows (MASK-0102): one line per SOURCE/ID with a per-agent state column.
         self.assertTrue(self.machine('install', 'beta', '--project', self.project)['ok'])
         self.linked_consumer_with_stale_roles()
         run = self.human('inventory', '--project', self.project)

@@ -1,4 +1,4 @@
-"""Observational inventory over pinned consumer records, locks and owned links (RFC-MASK-0011, MASK-0100).
+"""Observational inventory over pinned consumer records, locks and owned links (RFC-MASK-0011, MASK-0102).
 
 Reads only the selected consumers' declarations, locks and state records, one level of
 discovery leaves, and the locked store metadata a compatibility decision needs. There is

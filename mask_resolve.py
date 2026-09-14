@@ -436,7 +436,7 @@ SELECTION_SETTERS = {'project.set', 'project.require', 'project.unrequire', 'pro
 
 
 def refuse_selection_setter(args):
-    """Only install and remove edit a v2 declaration; set, require and unrequire refuse (RFC-MASK-0020 owner decision Q4)."""
+    """Only install and remove edit a v2 declaration; set, require and unrequire refuse (RFC-MASK-0021 owner decision Q4)."""
     scope = ' --user' if args.command.startswith('user.') else ' --project PATH' if getattr(args, 'project', None) else ''
     c.fail('selection.command_unsupported', f"mask {args.command.replace('.', ' ')} does not edit v2 declarations; "
            f"add skills with 'mask install ID{scope}' and remove them with 'mask remove ID{scope}'.", 4)

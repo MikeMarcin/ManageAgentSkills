@@ -5,7 +5,7 @@ helpers are kept separate on purpose: ``raw`` returns the completed process,
 ``machine`` requests the JSON protocol explicitly, and ``human`` is the plain
 terminal invocation whose output is the thing under test. Starting states are
 prepared only up to the one-time source prerequisite, which is ``tap add`` of a
-local bare upstream on an empty MASK_HOME (RFC-MASK-0020); no helper registers a
+local bare upstream on an empty MASK_HOME (RFC-MASK-0021); no helper registers a
 consumer, approves readiness, renders roles or applies a change on behalf of the
 command under test.
 """

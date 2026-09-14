@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Current CLI contract through RFC-MASK-0020 (tap-only deployment), with the lock, artifact store, pinned-consumer engine and authoring slices of RFC-MASK-0008, the inventory slice of RFC-MASK-0011 and the tap line-ending policy of MASK-0107. A skill source is a tap: an approved Git repository that MASK fetches into its own bare cache. Every project and personal selection is pinned by a lock and deployed from `MASK_HOME/store`; only an explicit `source dev-link` links an authoring checkout. The result envelope remains v1. Machine configuration is v3, new declarations are v2 with v1 locks, and ownership state and pending journals read v1/v2/v3. Machine configuration v1/v2 and v1 declarations, left by the retired live-checkout model, are read only to report, recover and convert them with `doctor --migrate`. Native evidence is recorded in the corresponding RFC closeouts; RFC-MASK-0020 native qualification is pending.
+Current CLI contract through RFC-MASK-0021 (tap-only deployment), with the lock, artifact store, pinned-consumer engine and authoring slices of RFC-MASK-0008, the inventory slice of RFC-MASK-0011 and the tap line-ending policy of MASK-0109. A skill source is a tap: an approved Git repository that MASK fetches into its own bare cache. Every project and personal selection is pinned by a lock and deployed from `MASK_HOME/store`; only an explicit `source dev-link` links an authoring checkout. The result envelope remains v1. Machine configuration is v3, new declarations are v2 with v1 locks, and ownership state and pending journals read v1/v2/v3. Machine configuration v1/v2 and v1 declarations, left by the retired live-checkout model, are read only to report, recover and convert them with `doctor --migrate`. Native evidence is recorded in the corresponding RFC closeouts; RFC-MASK-0021 native qualification is pending.
 
 ## Common options
 
@@ -712,7 +712,7 @@ stable across artifact materialization. Plans/checks/previews do not fetch or
 materialize. A plan whose store artifact is still absent examines the exact locked
 payload in the approved tap cache instead, so a cold preview discloses and binds
 the native role writes and setup identities that the applying run plans after
-materializing it (MASK-0109). When the cache lacks the locked commit, that content
+materializing it (MASK-0111). When the cache lacks the locked commit, that content
 stays unexamined; a guarded run that must first acquire it refuses `plan.stale`
 if the acquired content adds roles or setup to the plan. Warm artifact validation does not consult source Git; worktree Git
 observations still establish branch/index preconditions. Each activation rechecks
@@ -729,7 +729,7 @@ ref or rewrites its selection/lock. Retained preparation effects survive failure
 including stale post-preparation inputs and consumer noops. A created artifact or
 acquired object sets `changed: true` and is listed in `data.retained_preparation`;
 it turns a successful `not_needed` result into `committed`, leaves a refusal
-before any consumer effect `not_started` (MASK-0110; see
+before any consumer effect `not_started` (MASK-0112; see
 [JSON envelope](#json-envelope)), and keeps a consumer `committed`, `rolled_back`
 or `partial` status.
 
@@ -875,7 +875,7 @@ An attempted push with a lost/failed acknowledgement reports an unknown outcome
 and retains the created commit/ref for inspection. Source
 publication never updates consumer locks. File-URI fixtures remain machine-local.
 
-Tap line endings (MASK-0107, amending the RFC-MASK-0020 tap entry shape). A tap
+Tap line endings (MASK-0109, amending the RFC-MASK-0021 tap entry shape). A tap
 keeps exact bytes: its catalog entry's `line_endings` is `exact`, or absent in an
 entry written before the policy existed. `tap add --autocrlf` is the only opt-in
 and records `autocrlf`; `tap add` and `doctor --migrate` write the field, and

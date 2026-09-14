@@ -79,6 +79,8 @@ class WorkflowScopeTests(SetupFixture):
         value = json.loads(self.descriptor_path.read_text())
         value['scopes']['user']['setup'][0]['parameters']['mode'] = 'changed'
         self.descriptor_path.write_text(json.dumps(value))
+        self.publish('change personal scope')
+        self.machine('update', '--user')
         refused = self.machine('ensure', '--user', '--expect-plan-hash', preview['data']['plan_hash'], '--allow-setup', SUBJECT)
         self.assertEqual(refused['error']['code'], 'plan.stale')
         self.assertEqual(self.launches(), 0)
@@ -104,6 +106,7 @@ class WorkflowScopeTests(SetupFixture):
             else:
                 value['scopes']['project' if change == 'project-override' else 'personal'] = value['scopes']['user']
             self.descriptor_path.write_text(json.dumps(value))
-            result = self.machine('ensure', '--project', self.project)
+            self.publish('invalid ' + change)
+            result = self.machine('update', '--project', self.project)
             self.assertEqual(result['error']['code'], 'workflow.invalid', result)
         self.assertEqual(self.launches(), 0)

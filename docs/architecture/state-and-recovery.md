@@ -1,6 +1,6 @@
 # Local state and recovery data
 
-The public API is the CLI, not these internal files. This page describes the current tap-model serialization under `MASK_HOME` (RFC-MASK-0020). No agent hand-edits it during ordinary management. The schema files named below document the closed JSON shapes; runtime validation is stricter (canonical roots, digests, recomputed paths, source approval).
+The public API is the CLI, not these internal files. This page describes the current tap-model serialization under `MASK_HOME` (RFC-MASK-0021). No agent hand-edits it during ordinary management. The schema files named below document the closed JSON shapes; runtime validation is stricter (canonical roots, digests, recomputed paths, source approval).
 
 ## config.json
 
@@ -35,7 +35,7 @@ The intent is written before the first effect. Recovery validates the whole inte
 
 **`update`.** `update` fetches each referenced tap once under the writer lock and materializes store payloads before it writes its journal. One `update` journal then carries the lock and link changes of every applied consumer. It recovers like any pinned journal, and the fetched objects and payloads stay.
 
-**`doctor.migrate`.** Migration is best effort (owner decision recorded in RFC-MASK-0020).
+**`doctor.migrate`.** Migration is best effort (owner decision recorded in RFC-MASK-0021).
 - **Journal shape.** A machine migration of a v1 or v2 configuration is one version 3 journal with no `manifests`. Its typed `files` end with the `machine_config` role: the exact `config.json` before and after bytes. Its `migration` field records:
   - `config_before` and `config_after`;
   - `source`, the legacy checkout observed at planning: root, identity, HEAD, branch, index digest, repository and object format;

@@ -1,4 +1,4 @@
-"""Tap-first bootstrap through the public CLI (RFC-MASK-0020 AC01 and the retired ``init --source``; MASK-0099).
+"""Tap-first bootstrap through the public CLI (RFC-MASK-0021 AC01 and the retired ``init --source``; MASK-0101).
 
 The upstream is a local bare repository filled from a throwaway author checkout that
 is deleted before MASK runs, so no working checkout of the skills exists anywhere on

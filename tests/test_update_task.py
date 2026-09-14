@@ -1,4 +1,4 @@
-"""One-command safe updates through the public CLI (RFC-MASK-0018 AC04-AC06, MASK-0087; cases C16-C18 and C20), on taps (RFC-MASK-0020, MASK-0101).
+"""One-command safe updates through the public CLI (RFC-MASK-0018 AC04-AC06, MASK-0087; cases C16-C18 and C20), on taps (RFC-MASK-0021, MASK-0103).
 
 Every check runs the program as a subprocess against a local bare upstream approved as a
 tap and a consumer created through the public ``install`` command; upstream changes reach

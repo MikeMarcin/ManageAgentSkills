@@ -1,4 +1,4 @@
-"""Tap-first CLI fixtures (RFC-MASK-0020, MASK-0099).
+"""Tap-first CLI fixtures (RFC-MASK-0021, MASK-0101).
 
 A machine starts the way a user's does: ``tap add`` on an empty MASK_HOME approves one
 local bare repository as a ``file`` tap and creates machine config v3 and state. New
