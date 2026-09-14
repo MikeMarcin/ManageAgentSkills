@@ -44,7 +44,20 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 - **Pending owner decisions:**
   - Q4 (below, unchanged).
   - New Q5: the MIGRATION.md blocker remediations (`project unregister --keep-links`, `workspace forget`) are gated on v1/v2 machines by AC05. Exempt them from the gate (amending AC05), or keep the gate and document that a non-migratable consumer must be restored on disk first?
-- **Next discriminating step:** the worker's candidate, then focused modules and the crash matrix.
+- **B1 worker result, collected and quiescent** (dispatched as `rfc-worker` with no model/effort override; banner `claude-opus-5[1m]`, effort xhigh as configured):
+  - v1/v2 `doctor --migrate`: dry run and plan hash, acquisition from the clone into `refs/mask/frozen/<head>`, one `doctor.migrate` journal with a `machine_config` role, and recovery hooks in `mask_fs`/`mask_pinned`.
+  - Refusals: diverged is `source.identity_mismatch` with reason `diverged`; a legacy record with a v2 declaration is `migration.declaration_unsupported`.
+  - M12: the `b92372f` program refuses the journal with `recovery.conflict`.
+  - Logs under the session scratchpad `b1/`: doctor module 18/18 OK; affected modules 76/76 OK; negative control 3 failing subtests when rollback skips `machine_config`.
+- **Integrator corrections, uncommitted:**
+  - Refusals keep the typed exit code instead of guessing it from the code suffix (`source.identity_invalid` exits 3).
+  - A legacy consumer that selects nothing migrates; `validate_journal` wrongly rejected an empty lock.
+  - The doctor report blocks a legacy record with a v2 declaration, so it agrees with `--migrate`.
+  - Two regression tests were added. Reruns of `tests.test_doctor_migration` and `tests.test_retired_paths` are running (scratchpad `integ/`).
+- **Next discriminating step:**
+  - Commit the B1 slice plus corrections.
+  - Then run worker B2 (v3 path: an unregistered straggler, and a registered legacy record converted under `--project/--user --alias`) and a critical review of the committed journal/recovery candidate concurrently.
+  - The reviewer experiments on an archived snapshot, not the working tree.
 
 **Dispatch `d3` record (historical; milestone `engine` accepted; its next milestone `migration` is in progress under d4).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
