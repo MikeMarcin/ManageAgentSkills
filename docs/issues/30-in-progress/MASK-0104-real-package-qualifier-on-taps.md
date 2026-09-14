@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0104"
 title: "Requalify the real AgentSkills package and legacy lab natively"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0101", "MASK-0102", "MASK-0103", "MASK-0107"]
 priority: "P1"
