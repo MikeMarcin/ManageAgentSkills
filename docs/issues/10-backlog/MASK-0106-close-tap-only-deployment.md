@@ -16,65 +16,75 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d3` checkpoint (milestone `engine` in progress; refreshed after integration).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`. The coordinator's amendments r2 and r3 answered the three decisions d2 left open, as recorded under Owner decisions below. Nothing else in the mandate or permissions has changed since d2.
+**Dispatch `d3` record (milestone `engine` accepted).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
+- The mandate is still `/implement-rfc RFC-MASK-0020` with no added stop conditions. The coordinator's amendments r2 and r3 answered the three decisions d2 left open; see Owner decisions below.
+- No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
 
-- **Binding** (`coordinator_handoff.py assign --target RFC-MASK-0020 --milestone engine`, with `baseline` and `bootstrap` accepted):
+- **Accepted milestone `engine`:**
+  - MASK-0100 is Done at `e8c3052` and MASK-0101 at `de45c37`.
+  - Implementation runs from `d61d4be` to `a62f7c4`, and MASK-0102 was promoted to Ready at `c254bc2`.
+  - **Exit 1** (no link producer targets a checkout except `source dev-link`): `tests.test_link_producers`.
+    - A static allowlist of every link spelling: `symlink_to`, `os.symlink`, `link_to`, `hardlink_to`, `CreateSymbolicLink` and `mklink`.
+    - A CLI journey through every public link producer.
+    - A refusal on mode-less records.
+    - Negative controls: it fails at `be64043`, and fails again when `pinned.target` is mutated to point at the authoring checkout.
+  - **Exit 2** (retired commands are absent from capabilities and exit 2; legacy configuration exits 4): `tests.test_retired_paths`. It covers the retired commands, the migration gate on v1 and v2 builder machines (which exempts `capabilities`, `config show`, `doctor`, `recover` and `self *`), and consumer-level remediation. It fails 5 of 5 at `be64043`.
+  - **Exit 3** (`update` fetches each tap once, isolates failed taps and applies one journal): `tests.test_update` cases U01–U09 and `UpdateSafetyOnTaps`, which count Git fetch processes from trace2 events. The module has 10 failures and 1 error at `be64043`.
+  - **Full suite on `a62f7c4`:**
+    - guarded per-module run: 45 modules, 386 tests, 16 skipped;
+    - literal `python -B -m unittest`: exit 0, 386 tests in 8694 s, OK with 16 skipped;
+    - HEAD, tree and the code-tree guard were unchanged, and the owner profile snapshot was identical.
+    - Only Windows 11 Home 10.0.26200 (Python 3.14.6, Git 2.55.0.windows.3) was exercised.
+  - Evidence: the execution records on [MASK-0100](../60-done/MASK-0100-retire-live-checkout-engine.md#execution-record) and [MASK-0101](../60-done/MASK-0101-update-fetch-and-isolation.md#execution-record).
+- **Binding** (unchanged; the recomputed assignment matched every value):
   - definition `sha256:e41ecb8e391879ede6dbc0126096ab78d5e8d489dfdb9bb6f48980538036a517`
-  - obligations `sha256:ca9ace464b531dd11759bc20c98e3fed090a0e15ae26d3bb9b0ec13db457c20f` (MASK-0100 `sha256:74490bb6…`, MASK-0101 `sha256:45fa1db7…`)
+  - obligation `sha256:ca9ace464b531dd11759bc20c98e3fed090a0e15ae26d3bb9b0ec13db457c20f`
   - prerequisite `sha256:6e3b48d4ed539c1028f2f5db223f859fd9b69b4324ad8b66feb22dbab1a46101`
-  - The assignment is `d3-assignment.json` in the ignored run directory.
-- **Claims:** MASK-0100 at `f038340` and MASK-0101 at `66fb4e2`.
-- **Integrated candidate `d61d4be`:**
-  - **MASK-0100 behavior:**
-    - A v1 or v2 machine configuration refuses every command except `capabilities`, `config show`, `doctor`, `recover` and `self *` with `migration.required`, exit 4, naming `mask doctor --migrate --dry-run`.
-    - `source status`, `source migrate` and `migrate` are gone and exit 2.
-    - The planner, `link adopt`, recovery and `pinned.target` never derive a link text into a checkout; only `source dev-link` targets an authoring checkout.
-    - A retired journal (`migrate`, a `migration` field, a source-scope Git entry, or legacy ownership) refuses `recovery.conflict`, and `recover --inspect` shows it with `data.retired`.
-    - `inventory` and `skill where-used` report pinned rows, and `project init` without machine config writes a v2 declaration.
-  - **MASK-0101 behavior:** `mask_update.py` fetches each referenced tap once, with the declared selector objects in the same `git fetch`.
-    - A failed tap blocks only its consumers, and every other selected consumer is applied through one `update` journal; the command ends `update.incomplete` if any consumer stayed blocked.
-    - Nothing is fetched under `--dry-run`, `--offline` or `--expect-plan-hash`.
-    - `source fetch` without a name fetches every approved tap.
-  - **For MASK-0102:** the `migrate --to-pinned` machinery is deleted. MASK-0102 ports it from `0658a40`:
-    - `mask_pinned` `authoring_snapshot`, `migrated_selection`, `validate_migration`, `check_migration` and the migrate branch of `transition_dispatch`;
-    - `mask_sources.migrated_config`;
-    - `tests/test_pin_migration.py`.
-    Since `pinned.target` refuses legacy link records, doctor migration must derive the old clone targets itself and re-add the `migration` journal field and the `machine_config` file role.
-  - **Contract note for the closeout:** the update journal keeps `operation: update`, as `contracts/CLI.md` requires. So the RFC's rollout sentence, that the previous program refuses a tap-fetching update journal with `recovery.conflict`, does not hold for this journal shape.
-- **Evidence so far** (scratch logs are machine-local):
-  - The pre-integration retirement tree ran as guarded per-module processes: 46 modules, 401 tests, no regression. The 94 failures were 44 legacy-marked tests and 50 superseded by the parallel slices.
-  - **Negative controls at `be64043`:**
-    - `test_retired_paths` fails 5 of 5.
-    - `test_link_producers` fails 2 of 4; a mutation that points `pinned.target` at the authoring checkout fails its journey test.
-    - `test_update` has 10 failures and 1 error in 11 tests.
-    - `test_inventory` fails 9 of 9.
-  - Sanity run of the integrated tree: `test_cli_protocol`, `test_retired_paths`, `test_legacy_baseline`, `test_tap_bootstrap` and `test_launcher`, 25 tests OK.
-- **Active work (not complete):**
-  - A background run of the slice modules on `d61d4be`.
-  - Porting slice P1: `test_reconcile_apply`, `test_reconcile_plan`, `test_recovery`, `test_manifest_registry`, `test_locks`, `test_pinned_recovery` and `test_ensure`; deleting `test_pin_migration`; adding shared helpers to `tests/support.py`.
-  - Porting slice P2: `test_user_scope`, `test_targeting`, `test_skill_catalog`, `test_sources` and `test_end_to_end`.
-  - **Integrator work after both slices return:**
-    - Delete `tests/test_git_update.py`; each of its 9 tests is mapped to a retired case, an existing covering test or a new case in `tests/test_update.py`.
-    - Remove `legacy_init`, `declare` and `legacy_bootstrap` from the fixture bases.
-    - Run the full suite, both guarded per-module and as the literal `python -B -m unittest`.
-    - Commission a critical review, then finish MASK-0100 and MASK-0101.
-- **Owner decisions (amendments r2 and r3) and where they landed:**
-  1. **Line endings:** taps keep exact bytes, and `core.autocrlf` applies only by opt-in at tap registration. This is filed as MASK-0107 (`158e48f`), and MASK-0104 and MASK-0105 now depend on it.
-     - Recommended order: implement it after `migration` and before `qualification`.
-     - It sits outside the plan's scope list; r2 and r3 authorize it.
-  2. **Offline error code:** an offline bare ID on a cold single tap keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads under this decision, and `tests/test_tap_bootstrap.py` already asserts both codes.
-  3. **Follow-up cards** are filed in Backlog with no RFC link and no dependency edges into this pack (reservation `19b3c3a`):
-     - MASK-0108: authoring-checkout branch refusal
-     - MASK-0109: plan hash of a cold-store `ensure --dry-run`
-     - MASK-0110: truthful result after a refusal that retained store preparation
-- **Notes for later cards in this pack:**
-  - **MASK-0102:** the `MIGRATION.md` remediations `project unregister --keep-links` and `workspace forget` are themselves gated on a v1 or v2 machine, so the doctor card must resolve that. `capabilities.migration: doctor` and the `doctor` plan guard land with it.
-  - **MASK-0103:**
-    - Help, `COMMAND_HELP`, `EVERYDAY` and the renderers still name the removed commands and the shared source.
-    - The "Legacy inventory" section of `cli-contract.md` is stale.
-    - After a plain `source fetch`, reviewing a tag- or branch-pinned consumer with `update --dry-run` still needs `source inspect --ref`: the no-name fetch acquires only each tap's configured ref.
+  - The assignment and return are in the ignored run directory.
+- **Product state the next milestone inherits:**
+  - **Migration gate:** a v1 or v2 machine config refuses every command except `capabilities`, `config show`, `doctor`, `recover` and `self *` with `migration.required` (exit 4). The details carry `remediation` `mask doctor --migrate --dry-run`.
+    - `doctor` reports the issue without planning, and `--check` exits 7.
+    - `config show` reports `migration_required`.
+  - **Retired paths:**
+    - `source status`, `source migrate` and `migrate` exit 2.
+    - The `migrate --to-pinned` machinery is gone; MASK-0102 ports it from `0658a40` (`mask_pinned` migration helpers, `mask_sources.migrated_config`, `tests/test_pin_migration.py`).
+    - `pinned.target` refuses legacy link records, so doctor migration must derive the old clone targets itself and re-add the `migration` journal field, the `machine_config` role and the pending `doctor.migrate` operation.
+    - A retired journal (`migrate`, a `migration` field, a source-scope git entry, legacy ownership) is shown by `recover --inspect` and refused `recovery.conflict`.
+  - **Update:** `mask_update.py` owns `update` and no-name `source fetch`. The journal keeps `operation: update`.
+  - **Inventory and where-used:** they report pinned rows.
+  - **`project init`** without machine config writes an empty v2 declaration.
+  - **Fixed in `a62f7c4`:**
+    - a project install into the registered personal home now refuses `target.overlap`;
+    - a moved registered root refuses `user.unavailable` or `project.unavailable` from `apply`, `ensure` and `source dev-link`;
+    - `execute` verifies retained artifacts before writing a journal, and `remove` prepares the old artifacts of the rows it removes.
+- **Test state:**
+  - All fixtures are tap-first; `tests/legacy_support.py` stays for the doctor tests.
+  - `legacy_init`, `declare` and `legacy_bootstrap` are gone.
+  - `tests/test_pin_migration.py` and `tests/test_git_update.py` are removed. Coverage of the self update checkout journal moved to `tests/test_launcher.py`.
+- **Owner decisions (r2 and r3):**
+  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
+  2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads with this decision.
+  3. The d2 follow-ups are filed as MASK-0108 to MASK-0110, outside this RFC.
+- **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0103 describes these commands):**
+  - Retained `contracts/CLI.md` and the RFC Retirement paragraph say `project/user set|require|unrequire` "remain for v2 declarations" and write a v2 declaration and lock.
+  - The product has refused them for v2 declarations with `selection.command_unsupported` since before this RFC, and d3 kept that behavior.
+  - The ask: implement v2 set/require/unrequire, or amend the contract to keep the refusal and point to `install`/`remove`?
+- **Contract notes for the closeout and later cards:**
+  - The RFC rollout sentence is false: the previous program completes a crashed tap-fetching `update` journal with the same outcome instead of refusing it.
+  - The update fetch holds the writer lock for the network round (MASK-0103 should document this).
+  - A resolution error other than `lock.resolution_required` or `lock.ref_rebound` refuses the whole update (CLI.md step 6).
+  - `skill show` no longer refuses a linked package entry (`validate` and `install` do), and `skill.path_escape` has no test.
+  - On Windows, a long scratch path gives an untyped `git.failed` when a cache ref path exceeds MAX_PATH (MASK-0104).
+  - The `MIGRATION.md` remediations `project unregister --keep-links` and `workspace forget` are gated on v1/v2 machines (MASK-0102).
+  - `capabilities.migration: doctor` and the `doctor` plan guard land with MASK-0102.
+  - `doctor --project <unregistered>` answers `project.not_registered` before any migration report (MASK-0102).
+  - Help, README and guides still name retired commands (MASK-0103).
+  - Reviewing a tag- or branch-pinned consumer after a no-name `source fetch` still needs `source inspect --ref`.
+- **Execution state:** every d3 child has returned (retirement, update module, inventory, three porting slices, corrections, and the critical review with its follow-up). No command or child from d3 is active, and the consumed worktrees were removed.
+- **Next milestone:** `migration` (MASK-0102), in a fresh integrator context.
 
-**Dispatch `d2` record (milestone `bootstrap` accepted; its next milestone `engine` is being executed by d3).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
+**Dispatch `d2` record (historical; its next milestone `engine` was accepted by d3).** Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d2`, mandate revision `1`. The owner's mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no extra stop conditions. No push or publication is authorized, and the owner's real machine is changed only by attended MASK-0105.
 
 - **Accepted milestone `bootstrap`:** MASK-0099 is Done at `eb2eff8`. The implementation is `01b2ae3` plus the review fix `94d4f1c`. MASK-0100 and MASK-0101 were promoted to Ready at `5ea6f13`.
   - Exit 1: `tests.test_tap_bootstrap` passes 6 tests. On an empty `MASK_HOME`, `tap add` followed by `install` deploys v2 consumers from the store, with one bare cache and no checkout anywhere on disk. Negative controls: the pre-implementation product fails 5 of 5, and a retained author checkout fails the no-checkout assertion.
