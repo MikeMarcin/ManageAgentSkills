@@ -247,6 +247,18 @@ def render_doctor(data, output):
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
     lines.extend(workflow_lines(data, verb='would be deployed by'))
+    migration = data.get('migration') or {}
+    if migration.get('required'):
+        lines.append(f"  migration: required ({clean(migration.get('machine'))})")
+        tap = migration.get('proposed_tap') or {}
+        if tap:
+            lines.append(f"  proposed tap: {clean(tap.get('alias'))} {clean(tap.get('repository'))}")
+        for blocker in migration.get('blockers', []) or []:
+            lines.append(f"  migration blocked: {clean(blocker.get('message'))}")
+        for row in migration.get('consumers', []) or []:
+            state = 'migratable' if row.get('migratable') else 'blocked'
+            lines.append(f"  legacy {clean(row.get('scope'))}: {clean(row.get('root'))} ({state})")
+        lines.append("  preview the conversion with 'mask doctor --migrate --dry-run'")
     if output['would_change']:
         lines.append("  links or roles differ from the declaration; run 'mask apply' or 'mask ensure' to reconcile")
     return lines
@@ -758,7 +770,7 @@ COMMAND_HELP = {
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
     'update': ('With no scope options, fetch and update the shared source for ALL registered consumers that use it, regardless of your current directory. With --project, --user or --all, update independently pinned selections. A shared source cannot be updated for just one project. This command never runs package setup.', 'mask update --dry-run              # preview cached shared-source changes\nmask update                        # fetch and update shared consumers\nmask update --project .            # update this pinned project\nmask update --user                 # update personal pinned selections\nmask update --project . --skill ID # update one pinned selection\n\nIf required setup is missing after update, run ensure for the named consumer.\nUse mask self update to update the MASK program.'),
-    'doctor': ('Inspect health, missing files and drift without changing files. --check returns exit 7 when problems are found.', 'mask doctor --project . --check\nmask doctor --all --check'),
+    'doctor': ('Inspect health, missing files and drift without changing files. --check returns exit 7 when problems are found. On a machine or consumer that still uses a live checkout, doctor reports what migration to taps would convert; --migrate converts it through one recoverable transaction.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
     'apply': ('Reconcile managed links for the selected registered scopes. Does not run package setup.', 'mask apply --project . --dry-run\nmask apply --project .'),
@@ -863,7 +875,8 @@ OPTION_HELP = {
     'paths': 'Source paths to include; repeatable', 'commit': 'Explicitly commit the selected source changes',
     'push': 'Explicitly push the source changes', 'message': 'Commit message',
     'authoring-root': 'Local checkout to use while editing this skill',
-    'to-pinned': 'Select independent pinned deployment', 'alias': 'Alias for the existing source',
+    'to-pinned': 'Select independent pinned deployment', 'alias': 'Tap alias for the migrated live checkout (doctor --migrate)',
+    'migrate': 'Convert a live-checkout machine or consumer to taps through one recoverable transaction',
     'packages': 'Package directory inside the source', 'checkout': 'Local source checkout',
     'refresh': 'Refresh existing version resolutions', 'reason': 'Explanation for this compatibility override',
     'platform': 'Override the advertised platform restriction', 'architecture': 'Override the advertised architecture restriction',
