@@ -1,13 +1,32 @@
 {
-  "schema_version": 1,
-  "skills": [
-    "attended-review",
-    "implement-rfc",
-    "wizard",
-    "writing-for-agents"
-  ],
-  "targets": [
+  "default_agents": [
     "claude",
     "codex"
-  ]
+  ],
+  "schema_version": 2,
+  "skills": [
+    {
+      "id": "attended-review",
+      "source": "agentskills"
+    },
+    {
+      "id": "implement-rfc",
+      "source": "agentskills"
+    },
+    {
+      "id": "wizard",
+      "source": "agentskills"
+    },
+    {
+      "id": "writing-for-agents",
+      "source": "agentskills"
+    }
+  ],
+  "sources": {
+    "agentskills": {
+      "packages": "skills",
+      "ref": "refs/heads/main",
+      "repository": "https://github.com/MikeMarcin/AgentSkills.git"
+    }
+  }
 }
