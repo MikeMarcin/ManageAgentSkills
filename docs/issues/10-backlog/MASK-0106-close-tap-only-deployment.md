@@ -29,10 +29,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - Other facts: the clone is at `origin/main` `16192b7`, and the personal skill roots hold no entries MASK would collide with.
 - **MASK-0105 expectation gap** (W1 rehearsal): after `install implement-rfc --user`, `update` exits 4 and `doctor --check` exits 7, with only `workflow.incomplete`. The personal implement-rfc context and consented role setup are missing, so the card's `doctor --check` 0 needs an owner decision.
 - `doctor --check` failures report the documented umbrella `state.drift` (exit 7), with specific codes in the issue rows. That is not a defect.
+- **W1b owner-state replica rehearsal** (MASK `f9c7fbc`; guard passed; the owner's files, the real clone and the real checkout's 8 link texts unchanged; evidence in scratchpad `d7-w1b/`):
+  - The card's exact sequence ran with no refusals. Exits: `doctor` 0; `--migrate --dry-run` 0, writing nothing; `--migrate` 0, committed; `install implement-rfc --user` 4; `list --user` 0; `update` 4, fetching and no-op; `doctor --check` 7.
+  - Config becomes v3: tap `agentskills`, `authoring` set to the clone, `line_endings` `exact`. State goes from 1 to 3. The launcher record and `integration.json` are unchanged. All 8 consumer links and 2 personal links resolve under `store/v1`.
+  - **Finding 1:** migration keeps this repository's 16 native role files and state rows but no longer vouches for them. The role lock's `contract_sha256` is the digest of the CRLF working-copy `mask-workflow.json`, while the store copy has exact bytes (`9575dc4f…`). Every role becomes `setup_required`, and `doctor --check` exits 7 from the project scope. Recovery is a consented `ensure` setup in this repository.
+  - **Finding 2:** the personal scope has no implement-rfc context and needs role setup, so `install --user`, `update` and `doctor --check` exit 4, 4 and 7.
+  - **Finding 3:** migration leaves this main checkout with `M .mask.json` (v2) and `?? .mask.lock.json` (4 rows at `16192b7`).
+  - Not reproduced: the SSH GitHub origin (the replica used a local bare origin) and the exact interpreter path.
+- **Integrated:** MASK-0108 (W2) cherry-picked onto main at `2848f6d`, structure gate 0 violations. Its worktree and branch are removed. The card's finish waits for the integration pass.
 - **Active children:**
-  - W2 (MASK-0108, worktree `.claude/worktrees/agent-a666a6d85807aff8e`): resumed after its turn limit.
   - W3 (MASK-0109 and MASK-0110, worktree `.claude/worktrees/agent-a89371c0e6c3ffec8`): resumed to finish its runs.
-  - W1b: a disposable replica of the owner's exact state, rehearsing the MASK-0105 sequence. Evidence only, under the scratchpad `d7-w1b/`.
+  - W1, W1b and W2 have returned. R1 failed terminally.
 - The structure gate reports 0 violations.
 
 **Dispatch `d7` checkpoint 1 (start of dispatch; superseded by checkpoint 2 where they differ).**
