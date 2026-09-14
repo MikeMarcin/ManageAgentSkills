@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0102"
 title: "Detect and migrate legacy machines and consumers through doctor"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0020"]
 depends_on: ["MASK-0098", "MASK-0100"]
 priority: "P1"
