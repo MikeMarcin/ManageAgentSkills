@@ -24,8 +24,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - obligation `sha256:3b1373c09a1afd12769793c33ca42785edfe4f6b256cdcc32135d0439faab981` (MASK-0102 source `sha256:811fc2d6…`)
   - prerequisite `sha256:c0763bebfa7700e8d261bce15d6adc0a9468c1a026e93b0138175381445dcb14`
   - The assignment is `d4-assignment.json` in the ignored run directory.
-- **Board:** MASK-0102 claimed at `333c2f7`. Implementation base `333c2f7`; no product change yet.
-- **Plan:** one standard `rfc-worker` owns the coupled MASK-0102 slice (report, mapping, clone acquisition, `doctor.migrate` journal, recovery hooks, v3 straggler path, tests). The integrator adjudicates, runs the integration pass and commissions a critical review of the journal and recovery changes.
+- **Board:** MASK-0102 claimed at `333c2f7`.
+- **Phase 1, integrator-local, committed at `e28d615`:**
+  - `mask_legacy.py`: read-only detection, the proposed tap and alias, clone observations, consumer rows with typed blockers, and the shared `migrated_declaration` mapping.
+  - `doctor` reports `data.migration`, including an unregistered v1 declaration named by `--project`/`--user`.
+  - CLI surface: `--migrate`, `--alias`, `--offline`, guarded `--dry-run`/`--expect-plan-hash`; `capabilities.migration: doctor`.
+  - `mask_migrate.dispatch` is a stub.
+  - Evidence: `tests.test_doctor_migration` (M01 report cases) passes 6 of 6. Negative control: with only the test module copied onto `d0afac8`, 6 of 6 error `KeyError: 'migration'`.
+- **Plan, revised:** the generated `rfc-worker` has `maxTurns: 56`, so the slice is split.
+  - Worker B1: the v1/v2 `doctor.migrate` journal, recovery hooks, crash matrix and refusals (M02–M10, M12).
+  - Worker B2: the v3 straggler path (M11).
+  - The integrator adjudicates, runs the integration pass and commissions a critical review of the journal and recovery changes.
 - **Integrator design decisions given to the worker:**
   - Operation `doctor.migrate`. A retired `migrate` journal and legacy ownership outside `doctor.migrate` stay refused.
   - Only `doctor.migrate` may restore the legacy link text into the clone, from the validated clone target. This is where AC04 rollback meets the AC02 checkout-link rule.
