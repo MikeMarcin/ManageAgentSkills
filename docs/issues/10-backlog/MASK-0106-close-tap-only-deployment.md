@@ -57,7 +57,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - The remediation is to set `core.autocrlf false` in the checkout, delete the reported files, then run `git checkout -- PATH`. `checkout-index --force` leaves a stat-clean converted file in place.
   - `source dev-link` reports `data.development[].payload_digest`. Test fixtures author LF bytes.
   - For MASK-0104 and MASK-0105: the owner's AgentSkills clone migrates as an exact tap. Its CRLF working copies would refuse publishing and new dev links until restored or re-registered with `--autocrlf`. The migration steps themselves do not publish.
-- **Owner decisions r4** (recorded at `0be6b26` on the RFC and on [MASK-0103](../30-in-progress/MASK-0103-help-docs-and-capabilities-truth.md#owner-decisions-mandate-r4-september-13-2026)):
+- **Owner decisions r4** (recorded at `0be6b26` on the RFC and on [MASK-0103](../60-done/MASK-0103-help-docs-and-capabilities-truth.md#owner-decisions-mandate-r4-september-13-2026)):
   - **Q4:** v2 set/require/unrequire are not implemented. The refusal remains, and MASK-0103 points it, the help and the contract to `install`/`remove`.
   - **Q5:** migration is best effort. The AC05 gate is unchanged, and MASK-0103 briefly documents restoring an unconvertible consumer on disk.
   - d4's migration notes are closed unless they block MASK-0105. No acceptance text is narrowed.
