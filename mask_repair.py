@@ -193,7 +193,8 @@ def ensure_all(args, output, home, ensure):
         output['would_change'] |= child['would_change'] or bool((child['data'].get('setup') or {}).get('actions'))
         if child['transaction'] == 'partial':
             output['transaction'] = 'partial'
-        elif output['changed'] and output['transaction'] != 'partial':
+        elif child['changed'] and child['transaction'] != 'not_started' and output['transaction'] != 'partial':
+            # A scope that refused with only retained preparation applied no consumer transaction (MASK-0110).
             output['transaction'] = 'committed'
         if interrupted:
             if c.kind(home / 'pending.json') != 'missing':

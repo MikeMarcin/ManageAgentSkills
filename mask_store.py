@@ -209,6 +209,21 @@ def materialize(home, row, payload, *, dry_run=False, effects=None):
         cleanup(stage, identity)
 
 
+def exact_cached(home, row, entry):
+    """Whether the approved tap cache already holds the exact locked commit; never fetches."""
+    cache = s.cached(home, row['source'], entry)
+    return cache is not None and c.git(cache, 'rev-parse', '--verify', row['commit'] + '^{commit}', optional=True) == row['commit']
+
+
+def cached_payload(home, row, config):
+    """The exact locked bytes of an absent artifact, read from its approved tap cache, or None when the cache lacks the commit.
+
+    A plan examines them so a preview sees the package the applying run materializes; nothing is fetched or written.
+    """
+    entry = s.selected(config, row['source'])
+    return r.verify_resolution(home, row['source'], entry, row) if exact_cached(home, row, entry) else None
+
+
 def ensure(home, declaration, resolved, config, *, offline=True, dry_run=False, effects=None, coordinates=None):
     """Prepare exact artifacts only. Default is cache-only; never activate links."""
     declaration = r.selection(declaration)
@@ -230,9 +245,7 @@ def ensure(home, declaration, resolved, config, *, offline=True, dry_run=False, 
             effects['artifacts'].append(dict(path=str(target), reused=True, created=False))
             continue
         entry = entries[row['source']]
-        cache = s.cached(home, row['source'], entry)
-        available = cache is not None and c.git(cache, 'rev-parse', '--verify', row['commit'] + '^{commit}', optional=True) == row['commit']
-        if not available:
+        if not exact_cached(home, row, entry):
             if dry_run:
                 effects['artifacts'].append(dict(path=str(target), created=False, resolution_required=True, commit=row['commit']))
                 continue

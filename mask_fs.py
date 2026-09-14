@@ -49,10 +49,11 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     after = copy.deepcopy(state)
     links, actions, blockers, observations = [], [], [], []
     import mask_selection as selection
+    import mask_store as store
     policy_value = selection.policy(selection_policy) if selection_policy is not None else selection.read_policy(home)[0] if home is not None else selection.policy()
     typed_files, uses_pinned = [], selection_policy is not None
     role_files, workflow_reports, released_roles, retired_files = [], [], [], []
-    outcomes = []
+    outcomes, package_views = [], {}
     for root in sorted(roots, key=str):
         key = str(root)
         record = c.consumer_records(state).get(key)
@@ -159,8 +160,16 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 bindings.setdefault(link['skill'], set()).add(link['target'])
                 if link['skill'] not in targets:
                     location = pinned.target(link, config, home)
-                    view = (payload_views or {}).get(link['resolution']['payload_digest']) if 'dev' not in link else None
-                    targets[link['skill']] = workflow.PackageView(root=location) if c.kind(location) == 'directory' else workflow.PackageView(payload=view) if view is not None else None
+                    if c.kind(location) == 'directory':
+                        targets[link['skill']] = workflow.PackageView(root=location)
+                    else:
+                        # An absent store artifact is examined from its exact locked bytes, supplied or read from the approved
+                        # cache without fetching, so a preview plans the roles and setup the materializing run binds (MASK-0109).
+                        row = link['resolution']
+                        payload = None if 'dev' in link else (payload_views or {}).get(row['payload_digest']) or store.cached_payload(home, row, config)
+                        targets[link['skill']] = None if payload is None else workflow.PackageView(root=location, payload=payload)
+                        if payload is not None:
+                            package_views[str(location)] = targets[link['skill']]
                     coordinates[link['skill']] = resolve.coordinate(link['resolution'])
             roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles)
             from mask_repair import retired_files as plan_retired
@@ -215,6 +224,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
         result['intent'].update(files=typed_files, pinned=pinned_controls)
     if workflow_reports:
         result.update(workflow_readiness=workflow_reports, released_roles=released_roles)
+    if package_views:
+        result['package_views'] = package_views  # For setup proposals only; public_plan never publishes it.
     if role_files:
         result['intent']['native_roles'] = role_files
     if retired_files:
@@ -286,7 +297,7 @@ def shadow_warnings(rows):
 
 
 def public_plan(planned, output):
-    output['data'] = {key: value for key, value in planned.items() if key not in ('intent', 'actions', 'would_change', 'released_roles')}
+    output['data'] = {key: value for key, value in planned.items() if key not in ('intent', 'actions', 'would_change', 'released_roles', 'package_views')}
     output['actions'] = planned['actions']
     output['would_change'] = planned['would_change']
     output['warnings'].extend(shadow_warnings(planned.get('shadowing', [])))

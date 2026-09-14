@@ -239,7 +239,7 @@ Every normal machine-mode response includes:
 
 `data` contains command-specific results, including resolved consumer root and declaration, registration state, lock changes, fetch and preparation effects, expected/actual links and plan hash as applicable. Actions have stable kinds and statuses. No fabricated revision is emitted for an unborn repository; use null plus an explicit condition.
 
-`changed` reports actual remaining changes to managed configuration, registry, declarations and locks, links, store artifacts, launchers, authoring commits and refs created by `source publish`, or the program checkout. Fetch transfers are reported in `data.fetch_effects` (`source fetch NAME`) or per tap in `data.fetches` (`update`, `source fetch` without a name); named-source cache creation is reported in `data.cache_effects`. These fetch effects do not set `changed` and do not imply skill activation. Store artifacts and exact acquisitions retained by preparation are reported in `data.preparation` and do set `changed`. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
+`changed` reports actual remaining changes to managed configuration, registry, declarations and locks, links, store artifacts, launchers, authoring commits and refs created by `source publish`, or the program checkout. Fetch transfers are reported in `data.fetch_effects` (`source fetch NAME`) or per tap in `data.fetches` (`update`, `source fetch` without a name); named-source cache creation is reported in `data.cache_effects`. These fetch effects do not set `changed` and do not imply skill activation. Store artifacts and exact acquisitions retained by preparation are reported in `data.preparation` and do set `changed`; `data.retained_preparation` summarizes them as `artifacts` (created store payload paths), `directories` (retained created store directories) and `acquisitions` (`cache` and `commit`), apart from the consumer `transaction`. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
 
 `transaction` values:
 
@@ -249,7 +249,7 @@ Every normal machine-mode response includes:
 - `rolled_back`: core planned effects were restored; any retained empty created directories are separately reported and keep `changed=true`.
 - `partial`: some persistent effects remain or source/operation state is indeterminate; nonzero exit and recovery guidance are mandatory.
 
-An operation cannot set `ok=true` with `partial`. A refusal after preparation created store artifacts or cache objects, such as `plan.stale` found under the writer lock after `install`, `remove`, `update`, `apply`, `ensure` or `doctor --migrate` prepared new payloads, reports `changed: true` and `transaction: partial` although no declaration, lock, link or registry byte changed and no journal is pending; `data.preparation` names the retained effects, and nothing needs recovery. The same refusal with no created artifact reports `not_started`. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
+An operation cannot set `ok=true` with `partial`. `transaction` describes the consumer transaction, not MASK-owned preparation. A refusal before any consumer effect, after preparation created store artifacts or cache objects, reports `transaction: not_started` with `changed: true` and lists the retained effects in `data.retained_preparation`. Examples are `plan.stale` found under the writer lock, a collision, or withheld readiness consent (`confirmation.required` or `confirmation.declined`) after `install`, `remove`, `update`, `apply`, `ensure` or `doctor --migrate` prepared new payloads. No declaration, lock, link, registration, policy or project byte changed, no journal is pending and nothing needs recovery. A refusal after consumer effects keeps its `committed`, `rolled_back` or `partial` status. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
 
 Exactly one JSON document is guaranteed for errors MASK handles after Python starts, including parser errors, ordinary exceptions, timeout and caught interruption. SIGKILL, interpreter startup failure, disk-full stdout, a terminated host or power loss can prevent any response; recovery is on disk. Do not promise impossible output guarantees.
 
@@ -709,7 +709,12 @@ Preparation runs outside the consumer writer lock. After reacquiring the lock,
 MASK compares exact control/policy/state bytes, generations and physical/worktree
 identities before activation. Plan hashes describe consumer intent and remain
 stable across artifact materialization. Plans/checks/previews do not fetch or
-materialize. Warm artifact validation does not consult source Git; worktree Git
+materialize. A plan whose store artifact is still absent examines the exact locked
+payload in the approved tap cache instead, so a cold preview discloses and binds
+the native role writes and setup identities that the applying run plans after
+materializing it (MASK-0109). When the cache lacks the locked commit, that content
+stays unexamined; a guarded run that must first acquire it refuses `plan.stale`
+if the acquired content adds roles or setup to the plan. Warm artifact validation does not consult source Git; worktree Git
 observations still establish branch/index preconditions. Each activation rechecks
 its relevant old/new artifacts, with a deduplicated complete preflight.
 
@@ -722,10 +727,11 @@ Personal readiness infers no network authority; `source fetch --locked --user`
 remains the explicit preparation command. No readiness operation resolves a newer
 ref or rewrites its selection/lock. Retained preparation effects survive failures,
 including stale post-preparation inputs and consumer noops. A created artifact or
-acquired object sets `changed: true`; it turns a `not_needed` result into
-`committed` and a refusal before any journal into `partial` (see
-[JSON envelope](#json-envelope)), while a consumer `rolled_back` or `partial`
-status is kept.
+acquired object sets `changed: true` and is listed in `data.retained_preparation`;
+it turns a successful `not_needed` result into `committed`, leaves a refusal
+before any consumer effect `not_started` (MASK-0110; see
+[JSON envelope](#json-envelope)), and keeps a consumer `committed`, `rolled_back`
+or `partial` status.
 
 ### Explicit migration, selected updates and authoring exceptions
 
@@ -815,7 +821,7 @@ and applies the selected consumers' updates end to end:
 3. Consumers that reference a failed tap are `blocked` and left out of the plan. With `--project` or `--user`, a failed tap is a plain refusal with its Git error (exit 5).
 4. Every remaining consumer is resolved from the cache. A moved tag or a branch not proven fast-forward (`lock.ref_rebound`) refuses the whole invocation (4) unless `--allow-ref-rebind`. In a run that did not fetch, `lock.resolution_required` marks the consumer `blocked` with `requires_fetch: true`. Every other resolution error, and `lock.resolution_required` after a fetch, refuses the whole invocation (4) before any plan or journal; the fetch effects stay disclosed and the fetched objects stay in the caches.
 5. `data.consumers[]` rows carry `root`, `scope`, `status` (`updated`, `unchanged`, `blocked` or `skipped`), `changes` (`coordinate`, `before_commit`, `after_commit`, `before_digest`, `after_digest`, `selector`) and `error`, followed by the ordinary public plan. The plan hash also binds which roots were blocked or skipped, but not the fetch effects, so a dry run and a guarded rerun agree; a guarded rerun never fetches.
-6. Apply prepares store artifacts offline, retakes the writer lock and rechecks the consumer snapshot (`plan.stale`, 4, reported `partial` when preparation created artifacts). It then activates one journal with `operation: update` and reports the shared readiness final status.
+6. Apply prepares store artifacts offline, retakes the writer lock and rechecks the consumer snapshot (`plan.stale`, 4, reported `not_started` with `data.retained_preparation` when preparation created artifacts). It then activates one journal with `operation: update` and reports the shared readiness final status.
 7. When any consumer was blocked, the others are applied or no-oped and the command ends `update.incomplete` (4), naming the blocked roots in `details.blocked`; its `transaction` reflects what was applied to the other consumers (`committed` when any changed), and its details add the workflow verdict when declared roles are also incomplete.
 
 **Fetching without deploying.** `source fetch` without a name fetches each approved

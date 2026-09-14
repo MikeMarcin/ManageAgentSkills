@@ -90,6 +90,19 @@ def snapshot(root, destination=None):
     return c.digest(digests)
 
 
+def files_snapshot(files):
+    """``snapshot`` of exact in-memory package bytes: the digest and bounds of the same package once materialized."""
+    digests, total = {}, 0
+    for relative, data in files.items():
+        if any(part == '__pycache__' or Path(part).suffix in ('.pyc', '.pyo') for part in relative.split('/')):
+            continue
+        total += len(data)
+        digests[relative] = c.digest(data)
+        if len(digests) > SNAPSHOT_FILES or total > SNAPSHOT_BYTES:
+            c.fail('workflow.invalid', 'The package exceeds the setup snapshot bounds.', 4)
+    return c.digest(digests)
+
+
 def describe(entry, report, desc, action_id, roles, package_sha256):
     """The frozen identity of one action for one consumer, plus the disclosure a human or automation reviews."""
     action = desc['setup'][action_id]
@@ -121,8 +134,10 @@ def proposals(planned, *, repair=False):
                                  detail=f"consumer inputs are missing or invalid: {', '.join(blocked)}" if blocked else 'package content is not a local directory'))
                 continue
             package_root = Path(report['package']['root'])
-            desc = workflow.descriptor(workflow.PackageView(root=package_root), report['skill'], entry['scope'])
-            package_sha256 = snapshot(package_root)
+            # A plan examines an absent store artifact from its exact locked bytes; the identity is the materialized package's.
+            view = planned.get('package_views', {}).get(str(package_root)) or workflow.PackageView(root=package_root)
+            desc = workflow.descriptor(view, report['skill'], entry['scope'])
+            package_sha256 = snapshot(package_root) if view.files is None else files_snapshot(view.files)
             for action_id, roles in sorted(wanted.items()):
                 row = describe(entry, report, desc, action_id, roles, package_sha256)
                 occupied = [role['path'] for role in report['roles']

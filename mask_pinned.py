@@ -462,22 +462,31 @@ def verify_transition(pending, home, entry=None, *, journaled=True):
 
 
 def merge_preparation(output, *, completed):
-    """Retained preparation effects survive every consumer failure boundary."""
+    """Retained preparation effects survive every consumer failure boundary.
+
+    MASK-owned store and cache effects set ``changed`` and are summarized in ``data.retained_preparation``, apart from the
+    consumer transaction (MASK-0110): a completed consumer no-op becomes ``committed``, a refusal before any consumer
+    effect stays ``not_started`` (no journal, nothing to recover), and ``committed``, ``rolled_back`` or ``partial`` is kept.
+    """
     effects = output.get('data', {}).get('preparation', [])
-    changed = False
+    retained = dict(artifacts=[], directories=[], acquisitions=[])
     network = False
     for observation in effects:
         item = observation['effects']
         network |= item.get('network_attempted', False)
-        changed |= any(row.get('created') or row.get('retained_directories') for row in item.get('artifacts', []))
-        changed |= any(row.get('cache_created') or row.get('acquired') or row.get('retained_objects_possible') for row in item.get('acquisitions', []))
+        for row in item.get('artifacts', []):
+            retained['artifacts'] += [row['path']] if row.get('created') else []
+            retained['directories'] += row.get('retained_directories', [])
+        retained['acquisitions'] += [dict(cache=row.get('path'), commit=row.get('commit')) for row in item.get('acquisitions', [])
+                                     if row.get('cache_created') or row.get('acquired') or row.get('retained_objects_possible')]
     if effects:
         output['data']['network'] = 'locked_fetch' if network else output['data'].get('network', 'none')
-    if changed:
+    if any(retained.values()):
+        output['data']['retained_preparation'] = retained
         output['changed'] = True
         output['would_change'] = True
         if output['transaction'] in ('not_needed', 'not_started'):
-            output['transaction'] = 'committed' if completed else 'partial'
+            output['transaction'] = 'committed' if completed else 'not_started'
 
 
 def validate_live_lock(value, declaration, pending):

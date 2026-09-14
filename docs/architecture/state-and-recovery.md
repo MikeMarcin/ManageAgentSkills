@@ -25,7 +25,7 @@ The root identity is an available-platform consistency check, not a globally sta
 - `MASK_HOME/sources/<alias>-<digest prefix>.git` is one bare Git cache per tap, marked by `mask-source.json`. `tap add` never fetches; `install`, `update`, `source fetch` and `doctor --migrate` acquire into it.
 - `MASK_HOME/store/v1/<payload hex>/` holds `manifest.json` (`schemas/artifact-v1.schema.json`) and `payload/<id>`: content-addressed payloads, verified before reuse and shared by identical content.
 
-Cache and store writes are MASK-owned preparation effects made before a journal exists. They are reported (`preparation`, `retained_directories`) and retained: neither a failed operation nor `recover --rollback` removes them, and nothing prunes them.
+Cache and store writes are MASK-owned preparation effects made before a journal exists. They are reported (`preparation`, `retained_directories` and the `retained_preparation` summary) and retained: neither a failed operation nor `recover --rollback` removes them, and nothing prunes them. They are not a consumer transaction: a command that refuses after preparation but before any consumer effect reports `transaction: not_started`, and nothing needs recovery. A plan whose store artifact is still absent reads the exact locked bytes from the tap cache instead, without fetching or writing.
 
 ## pending.json
 

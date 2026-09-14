@@ -665,8 +665,12 @@ def render_error(output):
     if setup.get('confirmation') and output['dry_run'] and data.get('plan_hash'):
         lines.append(f"  plan hash: {data['plan_hash']}")
     lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
-    if output.get('changed'):
+    if output.get('changed') and output['transaction'] != 'not_started':
         lines.extend(actions(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
+    retained = data.get('retained_preparation')
+    if retained:
+        lines.append(f"  retained preparation: {len(retained['artifacts'])} store artifact(s) and {len(retained['acquisitions'])} cache acquisition(s) "
+                     'kept under MASK_HOME; they are not deployment changes')
     lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
     for step in error.get('remediation', []):
         if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
