@@ -15,11 +15,13 @@ mask ensure --project /absolute/path/to/project --check --json
 ```
 
 `ensure` registers and reconciles an approved project under one writer lock,
-without a caller-supplied plan hash. It reads selected packages from the local
-source and never fetches. Registration alone does not grant readiness approval.
+without a caller-supplied plan hash. It prepares locked payloads from the local
+tap cache. Unless `--offline` is given, it fetches locked commits only from taps
+that the approval names with `--allow-locked-fetch`, or from every locked tap under
+`--repair`. Registration alone does not grant readiness approval.
 `--check` is observational and exits 7 for drift; a busy writer exits 6 and pending
-recovery exits 8. A ready result describes filesystem deployment of unpinned
-local content, not confirmation that an agent has loaded the skills.
+recovery exits 8. A ready result describes filesystem deployment of locked store
+content, not confirmation that an agent has loaded the skills.
 
 A package may declare workflow prerequisites in a passive `mask-workflow.json`
 beside `SKILL.md`: bounded consumer inputs and the native role files each
@@ -99,7 +101,7 @@ a pair. Unlisted input changes still require setup, and malformed declarations
 are rejected. Setup consent continues to fingerprint the complete current package.
 
 Every public entrypoint shares that one prerequisite verdict. `install`, `remove`
-and `update` (shared source or pinned) report `workflow_readiness` and a per-scope
+and `update` report `workflow_readiness` and a per-scope
 `workflow` summary after their link transaction commits; a declared role or input
 that is still unmet makes them exit 4 with `workflow.incomplete` while the links
 stay committed and the phases stay truthful. They never run setup: run
@@ -133,7 +135,7 @@ Unattended runs pass the previewed hash with the named action:
 
 ```sh
 mask ensure --project /absolute/path/to/project --dry-run --json      # review data.plan_hash and data.setup
-mask ensure --project /absolute/path/to/project --expect-plan-hash RETURNED_HASH --allow-setup legacy/implement-rfc:prepare-roles --json
+mask ensure --project /absolute/path/to/project --expect-plan-hash RETURNED_HASH --allow-setup agentskills/implement-rfc:prepare-roles --json
 ```
 
 A changed package, descriptor, consumer input or interpreter after the preview is
@@ -187,7 +189,7 @@ for those policies, adapter removal, and recovery constraints.
 ```sh
 mask inventory --project /absolute/path/to/project --json
 mask inventory --all --include-unmanaged --json
-mask skill where-used legacy/manage-agent-skills --json
+mask skill where-used agentskills/manage-agent-skills --json
 ```
 
 Inventory reports declarations, converged or drifted owned links, collisions and
@@ -196,9 +198,10 @@ following their links or adopting content. Cached selections for unavailable
 consumers are diagnostic, not current observations. These commands do not fetch,
 scan package contents, acquire the writer lock, or change state.
 
-`legacy/ID` identifies a skill in the single configured source; other source
-aliases are not implemented. Both commands support `--limit` (1–1000, default
-100) and `--offset`, returning `total_rows` and `next_offset`. Recorded source
-revisions are historical metadata, not content pins. See the
+`skill where-used` takes a source-qualified `SOURCE/ID` that names an approved
+tap. Both commands support `--limit` (1–1000, default
+100) and `--offset`, returning `total_rows` and `next_offset`. Rows report the tap,
+package path and locked artifact behind each link; a consumer still recorded by
+the live-checkout program reports `migration.required`. See the
 [inventory contract](../architecture/cli-contract.md#legacy-inventory-unreleased-rfc-mask-0011-slice)
 for filters and result semantics.

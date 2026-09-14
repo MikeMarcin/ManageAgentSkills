@@ -28,12 +28,13 @@ while keeping links, caches, virtual environments, and local state excluded.
 The selected output file is always excluded from its own dump.
 
 `mask lock --project PATH --dry-run --json` previews an exact lock for a v2
-selection. Approve and fetch the source explicitly first, then run `mask lock`
+selection. Add the tap and fetch it with `mask source fetch NAME` first, then run `mask lock`
 with the returned `--expect-plan-hash`. `--user` selects the personal declaration.
 Locking uses cached objects only and never changes deployed skills. Existing locks
 retain their resolution; `--refresh --skill SOURCE/ID` updates selected bindings.
-Ref rewrites require explicit `--allow-ref-rebind`. New v2 consumers can register/apply those artifacts; existing legacy consumers
-require an explicit migration. Missing or stale locks block readiness. See the
+Ref rewrites require explicit `--allow-ref-rebind`. New consumers can register/apply those artifacts; a registered
+consumer changes its lock through `mask update` (`mask lock` refuses `lock.active`), and a consumer left by the
+live-checkout program converts with `mask doctor --migrate`. Missing or stale locks block readiness. See the
 [selection/lock contract](../architecture/cli-contract.md#cached-selection-locks)
 for canonical defaults, exact digests and the machine-local file-source limitation.
 
@@ -45,13 +46,15 @@ for canonical defaults, exact digests and the machine-local file-source limitati
 
 The September 2026 RFC pack is imported, with workspace readiness, integration,
 recovery and legacy inventory slices implemented. Native Windows
-readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The source
-catalog supports explicit migration, taps, fetch, package validation, curated
+readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The tap
+catalog supports fetch, package validation, curated
 copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
-new v2 consumers can deploy isolated artifacts through the recoverable engine.
+consumers deploy isolated store artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. Explicit migration, selected pinned update, scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
+remains pending. [RFC-MASK-0020](../rfcs/RFC-MASK-0020-tap-only-deployment.md) retires the live-checkout mode:
+`mask update` fetches taps and `mask doctor --migrate` converts live-checkout machines; its closeout records what
+is qualified. Scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.
 

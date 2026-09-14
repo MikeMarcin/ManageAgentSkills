@@ -164,7 +164,7 @@ def make_parser():
             parent = sub
         description, examples = present.COMMAND_HELP.get(command, (None, None))
         parser = parent.add_parser(parts[-1], add_help=False, allow_abbrev=False,
-                                   description=textwrap.fill(description, width=78) if description else None,
+                                   description=textwrap.fill(description, width=78, break_on_hyphens=False) if description else None,
                                    epilog='Examples:\n  ' + examples.replace('\n', '\n  ') if examples else None,
                                    formatter_class=argparse.RawDescriptionHelpFormatter)
         for name, shape in COMMON + arguments:
@@ -479,8 +479,10 @@ def project_dispatch(args, output, home):
         return
     if apply and record is None:
         core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
-    # set, require and unrequire only ever edited v1 string selections, which are retired.
-    core.fail('selection.command_unsupported', 'Edit v2 selection intent explicitly; legacy string mutation commands do not apply.', 4)
+    # set, require and unrequire only ever edited v1 string selections, which are retired; install and remove edit v2 declarations.
+    # The consumer guard (mask_resolve.guard_command) normally refuses first with this same refusal.
+    import mask_resolve
+    mask_resolve.refuse_selection_setter(args)
 
 
 def local_dispatch(args, output, leaves):

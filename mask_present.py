@@ -184,9 +184,9 @@ def render_where_used(data, output):
 
 def render_catalog(data, output):
     skills = data.get('skills', [])
-    lines = [f"{output['command'].replace('.', ' ')}: {len(skills)} skill(s) in the source catalog"]
+    lines = [f"{output['command'].replace('.', ' ')}: {len(skills)} skill(s) in the fetched taps"]
     if data.get('resolution_required'):
-        lines.append(f"  unresolved sources: {clean(data.get('unresolved_sources'))}; run 'mask source fetch' first")
+        lines.append(f"  taps not fetched yet: {clean(data.get('unresolved_sources'))}; run 'mask source fetch' first")
     if skills:
         rows = [dict(id=item.get('id') or item.get('name'), valid='ok' if item.get('valid', True) else 'invalid',
                      source=item.get('source') or item.get('scope') or '-', description=item.get('description')) for item in skills]
@@ -195,7 +195,7 @@ def render_catalog(data, output):
             for issue in item.get('issues', []) or []:
                 lines.append(f"  {clean(item.get('id'))}: {clean(issue.get('message'))}")
     elif not data.get('resolution_required'):
-        lines.append('  the source has no skills yet')
+        lines.append('  no skills found in the approved taps')
     return lines
 
 
@@ -425,6 +425,8 @@ def render_config(data, output):
         lines.append(f"  source {clean(name)}: {clean(entry.get('repository'))}")
     lines.extend(fields(config, [('default targets', 'default_targets'), ('git timeout (s)', 'git_timeout_seconds')]))
     lines.extend(fields(data, [('machine state', 'home'), ('program', 'program_root')]))
+    if data.get('migration_required'):
+        lines.append("  migration required: preview the conversion with 'mask doctor --migrate --dry-run'")
     return lines
 
 
@@ -435,9 +437,9 @@ def render_sources(data, output):
         for name, entry in sources.items():
             lines.append(f"  {clean(name)}: {clean(entry.get('repository'))} @ {clean(entry.get('ref', 'default'))}")
         if not sources:
-            lines.append('  no named sources configured')
+            lines.append("  no taps approved; add one with 'mask tap add NAME URL'")
     lines.extend(fields(data, [('source', 'source'), ('repository', 'repository'), ('ref', 'ref'), ('line endings', 'line_endings'), ('commit', 'commit'), ('cached revision', 'cached_revision'),
-                               ('resolution required', 'resolution_required'), ('migration required', 'migration_required'), ('network', 'network'),
+                               ('resolution required', 'resolution_required'), ('network', 'network'),
                                ('cache retained', 'cache_retained'), ('phase', 'phase'), ('created commit', 'created_commit'), ('created ref', 'created_ref'), ('pushed', 'pushed')]))
     if 'skills' in data and isinstance(data['skills'], list):
         lines.extend(render_catalog(data, output)[1:])
@@ -446,7 +448,7 @@ def render_sources(data, output):
 
 def render_update(data, output):
     lines = [headline(output, output['command'].replace('.', ' '))]
-    lines.extend(fields(data, [('source before', 'source_before'), ('source after', 'source_after'), ('program before', 'program_before'), ('program after', 'program_after'),
+    lines.extend(fields(data, [('program before', 'program_before'), ('program after', 'program_after'),
                                ('remote', 'remote_freshness'), ('fetch required', 'requires_fetch'), ('next invocation required', 'next_invocation_required'), ('network', 'network')]))
     if isinstance(data.get('scope'), str):
         lines.append(f"  scope: {clean(data['scope'])}")
@@ -556,11 +558,7 @@ def render_list(data, output):
     if not data.get('declared'):
         lines.append("  no skills are selected here; add one with 'mask install ID'")
         return lines
-    source = data.get('source') or {}
-    if source.get('mode') == 'legacy':
-        lines.append(f"  source: {clean(source.get('alias'))} {clean(source.get('root'))} (live checkout, not version-pinned)")
-    else:
-        lines.append(f"  sources: {clean(source.get('sources'))} (pinned)")
+    lines.append(f"  sources: {clean((data.get('source') or {}).get('sources'))} (pinned)")
     if not data.get('registered'):
         lines.append("  not registered: nothing is deployed; 'mask install ID' or 'mask ensure' deploys the selection")
     agents = data.get('agents', [])
@@ -599,9 +597,9 @@ RENDERERS = {
     'integration.approve': render_integration, 'integration.revoke': render_integration, 'integration.inspect': render_integration,
     'integration.enable': render_integration, 'integration.disable': render_integration, 'launch': render_launch,
     'workspace.forget': render_forget, 'link.adopt': summary('link adopt', [('root', 'root'), ('scope', 'scope'), ('path', 'path'), ('link', 'link_text')]),
-    'source.status': render_update, 'source.fetch': render_update, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
-    'source.publish': render_sources, 'source.dev-link': render_manifest, 'source.migrate': render_sources, 'tap.add': render_sources, 'tap.remove': render_sources,
-    'lock': render_lock, 'update': render_update, 'migrate': render_manifest,
+    'source.fetch': render_update, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
+    'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources,
+    'lock': render_lock, 'update': render_update,
     'self.status': render_self_status, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
     'self.update': render_update,
 }
@@ -739,12 +737,12 @@ def repair_lines(data, output):
 
 
 EVERYDAY = [
-    ('skill list', 'Browse available skills'),
-    ('install ID...', 'Add skills to this project and create their links'),
+    ('skill list', 'Browse the skills in your fetched taps'),
+    ('install ID...', 'Add skills to this project and link their pinned payloads'),
     ('remove ID...', 'Remove selections and their managed links'),
     ('list', 'Show this project\'s selected skills and link status'),
     ('ensure', 'Reconcile this project; offer required setup'),
-    ('update', 'Update the shared source and ALL its registered consumers'),
+    ('update', 'Fetch taps and update ALL registered projects and personal skills'),
     ('doctor --check', 'Check health without changing files'),
     ('self update', 'Update the MASK program itself'),
 ]
@@ -752,10 +750,11 @@ EVERYDAY = [
 
 def compact_help(version, groups):
     lines = [f'mask {version} - Manage Agent Skills', 'usage: mask COMMAND [OPTIONS]',
-             'Link shared skills into Claude Code and Codex projects.', '',
-             'Start here:', '  mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a skill source once',
+             'Deploy pinned skills from approved Git taps into Claude Code and Codex.', '',
+             'Start here:', '  mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a tap; sets up this machine',
+             '  mask source fetch                       # fetch approved taps so you can browse them',
              '  mask skill list                         # find a skill ID',
-             '  mask install implement-rfc              # add it to the current project',
+             '  mask install implement-rfc              # pin it and link it into the current project',
              '  mask ensure                             # finish any required setup',
              '  mask ensure --all --repair              # fix all registered scopes; back up replaced roles', '', 'Everyday commands:']
     pad = max(len(usage) for usage, _ in EVERYDAY)
@@ -763,13 +762,14 @@ def compact_help(version, groups):
     lines += ['', 'Choose where:',
               '  install / remove / list / ensure use the current project by default.',
               '  Add --project DIR for another project or --user for personal skills.',
-              '  Bare update changes the shared source for every registered consumer.',
-              '  update --project DIR / --user selects independently pinned skills.', '',
+              '  Bare update fetches each referenced tap once and updates every registered consumer.',
+              '  update --project DIR, --user or --skill SOURCE/ID narrows what it updates.', '',
               'Preview and diagnose:',
-              '  mask ensure --dry-run          Preview this project without running setup',
-              '  mask doctor --all --check      Check all registered scopes',
-              '  mask inventory --all           List skills across registered scopes',
-              '  mask update --help             Understand update scope before fetching', '',
+              '  mask ensure --dry-run            Preview this project without running setup',
+              '  mask doctor --all --check        Check all registered scopes',
+              '  mask inventory --all             List skills across registered scopes',
+              '  mask update --help               Understand update scope before fetching',
+              '  mask doctor --migrate --dry-run  Preview converting a live-checkout machine to taps', '',
               'Options:', '  --dry-run   Preview changes without applying or fetching (mutating commands)',
               '  --yes       Accept ordinary confirmation; never authorizes package setup',
               '  --json      Emit structured output for scripts; never prompt',
@@ -783,42 +783,37 @@ def compact_help(version, groups):
 
 # Parser-owned help uses these descriptions without changing the command grammar.
 COMMAND_HELP = {
-    'init': ('Create an empty machine tap catalog. mask tap add creates it automatically when it is missing.', 'mask init\nmask init --target codex --git-timeout 60'),
-    'install': ('Add skills and deploy their links. Uses the current project unless --project or --user is supplied. Other selections are kept.', 'mask install implement-rfc\nmask install wizard --user\nmask install wizard --project /path/to/project --dry-run'),
+    'init': ('Optionally create an empty machine configuration (a tap catalog) and state. mask tap add creates both when they are missing, so one tap add bootstraps a machine.', 'mask init\nmask init --target codex --git-timeout 60'),
+    'install': ('Add skills and link them. Uses the current project unless --project or --user is supplied. Other selections are kept. A bare ID is looked up in every approved tap; name SOURCE/ID when more than one tap offers it. A tap that is not fetched yet is fetched on demand, never with --offline or --dry-run. The declaration, its lock of exact commits, the registration and links to the payloads in the MASK store are written in one recoverable transaction.', 'mask install implement-rfc\nmask install wizard --user\nmask install agentskills/wizard --project /path/to/project --dry-run'),
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
-    'update': ('With no scope options, fetch and update the shared source for ALL registered consumers that use it, regardless of your current directory. With --project, --user or --all, update independently pinned selections. A shared source cannot be updated for just one project. This command never runs package setup.', 'mask update --dry-run              # preview cached shared-source changes\nmask update                        # fetch and update shared consumers\nmask update --project .            # update this pinned project\nmask update --user                 # update personal pinned selections\nmask update --project . --skill ID # update one pinned selection\n\nIf required setup is missing after update, run ensure for the named consumer.\nUse mask self update to update the MASK program.'),
-    'doctor': ('Inspect health, missing files and drift without changing files. --check returns exit 7 when problems are found. On a machine or consumer that still uses a live checkout, doctor reports what migration to taps would convert; --migrate converts it through one recoverable transaction.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH'),
+    'update': ('Fetch approved taps and update pinned skills. With no scope options, update ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with update.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask update --dry-run              # preview from cached taps; never fetches\nmask update                        # fetch taps; update every registered consumer\nmask update --project .            # update only this project\nmask update --user                 # update only your personal skills\nmask update --skill agentskills/implement-rfc  # update one selection wherever declared\n\nTo review fresh content before applying it, run mask source fetch, then\nmask update --dry-run, then mask update --expect-plan-hash HASH.\nIf required setup is missing after update, run ensure for the named consumer.\nUse mask self update to update the MASK program.'),
+    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found, including while migration to taps is required. On a machine whose configuration predates taps, only capabilities, config show, doctor, recover and self commands run: doctor reports what migration would convert, and doctor --migrate converts the machine and its registered consumers in one recoverable transaction (--alias NAME names the new tap). On a tap machine, doctor --migrate --project PATH --alias NAME (or --user --alias NAME) converts one leftover v1 declaration to use the approved tap NAME.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH\nmask doctor --migrate --project /path/to/project --alias agentskills --dry-run'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
     'apply': ('Reconcile managed links for the selected registered scopes. Does not run package setup.', 'mask apply --project . --dry-run\nmask apply --project .'),
     'recover': ('Inspect or finish an interrupted MASK deployment transaction.', 'mask recover --inspect\nmask recover --complete\nmask recover --rollback'),
-    'skill.list': ('List the skills available from your configured source.', 'mask skill list'),
-    'skill.show': ('Describe an available skill, optionally including its instructions.', 'mask skill show implement-rfc\nmask skill show implement-rfc --content'),
+    'skill.list': ('List the skills in the fetched caches of your approved taps. A tap that is not fetched yet is named instead; run mask source fetch first.', 'mask skill list'),
+    'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask skill show implement-rfc\nmask skill show implement-rfc --content'),
     'self.install': ('Create a MASK launcher in an existing bin directory.', 'mask self install --bin-dir /path/to/bin'),
     'self.update': ('Update the MASK program checkout using its configured Git remote.', 'mask self update --dry-run\nmask self update'),
     'self.status': ('Show the MASK program, interpreter and installed launchers.', 'mask self status'),
     'project.init': ('Create a project skill declaration without installing skills. For the everyday install task, use mask install ID.', 'mask project init --project .'),
     'project.show': ('Show a project\'s declared skill selections and targets.', 'mask project show --project .'),
-    'project.set': ('Replace the project\'s entire skill selection. Use install or project require to add skills without removing others.', 'mask project set --skill wizard --skill implement-rfc --dry-run'),
-    'project.require': ('Add skills to the project declaration. Use --apply to deploy the selection too.', 'mask project require wizard --apply'),
-    'project.unrequire': ('Remove skills from the declaration. Use --apply to reconcile their links too.', 'mask project unrequire wizard --apply'),
     'project.register': ('Register this physical project so MASK can manage its links.', 'mask project register /path/to/project'),
     'project.unregister': ('Stop managing this project. Preserve the declaration and any changed files.', 'mask project unregister /path/to/project --dry-run'),
     'project.list': ('List the physical projects registered on this machine.', 'mask project list'),
     'skill.where-used': ('Find registered consumers that select a skill.', 'mask skill where-used implement-rfc'),
-    'skill.validate': ('Validate passive skill package content without running package code.', 'mask skill validate implement-rfc\nmask skill validate --all'),
+    'skill.validate': ('Validate passive skill package content from fetched taps without running package code.', 'mask skill validate implement-rfc\nmask skill validate --all'),
     'integration.approve': ('Grant persistent automatic-readiness authority to an explicitly selected project or boundary.', 'mask integration approve --project /path/to/project --dry-run'),
     'integration.inspect': ('Inspect project readiness authority and installed integrations.', 'mask integration inspect --project .'),
-    'source.status': ('Show the configured shared source checkout and its Git state.', 'mask source status'),
-    'source.list': ('List configured source aliases.', 'mask source list'),
-    'source.show': ('Show one configured source and its available packages.', 'mask source show NAME'),
-    'source.fetch': ('Fetch source content without activating updates in consumers.', 'mask source fetch'),
+    'source.list': ('List approved taps.', 'mask source list'),
+    'source.show': ('Show one approved tap: its binding, line-ending policy and cached revision.', 'mask source show NAME'),
+    'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run update to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
-    'migrate': ('Preview or perform an explicit conversion from shared live selections to independent version pins.', 'mask migrate --to-pinned --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
-    'config.show': ('Show local MASK configuration.', None),
+    'config.show': ('Show the machine configuration and its approved taps, and whether the machine still needs migration to taps.', None),
     'config.set': ('Change local default agent targets or Git timeout.', None),
     'compatibility.override': ('Record an explicit exception to advertised compatibility, with a reason.', None),
     'compatibility.clear': ('Remove a recorded compatibility exception.', None),
@@ -835,30 +830,35 @@ COMMAND_HELP = {
     'skill.provenance': ('Show the recorded origin and adaptations of a skill.', None),
     'skill.record-adaptation': ('Record an explanation for a local skill adaptation.', None),
     'source.dev-link': ('Switch a pinned skill to a local authoring checkout, or return it to pinned deployment.', None),
-    'source.inspect': ('Inspect a prospective Git source without selecting it for deployment.', None),
-    'source.migrate': ('Register the existing shared source under a source alias.', None),
+    'source.inspect': ('Inspect an approved tap, named by alias or repository URL, at a ref or path and list its packages without selecting them for deployment.', None),
     'source.publish': ('Inspect selected source changes; commit or push only when explicitly requested by the corresponding flags.', None),
-    'tap.add': ('Register a named Git source for skill discovery. A tap keeps exact bytes: MASK never converts line endings '
-                'of its packages unless --autocrlf opts this tap in to Git core.autocrlf=true conversion at registration.', None),
-    'tap.remove': ('Remove a named source registration.', None),
+    'tap.add': ('Approve a Git repository as a named tap. Only the catalog is written and nothing is fetched; install, update or source fetch '
+                'later fetches the tap into a MASK-owned cache. On a machine without configuration this also creates the machine configuration '
+                'and state. --checkout binds an authoring checkout whose origin matches the tap; source publish, source dev-link and skill import '
+                'use it, install, update, list and ensure never read it, and it is never a link target. A tap keeps exact bytes: MASK never converts line endings '
+                'of its packages unless --autocrlf opts this tap in to Git core.autocrlf=true conversion at registration.',
+                'mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git\n'
+                'mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git --checkout /path/to/AgentSkills'),
+    'tap.remove': ('Remove an approved tap from the catalog. It refuses while a consumer still uses the tap; the cache is retained.', None),
     'user.init': ('Create the personal skill declaration without deploying skills.', None),
     'user.show': ('Show your personal skill declaration.', None),
-    'user.set': ('Replace your entire personal skill selection. Use install --user to add skills without removing others.', None),
-    'user.require': ('Add skills to your personal declaration; --apply also deploys them.', None),
-    'user.unrequire': ('Remove skills from your personal declaration; --apply also reconciles links.', None),
     'user.register': ('Register the personal home in which MASK will manage skill links.', None),
     'user.unregister': ('Stop managing personal links, preserving the declaration and changed files.', None),
     'user.set-agents': ('Choose which agents receive one pinned personal skill.', None),
     'user.set-targets': ('Replace personal agent targets, or restore inherited defaults.', None),
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
+# Owner decision Q4 (RFC-MASK-0020): only install and remove edit a v2 declaration; set, require and unrequire refuse.
+COMMAND_HELP.update({f'{scope}.{action}': (
+    'Does not edit v2 declarations: it refuses with selection.command_unsupported. '
+    f'Add skills with mask install ID{flag} and remove them with mask remove ID{flag}; other selections are kept.',
+    f'mask install wizard{flag}\nmask remove wizard{flag}') for scope, flag in (('project', ''), ('user', ' --user')) for action in ('set', 'require', 'unrequire')})
 
 OPTION_HELP = {
     'json': 'Emit a structured result for scripts; never prompt',
     'debug': 'Include diagnostic details', 'help': 'Show this help', 'version': 'Show MASK version',
     'home': 'MASK state directory (not the project or personal home)',
-    'source': 'Local AgentSkills checkout directory', 'project': 'Select a project directory',
-    'remote': 'Git remote to use for source updates', 'branch': 'Git branch to use for source updates',
+    'project': 'Select a project directory',
     'user': 'Select your personal skills instead of a project', 'all': 'Select all registered scopes',
     'ids': 'Skill IDs to add or remove', 'id': 'Skill ID',
     'dry-run': 'Preview local/cached changes without applying, fetching or running setup',
@@ -874,11 +874,11 @@ OPTION_HELP = {
     'content': 'Include SKILL.md content', 'inspect': 'Report the pending transaction without changing it',
     'complete': 'Complete the pending transaction', 'rollback': 'Roll back the pending transaction',
     'bin-dir': 'Existing directory in which to create the launcher',
-    'allow-ref-rebind': 'Explicitly allow a locked Git reference to resolve to a different commit',
+    'allow-ref-rebind': 'Allow a moved tag or a branch that is not a fast-forward to replace a locked commit',
     'apply': 'Also deploy the resulting selection', 'clear': 'Explicitly select no skills',
     'target': 'Agent target; repeat for multiple targets', 'targets': 'Agent targets to select',
     'agents': 'Agents to select for this skill', 'inherit': 'Use the configured default selection',
-    'path': 'Filesystem path', 'url': 'Git repository URL', 'name': 'Source alias',
+    'path': 'Filesystem path', 'url': 'Git repository URL', 'name': 'Tap name',
     'ref': 'Git branch, tag or commit', 'into': 'Destination skill ID',
     'mode': 'Import mode', 'note': 'Explanation to record with the adaptation',
     'scope': 'Filter by project or personal scope', 'git-timeout': 'Git command timeout in seconds',
@@ -891,13 +891,15 @@ OPTION_HELP = {
     'git': 'Select Git hook integration', 'host_args': 'Arguments passed to the selected agent after --',
     'expect-identity': 'Require the recorded workspace identity before forgetting it',
     'expect-source': 'Require this exact source when adopting the link',
-    'locked': 'Fetch sources needed by locked selections',
+    'locked': "Prepare only the exact commits and store payloads the selected consumer's lock names",
     'paths': 'Source paths to include; repeatable', 'commit': 'Explicitly commit the selected source changes',
     'push': 'Explicitly push the source changes', 'message': 'Commit message',
     'authoring-root': 'Local checkout to use while editing this skill',
-    'to-pinned': 'Select independent pinned deployment', 'alias': 'Tap alias for the migrated live checkout (doctor --migrate)',
+    'to-pinned': 'Return the skill from its authoring checkout to its pinned store payload',
+    'alias': 'Tap name: the new tap for a migrated live checkout, or the approved tap for one leftover v1 declaration (doctor --migrate)',
     'migrate': 'Convert a live-checkout machine or consumer to taps through one recoverable transaction',
-    'packages': 'Package directory inside the source', 'checkout': 'Local source checkout',
+    'packages': 'Package directory inside the tap repository (default: skills)',
+    'checkout': 'Authoring checkout for source publish and source dev-link; never a link target',
     'autocrlf': 'Opt this tap in to Git core.autocrlf=true line-ending conversion (default: exact bytes)',
     'refresh': 'Refresh existing version resolutions', 'reason': 'Explanation for this compatibility override',
     'platform': 'Override the advertised platform restriction', 'architecture': 'Override the advertised architecture restriction',

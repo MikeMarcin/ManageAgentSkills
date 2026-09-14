@@ -435,6 +435,13 @@ def dispatch(args, output, home):
 SELECTION_SETTERS = {'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets'}
 
 
+def refuse_selection_setter(args):
+    """Only install and remove edit a v2 declaration; set, require and unrequire refuse (RFC-MASK-0020 owner decision Q4)."""
+    scope = ' --user' if args.command.startswith('user.') else ' --project PATH' if getattr(args, 'project', None) else ''
+    c.fail('selection.command_unsupported', f"mask {args.command.replace('.', ' ')} does not edit v2 declarations; "
+           f"add skills with 'mask install ID{scope}' and remove them with 'mask remove ID{scope}'.", 4)
+
+
 def guard_command(args, home):
     """Central consumer guard before side effects: a v1 declaration needs migration, a v2 declaration a matching lock.
 
@@ -472,4 +479,4 @@ def guard_command(args, home):
         if version == 2:
             lock(read_model(lock_path(root, scope, home), 'lock')[0], selection(value))
             if command in SELECTION_SETTERS:
-                c.fail('selection.command_unsupported', 'Legacy consumer mutation requires an explicit pinned-aware operation.', 4)
+                refuse_selection_setter(args)

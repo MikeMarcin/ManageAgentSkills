@@ -45,6 +45,15 @@ class RendererRegistry(unittest.TestCase):
                 self.assertTrue(parser.description)
                 self.assertEqual([action.dest for action in parser._actions if not action.help], [])
 
+    def test_selection_setter_help_points_to_install_and_remove(self):
+        parser, leaves = mask.make_parser()
+        for scope, flag in (('project', ''), ('user', ' --user')):
+            for action in ('set', 'require', 'unrequire'):
+                with self.subTest(command=f'{scope} {action}'):
+                    text = ' '.join(mask.help_text(parser, leaves, [scope, action]).split())
+                    for phrase in ('selection.command_unsupported', f'mask install ID{flag}', f'mask remove ID{flag}'):
+                        self.assertIn(phrase, text)
+
     def test_renderers_tolerate_minimal_results_and_never_emit_json(self):
         for command in mask.COMMANDS:
             with self.subTest(command=command):
@@ -74,8 +83,9 @@ class HumanTerminal(PublicFixture):
     def test_task_help_explains_scope_options_and_examples(self):
         for command, expected in (
             ('ensure', ('Examples:', '--allow-setup', 'SOURCE/ID:ACTION', 'Normal ensure', 'mask ensure --user', 'mask ensure --all --repair')),
-            ('update', ('Examples:', 'ALL registered consumers', 'independently pinned', 'mask self update')),
-            ('install', ('Examples:', 'Other selections are kept', 'mask install wizard --user')),
+            ('update', ('Examples:', 'ALL registered consumers', 'fetched once', 'update.incomplete', '--allow-ref-rebind', 'mask self update')),
+            ('install', ('Examples:', 'Other selections are kept', 'every approved tap', 'never with --offline', 'mask install wizard --user')),
+            ('doctor', ('Examples:', 'doctor --migrate', '--project PATH --alias NAME', 'mask doctor --migrate --dry-run')),
         ):
             with self.subTest(command=command):
                 run = self.human(command, '--help')
@@ -86,8 +96,28 @@ class HumanTerminal(PublicFixture):
                 self.assertEqual(machine['data']['help'], run.stdout)
         root = self.human('--help').stdout
         self.assertIn('Start here:', root)
-        self.assertIn('Bare update changes the shared source', root)
+        self.assertIn('Bare update fetches each referenced tap once', root)
         self.assertIn('mask update --help', root)
+        self.assertIn('mask doctor --migrate --dry-run', root)
+
+    def test_v2_selection_setters_refuse_and_point_to_install_and_remove(self):
+        # Owner decision Q4 (RFC-MASK-0020, MASK-0103): only install and remove edit a v2 declaration.
+        shown = self.human('project', 'require', '--help')
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        for phrase in ('selection.command_unsupported', 'mask install ID', 'mask remove ID'):
+            self.assertIn(phrase, ' '.join(shown.stdout.split()))
+        self.assertTrue(self.machine('install', 'alpha')['ok'])
+        self.assertTrue(self.machine('install', 'beta', '--user')['ok'])
+        controls = [self.project / '.mask.json', self.project / '.mask.lock.json', self.home / 'user.json', self.home / 'state.json']
+        before = [path.read_bytes() for path in controls]
+        for args, scope in ((('project', 'require', 'beta'), ''), (('project', 'set', '--clear', '--project', self.project), ' --project PATH'),
+                            (('user', 'unrequire', 'beta'), ' --user')):
+            with self.subTest(args=args):
+                run = self.human(*args)
+                self.assertEqual((run.returncode, run.stdout), (4, ''), run.stderr)
+                for phrase in ('code: selection.command_unsupported', f"'mask install ID{scope}'", f"'mask remove ID{scope}'"):
+                    self.assertIn(phrase, run.stderr)
+        self.assertEqual([path.read_bytes() for path in controls], before)
 
     def test_no_operand_shows_everyday_help_and_exits_zero(self):
         run = self.human()

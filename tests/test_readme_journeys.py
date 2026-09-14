@@ -1,13 +1,29 @@
-"""README recipes replayed as written (RFC-MASK-0018 AC07/AC08, MASK-0091; case C21).
+"""README recipes replayed verbatim through the public CLI (RFC-MASK-0020 AC06; MASK-0103; case D02).
 
-Each command below is the README's everyday command, run through the launcher that
-``self install`` wrote or through the plain entrypoint, with no ``--json``, no
-plan hash and no preparation beyond the one-time source selection. Prompts are
-exercised on a POSIX pseudoterminal, which is the macOS lane's terminal boundary;
-it is not native Windows qualification.
+``ReadmeText`` pins the replayed strings to README.md: it fails when a fenced command block or an Everyday command
+changes and this file does not follow. ``ReadmeRecipes`` runs exactly those strings on a fresh machine, with no
+``--json``, no plan hash and no preparation. ``shell`` splits each line with POSIX shell quoting and makes only these
+substitutions:
+
+- ``python3`` is this test's interpreter.
+- The ManageAgentSkills GitHub URL is a local bare remote holding this working tree's runtime, so
+  ``ManageAgentSkills/mask.py`` is the entrypoint of the disposable clone the README's ``git clone`` makes. Every
+  later command runs that clone, and ``mask self update`` updates it, never this repository's checkout.
+- The AgentSkills GitHub URL is the fixture's local bare tap upstream.
+- ``$HOME`` is the fixture's personal home, and ``mkdir -p`` is ``Path.mkdir`` (native Windows has no such executable).
+- ``mask`` and ``"$HOME/.local/bin/mask"`` are the launcher ``self install`` wrote (``mask.cmd`` on Windows).
+- The Everyday placeholder ``ID`` is a fixture skill.
+
+Prompts are exercised on a POSIX pseudoterminal, which is the macOS lane's terminal boundary; it is not native
+Windows qualification.
 """
+import json
 import os
+from pathlib import Path
+import re
 import select
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -21,39 +37,108 @@ except ImportError:  # Windows: prompts are exercised through a recorded native 
 
 from tests.public_support import ENTRY, PublicFixture
 from tests.support import TAP
-from tests.test_update_task import TapUpdateFixture
+
+README = ENTRY.parent / 'README.md'
+PROGRAM_URL = 'https://github.com/MikeMarcin/ManageAgentSkills.git'
+TAP_URL = 'https://github.com/MikeMarcin/AgentSkills.git'
+INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
+                'mkdir -p "$HOME/.local/bin"',
+                'python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"',
+                f'"$HOME/.local/bin/mask" tap add agentskills {TAP_URL}')
+IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask ensure')
+MAKE_EVERYTHING_WORK = ('mask ensure --all --repair',)
+EVERYDAY = {
+    'Add a skill here': 'mask install ID',
+    'Add a personal skill': 'mask install ID --user',
+    "Show this project's skills": 'mask list',
+    'Show personal skills': 'mask list --user',
+    'Check or reconcile declared setup': 'mask ensure',
+    'Repair every registered project and personal scope': 'mask ensure --all --repair',
+    'Remove a selection here': 'mask remove ID',
+    'Update every registered project and personal scope': 'mask update',
+    'Update only this project': 'mask update --project .',
+    'Update only personal skills': 'mask update --user',
+    'Update MASK itself': 'mask self update',
+}
+FENCE = re.compile(r'^```[^\n]*\n(.*?)^```$', re.M | re.S)
+
+
+def sections(text):
+    """README text by ``## `` heading; the text before the first heading is keyed ``''``."""
+    parts = re.split(r'^## (.+)$', text, flags=re.M)
+    return dict(zip(['', *parts[1::2]], parts[0::2]))
+
+
+class ReadmeText(unittest.TestCase):
+    def test_replayed_text_is_the_readme_text(self):
+        found = sections(README.read_text(encoding='utf-8'))
+        blocks = {name: [tuple(block.splitlines()) for block in FENCE.findall(body)] for name, body in found.items()}
+        self.assertEqual({name: rows for name, rows in blocks.items() if rows},
+                         {'Install once': [INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
+        table = [[cell.strip() for cell in line.strip('|').split('|')] for line in found['Everyday commands'].splitlines() if line.startswith('|')]
+        self.assertEqual(table, [['Task', 'Command'], ['---', '---'], *([task, f'`{command}`'] for task, command in EVERYDAY.items())])
 
 
 class ReadmeRecipes(PublicFixture):
-    """The README from "Install once" to "Everyday commands" on a fresh machine."""
+    """README "Install once" on a fresh machine, then each later recipe exactly as written."""
 
     def bootstrap(self):
-        """Nothing: README runs ``self install`` before the one-time ``tap add``, which each journey replays itself."""
-
-    def select_source(self):
-        """README "Install once": approve the skills upstream as a tap; the first command that creates machine config."""
-        self.assertFalse((self.home / 'config.json').exists())
-        return self.mask('tap', 'add', TAP, self.upstream)
+        """Nothing: setUp replays "Install once", whose ``tap add`` is the first command that creates machine config."""
 
     def setUp(self):
         super().setUp()
-        self.bin = self.personal / '.local/bin'  # README: mkdir -p "$HOME/.local/bin" precedes self install on a fresh home.
-        self.bin.mkdir(parents=True)
-        installed = self.human('self', 'install', '--bin-dir', self.bin)
-        self.assertEqual(installed.returncode, 0, installed.stderr)
-        self.launcher = self.bin / ('mask.cmd' if os.name == 'nt' else 'mask')
-        self.assertTrue(self.launcher.exists(), installed.stdout)
+        self.program_author, self.program_remote = self.program_repository()
+        self.program = self.base / 'ManageAgentSkills'
+        self.launcher = self.personal / '.local/bin' / ('mask.cmd' if os.name == 'nt' else 'mask')
+        self.assertFalse((self.home / 'config.json').exists())
+        for line in INSTALL_ONCE:
+            run = self.shell(line, cwd=self.base)  # "From the directory that will hold the clone".
+            self.assertEqual(run.returncode, 0, f'{line}\n{run.stdout}{run.stderr}')
+            self.assertFalse(self.parses_as_result_envelope(run.stdout))
+        self.assertIn(str(self.program / 'mask.py'), self.launcher.read_text(encoding='utf-8'))
 
-    def mask(self, *args, cwd=None, stdin=subprocess.DEVNULL):
-        """``mask ...`` exactly as the README shows it, through the installed launcher."""
-        self.assertNotIn('--json', args)
-        return subprocess.run([str(self.launcher), *map(str, args)], capture_output=True, encoding='utf-8',
-                              cwd=str(cwd or self.project), env=self.environment(), stdin=stdin, timeout=60)
+    def program_repository(self):
+        """A local bare ``ManageAgentSkills.git`` holding this working tree's runtime, and the author clone that publishes to it."""
+        author = self.base / 'program author'
+        author.mkdir()
+        for module in ENTRY.parent.glob('mask*.py'):
+            shutil.copyfile(module, author / module.name)
+        shutil.copytree(ENTRY.parent / 'schemas', author / 'schemas')
+        self.git(author, 'init', '-b', 'main')
+        self.git(author, 'config', 'user.name', 'Fixture')
+        self.git(author, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(author, 'add', '.')
+        self.git(author, 'commit', '-q', '-m', 'program')
+        remote = self.base / 'program remote' / 'ManageAgentSkills.git'  # self update requires this repository name.
+        remote.parent.mkdir()
+        self.git(self.base, 'init', '-q', '--bare', '-b', 'main', str(remote))
+        self.git(author, 'push', '-q', str(remote), 'main')
+        return author, remote
 
-    def terminal(self, *args, answer, cwd=None):
+    def argv(self, line, **placeholders):
+        """The README line split as POSIX sh would, with only the substitutions the module docstring names."""
+        command, *words = shlex.split(line)
+        self.assertIn(command, ('git', 'mkdir', 'python3', 'mask', '$HOME/.local/bin/mask'), line)
+        program = {'python3': sys.executable, 'mask': str(self.launcher), '$HOME/.local/bin/mask': str(self.launcher)}.get(command, command)
+        urls = {PROGRAM_URL: str(self.program_remote), TAP_URL: str(self.upstream)}
+        return [program, *(urls.get(word, placeholders.get(word, word)).replace('$HOME', str(self.personal)) for word in words)]
+
+    def shell(self, line, cwd=None, **placeholders):
+        """Run one README line from the project (or ``cwd``) with stdin closed, as a pipeline would."""
+        argv = self.argv(line, **placeholders)
+        self.assertNotIn('--json', argv)
+        cwd = cwd or self.project
+        if argv[:2] == ['mkdir', '-p']:
+            for directory in argv[2:]:
+                (cwd / directory).mkdir(parents=True, exist_ok=True)
+            return subprocess.CompletedProcess(argv, 0, '', '')
+        return subprocess.run(argv, capture_output=True, encoding='utf-8', cwd=str(cwd), env=self.environment(),
+                              stdin=subprocess.DEVNULL, timeout=60)
+
+    def terminal(self, line, *, answer):
         master, slave = pty.openpty()
-        process = subprocess.Popen([str(self.launcher), *map(str, args)], stdin=slave, stdout=slave, stderr=slave,
-                                   cwd=str(cwd or self.project), env=self.environment(), close_fds=True)
+        process = subprocess.Popen(self.argv(line), stdin=slave, stdout=slave, stderr=slave, cwd=str(self.project),
+                                   env=self.environment(), close_fds=True)
         os.close(slave)
         transcript = b''
         answered = False
@@ -86,101 +171,125 @@ class ReadmeRecipes(PublicFixture):
     def links(self, root):
         return sorted(path.relative_to(root).as_posix() for path in root.glob('.*/skills/*') if path.is_symlink())
 
-    def test_install_once_then_in_your_project(self):
-        # README: `mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git`, with the fixture's local bare upstream for the URL.
-        selected = self.select_source()
-        self.assertEqual(selected.returncode, 0, selected.stderr)
-        self.assertFalse(self.parses_as_result_envelope(selected.stdout))
-        self.assertTrue((self.home / 'config.json').is_file())
+    @staticmethod
+    def unlink(link):
+        os.rmdir(link) if os.name == 'nt' else link.unlink()  # A Windows directory symlink is removed as a directory.
 
-        # The package declares consumer inputs this fresh project does not have yet: the links and
-        # static roles are committed, but install cannot report success (MASK-0090); it names them.
-        installed = self.mask('install', 'implement-rfc')
+    @staticmethod
+    def locked(path):
+        return json.loads(path.read_text(encoding='utf-8'))['packages'][0]['commit']
+
+    def test_install_once_then_in_your_project(self):
+        # "Install once" approved the tap without fetching it.
+        self.assertEqual(list(json.loads((self.home / 'config.json').read_text(encoding='utf-8'))['sources']), [TAP])
+        self.assertEqual(list((self.home / 'sources').glob('*.git')), [])
+
+        installed, listed, ensured = map(self.shell, IN_YOUR_PROJECT)
+        # install fetched the tap on demand and linked the pinned store copy. The package declares consumer inputs this
+        # fresh project does not have yet: links and static roles are committed, but install cannot report success
+        # (MASK-0090); it names them.
         self.assertEqual(installed.returncode, 4, installed.stdout + installed.stderr)
         self.assertIn('workflow.incomplete', installed.stderr)
         self.assertIn('.mask/skill-config/implement-rfc/project.json', installed.stderr)
         self.assertIn('deployment changes were saved', installed.stderr)
         self.assertIn('mask ensure', installed.stderr)
         self.assertEqual(installed.stdout, '')
+        self.assertEqual(len(list((self.home / 'sources').glob('*.git'))), 1)
+        self.assertTrue((self.project / '.mask.lock.json').is_file())
         self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])
+        self.assertTrue(Path(os.path.realpath(self.project / '.claude/skills/implement-rfc')).is_relative_to(os.path.realpath(self.home / 'store/v1')))
         self.assertTrue((self.project / '.codex/agents/rfc-integrator.toml').is_file())
         self.assertTrue((self.project / '.claude/agents/rfc-integrator.md').is_file())
 
-        listed = self.mask('list')
         self.assertEqual(listed.returncode, 0, listed.stderr)
         self.assertFalse(self.parses_as_result_envelope(listed.stdout))
         self.assertIn('implement-rfc', listed.stdout)
         self.assertIn('linked', listed.stdout)
 
-        # ensure shares the same verdict: it names the inputs and stops; no package code runs and nothing is overwritten.
-        ensured = self.mask('ensure')
-        self.assertEqual(ensured.returncode, 4, ensured.stdout + ensured.stderr)
+        # ensure and "Make everything work" share the verdict: they name the input and stop; nothing invents it.
+        [repaired] = map(self.shell, MAKE_EVERYTHING_WORK)
+        for run in (ensured, repaired):
+            self.assertEqual(run.returncode, 4, run.stdout + run.stderr)
+            self.assertIn('.mask/skill-config/implement-rfc/project.json', run.stderr)
+            self.assertEqual(run.stdout, '')
         self.assertIn('workflow.incomplete', ensured.stderr)
-        self.assertIn('.mask/skill-config/implement-rfc/project.json', ensured.stderr)
-        self.assertEqual(ensured.stdout, '')
+        self.assertFalse((self.project / '.mask/skill-config/implement-rfc/project.json').exists())
 
     @unittest.skipUnless(pty, 'POSIX pseudoterminal required; native Windows console is recorded separately')
     def test_ensure_asks_once_in_the_terminal_and_completes(self):
-        self.assertEqual(self.select_source().returncode, 0)
-        installed = self.mask('install', 'alpha')
-        self.assertEqual(installed.returncode, 0, installed.stderr)
-        (self.project / '.claude/skills/alpha').unlink()  # Something to reconcile.
-        code, text = self.terminal('ensure', answer=b'y\n')
+        self.assertEqual(self.shell(EVERYDAY['Add a skill here'], ID='alpha').returncode, 0)
+        ensure = EVERYDAY['Check or reconcile declared setup']
+        self.unlink(self.project / '.claude/skills/alpha')  # Something to reconcile.
+        code, text = self.terminal(ensure, answer=b'y\n')
         self.assertEqual(code, 0, text)
         self.assertIn('[y/N]', text)
         self.assertNotIn('sha256:', text)
         self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
         # Declining leaves the explicit incomplete result the README promises.
-        (self.project / '.claude/skills/alpha').unlink()
-        code, text = self.terminal('ensure', answer=b'n\n')
+        self.unlink(self.project / '.claude/skills/alpha')
+        code, text = self.terminal(ensure, answer=b'n\n')
         self.assertEqual(code, 4, text)
         self.assertIn('confirmation.declined', text)
         self.assertEqual(self.links(self.project), ['.agents/skills/alpha'])
         # The same command through a pipe never asks.
-        piped = self.mask('ensure')
+        piped = self.shell(ensure)
         self.assertEqual(piped.returncode, 4, piped.stderr)
         self.assertIn('confirmation.required', piped.stderr)
 
-    def test_personal_scope_and_remove(self):
-        self.assertEqual(self.select_source().returncode, 0)
-        personal = self.mask('install', 'alpha', '--user')
-        self.assertEqual(personal.returncode, 0, personal.stderr)
-        self.assertEqual(self.links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
-        self.assertFalse((self.project / '.mask.json').exists())
+    def test_everyday_commands(self):
+        replayed = set()
 
-        listed = self.mask('list', '--user')
-        self.assertEqual(listed.returncode, 0, listed.stderr)
-        self.assertIn('alpha', listed.stdout)
+        def run(task, **placeholders):
+            replayed.add(task)
+            result = self.shell(EVERYDAY[task], **placeholders)
+            self.assertEqual(result.returncode, 0, f'{EVERYDAY[task]}\n{result.stdout}{result.stderr}')
+            self.assertFalse(self.parses_as_result_envelope(result.stdout))
+            return result
 
-        installed = self.mask('install', 'alpha', 'beta')
-        self.assertEqual(installed.returncode, 0, installed.stderr)
-        removed = self.mask('remove', 'beta')
-        self.assertEqual(removed.returncode, 0, removed.stderr)
-        self.assertIn(f'removed: {TAP}/beta', removed.stdout)
-        self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
-        self.assertEqual(self.links(self.personal), ['.agents/skills/alpha', '.claude/skills/alpha'])
+        def push_upstream(text):
+            path = self.source / 'skills/alpha/SKILL.md'
+            path.write_text(path.read_text(encoding='utf-8') + text + '\n', encoding='utf-8', newline='\n')
+            return self.publish(text)
 
+        alpha = ['.agents/skills/alpha', '.claude/skills/alpha']
+        run('Add a skill here', ID='alpha')
+        run('Add a personal skill', ID='alpha')
+        run('Add a skill here', ID='beta')
+        self.assertEqual(self.links(self.project), sorted(alpha + ['.agents/skills/beta', '.claude/skills/beta']))
+        self.assertEqual(self.links(self.personal), alpha)
+        self.assertIn('beta', run("Show this project's skills").stdout)
+        self.assertIn('alpha', run('Show personal skills').stdout)
+        self.assertIn(f'removed: {TAP}/beta', run('Remove a selection here', ID='beta').stdout)
+        self.assertEqual(self.links(self.project), alpha)
+        run('Check or reconcile declared setup')
 
-class ReadmeUpdate(TapUpdateFixture):
-    """``mask update`` and ``mask update --dry-run`` as the README describes them, on the fixture tap."""
+        for root in (self.project, self.personal):
+            self.unlink(root / '.claude/skills/alpha')
+        run('Repair every registered project and personal scope')
+        self.assertEqual((self.links(self.project), self.links(self.personal)), (alpha, alpha))
 
-    def test_update_previews_locally_and_applies_in_one_command(self):
-        cache, lock = self.cached(), (self.project / '.mask.lock.json').read_bytes()
-        candidate = self.push_upstream()
-        preview = self.human('update', '--dry-run')
-        self.assertEqual(preview.returncode, 0, preview.stderr)
-        self.assertFalse(self.parses_as_result_envelope(preview.stdout))
-        self.assertNotIn('sha256:', preview.stdout)
-        self.assertEqual((self.cached(), (self.project / '.mask.lock.json').read_bytes()), (cache, lock))  # Preview did not fetch.
-        applied = self.human('update')
-        self.assertEqual(applied.returncode, 0, applied.stderr)
-        self.assertFalse(self.parses_as_result_envelope(applied.stdout))
-        self.assertNotIn('sha256:', applied.stdout)
-        self.assertEqual(self.locked(), candidate)
-        again = self.human('update')
-        self.assertEqual(again.returncode, 0, again.stderr)
-        self.assertIn('no change needed', again.stdout)
-        self.assertEqual(self.locked(), candidate)
+        # Each update scope moves only its own lock to the fetched upstream commit.
+        project_lock, user_lock = self.project / '.mask.lock.json', self.home / 'user.lock.json'
+        installed = self.locked(user_lock)
+        first = push_upstream('First upstream change.')
+        run('Update only this project')
+        self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (first, installed))
+        run('Update only personal skills')
+        self.assertEqual(self.locked(user_lock), first)
+        second = push_upstream('Second upstream change.')
+        self.assertIn(f'fetch {TAP}: fetched, configured ref moved', run('Update every registered project and personal scope').stdout)
+        self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
+        self.assertIn('Second upstream change.', (self.personal / '.claude/skills/alpha/SKILL.md').read_text(encoding='utf-8'))
+
+        # "Update MASK itself" fast-forwards the disposable program clone to a published compatible change.
+        with (self.program_author / 'mask.py').open('a', encoding='utf-8') as handle:
+            handle.write('\n# compatible fixture update\n')
+        self.git(self.program_author, 'commit', '-q', '-a', '-m', 'compatible fixture update')
+        self.git(self.program_author, 'push', '-q', str(self.program_remote), 'main')
+        run('Update MASK itself')
+        self.assertEqual(self.git(self.program, 'rev-parse', 'HEAD'), self.git(self.program_author, 'rev-parse', 'HEAD'))
+
+        self.assertEqual(replayed, set(EVERYDAY))
 
 
 if __name__ == '__main__':

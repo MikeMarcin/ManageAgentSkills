@@ -2,26 +2,35 @@
 
 Manage your agent skills in a project or your personal environment.
 
-MASK links skills from one local [AgentSkills](https://github.com/MikeMarcin/AgentSkills) checkout into the directories Claude Code and Codex read. Projects keep their selection in a versioned `.mask.json`; personal selections live in `MASK_HOME/user.json`.
+MASK installs skills from Git repositories you approve as taps, such as [AgentSkills](https://github.com/MikeMarcin/AgentSkills). It fetches each tap into its own cache, pins every selection to an exact commit and links that stored copy into the directories Claude Code and Codex read. Projects keep their selection in versioned `.mask.json` and `.mask.lock.json` files; personal selections live in `MASK_HOME/user.json` and `MASK_HOME/user.lock.json`.
 
 ## Install once
 
-You need Python 3.11+, Git, local ManageAgentSkills and AgentSkills checkouts, and
-existing directory-symlink support. MASK does not change privileges or install
-Python or Git. From the checkouts' parent directory on macOS or Linux:
+You need Python 3.11+, Git, a ManageAgentSkills clone and existing
+directory-symlink support. You do not need an AgentSkills checkout. MASK does not
+change privileges or install Python or Git. From the directory that will hold the
+clone, on macOS or Linux:
 
 ```sh
+git clone https://github.com/MikeMarcin/ManageAgentSkills.git
 mkdir -p "$HOME/.local/bin"
 python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
 "$HOME/.local/bin/mask" tap add agentskills https://github.com/MikeMarcin/AgentSkills.git
 ```
 
-Add that bin directory to PATH, or keep using the printed absolute launcher path.
-`self install` writes only into an existing parent directory. Windows uses the
-same Python entrypoint and a `mask.cmd` launcher; the
+The launcher runs MASK from that clone, so keep the clone where it is. Add the bin
+directory to PATH, or keep using the printed absolute launcher path. `self install`
+writes only into an existing parent directory. `tap add` approves the repository
+and creates the machine configuration without fetching anything; `install`
+fetches the tap when it needs it, using your existing Git authentication. Windows
+uses the same Python entrypoint and a `mask.cmd` launcher; the
 [installation reference](docs/guides/installation.md) gives the native PowerShell
-example. Installing the program and selecting a skill source are separate steps.
-Existing checkouts and Git authentication are reused.
+example.
+
+If MASK on this machine still links skills from a local AgentSkills checkout, other
+commands refuse with `migration.required` until you migrate. Preview the
+conversion with `mask doctor --migrate --dry-run` and follow
+[Migrating from a live checkout](docs/guides/migration-and-pins.md).
 
 ## In your project
 
@@ -31,9 +40,10 @@ mask list
 mask ensure
 ```
 
-`install` adds the skill without removing your other selections, creates the
-declaration and registration when they are missing, and links the skill for every
-selected agent in the same command. Run it from the project or use `--project PATH`.
+`install` adds the skill without removing your other selections, fetches its tap
+as needed, pins the exact commit in `.mask.lock.json`, creates the declaration and
+registration when they are missing, and links the skill for every selected agent
+in the same command. Run it from the project or use `--project PATH`.
 Packages that declare native agent roles have them copied exactly with the links;
 roles you keep checked in are used as they are. When a declared role or consumer
 input is still missing, `install` keeps the links and exits 4 naming it, the same
@@ -83,15 +93,22 @@ persistent startup approval. Restart active agents to load changed roles.
 | Check or reconcile declared setup | `mask ensure` |
 | Repair every registered project and personal scope | `mask ensure --all --repair` |
 | Remove a selection here | `mask remove ID` |
-| Update the shared skill source | `mask update` |
-| Update this pinned project | `mask update --project .` |
-| Update personal pinned skills | `mask update --user` |
+| Update every registered project and personal scope | `mask update` |
+| Update only this project | `mask update --project .` |
+| Update only personal skills | `mask update --user` |
 | Update MASK itself | `mask self update` |
 
-Updates explain the affected scopes before applying. A shared live source affects
-all of its registered consumers; pinned selections update independently. Run
-updates between active tasks: a running agent may cache instructions, and a
-changed file does not prove a host reloaded it.
+`mask update` fetches each tap your selections use once, resolves every registered
+project and your personal scope against the branch or tag each selection follows,
+shows each lock change and applies them together. `--project DIR` or `--user`
+limits it to one scope; `--all` names the default explicitly. A tap that cannot be
+fetched blocks only the scopes that use it: the others still update, and the
+command exits 4 (`update.incomplete`) naming the blocked roots. When a tag moved or
+a branch is no longer a fast-forward of the locked commit, update refuses until you
+review it and pass `--allow-ref-rebind`. `mask source fetch` fetches without
+deploying, and `mask self update` updates only the program clone. Run updates
+between active tasks: a running agent may cache instructions, and a changed file
+does not prove a host reloaded it.
 
 Use `--dry-run` to preview local or cached changes without fetching or applying.
 Use `--json` for structured machine output; without it MASK prints human text and
@@ -106,11 +123,11 @@ to restore a matching lock or review the files. `mask ensure --help` and
 
 ## Reference
 
-- [Installation reference](docs/guides/installation.md): requirements, launcher and Windows PowerShell.
+- [Installation reference](docs/guides/installation.md): requirements, launcher, the first tap and Windows PowerShell.
 - [Declarations and file layout](docs/guides/declarations.md): explicit `project`/`user` commands, plan hashes, what belongs where.
 - [Readiness and integrations](docs/guides/readiness-and-integrations.md): approval, `launch`, Git/host startup adapters, inventory.
-- [Sources and updates](docs/guides/sources-and-updates.md): taps, fetches, package validation, imports, provenance, `self update`.
-- [Migration and pins](docs/guides/migration-and-pins.md): moving legacy consumers to exact pins, per-skill agents, compatibility policy.
+- [Sources and updates](docs/guides/sources-and-updates.md): taps, fetching updates, package validation, imports, provenance, `self update`.
+- [Migrating from a live checkout](docs/guides/migration-and-pins.md): `doctor --migrate`, the old-command table, per-skill agents and local compatibility.
 - [Recovery](docs/guides/recovery.md): interrupted operations, unregistering and removing the program.
 - [Development](docs/guides/development.md), [CLI contract and exit codes](docs/architecture/cli-contract.md), [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and the [issue board](docs/issues/README.md).
 
@@ -118,11 +135,13 @@ These are advanced operations, not prerequisites for adding another skill to a
 working installation.
 
 > [!NOTE]
-> The task commands, human output, in-process confirmation and declarative native
-> roles are unreleased additions; the program version remains `0.2.0`. No daemon,
-> fleet enrollment, provider account or package-manager subscription is required.
-> Declarations are versioned; machine ownership and approvals are local. Native
-> macOS and Windows evidence exists for the everyday commands; see the
+> Tap-only deployment, the task commands, human output, in-process confirmation
+> and declarative native roles are unreleased additions; the program version
+> remains `0.2.0`. No daemon, fleet enrollment, provider account or
+> package-manager subscription is required. Declarations are versioned; machine
+> ownership and approvals are local. Native macOS and Windows evidence exists for
+> the everyday commands as they worked before tap-only deployment, whose native
+> qualification is still open; see the
 > [current acceptance records](docs/development/readiness-acceptance.md) and the
 > [corrective baseline](docs/development/corrective-baseline.md) for exactly which
 > native and host-loading behaviors have been verified. Linux remains best-effort.
