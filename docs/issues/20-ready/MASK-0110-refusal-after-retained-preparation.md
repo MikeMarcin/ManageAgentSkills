@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0110"
 title: "Report a refusal after retained store preparation without claiming a partial consumer transaction"
-status: "Backlog"
+status: "Ready"
 rfcs: []
 depends_on: ["MASK-0100"]
 priority: "P2"

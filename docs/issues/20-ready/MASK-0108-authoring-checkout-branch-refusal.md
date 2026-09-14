@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0108"
 title: "Refuse a wrong-branch authoring checkout with one typed code whether or not it has an origin"
-status: "Backlog"
+status: "Ready"
 rfcs: []
 depends_on: ["MASK-0100"]
 priority: "P2"
