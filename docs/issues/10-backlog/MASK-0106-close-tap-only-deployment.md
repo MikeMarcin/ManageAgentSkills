@@ -16,7 +16,26 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d5` record (MASK-0107 accepted and Done).**
+**Dispatch `d6` checkpoint (milestone `truth` in progress; refreshed before slice dispatch).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d6`, mandate revision `4`. The mandate is unchanged.
+  - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
+- **Binding** for `truth`, computed with `--accepted-milestone` baseline, bootstrap, engine and migration:
+  - definition `sha256:71edb75ce31f56f93508fd3e51215f3258d810d56e932d2d7b8b22d62c5066eb`
+  - obligation `sha256:36e421d5640b89b8d365caf8e3bc9cd2d8fa5c128cc74377a75857339a3d2e60`
+  - prerequisite `sha256:8ab8bfb6f05b93d38cae2665c74bbd1b284a3204f882aa796c764ff11445d497`
+  - The assignment is `d6-assignment.json` in the ignored run directory.
+- **Claim:** MASK-0103 is In Progress at `cf8c725`.
+- **Retired-spelling test:** `tests/test_retired_spellings.py` (integrator-owned). It covers every help page, the presentation tables, public `--help`/`capabilities`, and current Markdown.
+  - Exemptions are the historical records: `docs/rfcs/`, the board's cards under `docs/issues/`, `docs/releases/`, and two named baseline evidence reports under `docs/development/`.
+  - Inside the migration guide, only the table under an "Old commands" heading is exempt.
+- **Slices** (rfc-worker, no model or effort override):
+  - `d6-W1`: help and the Q4 refusal (`mask.py`, `mask_present.py`, help tests).
+  - `d6-W2`: README, guides, README replay.
+  - `d6-W3`: CLI contract, state and recovery, test boundaries.
+  - `d6-R1`: `rfc-reviewer-critical` on MASK-0107 (`6496967..4c0549f`), a third attempt after d5's two HTTP 429 failures.
+- **Next discriminating step:** collect the slices, integrate, run the focused modules and the structure gate, then finish MASK-0103.
+
+**Dispatch `d5` record (historical; MASK-0107 accepted and Done; its next milestone `truth` is d6's).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d5`, mandate revision `3`. Amendment r4 arrived during the dispatch.
   - The mandate is unchanged. No push or publication is authorized.
   - The owner's real machine changes only through attended MASK-0105.
