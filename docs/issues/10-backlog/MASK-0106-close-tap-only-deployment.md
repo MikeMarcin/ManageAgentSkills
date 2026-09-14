@@ -16,7 +16,28 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d3` record (milestone `engine` accepted).**
+**Dispatch `d4` checkpoint (milestone `migration` in progress).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d4`, mandate revision `3`. The mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no added stop conditions. r3 places no restriction on implementing MASK-0107 to MASK-0110.
+- No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
+- **Binding** (computed with `--accepted-milestone baseline/bootstrap/engine`):
+  - definition `sha256:445ea1fc2709589c20b25ad52d356075f62b7cd3f2a22f9772a393e571d964f6`
+  - obligation `sha256:3b1373c09a1afd12769793c33ca42785edfe4f6b256cdcc32135d0439faab981` (MASK-0102 source `sha256:811fc2d6…`)
+  - prerequisite `sha256:c0763bebfa7700e8d261bce15d6adc0a9468c1a026e93b0138175381445dcb14`
+  - The assignment is `d4-assignment.json` in the ignored run directory.
+- **Board:** MASK-0102 claimed at `333c2f7`. Implementation base `333c2f7`; no product change yet.
+- **Plan:** one standard `rfc-worker` owns the coupled MASK-0102 slice (report, mapping, clone acquisition, `doctor.migrate` journal, recovery hooks, v3 straggler path, tests). The integrator adjudicates, runs the integration pass and commissions a critical review of the journal and recovery changes.
+- **Integrator design decisions given to the worker:**
+  - Operation `doctor.migrate`. A retired `migrate` journal and legacy ownership outside `doctor.migrate` stay refused.
+  - Only `doctor.migrate` may restore the legacy link text into the clone, from the validated clone target. This is where AC04 rollback meets the AC02 checkout-link rule.
+  - Rollback never requires an unchanged clone; completion re-snapshots it.
+  - On v2, `--alias` renames the legacy binding unless something references it. An alias bound to another repository refuses `source.alias_conflict`.
+  - The migration gate is unchanged (AC05 literal).
+- **Pending owner decisions:**
+  - Q4 (below, unchanged).
+  - New Q5: the MIGRATION.md blocker remediations (`project unregister --keep-links`, `workspace forget`) are gated on v1/v2 machines by AC05. Exempt them from the gate (amending AC05), or keep the gate and document that a non-migratable consumer must be restored on disk first?
+- **Next discriminating step:** the worker's candidate, then focused modules and the crash matrix.
+
+**Dispatch `d3` record (historical; milestone `engine` accepted; its next milestone `migration` is in progress under d4).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
 - The mandate is still `/implement-rfc RFC-MASK-0020` with no added stop conditions. The coordinator's amendments r2 and r3 answered the three decisions d2 left open; see Owner decisions below.
 - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
