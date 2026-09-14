@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0107"
 title: "Keep exact bytes on taps unless line-ending conversion is opted in at tap registration"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: ["MASK-0100", "MASK-0101"]
 priority: "P1"

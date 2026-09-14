@@ -122,7 +122,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - `legacy_init`, `declare` and `legacy_bootstrap` are gone.
   - `tests/test_pin_migration.py` and `tests/test_git_update.py` are removed. Coverage of the self update checkout journal moved to `tests/test_launcher.py`.
 - **Owner decisions (r2 and r3):**
-  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../20-ready/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
+  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../30-in-progress/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
   2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads with this decision.
   3. The d2 follow-ups are filed as MASK-0108 to MASK-0110, outside this RFC.
 - **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0103 describes these commands):**

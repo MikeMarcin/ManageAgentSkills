@@ -15,7 +15,7 @@ metadata: {"milestone_plan":{"id":"tap-only-deployment","path":"docs/rfcs/plans/
 
 **Owner decisions (September 13, 2026; run `mask-rfc0020-2026-09-12-a`, mandate revisions r2 and r3).**
 - An offline install of a bare ID before its only tap is fetched refuses `source.unresolved`, naming the tap. `lock.resolution_required` is the offline refusal for a qualified `SOURCE/ID`. Retained case B04 is read with this decision; the retained packet is unchanged.
-- Taps keep exact bytes. MASK disables Git line-ending conversion for tap operations by default; only an explicit opt-in at tap registration enables `core.autocrlf`. This is tracked on [MASK-0107](../issues/20-ready/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it.
+- Taps keep exact bytes. MASK disables Git line-ending conversion for tap operations by default; only an explicit opt-in at tap registration enables `core.autocrlf`. This is tracked on [MASK-0107](../issues/30-in-progress/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it.
 - The remaining d2 follow-up candidates are filed outside this RFC as [MASK-0108](../issues/10-backlog/MASK-0108-authoring-checkout-branch-refusal.md), [MASK-0109](../issues/10-backlog/MASK-0109-ensure-cold-dry-run-plan-hash.md) and [MASK-0110](../issues/10-backlog/MASK-0110-refusal-after-retained-preparation.md).
 
 Amends applicable current behavior from RFC-MASK-0003 (`init --source`, shared
