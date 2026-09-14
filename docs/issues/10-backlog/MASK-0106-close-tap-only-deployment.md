@@ -54,10 +54,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - A legacy consumer that selects nothing migrates; `validate_journal` wrongly rejected an empty lock.
   - The doctor report blocks a legacy record with a v2 declaration, so it agrees with `--migrate`.
   - Two regression tests were added. Reruns of `tests.test_doctor_migration` and `tests.test_retired_paths` are running (scratchpad `integ/`).
-- **Next discriminating step:**
-  - Commit the B1 slice plus corrections.
-  - Then run worker B2 (v3 path: an unregistered straggler, and a registered legacy record converted under `--project/--user --alias`) and a critical review of the committed journal/recovery candidate concurrently.
-  - The reviewer experiments on an archived snapshot, not the working tree.
+- **Committed:**
+  - `5215741`: B1 plus the integrator corrections. Reruns: `tests.test_doctor_migration` 20/20, `tests.test_retired_paths` 6/6.
+- **B2 worker** (collected, quiescent; banner `claude-opus-5`, runtime effort `40` against configured xhigh, an unresolved route observation):
+  - The tap-machine path converts an unregistered straggler, or a registered legacy record, under `--project`/`--user` with `--alias`.
+  - Logs under scratchpad `b2/`: 5/5 new tests; 65/65 across six modules; three negative controls.
+- **Critical review R1** (`claude-fable-5-1`, high; collected, quiescent) of `5215741`/`e28d615`:
+  - No blocking finding.
+  - Findings 1 (a link edit before the lock) and 2 (manifests on the journal) are fixed and tested in `fe9c13a`.
+  - Findings 3–6 are notes on the MASK-0102 execution record.
+- **Candidate `fe9c13a`:** B2 plus review hardening. Focused reruns: `tests.test_doctor_migration` 21/22 (the failing assertion was test-only Windows readlink spelling, fixed, and `JournalHardening` 2/2 on rerun); straggler, link producers and retired paths 15/15.
+- **Next discriminating step:** the guarded full suite on `fe9c13a` (scratchpad `integ/full_suite.py`, per-module processes with redirected homes, HEAD/tree/owner-profile guard). Then finish MASK-0102.
 
 **Dispatch `d3` record (historical; milestone `engine` accepted; its next milestone `migration` is in progress under d4).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
