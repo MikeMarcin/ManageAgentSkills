@@ -21,6 +21,17 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 Rewrite the start-here text, everyday table and command help for `init`, `tap add`, `install`, `update`, `source fetch` and `doctor --migrate`. Replace the local-clone installation journey with the tap bootstrap in README and the installation guide; rewrite the sources guide around fetching updates; turn the migration guide into migrating from a live checkout with an old-command table. Update the CLI contract inventory and the state/recovery architecture for `doctor.migrate`. Replay the README recipes through the public CLI.
 
+## Owner decisions (mandate r4, September 13, 2026)
+
+- **Q4**, verbatim: "point users to install and remove".
+  - v2 `project/user set|require|unrequire` are not implemented; they keep refusing `selection.command_unsupported`.
+  - This card makes that refusal, its help and the CLI contract point to `install` and `remove`. The refusal text is in `mask.py`, which this decision adds to the owned paths.
+  - It also supersedes the RFC-MASK-0020 Retirement sentence that says these commands "remain for v2 declarations".
+- **Q5**, verbatim: "just make migration best effort, we're going to run migration on a single machine and then drop it entirely so dont put a lot into it".
+  - The AC05 gate is unchanged: `project unregister --keep-links` and `workspace forget` stay refused on a v1 or v2 machine.
+  - The migration guide says briefly that a consumer `doctor --migrate` cannot convert must be restored on disk before migrating.
+  - Add no migration features or hardening.
+
 ## Acceptance
 
 README recipes execute verbatim through the tap-first fixtures. Help output for every registered command renders and names no retired command. The documentation test finds the retired spellings only under `docs/rfcs/assets`, in historical RFC text and in the migration guide's old-command table. `capabilities` reflects the final command table.
