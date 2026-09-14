@@ -151,6 +151,9 @@ def file_path(entry, home):
     role, root = entry['role'], Path(entry['root'])
     if role == 'selection_policy' and root == home:
         return home / 'selection-policy.json'
+    if role == 'machine_config' and root == home:
+        # Only a doctor.migrate journal records the machine configuration (validate_files and mask_migrate.validate_journal).
+        return home / 'config.json'
     if role == 'project_declaration':
         return root / '.mask.json'
     if role == 'project_lock':
@@ -187,6 +190,11 @@ def validate_files(pending, home):
             change = pending.get('selection_change', {})
             if entry != dict(root=str(home), role='selection_policy', before=change.get('policy_before'), after=change.get('policy_after')):
                 c.fail('recovery.conflict', 'Selection policy role differs from its explicit transition.', 8)
+            continue
+        if entry['role'] == 'machine_config':
+            migration = pending.get('migration') if pending['operation'] == 'doctor.migrate' else None
+            if not isinstance(migration, dict) or entry != dict(root=str(home), role='machine_config', before=migration.get('config_before'), after=migration.get('config_after')):
+                c.fail('recovery.conflict', 'Machine configuration role differs from its doctor migration.', 8)
             continue
         key = (entry['root'], entry['role'])
         if key in seen or entry['root'] not in pending['selected']:
@@ -260,7 +268,8 @@ def check_observations(pending, home):
         c.fail('recovery.conflict', 'Local selection policy is no longer readable.', 8, cause=error.as_dict())
     if current_policy not in (policy_before, pending.get('selection_change', {}).get('policy_after', policy_before)):
         c.fail('recovery.conflict', 'Local selection policy changed.', 8)
-    if c.read_text(home / 'config.json', missing=True) != pending['pinned']['config_text'] or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
+    config_after = pending['migration']['config_after'] if pending['operation'] == 'doctor.migrate' else pending['pinned']['config_text']
+    if c.read_text(home / 'config.json', missing=True) not in (pending['pinned']['config_text'], config_after) or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
         c.fail('recovery.conflict', 'Pinned configuration or authority changed.', 8)
     for expected in observations:
         root = Path(expected['root'])
@@ -268,7 +277,7 @@ def check_observations(pending, home):
             c.fail('recovery.conflict', 'Pinned consumer root changed.', 8)
         actual = readiness.workspace_observation(root, scope=expected.get('scope', 'project'), home=home)
         for entry in pending.get('files', []):
-            if entry['root'] == str(root) and entry['role'] != 'selection_policy':
+            if entry['root'] == str(root) and entry['role'] not in ('selection_policy', 'machine_config'):
                 field = 'lock' if entry['role'].endswith('_lock') else 'manifest'
                 if actual.get(field) not in (entry['before'], entry['after']):
                     c.fail('recovery.conflict', 'Typed consumer control changed.', 8)
@@ -286,8 +295,12 @@ def validate_observations(pending, home):
     c.fields(value, ('workspaces', 'config_text', 'policy_text'), ('selection_policy_text', 'home_identity'), family='recovery')
     if not isinstance(value['workspaces'], list) or sorted(item.get('root', '') for item in value['workspaces'] if isinstance(item, dict)) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Pinned observations must cover selected consumers exactly.', 8)
+    if pending['operation'] == 'doctor.migrate':
+        # The migration's intent config is the converted one; the observation is its exact before bytes.
+        if not isinstance(value['config_text'], str) or value['config_text'] != (pending.get('migration') or {}).get('config_before'):
+            c.fail('recovery.conflict', 'Pinned config observation differs from the migration before bytes.', 8)
     # Pinned journals on a v2 machine stay recoverable before its migration, so both sides parse legacy-readable.
-    if not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text']), legacy=True) != c.config(pending['config'], legacy=True):
+    elif not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text']), legacy=True) != c.config(pending['config'], legacy=True):
         c.fail('recovery.conflict', 'Pinned config observation differs from intent.', 8)
     if value.get('selection_policy_text') is not None:
         import mask_selection as selection

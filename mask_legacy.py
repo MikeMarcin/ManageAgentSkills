@@ -32,7 +32,13 @@ def is_legacy(record):
 
 
 def issue(code, message, exit_code=4, **details):
-    return c.MaskError(code, message, exit_code, details=details).as_dict()
+    return c.MaskError(code, message, exit_code, details=details)
+
+
+def block(blockers, failures, error):
+    """Report a blocker and keep its typed error, so a refusal raised from it keeps the error's own exit code."""
+    blockers.append(error.as_dict())
+    failures.append(error)
 
 
 def dirty_reason(root):
@@ -53,13 +59,14 @@ def dirty_reason(root):
 def clone(config):
     """Observe the legacy checkout without changing it.
 
-    ``error`` is the typed reason nothing can be derived from it (a missing or non-root checkout). ``published``
-    is True when HEAD is an ancestor of ``refs/remotes/<remote>/<branch>``, False when not, 'unknown' without that ref.
+    ``error`` is the typed error (a MaskError) that prevents deriving anything from it, such as a missing or
+    non-root checkout. ``published`` is True when HEAD is an ancestor of ``refs/remotes/<remote>/<branch>``,
+    False when not, 'unknown' without that ref; ``diverged`` when each holds commits the other lacks.
     """
     source = config['source']
     root = Path(source['root'])
     value = dict(root=str(root), head=None, branch=None, dirty=None, unborn=None, published='unknown',
-                 remote_url=None, dirty_reason=None, error=None)
+                 remote_url=None, dirty_reason=None, error=None, diverged=False)
     try:
         c.parents_safe(Path(root.anchor), root)
         top = c.git(root, 'rev-parse', '--show-toplevel', optional=True) if c.kind(root) == 'directory' else None
@@ -74,8 +81,10 @@ def clone(config):
         tracking = c.git(root, 'rev-parse', '--verify', '--quiet', f"refs/remotes/{source['remote']}/{source['branch']}^{{commit}}", optional=True)
         if value['head'] and tracking:
             value['published'] = c.git(root, 'merge-base', '--is-ancestor', value['head'], tracking, optional=True) is not None
+            # Diverged: HEAD and the remote-tracking branch each hold commits the other lacks (HEAD strictly ahead is only unpublished).
+            value['diverged'] = not value['published'] and c.git(root, 'merge-base', '--is-ancestor', tracking, value['head'], optional=True) is None
     except c.MaskError as error:
-        value['error'] = error.as_dict()
+        value['error'] = error
     return value
 
 
@@ -159,7 +168,7 @@ def selected_consumers(home, state, *, project=None, user=False):
     return [(Path(key), c.consumer_scope(state, key), record) for key, record in sorted(c.consumer_records(state).items()) if is_legacy(record)]
 
 
-def link_rows(root, record, clone_root):
+def link_rows(root, record, clone_root, failures):
     """Per recorded link: ok, drift (link text or target differs from the record and checkout), missing or collision."""
     rows, blockers = [], []
     for relative, link in sorted(record['links'].items()):
@@ -170,26 +179,26 @@ def link_rows(root, record, clone_root):
             kind = c.kind(leaf)
         except c.MaskError as error:
             row['state'] = 'collision'
-            blockers.append(error.as_dict())
+            block(blockers, failures, error)
             rows.append(row)
             continue
         if kind == 'missing':
             row['state'] = 'missing'
         elif kind != 'symlink':
             row['state'] = 'collision'
-            blockers.append(issue('target.collision', 'A real or special entry occupies an owned link path.', path=str(leaf), existing_type=kind))
+            block(blockers, failures, issue('target.collision', 'A real or special entry occupies an owned link path.', path=str(leaf), existing_type=kind))
         else:
             text = os.readlink(leaf)
             expected = legacy_target(clone_root, link['skill']) if clone_root is not None else None
             if text != link['link_text'] or expected is not None and fs.normalized_link(leaf, text) != expected:
                 row['state'] = 'drift'
-                blockers.append(issue('target.drift', 'Owned link changed since it was recorded or no longer names the legacy checkout.', path=str(leaf),
-                                      expected=str(expected) if expected is not None else None))
+                block(blockers, failures, issue('target.drift', 'Owned link changed since it was recorded or no longer names the legacy checkout.', path=str(leaf),
+                                                expected=str(expected) if expected is not None else None))
         rows.append(row)
     return rows, blockers
 
 
-def consumer_row(home, root, scope, record, clone_root, available):
+def consumer_row(home, root, scope, record, clone_root, available, failures):
     row = dict(root=str(root), scope=scope, registered=record is not None, declaration_version=None,
                mode='legacy' if record is not None else None, skills=[], links=[])
     blockers = []
@@ -197,55 +206,65 @@ def consumer_row(home, root, scope, record, clone_root, available):
         try:
             c.registered_root(root, record, scope)
         except c.MaskError as error:
-            blockers.append(error.as_dict())
+            block(blockers, failures, error)
     if not blockers:
         try:
             declaration = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
             row['declaration_version'] = declaration['schema_version']
             row['skills'] = declaration['skills'] if declaration['schema_version'] == 1 else [r.coordinate(binding) for binding in declaration['skills']]
         except c.MaskError as error:
-            blockers.append(error.as_dict())
+            block(blockers, failures, error)
+        if record is not None and row['declaration_version'] == 2:
+            # Its lock may name other taps or commits the checkout lacks, which a clone-only migration cannot prove.
+            block(blockers, failures, issue('migration.declaration_unsupported', 'A legacy consumer already declares a v2 selection; release its ownership with unregister --keep-links, then migrate.',
+                                            root=str(root), declaration_version=2, remediation=['mask', scope, 'unregister', '--keep-links']))
         if record is not None:
-            row['links'], found = link_rows(root, record, clone_root)
+            row['links'], found = link_rows(root, record, clone_root, failures)
             blockers.extend(found)
     if available is not None and row['declaration_version'] == 1:
         for identifier in row['skills']:
             if identifier not in available:
-                blockers.append(issue('skill.unknown', 'A declared skill is absent from the legacy checkout at HEAD.', skill=identifier, root=str(root)))
+                block(blockers, failures, issue('skill.unknown', 'A declared skill is absent from the legacy checkout at HEAD.', skill=identifier, root=str(root)))
     row.update(migratable=not blockers, blockers=blockers)
     return row
 
 
-def inspect(home, config, state, *, project=None, user=False):
+def inspect(home, config, state, *, project=None, user=False, failures=None):
     """``data.migration`` and its warnings for doctor; also the machine observations ``doctor --migrate`` plans from.
 
     On a v1/v2 machine a condition of the checkout blocks migration only while a registered legacy consumer
     would lock its HEAD; with no such consumer, dirty or unborn checkouts are warnings (configuration only).
+    ``failures`` receives the typed errors behind every blocker, machine blockers first and then each row's,
+    in report order.
     """
+    failures = [] if failures is None else failures
     warnings, blockers = [], []
     legacy_machine = config['schema_version'] in (1, 2)
     observed = tap = available = None
     if legacy_machine:
         observed = clone(config)
         if observed['error'] is not None:
-            blockers.append(observed['error'])
+            block(blockers, failures, observed['error'])
         else:
             try:
                 tap = proposed_tap(config, home, derived_alias(config, observed['remote_url']), observed)
             except c.MaskError as error:
-                blockers.append(error.as_dict())
+                block(blockers, failures, error)
             locking = any(is_legacy(record) for record in c.consumer_records(state).values())
             if observed['branch'] != config['source']['branch']:
-                blockers.append(issue('source.identity_mismatch', 'The legacy checkout is detached or on a branch other than the configured one.',
-                                      branch=observed['branch'], expected=config['source']['branch']))
+                block(blockers, failures, issue('source.identity_mismatch', 'The legacy checkout is detached or on a branch other than the configured one.',
+                                                branch=observed['branch'], expected=config['source']['branch']))
+            if observed['diverged']:
+                block(blockers, failures, issue('source.identity_mismatch', 'The legacy checkout and its remote-tracking branch each hold commits the other lacks.',
+                                                reason='diverged', head=observed['head'], branch=observed['branch']))
             for condition, code, message in ((observed['unborn'], 'migration.unborn', 'The legacy checkout has no commit on HEAD.'),
                                              (observed['dirty'], 'source.dirty', 'The legacy checkout has uncommitted, untracked, hidden or unfinished work.')):
                 if condition:
                     found = issue(code, message, root=observed['root'], reason=observed['dirty_reason'] if code == 'source.dirty' else None)
                     if locking:
-                        blockers.append(found)
+                        block(blockers, failures, found)
                     else:
-                        warnings.append(dict(code=found['code'], message=found['message'] + ' No consumer locks its HEAD, so only the configuration migrates.', details=found['details']))
+                        warnings.append(dict(code=found.code, message=str(found) + ' No consumer locks its HEAD, so only the configuration migrates.', details=found.details))
             if tap is not None and observed['remote_url'] is None:
                 warnings.append(dict(code='migration.local_only_source', message='The checkout has no remote; the tap is a machine-local file identity.', details=dict(repository=tap['repository'])))
             if tap is not None and locking and observed['published'] is False:
@@ -254,8 +273,8 @@ def inspect(home, config, state, *, project=None, user=False):
                 try:
                     available = {item['id'] for item in sources.discover(Path(observed['root']), tap['alias'], tap, observed['head'])}
                 except c.MaskError as error:
-                    blockers.append(error.as_dict())
-    rows = [consumer_row(home, root, scope, record, observed['root'] if observed else None, available)
+                    block(blockers, failures, error)
+    rows = [consumer_row(home, root, scope, record, observed['root'] if observed else None, available, failures)
             for root, scope, record in selected_consumers(home, state, project=project, user=user)]
     report = dict(required=legacy_machine or bool(rows), machine=machine(config), proposed_tap=tap,
                   clone=public_clone(observed) if observed else None, consumers=rows, blockers=blockers,

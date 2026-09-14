@@ -26,7 +26,8 @@ PRODUCERS = {
     ('mask_fs.plan', 'creation_link_text', 'pinned.target(link, config, home)'):
         'explicit source dev-link: pinned.target of a link that carries its validated dev binding',
     ('mask_fs.set_link', 'symlink_to', 'wanted'):
-        'journal replay: validate_pending proves the text is an owned record whose pinned.target is the store or a dev link',
+        'journal replay: validate_pending proves the text is an owned record whose pinned.target is the store or a dev link, '
+        'or, only when rolling back a doctor.migrate journal, the recorded legacy text naming the journal\'s recorded checkout',
 }
 # The only directories pinned.target derives; a link record with neither refuses migration.required.
 TARGETS = {"Path(link['dev']['root']) / link['dev']['path']", "store.location(home, link['resolution']['payload_digest'], link['skill'])[1]"}

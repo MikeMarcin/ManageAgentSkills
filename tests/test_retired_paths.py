@@ -107,13 +107,22 @@ class MigrationGate(LegacyFixture):
         common = dict(schema_version=state['schema_version'], transaction_id='00000000-0000-4000-8000-000000000000', phase='prepared',
                       base_generation=state['generation'], selected=[str(roots.project)], links=[], manifests=[], before_state=state,
                       after_state=state, config=config, before_state_text=state_text, after_state_text=state_text, directories=[])
-        journals = {
-            'migration': dict(common, schema_version=3, operation='migrate', files=[], migration=dict(config_before=config_text, config_after=config_text, source={})),
-            'shared_checkout_update': dict(common, operation='update', git=dict(scope='source', root=str(roots.clone), before='0' * 40, candidate='1' * 40)),
-            'legacy_ownership': dict(common, operation='apply'),
-        }
-        for reason, journal in journals.items():
-            with self.subTest(retired=reason):
+        clone_text = state['projects'][str(roots.project)]['links']['.claude/skills/alpha']['link_text']
+        migration = dict(config_before=config_text, config_after=config_text, source={}, cache=None)
+        shared = dict(scope='source', root=str(roots.clone), before='0' * 40, candidate='1' * 40)
+        journals = (
+            ('migration', dict(common, schema_version=3, operation='migrate', files=[], migration=dict(config_before=config_text, config_after=config_text, source={}))),
+            # Only doctor.migrate may record a migration or the machine configuration; on any other operation both stay retired.
+            ('migration', dict(common, schema_version=3, operation='update', files=[], migration=migration)),
+            ('migration', dict(common, schema_version=3, operation='apply', files=[dict(root=str(roots.home), role='machine_config', before=config_text, after=config_text)])),
+            ('shared_checkout_update', dict(common, operation='update', git=shared)),
+            ('shared_checkout_update', dict(common, schema_version=3, operation='doctor.migrate', files=[], migration=migration, git=shared)),
+            ('legacy_ownership', dict(common, operation='apply')),
+            # A plain journal replaying a live-checkout link text is legacy ownership, never a replay.
+            ('legacy_ownership', dict(common, operation='apply', links=[dict(root=str(roots.project), relative='.claude/skills/alpha', skill='alpha', target='claude', before=clone_text, after=clone_text)])),
+        )
+        for reason, journal in journals:
+            with self.subTest(retired=reason, operation=journal['operation']):
                 write_json(roots.home / 'pending.json', journal)
                 before = snapshot(roots.base, roots.base)
                 inspected = self.machine('recover', '--inspect')['data']

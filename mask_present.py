@@ -239,7 +239,26 @@ def render_show(data, output):
     return lines + plan_guard(data, output)
 
 
+def render_migrate(data, output):
+    """doctor --migrate: the conversion preview or its applied result."""
+    migration = data.get('migration') or {}
+    tap = migration.get('proposed_tap') or {}
+    lines = [f"doctor --migrate: {clean(migration.get('machine'))} to taps ({outcome(output)})",
+             f"  tap: {clean(tap.get('alias'))} {clean(tap.get('repository'))}"]
+    for row in migration.get('changes', []) or []:
+        lines.append(f"  legacy {clean(row.get('scope'))}: {clean(row.get('root'))}")
+    acquisition = migration.get('acquisition') or {}
+    if acquisition:
+        lines.append(f"  cache: {clean(acquisition.get('commit'))} from {clean(acquisition.get('source'))}")
+    lines.extend(actions(output))
+    if output['dry_run'] and data.get('plan_hash'):
+        lines.append(f"  apply this preview with 'mask doctor --migrate --expect-plan-hash {clean(data['plan_hash'])}'")
+    return lines
+
+
 def render_doctor(data, output):
+    if 'config_after' in (data.get('migration') or {}):
+        return render_migrate(data, output)
     lines = [f"doctor: {'healthy' if data.get('healthy') else 'problems found'}"]
     for issue in data.get('issues', []) or []:
         lines.append(f"  issue: {clean(issue.get('message') if isinstance(issue, dict) else issue)}")
