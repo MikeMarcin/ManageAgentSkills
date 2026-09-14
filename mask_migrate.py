@@ -9,6 +9,10 @@ links and converts the records. Nothing here writes to the clone, and recovery n
 
 A registered legacy record whose declaration is already v2 refuses ``migration.declaration_unsupported``: its lock may
 name other taps or commits absent from the clone, which an offline, clone-only migration cannot prove.
+
+On a v3 (tap) machine the command converts one scoped straggler, ``--project PATH --alias NAME`` or ``--user --alias
+NAME``, with install semantics: see :func:`migrate_straggler`. Its journal has no ``migration`` field and recovery never
+reads a checkout.
 """
 from __future__ import annotations
 
@@ -266,11 +270,14 @@ def dispatch(args, output, home):
                 effects.append(dict(skill=r.coordinate(row), effects=dict(artifacts=[artifact])))
                 store.materialize(home, row, payload, effects=artifact)
         with c.writer_lock(home):
-            if (c.kind(home / 'pending.json') != 'missing' or pinned.snapshot(home, consumers) != before
+            if c.kind(home / 'pending.json') != 'missing':
+                c.fail('recovery.required', 'Recover the pending operation before migrating.', 8)
+            if (pinned.snapshot(home, consumers) != before
                     or c.read_text(home / 'config.json', missing=True) != config_text
                     or c.read_text(home / 'state.json', 'state', missing=True) != state_text
-                    or clone_snapshot(clone_root, entry['repository']) != source):
-                c.fail('plan.stale', 'The configuration, a consumer control or the legacy checkout changed during preparation; nothing was migrated.', 4)
+                    or clone_snapshot(clone_root, entry['repository']) != source
+                    or not unchanged_links(planned['intent'])):
+                c.fail('plan.stale', 'The configuration, a consumer control, an owned link or the legacy checkout changed during preparation; nothing was migrated.', 4)
             pending = fs.make_pending(planned, home)
             pending['schema_version'] = 3
             fs.execute(planned, home, output, pending=pending)
@@ -280,9 +287,94 @@ def dispatch(args, output, home):
         output['data']['network'] = 'none'
 
 
+def unchanged_links(intent):
+    """Under the writer lock, before any journal exists: every link the plan replaces still has its planned before text, or is still absent.
+
+    A link edited during preparation is then plan.stale with nothing written, rather than a retained journal that recovery refuses.
+    """
+    for entry in intent['links']:
+        root = Path(entry['root'])
+        leaf = root / entry['relative']
+        c.parents_safe(root, leaf)
+        actual = fs.link_value(leaf)
+        if actual['link_text'] != entry['before'] or entry['before'] is None and actual['type'] != 'missing':
+            return False
+    return True
+
+
 def migrate_straggler(args, output, home):
-    """M11: convert an unregistered v1 declaration on a tap machine (MASK-0102 worker B2)."""
-    c.fail('config.command_unavailable', 'doctor --migrate of a v1 declaration on a tap machine is not available in this build yet.')
+    """M11: on a tap machine, convert one straggler v1 declaration with install semantics (MIGRATION.md "Scope and atomicity").
+
+    ``--project PATH --alias NAME`` or ``--user --alias NAME``. The v1 declaration becomes a v2 declaration bound to the
+    approved tap NAME without a ref, as install writes it. Each binding resolves through the ordinary resolver, fetching on
+    demand unless ``--offline`` or ``--dry-run``. One ``doctor.migrate`` journal without a ``migration`` field then registers
+    the consumer (or converts its registered legacy record) and links from the store. The configuration is unchanged and no
+    checkout is read. A scope with nothing to convert is an idempotent no-op.
+    """
+    import mask_ensure as readiness
+    import mask_selection as selection
+    import mask_store as store
+    import mask_task as task
+    project, user, alias = getattr(args, 'project', None), getattr(args, 'user', False), getattr(args, 'alias', None)
+    if getattr(args, 'all', False) or alias is None or not (project or user):
+        c.fail('invocation.invalid', 'A tap machine migrates one straggler declaration: doctor --migrate --project PATH --alias NAME (or --user --alias NAME).', 2)
+    config_text = c.read_text(home / 'config.json')
+    config = c.config(c.parse_json(config_text))
+    entry = sources.selected(config, alias)
+    if c.kind(home / 'pending.json') != 'missing':
+        c.fail('recovery.required', 'Recover the pending operation before migrating.', 8)
+    state_text = c.read_text(home / 'state.json', 'state', missing=True)
+    state = c.state(c.parse_json(state_text, 'state')) if state_text is not None else c.empty_state()
+    failures = []
+    report, warnings = legacy.inspect(home, config, state, project=project, user=user, failures=failures)
+    output['data'] = dict(migration=report)
+    output['warnings'].extend(warnings)
+    if failures:
+        refuse(failures, report['blockers'] + [item for row in report['consumers'] for item in row['blockers']])
+    rows = legacy.selected_consumers(home, state, project=project, user=user)
+    if not rows:
+        return  # Already a tap consumer, or nothing declared: report.required is False and nothing changes.
+    root, scope, record = rows[0]
+    key, consumers = str(root), [(root, scope)]
+    before = pinned.snapshot(home, consumers)
+    current = c.read_json(c.declaration_path(root, scope, home), 'manifest')
+    declaration = legacy.migrated_declaration(current, alias, entry, config['default_targets'])
+    views = {}
+    resolved = [task.resolve_row(home, declaration, binding, entry, config, args, output, views) for binding in declaration['skills']]
+    acquisitions = output['data'].get('acquisitions', [])
+    locked = r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(declaration), packages=resolved), declaration)
+    planned = fs.plan(config, state, [root], home=home, proposals={key: declaration}, lock_proposals={key: locked},
+                      register=[key] if record is None else (), user_root=root if scope == 'user' else None,
+                      operation=OPERATION, allow_migration=True, payload_views=views)
+    fs.public_plan(planned, output)
+    links = [dict(relative=item['relative'], agent=item['target'], before=item['before'], after=item['after']) for item in planned['intent']['links']]
+    output['data'].update(acquisitions=acquisitions, network='fetch' if acquisitions else 'none', migration=dict(
+        report, alias=alias, changes=[dict(root=key, scope=scope, registered=record is not None, declaration_before=current,
+                                           declaration_after=declaration, lock_after=locked, links=links)]))
+    fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
+    if output['dry_run']:
+        return
+    observation = dict(root=key, effects={})
+    output['data']['preparation'] = [observation]
+    completed = False
+    try:
+        store.ensure(home, declaration, locked, config, offline=True, coordinates=selection.applicable_coordinates(declaration), effects=observation['effects'])
+        with c.writer_lock(home):
+            if c.kind(home / 'pending.json') != 'missing':
+                c.fail('recovery.required', 'Recover the pending operation before migrating.', 8)
+            if (pinned.snapshot(home, consumers) != before
+                    or c.read_text(home / 'config.json', missing=True) != config_text
+                    or c.read_text(home / 'state.json', 'state', missing=True) != state_text
+                    or not unchanged_links(planned['intent'])):
+                c.fail('plan.stale', 'The configuration, registry, consumer declaration or an owned link changed during preparation; nothing was migrated.', 4)
+            pending = fs.make_pending(planned, home)
+            pending['schema_version'] = 3
+            fs.execute(planned, home, output, pending=pending)
+        completed = output['transaction'] == 'committed'
+    finally:
+        pinned.merge_preparation(output, completed=completed)
+    # Links are committed above; declared roles or inputs still unmet make the migration nonzero, as install does.
+    readiness.final_status(output)
 
 
 def conflict(message, **details):
@@ -303,9 +395,15 @@ def journal_alias(value, before, after_value, home):
 
 
 def validate_journal(pending, home):
-    """Recompute a doctor.migrate journal from its own records; never reads the clone."""
+    """Recompute a doctor.migrate journal from its own records; never reads the clone.
+
+    A journal with a ``migration`` field converts a live-checkout machine; one without it converts a straggler on a tap machine.
+    """
     try:
-        check_recorded(pending, Path(home))
+        if 'migration' in pending:
+            check_recorded(pending, Path(home))
+        else:
+            check_straggler(pending, Path(home))
     except c.MaskError as error:
         if error.code == 'recovery.conflict':
             raise
@@ -318,7 +416,8 @@ def check_recorded(pending, home):
     value = pending.get('migration')
     c.fields(value, FIELDS, family='recovery')
     files = pending.get('files')
-    if pending['operation'] != OPERATION or pending['schema_version'] != 3 or not isinstance(pending.get('pinned'), dict) or not isinstance(files, list) or any(name in pending for name in FOREIGN):
+    if (pending['operation'] != OPERATION or pending['schema_version'] != 3 or not isinstance(pending.get('pinned'), dict) or not isinstance(files, list)
+            or any(name in pending for name in FOREIGN) or pending['manifests'] != []):
         conflict('A doctor migration requires its typed pinned journal and no other transition.')
     if not isinstance(value['config_before'], str) or not isinstance(value['config_after'], str) or value['config_before'] != pending['pinned'].get('config_text'):
         conflict('Migration before config must preserve its exact observed bytes.')
@@ -360,6 +459,40 @@ def check_recorded(pending, home):
             conflict('Migration cache acquisition differs from the observed checkout HEAD.')
     elif value['cache'] is not None or files != [machine] or pending['links']:
         conflict('An empty-registry migration converts the configuration only.')
+
+
+def check_straggler(pending, home):
+    """A tap-machine migration: one unregistered or legacy consumer becomes pinned on the unchanged configuration.
+
+    Its after selection must be exactly the mapping of the observed v1 declaration onto the one approved tap it binds, and
+    every lock row must name that tap. No clone exists, so ``check_journal`` is never called for such a journal.
+    """
+    files = pending.get('files')
+    if (pending['operation'] != OPERATION or pending['schema_version'] != 3 or not isinstance(pending.get('pinned'), dict)
+            or not isinstance(files, list) or any(name in pending for name in FOREIGN) or pending['manifests'] != []):
+        conflict('A tap-machine migration requires its typed pinned journal and no other transition.')
+    config = c.config(pending['config'])
+    if config != c.config(c.read_json(home / 'config.json', default={})):
+        conflict('Machine configuration changed since the pending migration.')
+    if len(pending['selected']) != 1:
+        conflict('A tap-machine migration converts exactly one consumer.')
+    root = pending['selected'][0]
+    old, new = c.consumer_records(pending['before_state']).get(root), c.consumer_records(pending['after_state']).get(root)
+    if not (old is None or legacy.is_legacy(old)) or not isinstance(new, dict) or new.get('mode') != 'pinned':
+        conflict('A tap-machine migration needs an unregistered or legacy before record and a pinned after record.', root=root)
+    scope = c.consumer_scope(pending['after_state'], root)
+    if any(not isinstance(item, dict) or item.get('root') != root or item.get('role') not in (scope + '_declaration', scope + '_lock') for item in files):
+        conflict('A tap-machine migration writes only the consumer declaration and lock.', root=root)
+    workspace = next(item for item in pending['pinned']['workspaces'] if item['root'] == root)
+    names = sorted(new['last_manifest']['sources'])
+    if len(names) != 1 or names[0] not in config['sources']:
+        conflict('A tap-machine migration binds exactly one approved tap.', root=root)
+    alias = names[0]
+    expected = legacy.migrated_declaration(c.parse_json(workspace['manifest'], 'manifest'), alias, config['sources'][alias], config['default_targets'])
+    if new['last_manifest'] != expected:
+        conflict('Migrated selection differs from the observed v1 declaration.', root=root)
+    if any(row['source'] != alias for row in new['last_lock']['packages']):
+        conflict('Migrated locks must name the migrated tap.', root=root)
 
 
 def check_journal(pending, home):

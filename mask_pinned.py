@@ -268,7 +268,8 @@ def check_observations(pending, home):
         c.fail('recovery.conflict', 'Local selection policy is no longer readable.', 8, cause=error.as_dict())
     if current_policy not in (policy_before, pending.get('selection_change', {}).get('policy_after', policy_before)):
         c.fail('recovery.conflict', 'Local selection policy changed.', 8)
-    config_after = pending['migration']['config_after'] if pending['operation'] == 'doctor.migrate' else pending['pinned']['config_text']
+    # Only a machine migration (a doctor.migrate journal with a ``migration`` field) changes the configuration.
+    config_after = pending['migration']['config_after'] if pending['operation'] == 'doctor.migrate' and 'migration' in pending else pending['pinned']['config_text']
     if c.read_text(home / 'config.json', missing=True) not in (pending['pinned']['config_text'], config_after) or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
         c.fail('recovery.conflict', 'Pinned configuration or authority changed.', 8)
     for expected in observations:
@@ -295,8 +296,9 @@ def validate_observations(pending, home):
     c.fields(value, ('workspaces', 'config_text', 'policy_text'), ('selection_policy_text', 'home_identity'), family='recovery')
     if not isinstance(value['workspaces'], list) or sorted(item.get('root', '') for item in value['workspaces'] if isinstance(item, dict)) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Pinned observations must cover selected consumers exactly.', 8)
-    if pending['operation'] == 'doctor.migrate':
-        # The migration's intent config is the converted one; the observation is its exact before bytes.
+    if pending['operation'] == 'doctor.migrate' and 'migration' in pending:
+        # A machine migration's intent config is the converted one; the observation is its exact before bytes.
+        # A tap-machine migration keeps its configuration, so it takes the ordinary equality below.
         if not isinstance(value['config_text'], str) or value['config_text'] != (pending.get('migration') or {}).get('config_before'):
             c.fail('recovery.conflict', 'Pinned config observation differs from the migration before bytes.', 8)
     # Pinned journals on a v2 machine stay recoverable before its migration, so both sides parse legacy-readable.

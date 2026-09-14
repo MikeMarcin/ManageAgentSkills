@@ -435,6 +435,50 @@ class MachineMigration(MigrationFixture):
         self.assertEqual((self.controls(), self.links()), (controls, links))
 
 
+class JournalHardening(MigrationFixture):
+    """Review findings R1-1 and R1-2: a link edited before the writer lock is plan.stale, and a doctor.migrate journal carries no manifests."""
+
+    RETARGET = ("import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_core;real=mask_core.writer_lock\n"
+                "def lock(home):\n"
+                "    leaf=sys.argv[2]\n"
+                "    os.rmdir(leaf) if os.name=='nt' else os.unlink(leaf)\n"
+                "    os.symlink(sys.argv[3],leaf,target_is_directory=True)\n"
+                "    mask_core.writer_lock=real\n"
+                "    return real(home)\n"
+                "mask_core.writer_lock=lock\n"
+                "sys.exit(mask.main(sys.argv[4:]))")
+
+    def test_a_link_edited_before_the_writer_lock_is_plan_stale_and_nothing_is_written(self):
+        roots = self.legacy_machine(1)
+        leaf = roots.project / '.claude/skills/alpha'
+        elsewhere = str(roots.clone / 'skills' / 'beta')
+        controls = self.controls()
+        run = subprocess.run([sys.executable, '-B', '-c', self.RETARGET, str(ENTRY.parent), str(leaf), elsewhere, 'doctor', '--migrate', '--json'],
+                             capture_output=True, encoding='utf-8', cwd=str(roots.base), env=self.environment(), timeout=180)
+        self.assertEqual((run.returncode, json.loads(run.stdout)['error']['code']), (4, 'plan.stale'), run.stdout + run.stderr)
+        self.assertEqual(self.controls(), controls)
+        # The link the user retargeted is left exactly where they pointed it (os.readlink may spell it with a \\?\ prefix on Windows).
+        self.assertTrue(leaf.is_symlink() and os.path.samefile(leaf, elsewhere), os.readlink(leaf))
+
+    def test_a_doctor_migration_journal_with_manifest_entries_refuses_recovery(self):
+        roots = self.legacy_machine(1)
+        controls, links = self.controls(), self.links()
+        journal = self.crash('intent', 'doctor', '--migrate')
+        path = roots.home / 'pending.json'
+        original = path.read_bytes()
+        text = (roots.project / '.mask.json').read_text(encoding='utf-8')
+        journal['manifests'] = [dict(root=str(roots.project), before=text, after=text)]
+        path.write_text(json.dumps(journal, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8', newline='\n')
+        tampered = snapshot(roots.base, roots.base)
+        for mode in ('--complete', '--rollback'):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.machine('recover', mode, code=8)['error']['code'], 'recovery.conflict')
+                self.assertEqual(snapshot(roots.base, roots.base), tampered)
+        path.write_bytes(original)
+        self.machine('recover', '--rollback')
+        self.assertEqual((self.controls(), self.links()), (controls, links))
+
+
 class PreviousProgramRecovery(MigrationFixture):
     """M12: the previous program refuses a doctor.migrate journal; the current program still rolls it back."""
 

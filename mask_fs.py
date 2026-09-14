@@ -38,8 +38,10 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
 
     A mode-less (live-checkout) record or a v1 declaration refuses ``migration.required`` per root.
     ``allow_migration`` admits a v2 proposal for them, but a legacy link record still never yields a
-    checkout link text. Only ``doctor.migrate`` passes ``legacy_checkout``: a legacy record's old link is
-    then validated against the checkout it named, and replaced, never created.
+    checkout link text. Only ``doctor.migrate`` passes ``allow_migration``. A machine migration also passes
+    ``legacy_checkout``: a legacy record's old link is then validated against the checkout it named. A tap
+    machine has no checkout, so its old target is the recorded link text itself; the drift, unmanaged and
+    collision checks still apply. Either way the old link is replaced, never created.
     """
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
@@ -130,7 +132,10 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 wanted = expected.get(relative)
                 if actual['type'] not in ('missing', 'symlink'):
                     c.fail('target.collision', 'A real or special entry occupies the target.', 4, path=str(leaf), existing_type=actual['type'])
-                old_target = recorded_legacy_target(legacy_checkout, old['skill']) if old and allow_migration and legacy_checkout is not None and not pinned.is_pinned(record) else pinned.target(old, config, home) if old else None
+                if old and allow_migration and not pinned.is_pinned(record):
+                    old_target = recorded_legacy_target(legacy_checkout, old['skill']) if legacy_checkout is not None else normalized_link(leaf, old['link_text'])
+                else:
+                    old_target = pinned.target(old, config, home) if old else None
                 if old and normalized_link(leaf, old['link_text']) != old_target:
                     c.fail('state.invalid', 'Ownership value does not name the configured source.', path=str(leaf))
                 if actual['type'] == 'symlink':
@@ -481,9 +486,12 @@ def validate_pending(pending, home):
             consumer = c.consumer_records(state).get(entry['root'], {})
             record = consumer.get('links', {}).get(entry['relative'])
             raw = entry[side]
-            # Only a doctor.migrate before side is legacy: its recorded text must name the journal's recorded checkout.
+            # Only a doctor.migrate before side is legacy. A machine migration's recorded text must name the journal's recorded
+            # checkout; a tap-machine migration (no ``migration`` field) has no checkout, so exact equality with the before record is its proof.
             legacy = migrating and side == 'before' and not pinned.is_pinned(consumer)
-            if raw is not None and (not record or not isinstance(raw, str) or record['link_text'] != raw or normalized_link(leaf, raw) != (recorded_legacy_target(pending['migration']['source']['root'], record['skill']) if legacy else pinned.target(record, pending['config'], home))):
+            if raw is not None and (not record or not isinstance(raw, str) or record['link_text'] != raw):
+                c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
+            if raw is not None and not (legacy and 'migration' not in pending) and normalized_link(leaf, raw) != (recorded_legacy_target(pending['migration']['source']['root'], record['skill']) if legacy else pinned.target(record, pending['config'], home)):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
             if side == 'after' and raw != (record['link_text'] if record else None):
                 c.fail('recovery.conflict', 'Pending link omits its desired ownership target.', 8)
@@ -592,9 +600,9 @@ def set_link(entry, side, *, inject=False):
 
 def restore(pending, home, side, *, inject=False):
     check_current(pending, home)
-    migrating = pending['operation'] == 'doctor.migrate' and side == 'after'
+    migrating = pending['operation'] == 'doctor.migrate' and side == 'after' and 'migration' in pending
     if migrating:
-        # Completing a migration requires the unchanged legacy checkout; rollback never reads it.
+        # Completing a machine migration requires the unchanged legacy checkout; rollback, and a tap-machine migration, never read it.
         from mask_migrate import check_journal
         check_journal(pending, home)
     if side == 'after':
