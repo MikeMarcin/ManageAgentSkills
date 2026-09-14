@@ -16,57 +16,66 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
 
 ## Current frontier
 
-**Dispatch `d4` checkpoint (milestone `migration` in progress).**
-- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d4`, mandate revision `3`. The mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no added stop conditions. r3 places no restriction on implementing MASK-0107 to MASK-0110.
+**Dispatch `d4` record (milestone `migration` accepted).**
+- Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d4`, mandate revision `3`.
+  - The mandate is unchanged: `/implement-rfc RFC-MASK-0020`, with no added stop conditions.
+  - r3 places no restriction on implementing MASK-0107 to MASK-0110.
 - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
-- **Binding** (computed with `--accepted-milestone baseline/bootstrap/engine`):
-  - definition `sha256:445ea1fc2709589c20b25ad52d356075f62b7cd3f2a22f9772a393e571d964f6`
-  - obligation `sha256:3b1373c09a1afd12769793c33ca42785edfe4f6b256cdcc32135d0439faab981` (MASK-0102 source `sha256:811fc2d6…`)
-  - prerequisite `sha256:c0763bebfa7700e8d261bce15d6adc0a9468c1a026e93b0138175381445dcb14`
-  - The assignment is `d4-assignment.json` in the ignored run directory.
-- **Board:** MASK-0102 claimed at `333c2f7`.
-- **Phase 1, integrator-local, committed at `e28d615`:**
-  - `mask_legacy.py`: read-only detection, the proposed tap and alias, clone observations, consumer rows with typed blockers, and the shared `migrated_declaration` mapping.
-  - `doctor` reports `data.migration`, including an unregistered v1 declaration named by `--project`/`--user`.
-  - CLI surface: `--migrate`, `--alias`, `--offline`, guarded `--dry-run`/`--expect-plan-hash`; `capabilities.migration: doctor`.
-  - `mask_migrate.dispatch` is a stub.
-  - Evidence: `tests.test_doctor_migration` (M01 report cases) passes 6 of 6. Negative control: with only the test module copied onto `d0afac8`, 6 of 6 error `KeyError: 'migration'`.
-- **Plan, revised:** the generated `rfc-worker` has `maxTurns: 56`, so the slice is split.
-  - Worker B1: the v1/v2 `doctor.migrate` journal, recovery hooks, crash matrix and refusals (M02–M10, M12).
-  - Worker B2: the v3 straggler path (M11).
-  - The integrator adjudicates, runs the integration pass and commissions a critical review of the journal and recovery changes.
-- **Integrator design decisions given to the worker:**
-  - Operation `doctor.migrate`. A retired `migrate` journal and legacy ownership outside `doctor.migrate` stay refused.
-  - Only `doctor.migrate` may restore the legacy link text into the clone, from the validated clone target. This is where AC04 rollback meets the AC02 checkout-link rule.
-  - Rollback never requires an unchanged clone; completion re-snapshots it.
-  - On v2, `--alias` renames the legacy binding unless something references it. An alias bound to another repository refuses `source.alias_conflict`.
-  - The migration gate is unchanged (AC05 literal).
-- **Pending owner decisions:**
-  - Q4 (below, unchanged).
-  - New Q5: the MIGRATION.md blocker remediations (`project unregister --keep-links`, `workspace forget`) are gated on v1/v2 machines by AC05. Exempt them from the gate (amending AC05), or keep the gate and document that a non-migratable consumer must be restored on disk first?
-- **B1 worker result, collected and quiescent** (dispatched as `rfc-worker` with no model/effort override; banner `claude-opus-5[1m]`, effort xhigh as configured):
-  - v1/v2 `doctor --migrate`: dry run and plan hash, acquisition from the clone into `refs/mask/frozen/<head>`, one `doctor.migrate` journal with a `machine_config` role, and recovery hooks in `mask_fs`/`mask_pinned`.
-  - Refusals: diverged is `source.identity_mismatch` with reason `diverged`; a legacy record with a v2 declaration is `migration.declaration_unsupported`.
-  - M12: the `b92372f` program refuses the journal with `recovery.conflict`.
-  - Logs under the session scratchpad `b1/`: doctor module 18/18 OK; affected modules 76/76 OK; negative control 3 failing subtests when rollback skips `machine_config`.
-- **Integrator corrections, uncommitted:**
-  - Refusals keep the typed exit code instead of guessing it from the code suffix (`source.identity_invalid` exits 3).
-  - A legacy consumer that selects nothing migrates; `validate_journal` wrongly rejected an empty lock.
-  - The doctor report blocks a legacy record with a v2 declaration, so it agrees with `--migrate`.
-  - Two regression tests were added. Reruns of `tests.test_doctor_migration` and `tests.test_retired_paths` are running (scratchpad `integ/`).
-- **Committed:**
-  - `5215741`: B1 plus the integrator corrections. Reruns: `tests.test_doctor_migration` 20/20, `tests.test_retired_paths` 6/6.
-- **B2 worker** (collected, quiescent; banner `claude-opus-5`, runtime effort `40` against configured xhigh, an unresolved route observation):
-  - The tap-machine path converts an unregistered straggler, or a registered legacy record, under `--project`/`--user` with `--alias`.
-  - Logs under scratchpad `b2/`: 5/5 new tests; 65/65 across six modules; three negative controls.
-- **Critical review R1** (`claude-fable-5-1`, high; collected, quiescent) of `5215741`/`e28d615`:
-  - No blocking finding.
-  - Findings 1 (a link edit before the lock) and 2 (manifests on the journal) are fixed and tested in `fe9c13a`.
-  - Findings 3–6 are notes on the MASK-0102 execution record.
-- **Candidate `fe9c13a`:** B2 plus review hardening. Focused reruns: `tests.test_doctor_migration` 21/22 (the failing assertion was test-only Windows readlink spelling, fixed, and `JournalHardening` 2/2 on rerun); straggler, link producers and retired paths 15/15.
-- **Next discriminating step:** the guarded full suite on `fe9c13a` (scratchpad `integ/full_suite.py`, per-module processes with redirected homes, HEAD/tree/owner-profile guard). Then finish MASK-0102.
 
-**Dispatch `d3` record (historical; milestone `engine` accepted; its next milestone `migration` is in progress under d4).**
+- **Accepted milestone `migration`:**
+  - MASK-0102 is Done at `645b3c0`.
+  - Implementation: `e28d615` (doctor report), `5215741` (machine migration), `fe9c13a` (tap-machine path and review hardening). The evidence record is `d621bdc`.
+  - MASK-0103 and MASK-0107 were promoted to Ready at `6e2326f`; the links that promotion repaired are committed with this record.
+  - **Exit 1** (the fixture crash matrix recovers with rollback or complete at every checkpoint):
+    - `tests.test_doctor_migration` `test_crash_at_every_checkpoint_rolls_back_exactly_or_completes` covers seven checkpoints.
+    - `tests.test_doctor_straggler` `LegacyRecordOnTapMachine` covers the tap-machine journal.
+    - Negative control: a rollback that skips `machine_config` fails.
+    - Review R1 also completed the migration from every checkpoint.
+  - **Exit 2** (an empty registry migrates its configuration only): `test_empty_registry_migrates_configuration_only`.
+  - **Full suite on `d621bdc`:**
+    - guarded per-module run, 4 workers: 47 of 47 modules, 413 tests, 16 skipped, 2687 s;
+    - HEAD, tree status, tracked index and owner profile were unchanged;
+    - only Windows 11 was exercised, and this was not the literal single-process run.
+  - Evidence: the [MASK-0102 execution record](../60-done/MASK-0102-doctor-migration.md#execution-record).
+- **Binding** (unchanged from dispatch to finish; each recomputed assignment matched every value):
+  - definition `sha256:445ea1fc2709589c20b25ad52d356075f62b7cd3f2a22f9772a393e571d964f6`
+  - obligation `sha256:3b1373c09a1afd12769793c33ca42785edfe4f6b256cdcc32135d0439faab981`
+  - prerequisite `sha256:c0763bebfa7700e8d261bce15d6adc0a9468c1a026e93b0138175381445dcb14`
+  - The assignment, the finish decision and the return are in the ignored run directory.
+- **Product state the next milestone inherits:**
+  - **`doctor` report:** `data.migration` on v1, v2 and tap machines. `--check` exits 7 while migration is required.
+  - **v1/v2 machine:** `doctor --migrate`, unscoped or with `--all`, converts the machine configuration and every registered legacy consumer in one `doctor.migrate` journal.
+    - `--dry-run` and `--expect-plan-hash` bind the plan.
+    - With an empty registry, only the configuration migrates.
+    - The clone's HEAD is acquired over file transport into `refs/mask/frozen/<head>`, and the cache and store effects are retained.
+  - **Tap machine:** `doctor --migrate --project PATH --alias NAME` (or `--user --alias NAME`) converts an unregistered v1 declaration, or a registered legacy record with a v1 declaration, using install semantics.
+  - **Surfaces:**
+    - `capabilities` publishes `migration: doctor`, and `doctor` is plan-guarded.
+    - `mask doctor --help` names `--migrate`. README, the guides and other help still name retired commands (MASK-0103).
+  - **MASK-0107:** migrated tap entries don't carry a line-ending field yet. That card should make migration write its exact-bytes default.
+- **Pending owner decisions:**
+  - **Q4 (unchanged):** implement v2 `project/user set|require|unrequire`, or amend the contract to keep `selection.command_unsupported` and point to `install`/`remove`? Details below; needed before MASK-0103 describes these commands.
+  - **Q5 (new):** on a v1/v2 machine, the AC05 gate refuses the MIGRATION.md blocker remediations (`project unregister --keep-links`, `workspace forget`).
+    - The ask: exempt them from the gate, which amends AC05? Or keep the gate, and document that a consumer which can't be migrated must first be restored on disk?
+    - The gate is unchanged. This blocks nothing accepted. It affects MASK-0103's documentation, and MASK-0105 only if the owner's machine held such a consumer; its registry is empty.
+- **Notes for later cards** (from review R1 and worker B2):
+  - Plain `doctor` on a legacy record with a v2 declaration and no lock stops at `lock.missing` before reporting, because of guard order.
+  - Completing a migration rechecks the clone's HEAD, index, branch and remote, but not worktree cleanliness.
+  - After preparation, `plan.stale` reports `transaction: partial`, because retained cache and store effects are merged in. MASK-0103 should document this.
+  - `diverged` refuses `source.identity_mismatch` with reason `diverged`.
+  - A legacy record with a v2 declaration refuses with the new code `migration.declaration_unsupported`.
+- **Route observations:**
+  - Every leaf was dispatched by generated role with no model or effort override.
+  - Banners: B1 `claude-opus-5[1m]`, xhigh; B2 `claude-opus-5`, runtime reasoning effort `40`; R1 `claude-fable-5-1`, high.
+  - This integrator session also shows reasoning effort `40` against the configured xhigh. That difference is an unresolved observation.
+- **Execution state:**
+  - Every d4 child (B1, B2, R1) has returned, and every background command was consumed. No command or child from d4 is active.
+  - Logs remain in the session scratchpad (`b1/`, `b2/`, `r1/`, `integ/`).
+- **Next:** a fresh integrator context.
+  - Recommended first: MASK-0107 (exact-byte taps). It is Ready, independent of Q4 and Q5, and required before qualification.
+  - Then milestone `truth` (MASK-0103, Ready), once Q4 is answered.
+
+**Dispatch `d3` record (historical; its next milestone `migration` was accepted by d4).**
 - Run `mask-rfc0020-2026-09-12-a`, producer `rfc-integrator-d3`.
 - The mandate is still `/implement-rfc RFC-MASK-0020` with no added stop conditions. The coordinator's amendments r2 and r3 answered the three decisions d2 left open; see Owner decisions below.
 - No push or publication is authorized. The owner's real machine changes only through attended MASK-0105.
@@ -113,7 +122,7 @@ Governing RFC: [RFC-MASK-0020](../../rfcs/RFC-MASK-0020-tap-only-deployment.md).
   - `legacy_init`, `declare` and `legacy_bootstrap` are gone.
   - `tests/test_pin_migration.py` and `tests/test_git_update.py` are removed. Coverage of the self update checkout journal moved to `tests/test_launcher.py`.
 - **Owner decisions (r2 and r3):**
-  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
+  1. Taps keep exact bytes, with `core.autocrlf` only on explicit opt-in at tap registration. This is filed as [MASK-0107](../20-ready/MASK-0107-tap-line-endings-exact-bytes.md), and MASK-0104 and MASK-0105 depend on it. Recommended order: after `migration`, before `qualification`.
   2. An offline cold single-tap bare ID keeps refusing `source.unresolved`. RFC-MASK-0020 records how retained case B04 reads with this decision.
   3. The d2 follow-ups are filed as MASK-0108 to MASK-0110, outside this RFC.
 - **Pending owner decision (new; blocks nothing accepted here; needed before MASK-0103 describes these commands):**
