@@ -122,11 +122,12 @@ def proposed_tap(config, home, alias, observed):
         if identity != legacy['repository']:
             c.fail('source.identity_mismatch', "The checkout's remote no longer matches the approved legacy source identity.", 4,
                    source=config['legacy_source'], observed=identity, approved=legacy['repository'])
-        entry = legacy
+        # The migrated tap keeps exact bytes, the policy every v2 entry had implicitly (MASK-0107).
+        entry = dict(legacy, line_endings='exact')
         if alias != config['legacy_source']:
             entry = sources.binding(home, alias, legacy['transport'], legacy['ref'], legacy['packages'], legacy['authoring'])
             existing = config['sources'].get(alias)
-            if existing is not None and existing != entry:
+            if existing is not None and not sources.same_binding(existing, entry):
                 c.fail('source.alias_conflict', 'The chosen alias already names a different approved tap.', 4, source=alias)
     else:
         entry = sources.binding(home, alias, observed['remote_url'] or root, config['source']['branch'], 'skills', authoring=root)

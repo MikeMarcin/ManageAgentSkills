@@ -94,7 +94,7 @@ COMMANDS = {
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
     'source.publish': (True, True, [('name', 'pos'), ('paths', 'repeat'), ('commit', 'flag'), ('push', 'flag'), ('message', 'value')]),
     'source.dev-link': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('authoring-root', 'value'), ('to-pinned', 'flag')]),
-    'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value')]),
+    'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
@@ -197,7 +197,7 @@ def capabilities(leaves):
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2, 3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                deployment_model='taps', migration='doctor', pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
+                deployment_model='taps', migration='doctor', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
                 workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
 
 

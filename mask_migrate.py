@@ -16,7 +16,6 @@ reads a checkout.
 """
 from __future__ import annotations
 
-import copy
 from pathlib import Path
 import re
 import time
@@ -47,9 +46,10 @@ def migrated_config(config_before, home, alias, *, transport=None):
     """The v3 configuration a v1 or v2 configuration becomes under ``alias``; reads no Git and writes nothing.
 
     v1: one tap bound to the checkout. Its transport is the checkout's remote URL, supplied by the caller, or by
-    default the checkout path itself. v2: ``source`` and ``legacy_source`` are dropped and every other tap is kept
-    unchanged; the legacy binding stays under its alias and another alias renames it (the cache path follows the
-    alias). An alias already naming a different tap refuses ``source.alias_conflict``.
+    default the checkout path itself. v2: ``source`` and ``legacy_source`` are dropped and every other tap is kept;
+    the legacy binding stays under its alias and another alias renames it (the cache path follows the alias). An
+    alias already naming a different tap refuses ``source.alias_conflict``. Every migrated tap is written with the
+    exact-bytes line-ending policy (MASK-0107).
     """
     before = c.config(config_before, legacy=True)
     home = Path(home)
@@ -58,7 +58,8 @@ def migrated_config(config_before, home, alias, *, transport=None):
         root = str(Path(before['source']['root']))
         catalog = {alias: sources.binding(home, alias, transport or root, before['source']['branch'], 'skills', authoring=root)}
     elif before['schema_version'] == 2:
-        catalog = copy.deepcopy(before['sources'])
+        # Migration writes each tap's line-ending policy; a v2 entry predates it and keeps exact bytes (MASK-0107).
+        catalog = {name: dict(value, line_endings='exact') for name, value in before['sources'].items()}
         entry = catalog.pop(before['legacy_source'])
         if alias != before['legacy_source']:
             entry = sources.binding(home, alias, entry['transport'], entry['ref'], entry['packages'], entry['authoring'])

@@ -436,7 +436,7 @@ def render_sources(data, output):
             lines.append(f"  {clean(name)}: {clean(entry.get('repository'))} @ {clean(entry.get('ref', 'default'))}")
         if not sources:
             lines.append('  no named sources configured')
-    lines.extend(fields(data, [('source', 'source'), ('repository', 'repository'), ('ref', 'ref'), ('commit', 'commit'), ('cached revision', 'cached_revision'),
+    lines.extend(fields(data, [('source', 'source'), ('repository', 'repository'), ('ref', 'ref'), ('line endings', 'line_endings'), ('commit', 'commit'), ('cached revision', 'cached_revision'),
                                ('resolution required', 'resolution_required'), ('migration required', 'migration_required'), ('network', 'network'),
                                ('cache retained', 'cache_retained'), ('phase', 'phase'), ('created commit', 'created_commit'), ('created ref', 'created_ref'), ('pushed', 'pushed')]))
     if 'skills' in data and isinstance(data['skills'], list):
@@ -838,7 +838,8 @@ COMMAND_HELP = {
     'source.inspect': ('Inspect a prospective Git source without selecting it for deployment.', None),
     'source.migrate': ('Register the existing shared source under a source alias.', None),
     'source.publish': ('Inspect selected source changes; commit or push only when explicitly requested by the corresponding flags.', None),
-    'tap.add': ('Register a named Git source for skill discovery.', None),
+    'tap.add': ('Register a named Git source for skill discovery. A tap keeps exact bytes: MASK never converts line endings '
+                'of its packages unless --autocrlf opts this tap in to Git core.autocrlf=true conversion at registration.', None),
     'tap.remove': ('Remove a named source registration.', None),
     'user.init': ('Create the personal skill declaration without deploying skills.', None),
     'user.show': ('Show your personal skill declaration.', None),
@@ -897,6 +898,7 @@ OPTION_HELP = {
     'to-pinned': 'Select independent pinned deployment', 'alias': 'Tap alias for the migrated live checkout (doctor --migrate)',
     'migrate': 'Convert a live-checkout machine or consumer to taps through one recoverable transaction',
     'packages': 'Package directory inside the source', 'checkout': 'Local source checkout',
+    'autocrlf': 'Opt this tap in to Git core.autocrlf=true line-ending conversion (default: exact bytes)',
     'refresh': 'Refresh existing version resolutions', 'reason': 'Explanation for this compatibility override',
     'platform': 'Override the advertised platform restriction', 'architecture': 'Override the advertised architecture restriction',
 }

@@ -103,9 +103,6 @@ class UpdateTests(Fixture):
         (self.source / 'unrelated').write_text('staged elsewhere')
         self.git(self.source, 'add', 'unrelated')
         index = self.git(self.source, 'ls-files', '--stage')
-        # Publication hashes unfiltered working bytes; undo the Windows CRLF smudge of the committed LF fixture text.
-        skill = self.source / 'skills/alpha/SKILL.md'
-        skill.write_bytes(skill.read_bytes().replace(b'\r\n', b'\n'))
         (self.source / 'skills/alpha/published').write_bytes(b'raw\r\n')
         marker = self.base / 'executed-marker'
         helper = self.base / 'helper.sh'

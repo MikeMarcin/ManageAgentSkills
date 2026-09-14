@@ -75,10 +75,16 @@
               "null"
             ],
             "minLength": 1
+          },
+          "line_endings": {
+            "enum": [
+              "exact",
+              "autocrlf"
+            ]
           }
         }
       }
     }
   },
-  "$comment": "Machine configuration v3 (RFC-MASK-0020): every skill source is a tap. There is no live source block and no legacy_source. Repository is a normalized credential-free HTTPS, SSH or local file identity; transport must match it; cache and authoring are machine-local absolute paths. An authoring checkout is for publishing and explicit dev-link only. Runtime additionally validates URI/ref/path safety and catalog ownership. Versions 1 and 2 remain readable."
+  "$comment": "Machine configuration v3 (RFC-MASK-0020): every skill source is a tap. There is no live source block and no legacy_source. Repository is a normalized credential-free HTTPS, SSH or local file identity; transport must match it; cache and authoring are machine-local absolute paths. An authoring checkout is for publishing and explicit dev-link only. line_endings (MASK-0107 amendment) is the tap's byte policy: exact, or absent in an entry written before it existed, keeps exact bytes; autocrlf is the explicit tap add --autocrlf opt-in to Git core.autocrlf=true conversion of authoring bytes. tap add and doctor --migrate write it. Runtime additionally validates URI/ref/path safety and catalog ownership. Versions 1 and 2 remain readable."
 }

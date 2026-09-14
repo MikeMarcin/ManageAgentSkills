@@ -509,16 +509,20 @@ def validate_dev(value, config=None):
     return value
 
 
-def observe_dev(value, config, *, with_payload=False):
+def observe_dev(value, config, *, with_payload=False, guard=False):
+    """Observe development bytes under the tap's line-ending policy; ``guard`` refuses an exact tap's Git-converted copies."""
     import mask_provenance as provenance
     import mask_packages as packages
+    import mask_sources as sources
     validate_dev(value, config)
     root, target, observed = provenance.destination(config, value['source'], value['id'])
     if observed['root_identity'] != value['identity'] or observed['path'] != value['path']:
         c.fail('source.identity_mismatch', 'Development source identity or package path changed.', 4)
     # Preserve tracked logical executable modes on Windows; new files default regular.
-    modes = {item.path: item.mode for item in packages.validate(root, observed['head'], value['path'], value['id']).files}
-    payload = provenance.working_payload(target, value['id'], commit=observed['head'], path=value['path'], modes=modes)
+    committed = {item.path: item for item in packages.validate(root, observed['head'], value['path'], value['id']).files}
+    payload = provenance.authoring_payload(root, target, value['id'], commit=observed['head'], path=value['path'], committed=committed,
+                                           policy=sources.line_endings(sources.selected(config, value['source'])),
+                                           source=value['source'] if guard else None)
     result = dict(binding=value, observation=observed, payload_digest=payload.digest)
     return (result, payload) if with_payload else result
 
@@ -599,10 +603,16 @@ def dev_dispatch(args, output, home):
         if Path(args.authoring_root).expanduser().resolve() != authoring:
             c.fail('source.identity_mismatch', 'Explicit development root must match approved authoring identity.', 4)
         devs[args.id] = dict(source=name, id=identifier, root=str(authoring), identity=c.identity(authoring), path=observation['path'])
+        # A new development link of an exact tap refuses Git-converted copies of committed files (MASK-0107).
+        observe_dev(devs[args.id], config, guard=True)
     planned = fs.plan(config, state, [root], home=home, operation='source.dev-link', dev_proposals={str(root): devs})
     fs.public_plan(planned, output)
     fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-    output['data'].update(mode='dev-link' if devs else 'pinned', reproducible=not bool(devs), fleet_eligible=not bool(devs), writeback=False)
+    import mask_sources as sources
+    output['data'].update(mode='dev-link' if devs else 'pinned', reproducible=not bool(devs), fleet_eligible=not bool(devs), writeback=False,
+                          line_endings=sources.line_endings(sources.selected(config, args.id.split('/', 1)[0])),
+                          development=[dict(coordinate=item['binding']['source'] + '/' + item['binding']['id'], root=item['binding']['root'],
+                                            payload_digest=item['payload_digest']) for item in planned['intent'].get('development', [])])
     if output['dry_run']:
         return
     if not devs:

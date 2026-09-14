@@ -49,7 +49,8 @@ class PublicFixture(unittest.TestCase):
         for name in ('alpha', 'beta'):
             root = self.source / 'skills' / name
             root.mkdir()
-            (root / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture skill\n---\n\nFixture only.\n', encoding='utf-8')
+            # Explicit LF: the working bytes equal the committed bytes on every host, whatever Git line-ending conversion applies.
+            (root / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture skill\n---\n\nFixture only.\n', encoding='utf-8', newline='\n')
         shutil.copytree(STATIC_PACKAGE, self.source / 'skills/implement-rfc')
         self.git(self.source, 'add', 'skills')
         self.git(self.source, 'commit', '-m', 'fixture skills')

@@ -48,9 +48,10 @@ class Fixture(unittest.TestCase):
         return subprocess.run(['git', '-C', str(root), *args], capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
     def add_skill(self, name, description='Fixture skill'):
+        """Author an LF package; explicit newline keeps Windows from writing CRLF copies of the committed LF bytes."""
         root = self.source / 'skills' / name
         root.mkdir(parents=True)
-        (root / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: {description}\n---\n\nFixture instructions.\n')
+        (root / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: {description}\n---\n\nFixture instructions.\n', encoding='utf-8', newline='\n')
         return root
 
     def publish(self, message='fixture change', *, force=False):

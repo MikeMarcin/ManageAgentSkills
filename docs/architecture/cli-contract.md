@@ -53,7 +53,7 @@ All mutators accept `--dry-run` and `--yes`; project manifest mutators may accep
 | `source show` | `SOURCE` | None | No |
 | `source inspect` | `URL-or-SOURCE [--ref REF] [--path PATH]` | Owned bare cache for already approved source; never deployment | Yes |
 | `source migrate` | `[--alias NAME] [--expect-plan-hash HASH]` | Explicit machine v1 → v2 migration; legacy alias defaults to `legacy` | No |
-| `tap add` | `SOURCE URL [--ref REF] [--packages PATH] [--checkout PATH] [--expect-plan-hash HASH]` | Approved catalog binding only | No |
+| `tap add` | `SOURCE URL [--ref REF] [--packages PATH] [--checkout PATH] [--autocrlf] [--expect-plan-hash HASH]` | Approved catalog binding and its line-ending policy only | No |
 | `tap remove` | `SOURCE [--expect-plan-hash HASH]` | Unreferenced catalog binding only; retains cache | No |
 | `update` | `[--project PATH \| --user \| --all] [--skill SOURCE/ID ...] [--offline] [--expect-plan-hash HASH]` | Legacy: fetch, freeze, source fast-forward + every legacy scope's links/state; pinned: selected locks/links | Yes |
 | `self status` | none | None | No |
@@ -745,6 +745,31 @@ object construction report potentially retained objects even without a commit.
 An attempted push with a lost/failed acknowledgement reports an unknown outcome
 and retains the created commit/ref for inspection. Source
 publication never updates consumer locks. File-URI fixtures remain machine-local.
+
+Tap line endings (MASK-0107, amending the RFC-MASK-0020 tap entry shape). A tap
+keeps exact bytes: its catalog entry's `line_endings` is `exact`, or absent in an
+entry written before the policy existed. `tap add --autocrlf` is the only opt-in
+and records `autocrlf`; `tap add` and `doctor --migrate` write the field, and
+`tap add`, `source show`, `source publish` and `source dev-link` report it.
+Changing an existing tap's policy is an alias conflict. Caches are bare and read
+raw Git objects, so the policy governs only the bytes MASK derives from an
+authoring checkout. For an exact tap those are the raw working bytes:
+`source publish` and a new `source dev-link` refuse
+`source.line_endings_converted` (exit 4, naming repository paths) when an unedited
+package file differs from its committed copy only in line endings, as Git's own
+conversion leaves it, and `tap add --checkout` warns
+`source.line_endings_conversion` when the checkout's effective `core.autocrlf`
+converts. MASK never edits the checkout's Git configuration; set
+`core.autocrlf false` there, delete the reported unedited files and check them
+out again (`git checkout -- PATH ...`; Git leaves a stat-clean converted file in
+place), or register the tap with `--autocrlf`. For an autocrlf tap MASK applies Git's `core.autocrlf=true` check-in
+conversion to published and development bytes (Git's text statistics decide, and a
+file whose committed copy is text that already holds CRLF is not converted). Files with a `text`, `eol`, `crlf`,
+`filter`, `ident` or `working-tree-encoding` attribute refuse
+`source.line_endings_unsupported` instead of running a filter. An existing
+development link's later observations use the same policy without refusing.
+`source dev-link` reports each observed development payload digest. A previous
+tap-era program refuses a catalog entry that carries `line_endings`.
 
 
 ### Targeting and machine-local compatibility policy

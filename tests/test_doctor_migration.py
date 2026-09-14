@@ -71,7 +71,8 @@ class DoctorReport(LegacyFixture):
         roots = self.legacy_machine(2)
         migration = self.report()['data']['migration']
         self.assertEqual((migration['machine'], migration['migratable']), ('legacy_v2', True))
-        self.assertEqual(migration['proposed_tap'], dict(alias='legacy', **roots.config['sources']['legacy']))
+        # The v2 binding predates the tap line-ending policy; the proposal adds its exact default (MASK-0107).
+        self.assertEqual(migration['proposed_tap'], dict(alias='legacy', **roots.config['sources']['legacy'], line_endings='exact'))
         self.assertEqual(len(migration['consumers']), 2)
 
     def test_link_drift_and_clone_conditions_are_typed_blockers(self):
@@ -276,7 +277,9 @@ class MachineMigration(MigrationFixture):
         roots = self.legacy_machine(2)
         self.machine('doctor', '--migrate')
         config = self.assert_migrated('legacy', git(roots.clone, 'rev-parse', 'HEAD'))
-        self.assertEqual(config['sources'], dict(legacy=roots.config['sources']['legacy'], extra=roots.config['sources']['extra']))
+        # Every kept tap is unchanged except for the exact line-ending default migration writes (MASK-0107).
+        self.assertEqual(config['sources'], dict(legacy=dict(roots.config['sources']['legacy'], line_endings='exact'),
+                                                 extra=dict(roots.config['sources']['extra'], line_endings='exact')))
 
     def test_crash_at_every_checkpoint_rolls_back_exactly_or_completes(self):
         roots = self.legacy_machine(1)
@@ -383,7 +386,7 @@ class MachineMigration(MigrationFixture):
         config = self.assert_migrated('other', git(roots.clone, 'rev-parse', 'HEAD'))
         legacy = roots.config['sources']['legacy']
         renamed = sources.binding(roots.home, 'other', legacy['transport'], 'main', 'skills', legacy['authoring'])
-        self.assertEqual(config['sources'], dict(extra=roots.config['sources']['extra'], other=renamed))
+        self.assertEqual(config['sources'], dict(extra=dict(roots.config['sources']['extra'], line_endings='exact'), other=renamed))
         self.assertNotEqual(renamed['cache'], legacy['cache'])
 
     def test_renaming_a_legacy_tap_a_pinned_consumer_names_refuses_and_pinned_consumers_stay_untouched(self):

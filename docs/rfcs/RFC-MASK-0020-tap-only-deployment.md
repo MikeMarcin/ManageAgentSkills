@@ -73,15 +73,17 @@ The normative contracts are `assets/mask-corrective-managed-taps/contracts/CLI.m
 `contracts/MIGRATION.md` and `contracts/machine-v3.schema.json`. Summary:
 
 **Machine config v3.** `schema_version: 3`, `default_targets`,
-`git_timeout_seconds`, `sources` (0 to 256 tap entries; the entry shape of v2 is
-unchanged). No `source` block and no `legacy_source`. `mask_core.config` still
+`git_timeout_seconds`, `sources` (0 to 256 tap entries; the entry shape of v2
+plus the optional `line_endings` policy, `exact` or `autocrlf`, that the owner's
+exact-bytes decision above adds through MASK-0107; absent means `exact`). No
+`source` block and no `legacy_source`. `mask_core.config` still
 parses v1 and v2 for migration only; every command other than `capabilities`,
 `config show`, `doctor`, `recover` and `self *` refuses a v1/v2 configuration with
 `migration.required` (exit 4) naming `mask doctor --migrate --dry-run`.
 
 **Bootstrap.** `mask init [--target T ...] [--git-timeout N]` writes an empty v3
 catalog and state. `mask tap add NAME URL [--ref REF] [--packages PATH]
-[--checkout PATH]` creates the machine config and state when they are missing,
+[--checkout PATH] [--autocrlf]` creates the machine config and state when they are missing,
 so one command bootstraps a machine. `tap add` stays catalog-only and network-free.
 `--checkout` binds an authoring checkout whose origin must normalize to the tap
 identity; it is never read by install, list, ensure or update.

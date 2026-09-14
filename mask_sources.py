@@ -14,6 +14,23 @@ import mask_core as c
 
 FETCH_BYTES = 256 * 1024 * 1024
 CACHE_BYTES = 1024 * 1024 * 1024
+# A tap keeps exact bytes unless it opted in to Git's core.autocrlf=true conversion at tap add (MASK-0107).
+LINE_ENDINGS = ('exact', 'autocrlf')
+
+
+def line_endings(entry):
+    """The tap's line-ending policy; an entry written before the policy existed keeps exact bytes."""
+    return entry.get('line_endings', 'exact')
+
+
+def same_binding(left, right):
+    return dict(left, line_endings=line_endings(left)) == dict(right, line_endings=line_endings(right))
+
+
+def checkout_conversion(root):
+    """The authoring checkout's effective core.autocrlf when Git would convert line endings there; observational."""
+    value = c.git(root, 'config', '--get', 'core.autocrlf', optional=True)
+    return value if value is not None and value.lower() in ('true', 'input', 'yes', 'on', '1') else None
 
 
 def cache_bytes(root):
@@ -115,7 +132,9 @@ def validate_config(value):
             c.fail('config.invalid', 'The legacy source binding is missing.')
     for name, entry in value['sources'].items():
         alias(name)
-        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), family='source')
+        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), () if legacy else ('line_endings',), family='source')
+        if line_endings(entry) not in LINE_ENDINGS:
+            c.fail('config.invalid', 'A tap line-ending policy is exact or autocrlf.')
         if repository(entry['repository']) != entry['repository'] or repository(entry['transport']) != entry['repository']:
             c.fail('source.identity_mismatch', 'Source transport does not match its approved identity.', 4)
         selector(entry['ref'])
@@ -128,14 +147,16 @@ def validate_config(value):
         c.fail('config.invalid', 'Legacy source migration must preserve its authoring root.')
 
 
-def binding(home, name, transport, ref='main', packages='skills', authoring=None):
+def binding(home, name, transport, ref='main', packages='skills', authoring=None, policy='exact'):
     alias(name)
     identity = repository(transport)
+    if policy not in LINE_ENDINGS:
+        c.fail('invocation.invalid', 'A tap line-ending policy is exact or autocrlf.', 2)
     # Store only validated credential-free text; actual credentials stay with Git.
     transport = str(Path(transport).resolve()) if Path(transport).is_absolute() else transport
     return dict(repository=identity, transport=transport,
                 cache=str(home / 'sources' / (name + '-' + c.digest(identity)[7:23] + '.git')),
-                ref=selector(ref), packages=package_path(packages), authoring=authoring)
+                ref=selector(ref), packages=package_path(packages), authoring=authoring, line_endings=policy)
 
 
 def selected(config, name):
@@ -343,7 +364,9 @@ def dispatch(args, output, home):
         output['data']['sources'] = config['sources']
         return
     elif args.command == 'tap.add':
-        entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None))
+        policy = 'autocrlf' if getattr(args, 'autocrlf', False) else 'exact'
+        entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None), policy)
+        output['data']['line_endings'] = policy
         if entry['authoring'] is not None:
             root = Path(entry['authoring']).expanduser().resolve()
             c.checkout(root)
@@ -351,10 +374,16 @@ def dispatch(args, output, home):
             if repository(remote) != entry['repository']:
                 c.fail('source.identity_mismatch', 'Authoring checkout does not match the source identity.', 4)
             entry['authoring'] = str(root)
+            converting = checkout_conversion(root) if policy == 'exact' else None
+            if converting is not None:
+                output['warnings'].append(dict(code='source.line_endings_conversion', path=str(root), autocrlf=converting,
+                    message='This tap keeps exact bytes, but Git converts line endings in this checkout (core.autocrlf=' + converting + '). '
+                            'Publishing and new development links refuse converted files; set core.autocrlf false in the checkout, or register the tap with --autocrlf.'))
         existing = config['sources'].get(name)
-        if existing is not None and existing != entry:
+        if existing is not None and not same_binding(existing, entry):
             c.fail('source.alias_conflict', 'Source alias already has a different approved binding.', 4)
-        proposal['sources'][name] = entry
+        # An identical binding written before the policy existed is kept byte-for-byte.
+        proposal['sources'][name] = existing if existing is not None else entry
     elif args.command == 'tap.remove':
         selected(config, name)
         state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
@@ -366,7 +395,7 @@ def dispatch(args, output, home):
     else:
         entry = selected(config, name)
         root = cached(home, name, entry)
-        output['data'].update(source=name, binding=entry, cached_revision=c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True) if root else None)
+        output['data'].update(source=name, binding=entry, line_endings=line_endings(entry), cached_revision=c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True) if root else None)
         output['data']['resolution_required'] = root is None or output['data']['cached_revision'] is None
         if args.command == 'source.fetch':
             output['data']['fetch_effects'] = dict(attempted=False)
@@ -756,8 +785,10 @@ def publication(args, output, home):
     if any(a.startswith(b + '/') or b.startswith(a + '/') for i, a in enumerate(paths) for b in paths[i + 1: ]):
         c.fail('source.publish_path', 'Publication package roots overlap.', 4)
     config_raw = c.read_text(home / 'config.json')
+    policy = line_endings(entry)
     observations = []
     payloads = []
+    committed = []
     for identifier, path in zip(selected_ids, paths):
         actual, target, observation = provenance.destination(config, args.name, identifier)
         if actual != root or observation['path'] != path or observation['head'] != head:
@@ -765,12 +796,14 @@ def publication(args, output, home):
         staged = c.git(root, '--literal-pathspecs', 'diff', '--cached', '--name-only', '-z', '--', path, binary=True)
         if staged:
             c.fail('source.publish_overlap', 'Selected package has staged changes; preserve/commit those explicitly first.', 4, path=path)
-        old_modes = {}
+        old = {}
         if exact_entry(root, head, path) is not None:
-            old_modes = {item.path: item.mode for item in packages.validate(root, head, path, identifier).files}
-        payload = provenance.working_payload(target, identifier, commit=head, path=path, modes=old_modes)
+            old = {item.path: item for item in packages.validate(root, head, path, identifier).files}
+        # The tap's line-ending policy decides the published bytes; an exact tap refuses Git-converted copies.
+        payload = provenance.authoring_payload(root, target, identifier, commit=head, path=path, committed=old, policy=policy, source=args.name)
         observations.append(observation)
         payloads.append(payload)
+        committed.append(old)
     snapshot = dict(config=config_raw, identity=c.identity(root), head=head, index=c.digest(c.git(root, 'ls-files', '--stage', '-z', binary=True)), source_index=c.digest(raw_index), observations=observations, payloads=[payload.summary() for payload in payloads])
     message = getattr(args, 'message', 'Publish selected MASK packages')
     if not isinstance(message, str) or not 1 <= len(message) <= 4096 or '\x00' in message:
@@ -779,7 +812,7 @@ def publication(args, output, home):
     from mask_resolve import ref
     ref(branch, 'source')
     plan_hash = c.digest(dict(snapshot=snapshot, paths=sorted(paths), message=message, commit=getattr(args, 'commit', False), push=getattr(args, 'push', False)))
-    output['data'] = dict(source=args.name, paths=paths, parent_commit=head, plan_hash=plan_hash, created_commit=None, created_ref=None, pushed=False, push_outcome='not_attempted', phase='planned', retained_objects_possible=False, authoring_head=head, authoring_index_changed=False, authoring_checkout_updated=False, network='none')
+    output['data'] = dict(source=args.name, paths=paths, parent_commit=head, plan_hash=plan_hash, created_commit=None, created_ref=None, pushed=False, push_outcome='not_attempted', phase='planned', retained_objects_possible=False, authoring_head=head, authoring_index_changed=False, authoring_checkout_updated=False, network='none', line_endings=policy)
     output['would_change'] = any(exact_entry(root, head, payload.path) is None or packages.validate(root, head, payload.path, payload.id).digest != payload.digest for payload in payloads)
     if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
         c.fail('plan.stale', 'Publication inputs changed; preview again.', 4)
@@ -788,10 +821,9 @@ def publication(args, output, home):
     def recheck():
         if c.read_text(home / 'config.json') != snapshot['config'] or c.identity(root) != snapshot['identity'] or c.git(root, 'rev-parse', 'HEAD') != head or c.digest(c.git(root, 'ls-files', '--stage', '-z', binary=True)) != snapshot['index']:
             c.fail('plan.stale', 'Publication source/config/index changed.', 4)
-        for payload, observation in zip(payloads, observations):
+        for payload, observation, old in zip(payloads, observations, committed):
             actual, target, now = provenance.destination(config, args.name, payload.id)
-            modes = {item.path: item.mode for item in payload.files}
-            if now != observation or provenance.working_payload(target, payload.id, commit=head, path=payload.path, modes=modes).digest != payload.digest:
+            if now != observation or provenance.authoring_payload(root, target, payload.id, commit=head, path=payload.path, committed=old, policy=policy, source=args.name).digest != payload.digest:
                 c.fail('plan.stale', 'Publication package changed.', 4)
     recheck()
     with tempfile.TemporaryDirectory(prefix='mask-publish-') as temporary:

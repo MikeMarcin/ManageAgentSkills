@@ -35,6 +35,17 @@ are distinct approved identities. Git credentials remain in the existing Git
 configuration; URLs containing credentials and redirects are refused. Tap removal
 retains the cache and refuses references, including the legacy binding.
 
+A tap keeps exact bytes: MASK never converts the line endings of its packages
+unless you opt in when you register it, with `mask tap add NAME URL --checkout
+PATH --autocrlf`. That tap's published and development bytes then follow Git's
+`core.autocrlf=true` conversion. Without the opt-in, `source publish` and a new
+`source dev-link` refuse `source.line_endings_converted` when Git converted an
+authoring checkout's unedited files, and `tap add` warns when the checkout's own
+`core.autocrlf` converts. MASK does not change that checkout's Git configuration:
+run `git -C PATH config core.autocrlf false`, delete the reported files (they
+have no edits) and restore them with `git -C PATH checkout -- FILE ...`, or
+register the tap with `--autocrlf`.
+
 With a v2 catalog, `skill list` reports the fetched catalogs and `skill show
 SOURCE/ID` selects an exact source. Duplicate bare names require qualification;
 an unfetched source is reported explicitly. These queries read frozen Git objects.

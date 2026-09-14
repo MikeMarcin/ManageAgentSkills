@@ -337,6 +337,78 @@ def working_payload(target, identifier, *, commit, path, modes=None):
     return payload
 
 
+LINE_ENDING_ATTRIBUTES = ('text', 'eol', 'crlf', 'filter', 'ident', 'working-tree-encoding')
+# Control bytes Git's text statistics count as nonprintable (convert.c gather_stats); NUL is checked separately.
+NONPRINTABLE = bytes((*range(1, 8), 11, *range(14, 27), *range(28, 32), 127))
+
+
+def authoring_payload(root, target, identifier, *, commit, path, committed, policy, source=None):
+    """Package bytes MASK derives from an authoring checkout under its tap's line-ending policy (MASK-0107).
+
+    ``committed`` maps package-relative paths to the files committed at ``commit``. An exact tap reads raw bytes;
+    given ``source``, it refuses files whose bytes differ from their committed copies only in line endings, which
+    Git conversion produced, so publication and a new development link never take them for edits. A tap that
+    opted in at registration applies Git's core.autocrlf=true check-in conversion instead.
+    """
+    payload = working_payload(target, identifier, commit=commit, path=path, modes={name: item.mode for name, item in committed.items()})
+    if policy == 'autocrlf':
+        return p.validate_files(autocrlf_files(root, path, payload.files, committed), identifier, commit=commit, path=path)
+    if source is not None:
+        converted = [item.path for item in payload.files if item.path in committed and item.data != committed[item.path].data
+                     and item.data.replace(b'\r\n', b'\n') == committed[item.path].data.replace(b'\r\n', b'\n')]
+        if converted:
+            c.fail('source.line_endings_converted', 'This tap keeps exact bytes, but Git converted the line endings of these unedited authoring files. '
+                   'Set core.autocrlf false in the checkout, delete these unedited files and check them out again (git checkout -- PATH ...), '
+                   'or register the tap with --autocrlf.', 4, source=source, root=str(root),
+                   paths=[name if path == '.' else path + '/' + name for name in converted][:64], autocrlf=s.checkout_conversion(root))
+    return payload
+
+
+def autocrlf_files(root, package, files, committed):
+    """Refuse attributes whose conversion MASK does not reproduce, then convert each file as core.autocrlf=true would."""
+    names = [item.path if package == '.' else package + '/' + item.path for item in files]
+    batches, batch, size = [], [], 0
+    for name in names:
+        if batch and size + len(name) > 8000:
+            batches.append(batch)
+            batch, size = [], 0
+        batch.append(name)
+        size += len(name) + 1
+    specified = []
+    for batch in batches + ([batch] if batch else []):
+        fields = c.git(root, 'check-attr', '-z', *LINE_ENDING_ATTRIBUTES, '--', *batch, binary=True).split(b'\0')
+        for index in range(0, len(fields) - 2, 3):
+            name, attribute, value = (item.decode('utf-8', 'replace') for item in fields[index:index + 3])
+            if value != 'unspecified':
+                specified.append(dict(path=name, attribute=attribute, value=value))
+    if specified:
+        c.fail('source.line_endings_unsupported', 'Git attributes select a conversion that an autocrlf tap does not apply; '
+               'remove them from these files, or register the tap without --autocrlf.', 4, attributes=specified[:64])
+    return [p.PayloadFile(item.path, item.mode, autocrlf(item.data, committed.get(item.path))) for item in files]
+
+
+def git_binary(data):
+    """Git's text statistics call these bytes binary: a lone CR, a NUL, or too many nonprintable bytes (convert.c)."""
+    if data.count(b'\r') != data.count(b'\r\n') or b'\0' in data:
+        return True
+    control = len(data) - len(data.translate(None, NONPRINTABLE))
+    printable = len(data) - data.count(b'\r') - data.count(b'\n') - control
+    return (printable >> 7) < control - data.endswith(b'\x1a')
+
+
+def autocrlf(data, committed=None):
+    """Git's core.autocrlf=true check-in conversion of one file without attributes (convert.c crlf_to_git, text=auto).
+
+    Nothing changes without CRLF or for binary bytes, and nothing changes when the committed copy is text that
+    already holds CRLF (Git's has_crlf_in_index check).
+    """
+    if b'\r\n' not in data or git_binary(data):
+        return data
+    if committed is not None and b'\r\n' in committed.data and not git_binary(committed.data):
+        return data
+    return data.replace(b'\r\n', b'\n')
+
+
 def working_manifest(target, modes, *, exclude_record=True):
     if c.kind(target) != 'directory':
         c.fail('provenance.unavailable', 'Selected package is not a real directory.', 4)
