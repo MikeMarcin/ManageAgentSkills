@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0109"
 title: "Bind the same plan hash for a pinned ensure preview on a cold store as for the applying run"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: ["MASK-0100"]
 priority: "P2"
