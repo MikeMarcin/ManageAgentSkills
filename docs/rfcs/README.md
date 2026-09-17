@@ -49,3 +49,9 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC | Status | Title |
 |---|---|---|
 | RFC-MASK-0021 | Implementing | Tap-only deployment, fetching updates and doctor migration |
+
+## Corrective tap identity
+
+| RFC | Status | Title |
+|---|---|---|
+| RFC-MASK-0022 | Proposed | Transport-neutral tap identity and convention-following transport |
