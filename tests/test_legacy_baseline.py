@@ -98,9 +98,11 @@ class LegacyFixtureBytes(LegacyFixture):
         self.assertEqual(config['sources']['legacy']['repository'], roots.upstream.as_uri())
         self.assertIsNone(config['sources']['extra']['authoring'])
         for name, entry in config['sources'].items():
-            # A v2 entry never carries the tap line-ending policy the current binding adds (MASK-0109); otherwise they are equal.
+            # A v2 entry never carries the tap line-ending policy (MASK-0109) or the transport policy (RFC-MASK-0022) the current
+            # binding adds; otherwise they are equal.
             current = sources.binding(roots.home, name, entry['transport'], entry['ref'], entry['packages'], entry['authoring'])
-            self.assertEqual((current.pop('line_endings'), 'line_endings' in entry, current), ('exact', False, entry))
+            self.assertEqual((current.pop('line_endings'), current.pop('transport_policy'), 'line_endings' in entry, 'transport_policy' in entry, current),
+                             ('exact', 'derived', False, False, entry))
         state = self.canonical(roots.home / 'state.json', c.state)
         self.assert_legacy_consumers(roots, state)
 

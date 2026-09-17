@@ -139,6 +139,9 @@ class SourcesTests(Fixture):
         self.assertNotEqual(sources.repository('https://example.test/Org/Repo.git'), sources.repository('https://example.test/Org/Repo'))
         self.assertNotEqual(sources.repository('https://example.test/org/repo'), sources.repository('ssh://git@example.test/org/repo'))
         self.assertNotEqual(sources.repository('https://example.test/Org/Repo'), sources.repository('https://example.test/org/repo'))
+        # RFC-MASK-0022: on a forge host those spellings are one transport-neutral identity; anywhere else they stay apart, as above.
+        for spelling in ('https://github.com/Org/Repo', 'ssh://git@github.com/Org/Repo.git', 'git@github.com:Org/Repo.git'):
+            self.assertEqual(sources.repository(spelling), 'https://github.com/Org/Repo.git')
         for value in ('git@example.test:~other/repo', 'git@example.test:--help'):
             with self.assertRaises(c.MaskError):
                 sources.repository(value)

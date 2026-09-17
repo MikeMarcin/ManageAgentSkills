@@ -80,7 +80,7 @@ def authoring_checkout(config, name):
     branch = s.authoring_branch(root, entry['ref'])
     origin = c.git(root, 'remote', 'get-url', 'origin', optional=True)
     if origin is None:
-        if s.repository(str(root)) != entry['repository']:
+        if not s.same(str(root), entry['repository']):
             c.fail('source.identity_mismatch', 'Authoring checkout does not match its approved local identity.', 4)
         head = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}')
         for marker in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
@@ -90,7 +90,7 @@ def authoring_checkout(config, name):
     else:
         observed = g.checkout_preconditions(root, 'origin', branch, timeout=config['git_timeout_seconds'], clean=False)
         # The authoring checkout's identity is its origin normalized to the approved tap repository.
-        if s.repository(origin) != entry['repository']:
+        if not s.same(origin, entry['repository']):
             c.fail('source.identity_mismatch', 'Configured remote differs from its approved repository.', 4)
         s.endpoint(root, origin, entry['repository'])
         head = observed['revision']
@@ -288,7 +288,7 @@ def parse_record(raw):
     upstream, curated = value['upstream'], value['curated']
     c.fields(upstream, ('repository', 'path', 'id', 'commit', 'payload_digest', 'files', 'notices'), family='provenance', versions=None)
     c.fields(curated, ('source', 'id', 'path', 'authoring_revision_at_import', 'content_digest', 'files'), family='provenance', versions=None)
-    if s.repository(upstream['repository']) != upstream['repository']:
+    if upstream['repository'] not in (s.repository(upstream['repository']), s.spelling(upstream['repository'])):
         c.fail('provenance.invalid', 'Noncanonical recorded repository.', 4)
     for item in (upstream, curated):
         s.package_path(item['path']); c.skill_id(item['id'])
@@ -504,7 +504,7 @@ def observe_cached(config, home, args):
 def verify_upstream(config, home, record, data):
     upstream = record['upstream']
     for source_name, entry in config['sources'].items():
-        if entry['repository'] != upstream['repository']:
+        if not s.same(entry['repository'], upstream['repository']):
             continue
         cache = s.cached(home, source_name, entry)
         if cache is None or c.git(cache, 'cat-file', '-e', upstream['commit'] + '^{commit}', optional=True) is None:

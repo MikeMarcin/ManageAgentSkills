@@ -16,6 +16,7 @@ FETCH_BYTES = 256 * 1024 * 1024
 CACHE_BYTES = 1024 * 1024 * 1024
 # A tap keeps exact bytes unless it opted in to Git's core.autocrlf=true conversion at tap add (MASK-0109).
 LINE_ENDINGS = ('exact', 'autocrlf')
+TRANSPORT_POLICIES = ('derived', 'pinned')  # RFC-MASK-0022: derived follows convention; pinned uses the recorded transport only.
 
 
 def line_endings(entry):
@@ -23,8 +24,15 @@ def line_endings(entry):
     return entry.get('line_endings', 'exact')
 
 
+def transport_policy(entry):
+    """``pinned`` uses the recorded transport only; ``derived``, also the reading of an entry from before RFC-MASK-0022, follows convention."""
+    return entry.get('transport_policy', 'derived')
+
+
 def same_binding(left, right):
-    return dict(left, line_endings=line_endings(left)) == dict(right, line_endings=line_endings(right))
+    """Whether two catalog entries approve the same thing; how this machine reaches the tap is not part of that."""
+    return same(left['repository'], right['repository']) and line_endings(left) == line_endings(right) and \
+        all(left[key] == right[key] for key in ('ref', 'packages', 'authoring'))
 
 
 def checkout_conversion(root):
@@ -67,8 +75,57 @@ def alias(value):
     return value
 
 
+# RFC-MASK-0022: hosts where HTTPS and SSH front one repository namespace and one permission model.
+FORGE_HOSTS = frozenset(('github.com', 'gitlab.com', 'bitbucket.org', 'codeberg.org'))
+# The built-in set plus this machine's own ``forge_hosts``. Only a validated machine configuration extends it;
+# a project file never can. mask.main() resets it, so one invocation never inherits another machine's opt-in.
+ACTIVE_FORGES = set(FORGE_HOSTS)
+
+
+def forge_hosts(value):
+    if not isinstance(value, list) or len(value) > 64 or len(set(value)) != len(value) or \
+            any(not isinstance(host, str) or not re.fullmatch(r'[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?', host) for host in value):
+        c.fail('config.invalid', 'forge_hosts is a list of at most 64 unique lowercase hostnames.')
+    return value
+
+
+def forge_path(spelled):
+    """``(host, path)`` when a strict spelling names a forge repository in a transport-neutral shape, else None.
+
+    HTTPS without user info, ``ssh://git@`` with an absolute path, and ``ssh://git@H/~/P``, which is how MASK spelled
+    the scp form ``git@H:P`` before this RFC and which no forge serves as a real home-relative path. A non-default
+    port or any other SSH user stays strict.
+    """
+    parsed = urlsplit(spelled)
+    if parsed.scheme not in ('https', 'ssh') or parsed.hostname not in ACTIVE_FORGES or parsed.port is not None:
+        return None
+    if parsed.username != ('git' if parsed.scheme == 'ssh' else None):
+        return None
+    path = parsed.path[2:] if parsed.scheme == 'ssh' and parsed.path.startswith('/~/') else parsed.path
+    path = path.removesuffix('.git')
+    return (parsed.hostname, path) if len(path) > 1 else None
+
+
 def repository(value):
-    """Normalize transport spelling without equating HTTPS and SSH authority."""
+    """A tap's transport-neutral identity (RFC-MASK-0022): forge spellings fold to ``https://H/P.git``; every other host stays strict."""
+    spelled = spelling(value)
+    forge = forge_path(spelled)
+    return spelled if forge is None else 'https://' + forge[0] + forge[1] + '.git'
+
+
+def same(left, right):
+    """Whether two recorded or typed repository spellings name one identity. Every identity comparison goes through here."""
+    return repository(left) == repository(right)
+
+
+def scp(identity):
+    """The SSH transport of a forge identity, as Git's scp form; never the ``/~/`` URI, which forges refuse."""
+    forge = forge_path(identity)
+    return None if forge is None else 'git@' + forge[0] + ':' + forge[1].lstrip('/') + '.git'
+
+
+def spelling(value):
+    """Normalize one transport spelling without equating HTTPS and SSH authority; what files recorded before RFC-MASK-0022."""
     if not isinstance(value, str) or not value or value.startswith('-') or any(ch in value for ch in '\0\r\n'):
         c.fail('source.identity_invalid', 'Expected a credential-free repository URI or absolute local path.')
     if Path(value).is_absolute():
@@ -135,6 +192,9 @@ def package_path(value):
 
 def validate_config(value):
     legacy = value['schema_version'] == 2
+    # This machine's own opt-in extends forge equivalence before any of its identities is compared (RFC-MASK-0022).
+    ACTIVE_FORGES.clear()
+    ACTIVE_FORGES.update(FORGE_HOSTS, forge_hosts(value.get('forge_hosts', [])))
     if not isinstance(value['sources'], dict) or not (1 if legacy else 0) <= len(value['sources']) <= 256:
         c.fail('config.invalid', 'Expected a bounded approved source catalog.')
     if legacy:
@@ -143,10 +203,13 @@ def validate_config(value):
             c.fail('config.invalid', 'The legacy source binding is missing.')
     for name, entry in value['sources'].items():
         alias(name)
-        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), () if legacy else ('line_endings',), family='source')
+        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), () if legacy else ('line_endings', 'transport_policy'), family='source')
+        if entry.get('transport_policy', 'derived') not in TRANSPORT_POLICIES:
+            c.fail('config.invalid', 'A tap transport policy is derived or pinned.')
         if line_endings(entry) not in LINE_ENDINGS:
             c.fail('config.invalid', 'A tap line-ending policy is exact or autocrlf.')
-        if repository(entry['repository']) != entry['repository'] or repository(entry['transport']) != entry['repository']:
+        # A catalog written before RFC-MASK-0022 keeps its strict spelling until doctor --migrate converts it; both are one identity.
+        if entry['repository'] not in (repository(entry['repository']), spelling(entry['repository'])) or not same(entry['transport'], entry['repository']):
             c.fail('source.identity_mismatch', 'Source transport does not match its approved identity.', 4)
         selector(entry['ref'])
         package_path(entry['packages'])
@@ -158,16 +221,23 @@ def validate_config(value):
         c.fail('config.invalid', 'Legacy source migration must preserve its authoring root.')
 
 
-def binding(home, name, transport, ref='main', packages='skills', authoring=None, policy='exact'):
+def cache_path(home, name, identity):
+    return home / 'sources' / (name + '-' + c.digest(identity)[7:23] + '.git')
+
+
+def binding(home, name, transport, ref='main', packages='skills', authoring=None, policy='exact', pinned=False):
     alias(name)
     identity = repository(transport)
     if policy not in LINE_ENDINGS:
         c.fail('invocation.invalid', 'A tap line-ending policy is exact or autocrlf.', 2)
     # Store only validated credential-free text; actual credentials stay with Git.
     transport = str(Path(transport).resolve()) if Path(transport).is_absolute() else transport
-    return dict(repository=identity, transport=transport,
-                cache=str(home / 'sources' / (name + '-' + c.digest(identity)[7:23] + '.git')),
-                ref=selector(ref), packages=package_path(packages), authoring=authoring, line_endings=policy)
+    # A forge SSH transport is kept in Git's scp form: the /~/ URI a strict spelling produces is one no forge serves.
+    if forge_path(identity) is not None and not transport.startswith('https://'):
+        transport = scp(identity)
+    return dict(repository=identity, transport=transport, cache=str(cache_path(home, name, identity)),
+                ref=selector(ref), packages=package_path(packages), authoring=authoring, line_endings=policy,
+                transport_policy='pinned' if pinned else 'derived')
 
 
 def selected(config, name):
@@ -180,8 +250,123 @@ def selected(config, name):
 
 def endpoint(root, transport, identity):
     expanded = c.git(root, 'ls-remote', '--get-url', transport)
-    if repository(expanded) != identity:
+    if not same(expanded, identity):
         c.fail('source.identity_mismatch', 'Git rewrites the transport to an unapproved repository.', 4)
+
+
+def scheme(transport):
+    """``https``, ``ssh`` or ``file`` for a transport in any accepted spelling, including Git's scp form."""
+    return urlsplit(spelling(transport)).scheme
+
+
+def hint_path(root):
+    return root / 'mask-transport.json'
+
+
+def transport_hint(home, name, entry):
+    """The transport that last reached a derived tap, kept beside its cache; the catalog's transport until a fetch succeeds.
+
+    It is not rewritten into config.json: fetches run inside journaled operations that bind the configuration's bytes.
+    """
+    root = cached(home, name, entry)
+    value = c.read_json(hint_path(root), 'source', default={}) if root is not None else {}
+    if value:
+        c.fields(value, ('schema_version', 'transport', 'chosen_by'), family='source')
+        if isinstance(value['transport'], str) and same(value['transport'], entry['repository']):
+            return value['transport'], value['chosen_by']
+    return entry['transport'], 'catalog'
+
+
+def gh_protocol(host):
+    """``gh config get git_protocol -h HOST`` when gh is installed; read-only, and no gh failure is ever fatal."""
+    import shutil
+    if shutil.which('gh') is None:
+        return None
+    try:
+        code, stdout, _ = c.contained_run(['gh', 'config', 'get', 'git_protocol', '-h', host], dict(os.environ, GH_PROMPT_DISABLED='1', NO_COLOR='1'),
+                                          timeout=5, max_output=256, family='gh', name='gh')
+    except (c.MaskError, OSError):
+        return None
+    answer = stdout.decode('utf-8', errors='replace').strip().lower()
+    return answer if code == 0 and answer in ('https', 'ssh') else None
+
+
+def origin_scheme(consumer, host):
+    """The scheme of a consumer checkout's ``origin`` when it is on the tap's host: that machine demonstrably authenticates that way."""
+    if consumer is None:
+        return None
+    origin = c.git(consumer, 'remote', 'get-url', 'origin', optional=True)
+    try:
+        spelled = urlsplit(spelling(origin)) if origin else None
+    except c.MaskError:
+        return None
+    return spelled.scheme if spelled is not None and spelled.scheme in ('https', 'ssh') and spelled.hostname == host else None
+
+
+def transports(home, name, entry, consumer=None):
+    """Ordered ``(transport, chosen_by)`` for one fetch (RFC-MASK-0022): a pin alone; else origin, hint, gh, then the other scheme.
+
+    Every candidate is a spelling of the tap's own identity, so transport selection can never reach another repository.
+    """
+    forge = forge_path(repository(entry['repository']))
+    if transport_policy(entry) == 'pinned':
+        return [(entry['transport'], 'pinned')]
+    if forge is None:
+        return [(entry['transport'], 'catalog')]  # Off the forge hosts HTTPS and SSH are different identities: nothing to derive.
+    reach = {'https': repository(entry['repository']), 'ssh': scp(repository(entry['repository']))}
+    hinted, source = transport_hint(home, name, entry)
+    if scheme(hinted) == 'ssh':
+        hinted = reach['ssh']  # Never the /~/ URI an older catalog recorded: no forge serves it.
+    # A transport that a fetch proved outranks gh's stated preference; the URL typed at tap add, never yet proven, does not.
+    proven = source != 'catalog'
+    order = [(origin_scheme(consumer, forge[0]), 'origin'), (scheme(hinted) if proven else None, 'hint'), (gh_protocol(forge[0]), 'gh'),
+             (None if proven else scheme(hinted), 'catalog'), ('https', 'probe'), ('ssh', 'probe')]
+    result = []
+    for chosen, step in order:
+        if chosen in reach and chosen not in [scheme(item[0]) for item in result]:
+            # The hint keeps its recorded spelling (for example https without .git); a derived scheme uses the canonical one.
+            result.append((hinted if scheme(hinted) == chosen else reach[chosen], step))
+    return result
+
+
+UNREACHED = ('git.auth_required', 'git.failed', 'git.timeout')  # Authentication or reachability: the only failures that try the next transport.
+
+
+def negotiate(home, name, entry, timeout, output, consumer=None):
+    """Reach a tap without prompting: the first candidate transport that answers ``ls-remote``.
+
+    Returns the entry carrying the chosen transport, plus its advertisement. A rewritten endpoint, a redirect policy
+    or a malformed advertisement refuses at once; only an authentication or reachability failure moves on.
+    """
+    context = cached(home, name, entry) or home
+    attempted = []
+    for transport, step in transports(home, name, entry, consumer):
+        chosen = dict(entry, transport=transport)
+        try:
+            refs, options = remote_refs(context, chosen, timeout, output)
+        except c.MaskError as error:
+            if error.code not in UNREACHED:
+                raise
+            attempted.append(dict(transport=transport, chosen_by=step, code=error.code))
+            failure = error
+            continue
+        output['data'].setdefault('transports', {})[name] = dict(transport=transport, transport_policy=transport_policy(entry), chosen_by=step, tried=attempted)
+        return chosen, refs, options
+    if len(attempted) == 1:
+        raise failure  # One way to reach the tap: its own error says most.
+    c.fail('git.auth_required', 'No transport reached the tap without prompting; configure HTTPS credentials or an SSH key, or pin one with mask tap transport.', 5,
+           source=name, tried=attempted)
+
+
+def remember(home, name, entry, report):
+    """Record the transport that worked as the next fetch's hint; a pinned tap has nothing to remember."""
+    root = cached(home, name, entry)
+    if root is None or transport_policy(entry) == 'pinned' or report is None:
+        return
+    text = c.text_json(dict(schema_version=1, transport=report['transport'], chosen_by=report['chosen_by']))
+    before = c.read_text(hint_path(root), missing=True)
+    if before != text:
+        c.atomic_text(hint_path(root), text, before)
 
 
 def network_options(root, transport):
@@ -196,8 +381,10 @@ def network_options(root, transport):
 
 
 def cache_root(home, name, entry):
-    expected = Path(binding(home, name, entry['transport'], entry['ref'], entry['packages'])['cache'])
-    if Path(entry['cache']) != expected:
+    # Keyed by the canonical identity; a catalog from before RFC-MASK-0022 keeps the key of its recorded spelling until doctor --migrate.
+    allowed = {cache_path(home, name, identity) for identity in (repository(entry['repository']), entry['repository'])}
+    expected = Path(entry['cache'])
+    if expected not in allowed:
         c.fail('source.cache_invalid', 'Cache location is outside the selected source binding.', 4)
     c.parents_safe(home, expected)
     return expected
@@ -212,7 +399,8 @@ def cached(home, name, entry):
     if c.kind(root / 'mask-source.json') != 'file':
         c.fail('source.cache_invalid', 'Source cache has no regular ownership marker.', 4)
     marker = c.read_json(root / 'mask-source.json', 'source')
-    if marker != dict(schema_version=1, repository=entry['repository'], identity=c.identity(root)):
+    if set(marker) != {'schema_version', 'repository', 'identity'} or marker['schema_version'] != 1 or marker['identity'] != c.identity(root) \
+            or not isinstance(marker['repository'], str) or not same(marker['repository'], entry['repository']):
         c.fail('source.cache_invalid', 'Source cache ownership changed.', 4)
     if c.git(root, 'rev-parse', '--is-bare-repository') != 'true':
         c.fail('source.cache_invalid', 'Expected an owned bare source cache.', 4)
@@ -222,7 +410,7 @@ def cached(home, name, entry):
 def remote_refs(root, entry, timeout, output):
     endpoint(root, entry['transport'], entry['repository'])
     options = network_options(root, entry['transport'])
-    protocol = urlsplit(entry['repository']).scheme
+    protocol = scheme(entry['transport'])  # The transport in use; a forge identity is spelled https however it is reached.
     options += ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
     output['data']['resolution_effects'] = dict(network_attempted=True)
     raw = c.git(root, *options, 'ls-remote', entry['transport'], timeout=timeout, max_output=1024 * 1024)
@@ -264,7 +452,7 @@ def cached_refs(root, entry):
     if not value:
         return None
     c.fields(value, ('schema_version', 'repository', 'refs'), family='source')
-    if value['repository'] != entry['repository'] or not isinstance(value['refs'], dict) or len(value['refs']) > 4096:
+    if not isinstance(value['repository'], str) or not same(value['repository'], entry['repository']) or not isinstance(value['refs'], dict) or len(value['refs']) > 4096:
         c.fail('source.cache_invalid', 'Invalid cached ref advertisement.', 4)
     for ref, oid in value['refs'].items():
         selector(ref)
@@ -273,13 +461,13 @@ def cached_refs(root, entry):
     return value['refs']
 
 
-def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None, extra=()):
+def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None, extra=(), consumer=None):
     """Fetch one selector; ``extra`` object IDs join the same Git invocation and are retained under refs/mask/frozen."""
     root = cache_root(home, name, entry)
-    endpoint(home, entry['transport'], entry['repository'])
     existing = cached(home, name, entry)
-    context = existing or home
-    refs, options = advertised or remote_refs(context, entry, timeout, output)
+    # ``advertised`` is negotiate()'s result; its entry carries the transport that answered.
+    entry, refs, options = advertised or negotiate(home, name, entry, timeout, output, consumer)
+    endpoint(home, entry['transport'], entry['repository'])
     requested = entry['ref'] if ref is None else ref
     oid = resolve_ref(refs, requested)
     extra = sorted(set(extra))
@@ -327,6 +515,7 @@ def fetch(home, name, entry, timeout, output, *, ref=None, advertised=None, extr
             freeze(root, item, f'{staged}-{index}')
         path = root / 'mask-refs.json'
         c.atomic_text(path, c.text_json(dict(schema_version=1, repository=entry['repository'], refs=refs)), c.read_text(path, missing=True))
+        remember(home, name, entry, output['data'].get('transports', {}).get(name))
     finally:
         after = c.git(root, 'rev-parse', '--verify', destination + '^{commit}', optional=True)
         output['data']['fetch_effects'].update(after=after, remote_refs_changed=before != after)
@@ -376,14 +565,15 @@ def dispatch(args, output, home):
         return
     elif args.command == 'tap.add':
         policy = 'autocrlf' if getattr(args, 'autocrlf', False) else 'exact'
-        entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None), policy)
+        entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None), policy,
+                        pinned=getattr(args, 'pin_transport', False))
         output['data']['line_endings'] = policy
         if entry['authoring'] is not None:
             root = Path(entry['authoring']).expanduser().resolve()
             c.checkout(root)
             authoring_branch(root, entry['ref'])
             remote = c.git(root, 'remote', 'get-url', 'origin', optional=True) or str(root)
-            if repository(remote) != entry['repository']:
+            if not same(remote, entry['repository']):
                 c.fail('source.identity_mismatch', 'Authoring checkout does not match the source identity.', 4)
             entry['authoring'] = str(root)
             converting = checkout_conversion(root) if policy == 'exact' else None
@@ -396,6 +586,20 @@ def dispatch(args, output, home):
             c.fail('source.alias_conflict', 'Source alias already has a different approved binding.', 4)
         # An identical binding written before the policy existed is kept byte-for-byte.
         proposal['sources'][name] = existing if existing is not None else entry
+    elif args.command == 'tap.transport':
+        # How this machine reaches a tap (RFC-MASK-0022). Only the catalog changes, and never which repository is trusted.
+        existing = selected(config, name)
+        url, derive = getattr(args, 'url', None), getattr(args, 'derive', False)
+        if (url is None) == (not derive):
+            c.fail('invocation.invalid', 'Give the transport URL to pin, or --derive to follow convention again.', 2)
+        if derive:
+            proposal['sources'][name] = dict(existing, transport_policy='derived')
+        else:
+            if not same(url, existing['repository']):
+                c.fail('source.identity_mismatch', 'That URL names a different repository than the approved tap; nothing changed.', 4, source=name)
+            pinned = binding(home, name, url, existing['ref'], existing['packages'], existing['authoring'], line_endings(existing), pinned=True)
+            proposal['sources'][name] = dict(existing, transport=pinned['transport'], transport_policy='pinned')
+        output['data'].update(source=name, transport=proposal['sources'][name]['transport'], transport_policy=proposal['sources'][name]['transport_policy'])
     elif args.command == 'tap.remove':
         selected(config, name)
         state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
@@ -407,6 +611,9 @@ def dispatch(args, output, home):
     else:
         entry = selected(config, name)
         root = cached(home, name, entry)
+        hinted, chosen_by = transport_hint(home, name, entry)
+        pinned = transport_policy(entry) == 'pinned'
+        output['data'].update(transport=entry['transport'] if pinned else hinted, transport_policy=transport_policy(entry), chosen_by='pinned' if pinned else chosen_by)
         output['data'].update(source=name, binding=entry, line_endings=line_endings(entry), cached_revision=c.git(root, 'rev-parse', '--verify', 'refs/mask/selected^{commit}', optional=True) if root else None)
         output['data']['resolution_required'] = root is None or output['data']['cached_revision'] is None
         if args.command == 'source.fetch':
@@ -585,7 +792,7 @@ def locate_url(config, url):
     if url in config.get('sources', {}):
         return url, config['sources'][url], None, None
     normalized = repository(url)
-    candidates = [(name, entry, None, None) for name, entry in config.get('sources', {}).items() if entry['repository'] == normalized]
+    candidates = [(name, entry, None, None) for name, entry in config.get('sources', {}).items() if repository(entry['repository']) == normalized]
     parsed = urlsplit(url)
     parts = unquote(parsed.path).strip('/').split('/')
     if parsed.scheme.lower() == 'https' and parsed.hostname == 'github.com' and len(parts) >= 2:
@@ -593,7 +800,7 @@ def locate_url(config, url):
         tail = '/'.join(parts[3:]) if len(parts) >= 4 and parts[2] in ('tree', 'blob') else None
         if len(parts) == 2 or tail:
             candidates = [(name, entry, tail, parts[2] if tail else None) for name, entry in config.get('sources', {}).items()
-                          if entry['repository'] in (base, base + '.git')]
+                          if repository(entry['repository']) == repository(base)]
     if not candidates:
         c.fail('source.unapproved', 'Approve this repository with tap add before inspecting it.', 4)
     if len(candidates) > 1:
@@ -636,8 +843,8 @@ def inspect(args, output, home):
         if refs is None:
             return
     else:
-        advertised = remote_refs(root or home, entry, config['git_timeout_seconds'], output)
-        refs = advertised[0]
+        advertised = negotiate(home, name, entry, config['git_timeout_seconds'], output)
+        refs = advertised[1]
     ref, path = url_selection(tail, kind, refs, getattr(args, 'ref', None), getattr(args, 'path', None), entry['ref'])
     oid = resolve_ref(refs, ref)
     commit = c.git(root, 'rev-parse', '--verify', oid + '^{commit}', optional=True) if root else None
@@ -699,17 +906,21 @@ def validate_row(home, config, row):
     row.update(payload.summary())
 
 
-def acquire_exact(home, name, entry, commit, timeout, effects):
-    """Acquire only a full commit; never advertise/resolve refs or move selected."""
+def acquire_exact(home, name, entry, commit, timeout, effects, consumer=None):
+    """Acquire only a full commit; never resolve refs or move selected. A derived tap with two ways in is probed once for the one that answers."""
     if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', commit):
         c.fail('source.ref_invalid', 'Exact acquisition requires a full commit.', 4)
     root = cached(home, name, entry)
     if root and c.git(root, 'rev-parse', '--verify', commit + '^{commit}', optional=True) == commit:
         return root
     root = root or cache_root(home, name, entry)
+    ways = transports(home, name, entry, consumer)
+    scratch = dict(data={})
+    entry = negotiate(home, name, entry, timeout, scratch, consumer)[0] if len(ways) > 1 else dict(entry, transport=ways[0][0])
+    effects['transport'] = scratch['data'].get('transports', {}).get(name) or dict(transport=entry['transport'], transport_policy=transport_policy(entry), chosen_by=ways[0][1], tried=[])
     endpoint(home, entry['transport'], entry['repository'])
     options = network_options(root if root.exists() else home, entry['transport'])
-    protocol = urlsplit(entry['repository']).scheme
+    protocol = scheme(entry['transport'])  # The transport in use; a forge identity is spelled https however it is reached.
     options += ['-c', 'protocol.allow=never', '-c', 'protocol.' + protocol + '.allow=always']
     effects.update(path=str(root), commit=commit, network_attempted=False, retained_objects_possible=False)
     if c.kind(root) == 'missing':

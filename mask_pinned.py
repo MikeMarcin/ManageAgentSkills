@@ -497,7 +497,7 @@ def validate_live_lock(value, declaration, pending):
     locked = r.lock(value)
     for row in locked['packages']:
         entry = sources.selected(pending['config'], row['source'])
-        if row['repository'] != entry['repository']:
+        if not sources.same(row['repository'], entry['repository']):
             c.fail('recovery.conflict', 'Before disk lock contains an unapproved source identity.', 8)
     return locked
 

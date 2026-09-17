@@ -114,7 +114,8 @@ def selector(value, family='selection'):
 
 
 def repository(value, family):
-    if not isinstance(value, str) or not value.startswith(('https://', 'ssh://', 'file://')) or s.repository(value) != value:
+    # The canonical identity, or the strict spelling a file written before RFC-MASK-0022 recorded; both compare through s.same.
+    if not isinstance(value, str) or not value.startswith(('https://', 'ssh://', 'file://')) or value not in (s.repository(value), s.spelling(value)):
         invalid(family, 'Repository identity must be a canonical credential-free URI; file URIs are machine-local only.')
     return value
 
@@ -219,7 +220,7 @@ def lock(value, declaration=None, *, matching=True):
                     invalid('lock', 'Resolution is not selected.')
                 continue
             chosen = declared_selector(declaration, binding)
-            if row['repository'] != declaration['sources'][row['source']]['repository'] or chosen is not None and chosen != row['selector']:
+            if not s.same(row['repository'], declaration['sources'][row['source']]['repository']) or chosen is not None and chosen != row['selector']:
                 c.fail('lock.stale', 'Resolved identity or selector differs from the declaration; explicitly refresh the changed binding.', 4)
     return result
 
@@ -256,7 +257,7 @@ def approved(declaration, config):
     entries = {}
     for name, expected in declaration['sources'].items():
         entry = s.selected(config, name)
-        if entry['repository'] != expected['repository'] or entry['packages'] != expected['packages']:
+        if not s.same(entry['repository'], expected['repository']) or entry['packages'] != expected['packages']:
             c.fail('source.identity_mismatch', 'Selection repository or package layout does not match the machine approval.', 4, source=name)
         entries[name] = entry
     return entries
@@ -323,6 +324,7 @@ def resolve_binding(home, declaration, binding, entry, payload_views=None):
     if len(found) != 1:
         c.fail('skill.unknown', 'Selected package must have exactly one safe path at the chosen commit.', 4, skill=coordinate(binding))
     row = {key: found[0][key] for key in ('source', 'id', 'repository', 'path', 'commit')}
+    row['repository'] = s.repository(row['repository'])  # A new resolution records the transport-neutral identity.
     row.update(selector=chosen, git_object_format=c.git(root, 'rev-parse', '--show-object-format'))
     payload = frozen_payload(root, row)
     row.update(payload_digests(payload))
@@ -347,7 +349,7 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
         update = refresh and (not selected or key in selected)
         if prior is not None and not update:
             chosen = declared_selector(declaration, binding)
-            if prior['repository'] != entry['repository'] or chosen is not None and chosen != prior['selector']:
+            if not s.same(prior['repository'], entry['repository']) or chosen is not None and chosen != prior['selector']:
                 c.fail('lock.stale', 'Changed binding requires an explicit selected --refresh.', 4, skill=key)
             payload = verify_resolution(home, binding['source'], entry, prior)
             if payload_views is not None:
@@ -355,13 +357,18 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
             rows.append(prior)
             continue
         row = resolve_binding(home, declaration, binding, entry, payload_views)
-        if prior is not None and prior['repository'] == row['repository'] and prior['selector'] == row['selector'] and prior['commit'] != row['commit']:
+        if prior is not None and dict(prior, repository=row['repository']) == row:
+            row = prior  # The same resolution under an older spelling: a spelling alone never rewrites a committed lock.
+        if prior is not None and s.same(prior['repository'], row['repository']) and prior['selector'] == row['selector'] and prior['commit'] != row['commit']:
             chosen = row['selector']
             root = cached(home, binding['source'], entry)
             rewritten = 'ref' in chosen and (chosen['ref'].startswith('refs/tags/') or c.git(root, 'merge-base', '--is-ancestor', prior['commit'], row['commit'], optional=True) is None)
             if rewritten and not allow_ref_rebind:
                 c.fail('lock.ref_rebound', 'Cached tag moved or branch is not proven fast-forward; review and pass --allow-ref-rebind explicitly.', 4, skill=key, before=prior['commit'], after=row['commit'])
         rows.append(row)
+    if {coordinate(row): row for row in rows} != previous_rows:
+        # The lock is being written anyway, so every row takes the canonical spelling (RFC-MASK-0022).
+        rows = [dict(row, repository=s.repository(row['repository'])) for row in rows]
     return lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=selection_digest(declaration), packages=rows), declaration)
 
 

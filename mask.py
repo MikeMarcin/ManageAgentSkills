@@ -48,7 +48,7 @@ COMMANDS = {
     'capabilities': (False, False, []),
     'init': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
     'config.show': (False, False, []),
-    'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int')]),
+    'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int'), ('forge-host', 'repeat'), ('clear-forge-hosts', 'flag')]),
     'skill.list': (False, False, []),
     'skill.show': (False, False, [('id', 'pos'), ('content', 'flag')]),
     'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int')]),
@@ -94,7 +94,8 @@ COMMANDS = {
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
     'source.publish': (True, True, [('name', 'pos'), ('paths', 'repeat'), ('commit', 'flag'), ('push', 'flag'), ('message', 'value')]),
     'source.dev-link': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('authoring-root', 'value'), ('to-pinned', 'flag')]),
-    'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag')]),
+    'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
+    'tap.transport': (True, False, [('name', 'pos'), ('url', 'optional'), ('derive', 'flag')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     # brew/apt vocabulary: update refreshes what is available (this program and the taps); upgrade moves consumers to it.
@@ -113,7 +114,7 @@ GUARDED = {'apply', 'link.adopt', 'upgrade', 'project.set', 'project.require', '
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
-GUARDED.update({'tap.add', 'tap.remove'})
+GUARDED.update({'tap.add', 'tap.remove', 'tap.transport'})
 GUARDED.update({'skill.import', 'skill.record-adaptation', 'lock', 'source.dev-link', 'source.publish'})
 GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear'})
 GUARDED.add('ensure')
@@ -241,7 +242,7 @@ def validate_arguments(args):
                      'selection-policy.set': ('agent',), 'compatibility.override': ('project', 'user'), 'compatibility.clear': ('project', 'user'),
                      'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
                      'user.set': ('skill', 'clear'), 'user.set-targets': ('targets', 'inherit'), 'link.adopt': ('project', 'user'),
-                     'config.set': ('target', 'git_timeout'), 'skill.validate': ('id', 'all'),
+                     'config.set': ('target', 'git_timeout', 'forge_host', 'clear_forge_hosts'), 'skill.validate': ('id', 'all'),
                      'recover': ('inspect', 'complete', 'rollback')}
     if command == 'doctor' and not getattr(args, 'migrate', False) and any(getattr(args, key, None) for key in ('alias', 'offline', 'dry_run', 'yes', 'expect_plan_hash')):
         raise MaskError('invocation.invalid', '--alias, --offline, --dry-run, --yes and --expect-plan-hash apply only to doctor --migrate.', 2)
@@ -516,7 +517,7 @@ def local_dispatch(args, output, leaves):
         return sources_ops.publication(args, output, home)
     if command == 'source.inspect':
         return sources_ops.inspect(args, output, home)
-    if command in ('source.list', 'source.show', 'source.fetch', 'tap.add', 'tap.remove'):
+    if command in ('source.list', 'source.show', 'source.fetch', 'tap.add', 'tap.remove', 'tap.transport'):
         return sources_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
         return integration_ops.dispatch(args, output, home)
@@ -578,6 +579,11 @@ def local_dispatch(args, output, leaves):
         proposal['default_targets'] = args.target
     if hasattr(args, 'git_timeout'):
         proposal['git_timeout_seconds'] = args.git_timeout
+    # RFC-MASK-0022: forge equivalence beyond the built-in hosts is this machine's own decision, never a project file's.
+    if getattr(args, 'clear_forge_hosts', False):
+        proposal.pop('forge_hosts', None)
+    if getattr(args, 'forge_host', None):
+        proposal['forge_hosts'] = sorted(set(args.forge_host))
     proposal = core.config(proposal)
     output['data'] = dict(config=proposal)
     output['would_change'] = proposal != config
@@ -720,6 +726,8 @@ def main(argv=None):
             stream.reconfigure(encoding='utf-8')
     argv = list(sys.argv[1:] if argv is None else argv)
     core.FROZEN.clear()  # Object-addressed Git answers are reused within one invocation only.
+    sources_ops.ACTIVE_FORGES.clear()
+    sources_ops.ACTIVE_FORGES.update(sources_ops.FORGE_HOSTS)  # A machine's forge_hosts opt-in lasts one invocation.
     before_separator = argv[:argv.index('--')] if '--' in argv else argv
     machine = '--json' in before_separator
     output = result()

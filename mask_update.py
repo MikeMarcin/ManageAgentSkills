@@ -17,7 +17,7 @@ import mask_sources as sources
 NOT_ATTEMPTED = dict(attempted=False, ok=None, before=None, after=None, remote_refs_changed=None, error=None)
 
 
-def fetch_tap(home, name, entry, timeout, selectors=()):
+def fetch_tap(home, name, entry, timeout, selectors=(), consumer=None):
     """One git fetch: the tap's configured ref plus the objects its selected bindings name.
 
     Returns the disclosure row and the captured error, if any.
@@ -26,7 +26,7 @@ def fetch_tap(home, name, entry, timeout, selectors=()):
     row, captured = dict(NOT_ATTEMPTED, attempted=True, ok=False), None
     try:
         existing = sources.cached(home, name, entry)
-        refs, options = sources.remote_refs(existing or home, entry, timeout, scratch)
+        chosen, refs, options = sources.negotiate(home, name, entry, timeout, scratch, consumer)
         extra = set()
         for selector in selectors:
             if 'ref' in selector:
@@ -34,7 +34,7 @@ def fetch_tap(home, name, entry, timeout, selectors=()):
                     extra.add(refs[selector['ref']])
             elif existing is None or c.git(existing, 'rev-parse', '--verify', selector['commit'] + '^{commit}', optional=True) != selector['commit']:
                 extra.add(selector['commit'])
-        sources.fetch(home, name, entry, timeout, scratch, advertised=(refs, options), extra=sorted(extra))
+        sources.fetch(home, name, entry, timeout, scratch, advertised=(chosen, refs, options), extra=sorted(extra))
         row['ok'] = True
     except c.MaskError as error:
         if not error.code.startswith(('git.', 'source.')):
@@ -42,6 +42,7 @@ def fetch_tap(home, name, entry, timeout, selectors=()):
         captured = error
         row['error'] = error.as_dict()
     effects = scratch['data'].get('fetch_effects', {})
+    row.update(scratch['data'].get('transports', {}).get(name) or {})  # transport, transport_policy, chosen_by, tried (RFC-MASK-0022)
     row.update(before=effects.get('before'), after=effects.get('after'), remote_refs_changed=effects.get('remote_refs_changed', False))
     return row, captured
 
@@ -174,7 +175,9 @@ def dispatch(args, output, home):
             if c.kind(home / 'pending.json') != 'missing':
                 c.fail('recovery.required', 'Recover the pending operation before updating.', 8)
             for name in sorted(taps):
-                fetches[name], error = fetch_tap(home, name, config['sources'][name], config['git_timeout_seconds'], selectors.get(name, ()))
+                # One selected project lends its origin's scheme; a bare upgrade over many consumers fetches each tap once without it.
+                lender = consumers[0]['root'] if len(consumers) == 1 and consumers[0]['scope'] == 'project' else None
+                fetches[name], error = fetch_tap(home, name, config['sources'][name], config['git_timeout_seconds'], selectors.get(name, ()), lender)
                 if error is not None:
                     failures[name] = error
     locks, payload_views, planned_consumers, blocked = {}, {}, [], []

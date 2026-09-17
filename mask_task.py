@@ -88,7 +88,7 @@ def parse_request(identifiers):
     return requested
 
 
-def choose_source(identifier, proposal, config, home, args, output):
+def choose_source(identifier, proposal, config, home, args, output, consumer=None):
     """A bare ID resolves only when exactly one relevant approved catalog offers it."""
     bound = sorted({row['source'] for row in proposal['skills'] if row['id'] == identifier})
     if len(bound) == 1:
@@ -100,7 +100,7 @@ def choose_source(identifier, proposal, config, home, args, output):
         entry = config['sources'][name]
         probe = dict(schema_version=2, sources={name: dict(repository=entry['repository'], packages=entry['packages'])}, skills=[dict(source=name, id=identifier)])
         try:
-            resolve_row(home, r.selection(probe), dict(source=name, id=identifier), entry, config, args, output)
+            resolve_row(home, r.selection(probe), dict(source=name, id=identifier), entry, config, args, output, consumer=consumer)
         except c.MaskError as error:
             if error.code == 'skill.unknown':
                 continue
@@ -119,7 +119,7 @@ def choose_source(identifier, proposal, config, home, args, output):
     return matches[0]
 
 
-def resolve_row(home, declaration, binding, entry, config, args, output, payload_views=None):
+def resolve_row(home, declaration, binding, entry, config, args, output, payload_views=None, consumer=None):
     """Resolve one new binding from the approved cache; a live install may first acquire the approved source."""
     try:
         return r.resolve_binding(home, declaration, binding, entry, payload_views)
@@ -127,7 +127,7 @@ def resolve_row(home, declaration, binding, entry, config, args, output, payload
         if error.code != 'lock.resolution_required' or getattr(args, 'offline', False) or output['dry_run']:
             raise
     scratch = dict(data={})
-    sources.fetch(home, binding['source'], entry, config['git_timeout_seconds'], scratch)
+    sources.fetch(home, binding['source'], entry, config['git_timeout_seconds'], scratch, consumer=consumer)
     output['data'].setdefault('acquisitions', []).append(dict(source=binding['source'], **scratch['data']))
     return r.resolve_binding(home, declaration, binding, entry, payload_views)
 
@@ -145,7 +145,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
     changed, unchanged, new = [], [], set()
     for alias, identifier in requested:
         if alias is None and installing:
-            alias = choose_source(identifier, proposal, config, home, args, output)
+            alias = choose_source(identifier, proposal, config, home, args, output, root if scope == 'project' else None)
         elif alias is None:
             bound = sorted({row['source'] for row in proposal['skills'] if row['id'] == identifier})
             if len(bound) > 1:
@@ -160,7 +160,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
                 continue
             entry = sources.selected(config, alias)
             if alias not in proposal['sources']:
-                proposal['sources'][alias] = dict(repository=entry['repository'], packages=entry['packages'])
+                proposal['sources'][alias] = dict(repository=sources.repository(entry['repository']), packages=entry['packages'])
             binding = dict(source=alias, id=identifier)
             if agents:
                 binding['agents'] = agents
@@ -173,6 +173,10 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
         else:
             proposal['skills'] = [row for row in proposal['skills'] if r.coordinate(row) != coordinate]
             changed.append(coordinate)
+    if changed:  # The declaration and lock are written anyway, so they take the canonical spelling (RFC-MASK-0022).
+        for entry in proposal['sources'].values():
+            entry['repository'] = sources.repository(entry['repository'])
+        prior_rows = {key: dict(row, repository=sources.repository(row['repository'])) for key, row in prior_rows.items()}
     proposal = r.selection(proposal)
     entries = r.approved(proposal, config)
     payload_views = {}
@@ -182,7 +186,8 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
         if coordinate in prior_rows and coordinate not in new:
             rows.append(prior_rows[coordinate])
         else:
-            rows.append(resolve_row(home, proposal, binding, entries[binding['source']], config, args, output, payload_views))
+            # A project install lends its origin's scheme to transport selection (RFC-MASK-0022); the personal scope has no checkout.
+            rows.append(resolve_row(home, proposal, binding, entries[binding['source']], config, args, output, payload_views, root if scope == 'project' else None))
     lock = r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(proposal), packages=rows), proposal)
     return proposal, lock, changed, unchanged, payload_views, previous
 

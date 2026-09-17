@@ -521,7 +521,7 @@ def config(value, *, legacy=False):
         refuse_legacy_config(value)
     version = value.get('schema_version') if isinstance(value, dict) else None
     if version == 3:
-        fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), versions=(1, 2, 3))
+        fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), ('forge_hosts',), versions=(1, 2, 3))
     else:
         required = ('schema_version', 'source', 'default_targets', 'git_timeout_seconds')
         if version == 2:

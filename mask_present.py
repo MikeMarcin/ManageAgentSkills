@@ -483,7 +483,7 @@ def render_config(data, output):
         lines.append(f"  source: {clean(source.get('root'))} ({clean(source.get('remote'))}/{clean(source.get('branch'))})")
     for name, entry in (config.get('sources') or {}).items():
         lines.append(f"  source {clean(name)}: {clean(entry.get('repository'))}")
-    lines.extend(fields(config, [('default targets', 'default_targets'), ('git timeout (s)', 'git_timeout_seconds')]))
+    lines.extend(fields(config, [('default targets', 'default_targets'), ('git timeout (s)', 'git_timeout_seconds'), ('extra forge hosts', 'forge_hosts')]))
     lines.extend(fields(data, [('machine state', 'home'), ('program', 'program_root')]))
     if data.get('migration_required'):
         lines.append("  migration required: preview the conversion with 'mask doctor --migrate --dry-run'")
@@ -498,7 +498,8 @@ def render_sources(data, output):
             lines.append(f"  {clean(name)}: {clean(entry.get('repository'))} @ {clean(entry.get('ref', 'default'))}")
         if not sources:
             lines.append("  no taps approved; add one with 'mask tap add NAME URL'")
-    lines.extend(fields(data, [('source', 'source'), ('repository', 'repository'), ('ref', 'ref'), ('line endings', 'line_endings'), ('commit', 'commit'), ('cached revision', 'cached_revision'),
+    lines.extend(fields(data, [('source', 'source'), ('repository', 'repository'), ('ref', 'ref'), ('transport', 'transport'), ('transport policy', 'transport_policy'),
+                               ('transport chosen by', 'chosen_by'), ('line endings', 'line_endings'), ('commit', 'commit'), ('cached revision', 'cached_revision'),
                                ('resolution required', 'resolution_required'), ('network', 'network'),
                                ('cache retained', 'cache_retained'), ('phase', 'phase'), ('created commit', 'created_commit'), ('created ref', 'created_ref'), ('pushed', 'pushed')]))
     if 'skills' in data and isinstance(data['skills'], list):
@@ -589,6 +590,9 @@ def fetch_lines(data):
             outcome_text = f"fetch failed ({clean((row.get('error') or {}).get('code'))})"
         else:
             outcome_text = 'fetched new commits' if row.get('remote_refs_changed') else 'fetched, nothing new'
+        if row.get('chosen_by') and row.get('tried'):  # Only a fallback is news: the first choice working is the normal case.
+            tried = ', '.join(f"{clean(item.get('transport'))} ({clean(item.get('code'))})" for item in row['tried'])
+            outcome_text += f"; reached over {clean(row.get('transport'))} after {tried} did not answer"
         lines.append(f"  tap {clean(name)}: {outcome_text}")
     return lines
 
@@ -724,7 +728,7 @@ RENDERERS = {
     'integration.enable': render_integration, 'integration.disable': render_integration, 'launch': render_launch,
     'workspace.forget': render_forget, 'link.adopt': summary('link adopt', [('root', 'root'), ('scope', 'scope'), ('path', 'path'), ('link', 'link_text')]),
     'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
-    'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources,
+    'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources, 'tap.transport': render_sources,
     'lock': render_lock, 'update': render_refresh, 'upgrade': render_upgrade,
     'self.status': render_self_status, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
 }
@@ -951,7 +955,7 @@ COMMAND_HELP = {
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
     'config.show': ('Show the machine configuration and its approved taps, and whether the machine still needs migration to taps.', None),
-    'config.set': ('Change local default agent targets or Git timeout.', None),
+    'config.set': ('Change local default agent targets, the Git timeout, or the extra hosts on which this machine treats HTTPS and SSH URLs as one tap identity. github.com, gitlab.com, bitbucket.org and codeberg.org are always such hosts; add a self-hosted forge only when both URLs really reach the same repositories.', 'mask config set --forge-host git.example.com\nmask config set --clear-forge-hosts'),
     'compatibility.override': ('Record an explicit exception to advertised compatibility, with a reason.', None),
     'compatibility.clear': ('Remove a recorded compatibility exception.', None),
     'integration.enable': ('Install a selected Git or agent startup integration.', None),
@@ -976,6 +980,7 @@ COMMAND_HELP = {
                 'of its packages unless --autocrlf opts this tap in to Git core.autocrlf=true conversion at registration.',
                 'mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git\n'
                 'mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git --checkout /path/to/AgentSkills'),
+    'tap.transport': ('Choose how this machine reaches an approved tap, without changing which repository is trusted. A tap identity is transport-neutral on github.com, gitlab.com, bitbucket.org, codeberg.org and any host added with mask config set --forge-host: HTTPS and SSH URLs name the same tap, so one committed project file suits machines that authenticate either way. By default the transport is derived per fetch: the project checkout origin scheme on the same host, then the transport that last worked, then gh git_protocol, then the other scheme, moving on only when one cannot authenticate or connect, and never prompting. Give a URL to pin that transport so no other is tried; --derive returns to convention. A URL naming another repository refuses source.identity_mismatch. Only the machine catalog changes; nothing about transport is ever written to a project file.', 'mask tap transport agentskills git@github.com:MikeMarcin/AgentSkills.git   # always use SSH here\nmask tap transport agentskills --derive                                      # follow convention again\nmask source show agentskills                                                 # see the transport in use and why'),
     'tap.remove': ('Remove an approved tap from the catalog. It refuses while a consumer still uses the tap; the cache is retained.', None),
     'user.init': ('Create the personal skill declaration without deploying skills.', None),
     'user.show': ('Show your personal skill declaration.', None),
@@ -1025,7 +1030,9 @@ OPTION_HELP = {
     'linked-worktrees': 'Include linked worktrees in this approval',
     'inactive-branches': 'Allow readiness on inactive branches',
     'allow-locked-fetch': 'Allow fetching a named locked source; repeatable',
-    'git': 'Select Git hook integration', 'host_args': 'Arguments passed to the selected agent after --',
+    'git': 'Select Git hook integration',
+    'forge-host': 'Also treat HTTPS and SSH URLs on this host as one tap identity; repeatable, replaces the list',
+    'clear-forge-hosts': 'Remove every extra forge host from this machine', 'host_args': 'Arguments passed to the selected agent after --',
     'expect-identity': 'Require the recorded workspace identity before forgetting it',
     'expect-source': 'Require this exact source when adopting the link',
     'locked': "Prepare only the exact commits and store payloads the selected consumer's lock names",
@@ -1038,6 +1045,8 @@ OPTION_HELP = {
     'packages': 'Package directory inside the tap repository (default: skills)',
     'checkout': 'Authoring checkout for source publish and source dev-link; never a link target',
     'autocrlf': 'Opt this tap in to Git core.autocrlf=true line-ending conversion (default: exact bytes)',
+    'pin-transport': 'Always reach this tap exactly as the URL says, instead of deriving HTTPS or SSH per fetch',
+    'derive': 'Stop pinning: derive the transport by convention again',
     'refresh': 'Refresh existing version resolutions', 'reason': 'Explanation for this compatibility override',
     'platform': 'Override the advertised platform restriction', 'architecture': 'Override the advertised architecture restriction',
 }
