@@ -53,7 +53,8 @@
         "selection-policy.clear",
         "compatibility.override",
         "compatibility.clear",
-        "doctor.migrate"
+        "install",
+        "remove"
       ]
     },
     "base_generation": {
@@ -282,8 +283,7 @@
               "project_lock",
               "user_declaration",
               "user_lock",
-              "selection_policy",
-              "machine_config"
+              "selection_policy"
             ]
           },
           "before": {
@@ -297,96 +297,6 @@
               "string",
               "null"
             ]
-          }
-        }
-      }
-    },
-    "migration": {
-      "description": "doctor.migrate only: the exact machine configuration bytes before and after, the legacy checkout observed at planning, and the tap cache the clone HEAD was acquired into (null with an empty registry). Runtime recomputes config_after, the migrated declarations and the lock commits.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "config_before",
-        "config_after",
-        "source",
-        "cache"
-      ],
-      "properties": {
-        "config_before": {
-          "type": "string"
-        },
-        "config_after": {
-          "type": "string"
-        },
-        "source": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "root",
-            "identity",
-            "head",
-            "branch",
-            "index",
-            "repository",
-            "object_format"
-          ],
-          "properties": {
-            "root": {
-              "type": "string"
-            },
-            "identity": {
-              "type": "object"
-            },
-            "head": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "branch": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "index": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "repository": {
-              "type": "string"
-            },
-            "object_format": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          }
-        },
-        "cache": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "alias",
-            "path",
-            "commit"
-          ],
-          "properties": {
-            "alias": {
-              "type": "string"
-            },
-            "path": {
-              "type": "string"
-            },
-            "commit": {
-              "type": "string"
-            }
           }
         }
       }

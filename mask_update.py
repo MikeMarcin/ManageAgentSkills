@@ -86,7 +86,7 @@ def refresh(args, output, home, root):
     raw = c.read_json(home / 'config.json', default={})
     output['data'] = dict(fetches={}, network='none')  # Stays so with no configuration yet, or on a machine that predates taps.
     try:
-        if raw and c.config(raw, legacy=True)['schema_version'] == 3:
+        if raw:
             fetch_all(args, output, home)
     finally:  # A tap that fails to fetch still discloses what happened to the program.
         output['data']['program'] = program
@@ -123,9 +123,6 @@ def dispatch(args, output, home):
     records = c.consumer_records(state)
     scoped = bool(getattr(args, 'project', None) or getattr(args, 'user', False))
     roots = mask.selected_roots(args, state, all_default=True)
-    legacy = [str(root) for root in roots if not pinned.is_pinned(records[str(root)])]
-    if legacy:
-        c.migration_required('A legacy consumer has no live checkout on a tap catalog machine; migrate it before update.', roots=legacy)
     requested = getattr(args, 'skill', None) or []
     consumers, declared = [], set()
     for root in roots:

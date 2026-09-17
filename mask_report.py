@@ -11,7 +11,6 @@ from pathlib import Path
 import mask_adapters as adapters
 import mask_core as c
 import mask_fs as fs
-import mask_pinned as pinned
 import mask_resolve as r
 import mask_selection as selection
 import mask_store as store
@@ -115,12 +114,6 @@ def dispatch(args, output, home):
         if getattr(args, 'scope', None) not in (None, scope):
             continue
         root, record = Path(key), records[key]
-        if not pinned.is_pinned(record):
-            try:
-                c.migration_required('Legacy consumer ownership has no live checkout on a tap catalog machine; migrate it first.', root=key)
-            except c.MaskError as error:
-                consumers.append(dict(root=key, scope=scope, available=root.is_dir(), declaration_basis='cached_declaration', error=error.as_dict()))
-            continue
         consumer = dict(root=key, scope=scope, available=True, declaration_basis='live_declaration', error=None,
                         mode=record['mode'], reproducible=record['mode'] == 'pinned')
         consumers.append(consumer)

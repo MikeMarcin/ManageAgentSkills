@@ -213,23 +213,3 @@ class InventoryTests(Fixture):
         narrow = self.observe('skill', 'where-used', ALPHA, '--agent', 'codex', '--scope', 'project')
         self.assertEqual((len(narrow['rows']), narrow['work']['leaves_inspected'], narrow['work']['declarations_read'], narrow['work']['payload_files_read']), (1, 1, 1, 0))
         self.assertEqual(self.observe('inventory', '--limit', '0', code=2)['code'], 'invocation.invalid')
-
-    def test_mode_less_legacy_record_requires_migration_and_yields_no_rows(self):
-        from tests.legacy_support import create_links, legacy_record, write_json
-        legacy = self.base / 'legacy project'
-        legacy.mkdir()
-        declaration, record = legacy_record(SimpleNamespace(clone=self.source), legacy, ['beta'])
-        write_json(legacy / '.mask.json', declaration)
-        create_links(legacy, record)
-        state = c.read_json(self.home / 'state.json')
-        state['projects'][record['root']] = record
-        write_json(self.home / 'state.json', state)
-        self.assertEqual(c.read_json(self.home / 'config.json')['schema_version'], 3)
-        data = self.observe('inventory', '--all')
-        entry = next(item for item in data['consumers'] if item['root'] == str(legacy))
-        self.assertEqual((entry['error']['code'], entry['declaration_basis'], 'mode' in entry), ('migration.required', 'cached_declaration', False))
-        self.assertFalse(data['complete'])
-        self.assertEqual({row['root'] for row in data['rows']}, {str(self.project)})
-        only = self.observe('inventory', '--project', legacy)
-        self.assertEqual((only['rows'], only['total_rows'], only['complete']), ([], 0, False))
-        self.assertEqual(self.observe('skill', 'where-used', BETA)['rows'], [])

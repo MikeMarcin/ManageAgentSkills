@@ -35,8 +35,7 @@ with the returned `--expect-plan-hash`. `--user` selects the personal declaratio
 Locking uses cached objects only and never changes deployed skills. Existing locks
 retain their resolution; `--refresh --skill SOURCE/ID` updates selected bindings.
 Ref rewrites require explicit `--allow-ref-rebind`. New consumers can register/apply those artifacts; a registered
-consumer changes its lock through `mask upgrade` (`mask lock` refuses `lock.active`), and a consumer left by the
-live-checkout program converts with `mask doctor --migrate`. Missing or stale locks block readiness. See the
+consumer changes its lock through `mask upgrade` (`mask lock` refuses `lock.active`). Missing or stale locks block readiness. See the
 [selection/lock contract](../architecture/cli-contract.md#cached-selection-locks)
 for canonical defaults, exact digests and the machine-local file-source limitation.
 
@@ -47,15 +46,15 @@ for canonical defaults, exact digests and the machine-local file-source limitati
 - [Local v0.1.0 readiness and implementation provenance](../releases/v0.1.0.md)
 
 The September 2026 RFC pack is imported, with workspace readiness, integration,
-recovery and legacy inventory slices implemented. Native Windows
+recovery and inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The tap
 catalog supports fetch, package validation, curated
 copy imports and provenance. Cached v2 selection locks now record exact commits,
 paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
 consumers deploy isolated store artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
-remains pending. [RFC-MASK-0021](../rfcs/RFC-MASK-0021-tap-only-deployment.md) retires the live-checkout mode:
-`mask upgrade` fetches taps and `mask doctor --migrate` converts live-checkout machines; its closeout records what
+remains pending. [RFC-MASK-0021](../rfcs/RFC-MASK-0021-tap-only-deployment.md) makes deployment tap-only:
+`mask upgrade` fetches taps; its closeout records what
 is qualified. Scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
 management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.

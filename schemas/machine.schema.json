@@ -1,15 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:machine",
-  "oneOf": [
-    {
-      "$ref": "machine-v1.schema.json"
-    },
-    {
-      "$ref": "machine-v2.schema.json"
-    },
-    {
-      "$ref": "machine-v3.schema.json"
-    }
-  ]
+  "$ref": "machine-v3.schema.json"
 }

@@ -201,7 +201,6 @@ scan package contents, acquire the writer lock, or change state.
 `skill where-used` takes a source-qualified `SOURCE/ID` that names an approved
 tap. Both commands support `--limit` (1–1000, default
 100) and `--offset`, returning `total_rows` and `next_offset`. Rows report the tap,
-package path and locked artifact behind each link; a consumer still recorded by
-the live-checkout program reports `migration.required`. See the
-[inventory contract](../architecture/cli-contract.md#legacy-inventory-unreleased-rfc-mask-0011-slice)
+package path and locked artifact behind each link. See the
+[inventory contract](../architecture/cli-contract.md#inventory-unreleased-rfc-mask-0011-slice)
 for filters and result semantics.

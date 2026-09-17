@@ -14,7 +14,7 @@ import unittest
 
 import mask_consent as consent
 import mask_core as core
-from tests.legacy_support import write_json
+from tests.fixture_files import write_json
 from tests.public_support import PublicFixture
 from tests.support import TAP
 

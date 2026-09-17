@@ -33,15 +33,9 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, allow_migration=False, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, legacy_checkout=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False):
     """One observational plan; every owned link text names a store payload or an explicit dev link.
 
-    A mode-less (live-checkout) record or a v1 declaration refuses ``migration.required`` per root.
-    ``allow_migration`` admits a v2 proposal for them, but a legacy link record still never yields a
-    checkout link text. Only ``doctor.migrate`` passes ``allow_migration``. A machine migration also passes
-    ``legacy_checkout``: a legacy record's old link is then validated against the checkout it named. A tap
-    machine has no checkout, so its old target is the recorded link text itself; the drift, unmanaged and
-    collision checks still apply. Either way the old link is replaced, never created.
     """
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
@@ -61,8 +55,6 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
         scope = 'user' if user_root == root else 'project' if key in register else c.consumer_scope(state, root)
         manifest_path = c.declaration_path(root, scope, home)
         try:
-            if record is not None and not pinned.is_pinned(record) and not allow_migration:
-                c.migration_required('Live-checkout ownership must be migrated before this consumer is planned.', root=key)
             if record is None and key not in register:
                 c.fail(scope + '.not_registered', 'Consumer is not registered.', 4, root=key)
             if key in register:
@@ -84,8 +76,6 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
             else:
                 current = c.selection_manifest(c.parse_json(before_text, 'manifest'))
                 desired = c.selection_manifest(proposals.get(key, current))
-                if desired['schema_version'] == 1 or (current['schema_version'] == 1 and not allow_migration):
-                    c.migration_required('A v1 declaration must be migrated to a v2 declaration before this consumer is planned.', root=key, path=str(manifest_path))
             old_links = record['links'] if record else {}
             expected = {}
             uses_pinned = True
@@ -133,10 +123,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 wanted = expected.get(relative)
                 if actual['type'] not in ('missing', 'symlink'):
                     c.fail('target.collision', 'A real or special entry occupies the target.', 4, path=str(leaf), existing_type=actual['type'])
-                if old and allow_migration and not pinned.is_pinned(record):
-                    old_target = recorded_legacy_target(legacy_checkout, old['skill']) if legacy_checkout is not None else normalized_link(leaf, old['link_text'])
-                else:
-                    old_target = pinned.target(old, config, home) if old else None
+                old_target = pinned.target(old, config, home) if old else None
                 if old and normalized_link(leaf, old['link_text']) != old_target:
                     c.fail('state.invalid', 'Ownership value does not name the configured source.', path=str(leaf))
                 if actual['type'] == 'symlink':
@@ -233,12 +220,6 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     if development or operation == 'source.dev-link':
         result['intent']['development'] = development
     return result
-
-
-def recorded_legacy_target(checkout, skill):
-    """The checkout directory a live-checkout link record named. doctor.migrate validates and replaces it; nothing creates it."""
-    import mask_legacy
-    return mask_legacy.legacy_target(checkout, skill)
 
 
 def scope_shadowing(state, config, home, selected):
@@ -349,35 +330,12 @@ def make_pending(planned, home):
     return intent
 
 
-def retired_journal(pending):
-    """The retired live-checkout transition a journal records, or None: a migration, a shared-checkout Git advance or legacy ownership.
-
-    Only ``doctor.migrate`` may record a migration, the machine configuration or legacy ownership; validate_pending recomputes it.
-    """
-    try:
-        migrating = pending['operation'] == 'doctor.migrate'
-        if pending['operation'] == 'migrate' or not migrating and ('migration' in pending or any(entry['role'] == 'machine_config' for entry in pending.get('files', []))):
-            return 'migration'
-        if pending.get('git', {}).get('scope') == 'source':
-            return 'shared_checkout_update'
-        records = [c.consumer_records(pending[side]).get(root) for side in ('before_state', 'after_state') for root in pending['selected']]
-        if not migrating and any(record is not None and not pinned.is_pinned(record) for record in records):
-            return 'legacy_ownership'
-    except (AttributeError, KeyError, TypeError):
-        pass  # A malformed journal is refused by ordinary validation.
-    return None
-
-
 def validate_pending(pending, home):
     import mask_selection as selection
-    retired = retired_journal(pending)
-    if retired is not None:
-        c.fail('recovery.conflict', 'The journal records a retired live-checkout transition; this program never replays it.', 8, retired=retired)
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
-    migrating = pending['operation'] == 'doctor.migrate'
-    if pending['operation'] not in {'doctor.migrate', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove'}:
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
+    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set-targets', 'user.register', 'user.unregister', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -394,7 +352,7 @@ def validate_pending(pending, home):
         from mask_git import validate_git_intent
         validate_git_intent(pending['git'], Path(__file__).resolve().parent)
     before, after = c.state(pending['before_state']), c.state(pending['after_state'])
-    if pending['schema_version'] != (3 if migrating or any(key in pending for key in ('controls', 'selection_change', 'native_roles', 'retired_files')) else max(before['schema_version'], after['schema_version'])):
+    if pending['schema_version'] != (3 if any(key in pending for key in ('controls', 'selection_change', 'native_roles', 'retired_files')) else max(before['schema_version'], after['schema_version'])):
         c.fail('recovery.conflict', 'Journal version disagrees with its states.', 8)
     if before['schema_version'] != after['schema_version'] and not (pending['operation'] in ('user.register', 'install') and before['schema_version'] == 1 and after['schema_version'] == 2 and before.get('user') is None and after.get('user') is not None) and not (before['schema_version'] < 3 and after['schema_version'] == 3 and 'pinned' in pending):
         c.fail('recovery.conflict', 'Only user registration may upgrade the state schema.', 8)
@@ -402,14 +360,10 @@ def validate_pending(pending, home):
     if type(pending['base_generation']) is not int or pending['base_generation'] != before['generation'] or after['generation'] not in (before['generation'], before['generation'] + 1):
         c.fail('recovery.conflict', 'Invalid pending generation.', 8)
     current_config = c.read_json(home / 'config.json', default={})
-    if migrating:
-        # config.json must be exactly the recorded before or after bytes; the whole conversion is recomputed from the journal.
-        from mask_migrate import validate_journal
-        validate_journal(pending, home)
-    elif pending['config'] is None:
+    if pending['config'] is None:
         if pending['operation'] not in ('self.install', 'self.uninstall', 'update') or current_config:
             c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
-    elif c.config(pending['config'], legacy=True) != c.config(current_config, legacy=True):
+    elif c.config(pending['config']) != c.config(current_config):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
     if not isinstance(pending['selected'], list) or len(set(pending['selected'])) != len(pending['selected']):
         c.fail('recovery.conflict', 'Invalid pending project selection.', 8)
@@ -462,8 +416,6 @@ def validate_pending(pending, home):
     elif before['launchers'] != after['launchers']:
         c.fail('recovery.conflict', 'Link operations cannot change launcher ownership.', 8)
     for root in before_records.keys() | after_records.keys():
-        if root in before_records and root in after_records and pinned.is_pinned(before_records[root]) != pinned.is_pinned(after_records[root]) and not migrating:
-            c.fail('recovery.conflict', 'Existing consumer mode conversion requires an explicit migration journal.', 8)
         if root in before_records and root in after_records and c.consumer_scope(before, root) != c.consumer_scope(after, root):
             c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
         if root not in selected and before_records.get(root) != after_records.get(root):
@@ -497,12 +449,9 @@ def validate_pending(pending, home):
             consumer = c.consumer_records(state).get(entry['root'], {})
             record = consumer.get('links', {}).get(entry['relative'])
             raw = entry[side]
-            # Only a doctor.migrate before side is legacy. A machine migration's recorded text must name the journal's recorded
-            # checkout; a tap-machine migration (no ``migration`` field) has no checkout, so exact equality with the before record is its proof.
-            legacy = migrating and side == 'before' and not pinned.is_pinned(consumer)
             if raw is not None and (not record or not isinstance(raw, str) or record['link_text'] != raw):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
-            if raw is not None and not (legacy and 'migration' not in pending) and normalized_link(leaf, raw) != (recorded_legacy_target(pending['migration']['source']['root'], record['skill']) if legacy else pinned.target(record, pending['config'], home)):
+            if raw is not None and normalized_link(leaf, raw) != pinned.target(record, pending['config'], home):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
             if side == 'after' and raw != (record['link_text'] if record else None):
                 c.fail('recovery.conflict', 'Pending link omits its desired ownership target.', 8)
@@ -521,7 +470,7 @@ def validate_pending(pending, home):
         for side in ('before', 'after'):
             if not isinstance(entry[side], str):
                 c.fail('recovery.conflict', 'Invalid pending manifest bytes.', 8)
-            c.manifest(c.parse_json(entry[side], 'manifest'))
+            c.selection_manifest(c.parse_json(entry[side], 'manifest'))
     for side, expected in (('before', before), ('after', after)):
         text = pending[side + '_state_text']
         if text is None and side == 'before' and expected == c.empty_state():
@@ -611,11 +560,6 @@ def set_link(entry, side, *, inject=False):
 
 def restore(pending, home, side, *, inject=False):
     check_current(pending, home)
-    migrating = pending['operation'] == 'doctor.migrate' and side == 'after' and 'migration' in pending
-    if migrating:
-        # Completing a machine migration requires the unchanged legacy checkout; rollback, and a tap-machine migration, never read it.
-        from mask_migrate import check_journal
-        check_journal(pending, home)
     if side == 'after':
         from mask_repair import save_backups
         save_backups(pending, home)
@@ -684,8 +628,6 @@ def restore(pending, home, side, *, inject=False):
     if 'controls' in pending:
         from mask_ensure import restore_controls
         restore_controls(pending, home, side)
-    if migrating:
-        check_journal(pending, home)
     check_final_controls(pending, home, side)
     text = pending[side + '_state_text']
     path = home / 'state.json'
@@ -795,14 +737,8 @@ def recover(home, output, mode):
         output['data'] = dict(pending=None)
         return
     pending = c.parse_json(raw, 'recovery')
-    retired = retired_journal(pending)
-    if retired is None or mode != 'inspect':
-        validate_pending(pending, home)
+    validate_pending(pending, home)
     output['data'] = dict(pending=pending, recovery_mode=mode)
-    if retired is not None:
-        # Inspection shows a retired live-checkout journal; completing or rolling it back was refused above.
-        output['data']['retired'] = retired
-        return
     if 'setup' in pending:
         # Package script side effects are never inspected or undone; only MASK's own staged/published files are.
         output['data']['setup'] = dict(phase=pending['setup']['phase'], skill=pending['setup']['skill'], script_effects='unknown')
@@ -837,8 +773,6 @@ def adopt(config, state, root, identifier, target, expected_source, output, home
     if record is None:
         c.fail('project.not_registered', 'Adoption requires registration.', 4)
     c.registered_root(root, record, scope)
-    if not pinned.is_pinned(record):
-        c.migration_required('Live-checkout ownership must be migrated before adopting links.', root=str(root))
     if record['mode'] == 'dev-link':
         c.fail('dev_link.active', 'Return to pins explicitly before adopting additional links.', 4)
     declaration, locked = resolve.read_exact_lock(root, scope, home, config, verify=False)

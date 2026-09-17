@@ -439,18 +439,8 @@ def dispatch(args, output, home):
             output.update(changed=True, transaction='committed')
 
 
-SELECTION_SETTERS = {'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets'}
-
-
-def refuse_selection_setter(args):
-    """Only install and remove edit a v2 declaration; set, require and unrequire refuse (RFC-MASK-0021 owner decision Q4)."""
-    scope = ' --user' if args.command.startswith('user.') else ' --project PATH' if getattr(args, 'project', None) else ''
-    c.fail('selection.command_unsupported', f"mask {args.command.replace('.', ' ')} does not edit v2 declarations; "
-           f"add skills with 'mask install ID{scope}' and remove them with 'mask remove ID{scope}'.", 4)
-
-
 def guard_command(args, home):
-    """Central consumer guard before side effects: a v1 declaration needs migration, a v2 declaration a matching lock.
+    """Central consumer guard before side effects: a declaration needs a matching lock.
 
     Inventory and where-used are not guarded: they report an invalid declaration or lock per consumer.
     """
@@ -481,9 +471,5 @@ def guard_command(args, home):
         path = c.declaration_path(root, scope, home)
         value, _ = read_model(path, 'manifest', missing=True)
         version = value.get('schema_version') if isinstance(value, dict) else None
-        if type(version) is int and version == 1 and command != 'doctor':
-            c.migration_required('A v1 declaration must be migrated to a v2 declaration before this command.', path=str(path))
         if version == 2:
             lock(read_model(lock_path(root, scope, home), 'lock')[0], selection(value))
-            if command in SELECTION_SETTERS:
-                refuse_selection_setter(args)

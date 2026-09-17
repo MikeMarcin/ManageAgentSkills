@@ -62,15 +62,12 @@ COMMANDS = {
     'skill.record-adaptation': (True, False, [('id', 'pos'), ('note', 'required')]),
     'project.init': (True, False, [('project', 'value')]),
     'project.show': (False, False, [('project', 'value')]),
-    'project.set': (True, False, [('project', 'value'), ('skill', 'repeat'), ('clear', 'flag'), ('apply', 'flag')]),
-    'project.require': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
-    'project.unrequire': (True, False, [('project', 'value'), ('ids', 'many'), ('apply', 'flag')]),
+    'project.set-targets': (True, False, [('project', 'value'), ('targets', 'some'), ('inherit', 'flag'), ('apply', 'flag')]),
     'project.set-agents': (True, False, [('project', 'value'), ('id', 'pos'), ('agents', 'some'), ('all', 'flag'), ('inherit', 'flag'), ('apply', 'flag')]),
     'selection-policy.set': (True, False, [('agent', 'repeat')]),
     'selection-policy.clear': (True, False, []),
     'compatibility.override': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag'), ('reason', 'required'), ('agent', 'repeat'), ('platform', 'flag'), ('architecture', 'flag')]),
     'compatibility.clear': (True, False, [('id', 'pos'), ('project', 'value'), ('user', 'flag')]),
-    'project.set-targets': (True, False, [('project', 'value'), ('targets', 'some'), ('inherit', 'flag'), ('apply', 'flag')]),
     'project.register': (True, False, [('project', 'value'), ('path', 'optional'), ('apply', 'flag')]),
     'project.unregister': (True, False, [('project', 'value'), ('path', 'optional'), ('keep-links', 'flag')]),
     'project.list': (False, False, []),
@@ -86,8 +83,8 @@ COMMANDS = {
     'workspace.forget': (True, False, [('path', 'pos'), ('expect-identity', 'required')]),
     'link.adopt': (True, False, [('project', 'value'), ('user', 'flag'), ('skill', 'required'), ('target', 'required'), ('expect-source', 'required')]),
     'recover': (True, False, [('inspect', 'flag'), ('complete', 'flag'), ('rollback', 'flag')]),
-    # Observational unless --migrate, which converts a live-checkout machine or consumer through one journal.
-    'doctor': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag'), ('migrate', 'flag'), ('alias', 'value'), ('offline', 'flag')]),
+    # Observational unless --migrate, which rewrites the tap catalog's older identity spellings in one atomic write (RFC-MASK-0022).
+    'doctor': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag'), ('migrate', 'flag')]),
     'source.fetch': (True, True, [('name', 'optional'), ('locked', 'flag'), ('project', 'value'), ('user', 'flag'), ('offline', 'flag')]),
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
@@ -105,13 +102,13 @@ COMMANDS = {
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.uninstall': (True, False, []),
 }
-for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'set-agents', 'register', 'unregister'):
+for action in ('init', 'show', 'set-targets', 'set-agents', 'register', 'unregister'):
     mutates, network, arguments = COMMANDS['project.' + action]
     user_arguments = [(name, shape) for name, shape in arguments if name not in ('project', 'path')]
     if action == 'register':
         user_arguments.append(('user-home', 'value'))
     COMMANDS['user.' + action] = (mutates, network, user_arguments)
-GUARDED = {'apply', 'link.adopt', 'upgrade', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
+GUARDED = {'apply', 'link.adopt', 'upgrade', 'project.set-targets', 'project.register', 'project.unregister'}
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
@@ -199,14 +196,12 @@ def capabilities(leaves):
                                 effect='managed_mutation' if mutates else 'observational', network=network,
                                 dry_run=mutates, plan_guard=command in GUARDED, exit_classes=[0, 2, 3, 4, 5, 6, 7, 8, 10, 130]))
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
-                readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2, 3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
-                deployment_model='taps', migration='doctor', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
+                readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
+                deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
                 workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {
-    'project.set': {'skill': ['clear'], 'clear': ['skill']},
-    'project.set-targets': {'targets': ['inherit'], 'inherit': ['targets']},
     'project.register': {'path': ['project'], 'project': ['path']},
     'project.unregister': {'path': ['project'], 'project': ['path']},
     'skill.validate': {'id': ['all'], 'all': ['id']},
@@ -215,8 +210,7 @@ CONFLICTS = {
     'apply': {'project': ['all'], 'all': ['project']},
     'doctor': {'project': ['all'], 'all': ['project']},
 }
-for action in ('set', 'set-targets'):
-    CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
+CONFLICTS['project.set-targets'] = CONFLICTS['user.set-targets'] = {'targets': ['inherit'], 'inherit': ['targets']}
 for command in ('plan', 'apply', 'doctor', 'inventory', 'upgrade', 'ensure'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['doctor'].update(check=['migrate'], migrate=['check'])
@@ -241,12 +235,13 @@ def validate_arguments(args):
             raise MaskError('invocation.invalid', f'{key} conflicts with {", ".join(conflicts)}', 2)
     required_sets = {'project.set-agents': ('agents', 'all', 'inherit'), 'user.set-agents': ('agents', 'all', 'inherit'),
                      'selection-policy.set': ('agent',), 'compatibility.override': ('project', 'user'), 'compatibility.clear': ('project', 'user'),
-                     'project.set': ('skill', 'clear'), 'project.set-targets': ('targets', 'inherit'),
-                     'user.set': ('skill', 'clear'), 'user.set-targets': ('targets', 'inherit'), 'link.adopt': ('project', 'user'),
+                     'project.set-targets': ('targets', 'inherit'), 'user.set-targets': ('targets', 'inherit'), 'link.adopt': ('project', 'user'),
                      'config.set': ('target', 'git_timeout', 'forge_host', 'clear_forge_hosts'), 'skill.validate': ('id', 'all'),
                      'recover': ('inspect', 'complete', 'rollback')}
-    if command == 'doctor' and not getattr(args, 'migrate', False) and any(getattr(args, key, None) for key in ('alias', 'offline', 'dry_run', 'yes', 'expect_plan_hash')):
-        raise MaskError('invocation.invalid', '--alias, --offline, --dry-run, --yes and --expect-plan-hash apply only to doctor --migrate.', 2)
+    if command == 'doctor' and not getattr(args, 'migrate', False) and any(getattr(args, key, None) for key in ('dry_run', 'yes', 'expect_plan_hash')):
+        raise MaskError('invocation.invalid', '--dry-run, --yes and --expect-plan-hash apply only to doctor --migrate.', 2)
+    if command == 'doctor' and getattr(args, 'migrate', False) and any(getattr(args, key, None) for key in ('project', 'user', 'all')):
+        raise MaskError('invocation.invalid', 'doctor --migrate converts the machine tap catalog and takes no scope.', 2)
     if command == 'compatibility.override' and not any(getattr(args, key, None) for key in ('agent', 'platform', 'architecture')):
         raise MaskError('invocation.invalid', 'An explicit compatibility dimension is required.', 2)
     if command in required_sets and not any(getattr(args, key, None) for key in required_sets[command]):
@@ -280,47 +275,11 @@ def selected_roots(args, state, *, all_default=False):
     return [root]
 
 
-# Commands that stay available on a v1/v2 (live-checkout) machine so it can be inspected, recovered and migrated.
-MIGRATION_EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover'}
-
-
-def migration_gate(command, home):
-    """Refuse every other command on a v1/v2 machine before any effect; a missing configuration is not gated."""
-    if command in MIGRATION_EXEMPT or command.startswith('self.') or command == 'update':
-        return  # update still advances the program on a v1/v2 machine; it skips the taps such a machine does not have.
-    try:
-        value = core.read_json(home / 'config.json', default={})
-    except MaskError:
-        return  # An unreadable configuration is reported by the command that reads it.
-    core.refuse_legacy_config(value)
-
-
 def diagnostics(args, output, home):
-    import mask_legacy
-    config = core.config(core.read_json(home / 'config.json'), legacy=True)
+    config = machine_config(home)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
-    migration, migration_warnings = mask_legacy.inspect(home, config, state, project=getattr(args, 'project', None), user=getattr(args, 'user', False))
     pending = [MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict()] if core.kind(home / 'pending.json') != 'missing' else []
-    symlinks = 'unknown' if os.name == 'nt' else 'available'
-    consumer_issue = MaskError('migration.required', 'A consumer still uses the retired live-checkout model; preview its conversion with mask doctor --migrate --dry-run.', 4,
-                               details=dict(roots=[row['root'] for row in migration['consumers']], remediation=core.MIGRATION_REMEDIATION)).as_dict()
-    try:
-        core.refuse_legacy_config(config)
-        roots = selected_roots(args, state, all_default=True)
-    except MaskError as error:
-        if error.code == 'migration.required':
-            # Reported only: nothing is planned on a live-checkout machine, so no checkout link is derived or observed.
-            issues = [error.as_dict(), *pending]
-        elif error.code in ('project.not_registered', 'user.not_registered') and migration['consumers']:
-            # An unregistered v1 declaration is reported for migration instead of refused as unregistered.
-            issues = [consumer_issue, *pending]
-        else:
-            raise
-        output['data'].update(healthy=False, issues=issues, migration=migration, filesystem_present=False, host_load='not_verified', symlink_capability=symlinks)
-        output['warnings'].extend(migration_warnings)
-        if getattr(args, 'check', False):
-            core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7)
-        return
+    roots = selected_roots(args, state, all_default=True)
     planned = fs.plan(config, state, roots, home=home)
     fs.public_plan(planned, output)
     issues = list(planned['blockers']) + pending
@@ -342,19 +301,15 @@ def diagnostics(args, output, home):
             ignored = core.git(root, 'check-ignore', '--quiet', '--no-index', '--', relative, optional=True) is not None
             if tracked or not ignored:
                 output['warnings'].append(dict(code='project.link_ignore', message='Managed link is tracked or not ignored by Git.', details=dict(path=str(root / relative), tracked=tracked, ignored=ignored)))
-    if migration['required'] and not any(item['code'] == 'migration.required' for item in issues):
-        issues.append(consumer_issue)
-    output['warnings'].extend(migration_warnings)
-    if config['schema_version'] == 3:
-        # RFC-MASK-0022: an older identity spelling in the catalog still works, so it is reported, never an unhealthy machine.
-        forges = dict(built_in=sorted(sources_ops.FORGE_HOSTS), machine=config.get('forge_hosts', []))
-        stale = [dict(source=name, code='migration.identity_canonicalization', repository=config['sources'][name]['repository'],
-                      canonical=sources_ops.repository(config['sources'][name]['repository'])) for name in sources_ops.noncanonical(config)]
-        output['data'].update(forge_hosts=forges, identity_canonicalization=stale)
-        if stale:
-            output['warnings'].append(dict(code='migration.identity_canonicalization', sources=', '.join(row['source'] for row in stale),
-                                           message="The tap catalog records an older identity spelling; it still works. Convert it with 'mask doctor --migrate --dry-run', then without --dry-run."))
-    output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift, migration=migration,
+    # RFC-MASK-0022: an older identity spelling in the catalog still works, so it is reported, never an unhealthy machine.
+    forges = dict(built_in=sorted(sources_ops.FORGE_HOSTS), machine=config.get('forge_hosts', []))
+    stale = [dict(source=name, code='migration.identity_canonicalization', repository=config['sources'][name]['repository'],
+                  canonical=sources_ops.repository(config['sources'][name]['repository'])) for name in sources_ops.noncanonical(config)]
+    output['data'].update(forge_hosts=forges, identity_canonicalization=stale)
+    if stale:
+        output['warnings'].append(dict(code='migration.identity_canonicalization', sources=', '.join(row['source'] for row in stale),
+                                       message="The tap catalog records an older identity spelling; it still works. Convert it with 'mask doctor --migrate --dry-run', then without --dry-run."))
+    output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift,
                           host_load='not_verified', symlink_capability='unknown' if os.name == 'nt' else 'available')
     if getattr(args, 'check', False) and (issues or drift):
         core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7, **(dict(workflow=unmet) if unmet else {}))
@@ -451,8 +406,6 @@ def project_dispatch(args, output, home):
         return
     declaration_text = core.read_text(path, 'manifest')
     declaration = core.selection_manifest(core.parse_json(declaration_text, 'manifest'))
-    if declaration['schema_version'] == 1:
-        core.migration_required('A v1 declaration must be migrated to a v2 declaration before this command.', path=str(path))
     if record:
         core.registered_root(root, record, scope)
     import mask_pinned
@@ -489,12 +442,6 @@ def project_dispatch(args, output, home):
         if not output['dry_run']:
             fs.execute(planned, home, output)
         return
-    if apply and record is None:
-        core.fail(scope + '.not_registered', '--apply requires a registered consumer.', 4)
-    # set, require and unrequire only ever edited v1 string selections, which are retired; install and remove edit v2 declarations.
-    # The consumer guard (mask_resolve.guard_command) normally refuses first with this same refusal.
-    import mask_resolve
-    mask_resolve.refuse_selection_setter(args)
 
 
 def local_dispatch(args, output, leaves):
@@ -578,8 +525,7 @@ def local_dispatch(args, output, leaves):
     if command in ('skill.list', 'skill.show', 'skill.validate'):
         return sources_ops.query(args, output, home)
     if command == 'config.show':
-        config = core.config(core.read_json(home / 'config.json'), legacy=True)
-        output['data'] = dict(config=config, program_root=str(PROGRAM_ROOT), home=str(home), migration_required=config['schema_version'] != 3)
+        output['data'] = dict(config=machine_config(home), program_root=str(PROGRAM_ROOT), home=str(home))
         return
     if command != 'config.set':
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
@@ -618,7 +564,6 @@ def locked_dispatch(args, output, leaves, home, preparation):
 
 def dispatch_impl(args, output, leaves):
     home = machine_home(args)
-    migration_gate(args.command, home)
     if args.command == 'launch':
         if args.agent not in ADAPTERS:
             core.fail('invocation.invalid', 'Choose a supported agent.', 2)
@@ -644,8 +589,7 @@ def dispatch_impl(args, output, leaves):
     if args.command not in IMPLEMENTED:
         core.fail('config.command_unavailable', 'This command is not implemented in this version.')
     if args.command == 'doctor' and getattr(args, 'migrate', False):
-        import mask_migrate
-        return mask_migrate.dispatch(args, output, home)
+        return sources_ops.canonicalize(args, output, home)
     # Plain doctor stays observational: it takes no writer lock and a pending journal is reported, not refused.
     mutates = COMMANDS[args.command][0] and args.command != 'doctor' and not output['dry_run'] and not (args.command == 'recover' and getattr(args, 'inspect', False)) and not (args.command == 'ensure' and getattr(args, 'check', False))
     if args.command == 'ensure' and getattr(args, 'repair', False) and getattr(args, 'all', False):

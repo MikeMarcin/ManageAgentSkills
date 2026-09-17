@@ -4,7 +4,7 @@ The task commands in the [README](../../README.md) (`install`, `remove`, `list`)
 
 ## Project declaration commands
 
-Use an existing project root. These examples use `/absolute/path/to/project` as a placeholder; replace it before running them. `project init` creates an empty declaration and lock, while `project register` records the project on this machine. Add skills with `install` and remove them with `remove`; `project set`, `require` and `unrequire` refuse `selection.command_unsupported`.
+Use an existing project root. These examples use `/absolute/path/to/project` as a placeholder; replace it before running them. `project init` creates an empty declaration and lock, while `project register` records the project on this machine. Add skills with `install` and remove them with `remove`.
 
 A dry run never fetches, so fetch the approved taps first:
 
@@ -79,8 +79,7 @@ Hosts decide how duplicate skill names are discovered; MASK does not suppress
 one scope because another declares the same skill.
 
 Consumers use selection v2 and ownership state v3. Readiness, integration, and
-pinned changes use typed v3 journals. A v1 declaration or a consumer record left
-by the live-checkout program is read only to [migrate it](migration-and-pins.md).
+pinned changes use typed v3 journals.
 Pending operations must be recovered before further mutation. The JSON result
 protocol remains version 1.
 Finish recovery with a compatible program before changing installations. The

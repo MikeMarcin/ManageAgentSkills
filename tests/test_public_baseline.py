@@ -88,7 +88,7 @@ class WorkflowReadinessBaseline(PublicFixture):
         self.linked_consumer_with_stale_roles()
         run = self.raw('ensure', '--project', self.project, '--json')
         again = json.loads(run.stdout)
-        self.assertNotEqual(again['data']['readiness'], 'ready_legacy_unpinned')
+        self.assertNotEqual(again['data']['readiness'], 'ready_dev_link')
         # MASK-0088: the static package supplies the exact role bytes; no generator or script exists to run.
         self.assertEqual((self.project / f'.codex/agents/{MISSING_ROLE}.toml').read_bytes(), (STATIC_PACKAGE / f'runtime/roles/codex/{MISSING_ROLE}.toml').read_bytes())
         self.assertEqual((self.project / '.codex/agents/rfc-worker.toml').read_text(encoding='utf-8'), '# older rfc-worker definition for codex\n', 'the edited role is preserved')

@@ -8,18 +8,13 @@ Every MASK call is a subprocess with its own private MASK_HOME, HOME and USERPRO
 AgentSkills checkout is only cloned, never edited: a disposable bare clone is the tap, and a disposable
 authoring clone commits and pushes candidates to it. No helper renders roles: role bytes come only from
 MASK's consented setup or from files a consumer committed after such a run; the upstream renderer is
-imported read-only at the end to compare deployed bytes. Three independent machines run in order: the
-tap lab (bootstrap, consent, roles, fresh clone, removal, push-then-update), a v1 legacy lab built by the
-MASK under test's tests/legacy_support.py, and a small owner-shape rehearsal of MASK-0107 (a v1
-configuration over a checked-out AgentSkills clone whose origin is a local bare repository, with an empty
-registry). Keep --work short on Windows: a tap cache ref path beyond MAX_PATH fails as an untyped git.failed.
+imported read-only at the end to compare deployed bytes. One machine runs the tap lab: bootstrap, consent,
+roles, fresh clone, removal and push-then-upgrade. Keep --work short on Windows: a tap cache ref path beyond MAX_PATH fails as an untyped git.failed.
 This is an evidence tool for the closeout record, not part of the program or its test suite.
 """
 import argparse
 import copy
-import functools
 import hashlib
-import importlib.util
 import json
 import os
 import platform
@@ -411,12 +406,12 @@ def tap_lab(args, facts):
     cached = git(cache, 'for-each-ref', '--format=%(refname) %(objectname)')
     beta_lock_bytes, beta_roles_lock_bytes = (beta / '.mask.lock.json').read_bytes(), beta_roles_lock.read_bytes()
     beta_role_bytes = {f: (beta / f).read_bytes() for f in role_files(beta)}
-    run, preview = lab.run('update', '--dry-run')
+    run, preview = lab.run('upgrade', '--dry-run')
     fetch = body(preview).get('fetches', {}).get(TAP, {})
     step('update --dry-run after the push: no fetch; cache refs and beta lock unchanged',
          fetch.get('attempted') is False and (preview or {}).get('changed') is False and git(cache, 'for-each-ref', '--format=%(refname) %(objectname)') == cached
          and (beta / '.mask.lock.json').read_bytes() == beta_lock_bytes, exit=run.returncode, fetch=fetch, network=body(preview).get('network'), error=code_of(preview))
-    run, data = lab.run('update')
+    run, data = lab.run('upgrade')
     fetches = body(data).get('fetches', {})
     rows = {row['root']: row for row in body(data).get('consumers', [])}
     changes = [(c['coordinate'], c['before_commit'], c['after_commit']) for c in rows.get(str(beta), {}).get('changes', [])]
@@ -453,132 +448,6 @@ def tap_lab(args, facts):
         step('beta deployed bytes equal the deployed candidate generate_roles output (post hoc comparison)', False, error=repr(error))
 
 
-@functools.cache
-def load_legacy_support(mask):
-    """The MASK under test's own schema-true legacy builder (tests/legacy_support.py)."""
-    spec = importlib.util.spec_from_file_location('mask_legacy_support', Path(mask).resolve().parent / 'tests/legacy_support.py')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def legacy_lab(args, facts):
-    """AC04 on a v1 machine (legacy project, legacy personal scope, unregistered declaration) in its own private homes."""
-    legacy = load_legacy_support(args.mask)
-    roots = legacy.build_legacy_machine(Path(args.work).resolve() / 'legacy', 1)
-    machine = Machine(args.mask, roots.home, roots.personal, roots.base)
-    clone = checkout_facts(roots.clone)
-    head = clone['head']
-    straggler = (roots.straggler / '.mask.json').read_bytes()
-    facts.update(calls=machine.calls, base=str(roots.base), head=head)
-
-    run, data = machine.run('doctor', '--check')
-    migration = body(data).get('migration', {})
-    step('legacy lab: doctor --check exits 7 with migration.required on the v1 machine',
-         run.returncode == 7 and migration.get('required') is True and migration.get('machine') == 'legacy_v1' and 'migration.required' in codes(body(data).get('issues')),
-         exit=run.returncode, issues=body(data).get('issues'), machine=migration.get('machine'))
-    before = legacy.snapshot(roots.base, roots.base)
-    run, preview = machine.run('doctor', '--migrate', '--dry-run')
-    migration = body(preview).get('migration', {})
-    facts['preview'] = dict(exit=run.returncode, proposed_tap=migration.get('proposed_tap'), acquisition=migration.get('acquisition'), config_after=migration.get('config_after'),
-                            changes=[row.get('root') for row in migration.get('changes', [])], warnings=codes((preview or {}).get('warnings')), plan_hash=body(preview).get('plan_hash'))
-    step('legacy lab: doctor --migrate --dry-run discloses the tap and both consumers and writes nothing (lab byte snapshot, clone facts)',
-         run.returncode == 0 and preview['would_change'] is True and preview['changed'] is False and (migration.get('proposed_tap') or {}).get('alias') == TAP
-         and sorted(facts['preview']['changes']) == sorted([str(roots.project), str(roots.personal)]) and legacy.snapshot(roots.base, roots.base) == before and checkout_facts(roots.clone) == clone,
-         **facts['preview'])
-    run, data = machine.run('doctor', '--migrate')
-    config = load(roots.home / 'config.json')
-    entry = config.get('sources', {}).get(TAP, {})
-    locks = {scope: [row['commit'] for row in load(path).get('packages', [])] for scope, path in (('project', roots.project / '.mask.lock.json'), ('user', roots.home / 'user.lock.json'))}
-    links = dict(machine.store_links(roots.project, ('.agents/skills/alpha', '.claude/skills/alpha')), **machine.store_links(roots.personal, ('.agents/skills/beta', '.claude/skills/beta')))
-    facts['migrate'] = dict(exit=run.returncode, transaction=(data or {}).get('transaction'), warnings=codes((data or {}).get('warnings')), error=(data or {}).get('error'), tap=entry, locks=locks, links=links)
-    step('legacy lab: doctor --migrate yields config v3 with the clone as authoring of tap agentskills, v2 declarations, locks at the clone HEAD and store links',
-         run.returncode == 0 and data['transaction'] == 'committed' and config.get('schema_version') == 3 and entry.get('authoring') == str(roots.clone) and entry.get('line_endings') == 'exact'
-         and load(roots.project / '.mask.json').get('schema_version') == 2 and load(roots.home / 'user.json').get('schema_version') == 2
-         and locks == dict(project=[head], user=[head]) and all(links.values()) and (roots.straggler / '.mask.json').read_bytes() == straggler,
-         **facts['migrate'])
-    run, data = machine.run('doctor', '--check')
-    step('legacy lab: doctor --check exits 0 after migration', run.returncode == 0, exit=run.returncode, issues=body(data).get('issues'))
-    run, data = machine.run('update')
-    fetch = body(data).get('fetches', {}).get(TAP, {})
-    statuses = [row['status'] for row in body(data).get('consumers', [])]
-    facts['update'] = dict(exit=run.returncode, error=(data or {}).get('error'), changed=(data or {}).get('changed'), fetches=body(data).get('fetches'), statuses=statuses)
-    step('legacy lab: update fetches the migrated tap from the clone remote and no-ops for both consumers',
-         run.returncode == 0 and fetch.get('attempted') is True and fetch.get('ok') is True and fetch.get('after') == head and statuses == ['unchanged', 'unchanged'] and data['changed'] is False,
-         **facts['update'])
-    after = checkout_facts(roots.clone)
-    step('legacy lab: the clone HEAD, staged index, index file and status are unchanged', after == clone, before=clone, after=after)
-
-
-def owner_rehearsal(args, facts):
-    """A small MASK-0107 rehearsal: v1 config over a checked-out AgentSkills clone with a local bare origin and an empty registry."""
-    legacy = load_legacy_support(args.mask)
-    roots = legacy.layout(Path(args.work).resolve() / 'owner')
-    roots.personal.mkdir(parents=True)
-    bare_clone(args.agentskills, roots.upstream)
-    git(roots.base, 'clone', '-q', roots.upstream, roots.clone)  # origin is the local bare repository; the working copy follows this host's core.autocrlf
-    legacy.write_json(roots.home / 'config.json', legacy.v1_config(roots))
-    legacy.write_json(roots.home / 'state.json', legacy.legacy_state())
-    machine = Machine(args.mask, roots.home, roots.personal, roots.base)
-    clone, upstream = checkout_facts(roots.clone), git(roots.upstream, 'rev-parse', 'HEAD')
-    head = clone['head']
-    facts.update(calls=machine.calls, base=str(roots.base), head=head, autocrlf=git(roots.clone, 'config', '--get', 'core.autocrlf', check=False),
-                 crlf_working_copy=b'\r\n' in (roots.clone / 'skills/implement-rfc/SKILL.md').read_bytes())
-
-    run, data = machine.run('doctor')
-    migration = body(data).get('migration', {})
-    facts['doctor'] = dict(exit=run.returncode, machine=migration.get('machine'), proposed_tap=migration.get('proposed_tap'), clone=migration.get('clone'), consumers=migration.get('consumers'), blockers=migration.get('blockers'))
-    step('owner rehearsal: doctor reports the v1 machine, a clean clone, the proposed agentskills tap and no consumers',
-         run.returncode == 0 and migration.get('required') is True and migration.get('machine') == 'legacy_v1' and (migration.get('proposed_tap') or {}).get('alias') == TAP
-         and migration.get('consumers') == [] and (migration.get('clone') or {}).get('dirty') is False, **facts['doctor'])
-    before = legacy.snapshot(roots.base, roots.base)
-    run, preview = machine.run('doctor', '--migrate', '--dry-run')
-    facts['preview'] = dict(exit=run.returncode, error=(preview or {}).get('error'), config_after=body(preview).get('migration', {}).get('config_after'), warnings=codes((preview or {}).get('warnings')))
-    step('owner rehearsal: doctor --migrate --dry-run writes nothing', run.returncode == 0 and (preview or {}).get('changed') is False and legacy.snapshot(roots.base, roots.base) == before
-         and checkout_facts(roots.clone) == clone, **facts['preview'])
-    state = (roots.home / 'state.json').read_bytes()
-    run, data = machine.run('doctor', '--migrate')
-    config = load(roots.home / 'config.json')
-    entry = config.get('sources', {}).get(TAP, {})
-    facts['migrate'] = dict(exit=run.returncode, error=(data or {}).get('error'), transaction=(data or {}).get('transaction'), warnings=codes((data or {}).get('warnings')), config=config)
-    step('owner rehearsal: doctor --migrate converts the configuration only: v3 with tap agentskills, authoring = the clone, exact bytes',
-         run.returncode == 0 and config.get('schema_version') == 3 and list(config.get('sources', {})) == [TAP] and entry.get('authoring') == str(roots.clone) and entry.get('line_endings') == 'exact'
-         and (roots.home / 'state.json').read_bytes() == state and sorted(path.name for path in roots.home.iterdir()) == ['config.json', 'operation.lock', 'state.json'], **facts['migrate'])
-    def personal_verdict(details):
-        """The shared readiness verdict of a personal scope without implement-rfc context: both required inputs missing, 16 roles setup_required."""
-        rows = (details or {}).get('workflow', [])
-        missing = {f'{SKILL} input project-config (.mask/skill-config/{SKILL}/project.json): missing', f'{SKILL} input project-rules (.mask/skill-config/{SKILL}/project.md): missing'}
-        return len(rows) == 18 and missing <= set(rows) and sum(row.endswith(': setup_required') for row in rows) == 16
-
-    run, data = machine.run('install', SKILL, '--user')
-    links = machine.store_links(roots.personal)
-    locked = [row['commit'] for row in load(roots.home / 'user.lock.json').get('packages', [])]
-    facts['install'] = dict(exit=run.returncode, error=(data or {}).get('error'), transaction=(data or {}).get('transaction'), network=body(data).get('network'), links=links, locked=locked)
-    step('owner rehearsal: install implement-rfc --user fetches the tap, links the personal scope from MASK_HOME/store/v1 and reports exit 4 workflow.incomplete (personal context and role setup missing)',
-         run.returncode == 4 and code_of(data) == 'workflow.incomplete' and data['transaction'] == 'committed' and personal_verdict(data['error'].get('details'))
-         and body(data).get('network') == 'fetch' and locked == [head] and all(links.values()), **facts['install'])
-    run, data = machine.run('list', '--user')
-    states = {row['skill']: row.get('states') for row in body(data).get('skills', [])}
-    facts['list'] = dict(exit=run.returncode, states=states)
-    step('owner rehearsal: list --user shows implement-rfc linked for claude and codex', run.returncode == 0 and states == {COORDINATE: dict(claude='linked', codex='linked')}, **facts['list'])
-    run, data = machine.run('update')
-    fetch = body(data).get('fetches', {}).get(TAP, {})
-    statuses = [row['status'] for row in body(data).get('consumers', [])]
-    facts['update'] = dict(exit=run.returncode, error=(data or {}).get('error'), changed=(data or {}).get('changed'), fetches=body(data).get('fetches'), statuses=statuses)
-    step('owner rehearsal: update fetches the tap from origin and no-ops (same exit 4 workflow.incomplete verdict)', fetch.get('attempted') is True and fetch.get('ok') is True and fetch.get('after') == head
-         and statuses == ['unchanged'] and (data or {}).get('changed') is False and run.returncode == 4 and code_of(data) == 'workflow.incomplete' and personal_verdict(data['error'].get('details')),
-         **facts['update'])
-    run, data = machine.run('doctor', '--check')
-    issues = body(data).get('issues') or []
-    facts['doctor_check'] = dict(exit=run.returncode, issues=issues)
-    # MASK-0107 expects exit 0 here; without personal implement-rfc context and consented setup the documented verdict is 7.
-    step('owner rehearsal: doctor --check exits 7 with only workflow.incomplete (personal context and role setup missing; no migration issue)',
-         run.returncode == 7 and codes(issues) == ['workflow.incomplete'] and personal_verdict(issues[0].get('details')), **facts['doctor_check'])
-    after = checkout_facts(roots.clone)
-    step("owner rehearsal: the clone's HEAD, staged index, index file and status and the bare origin are unchanged", after == clone and git(roots.upstream, 'rev-parse', 'HEAD') == upstream,
-         before=clone, after=after)
-
-
 def host_facts(args):
     mask_root = Path(args.mask).resolve().parent
     facts = dict(os=platform.platform(), os_release=platform.release(), os_version=platform.version(), machine=platform.machine(),
@@ -608,7 +477,7 @@ def main():
     script = Path(__file__).resolve()
     record = dict(qualifier=dict(path=str(script), sha256=hashlib.sha256(script.read_bytes()).hexdigest()), host=host_facts(args))
     try:
-        for name, section in (('tap_lab', tap_lab), ('legacy_lab', legacy_lab), ('owner_rehearsal', owner_rehearsal)):
+        for name, section in (('tap_lab', tap_lab),):
             record[name] = {}
             try:
                 section(args, record[name])

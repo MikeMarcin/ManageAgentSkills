@@ -332,9 +332,9 @@ def ensure(args, output, home):
             incomplete = [entry for entry in final['workflow_readiness'] if not entry['complete']]
     final_records = c.consumer_records(planned['intent']['after_state'])
     workflows = scope_workflows(output['data'])
-    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_legacy_unpinned',
+    output['data']['scope_readiness'] = [dict(root=str(selected), readiness='inactive_on_branch' if str(selected) in inactive else 'ready_pinned' if final_records[str(selected)].get('mode') == 'pinned' else 'ready_dev_link',
                                               workflow=workflows.get(str(selected), 'not_declared')) for selected in roots]
-    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_legacy_unpinned'
+    output['data']['readiness'] = 'would_reconcile' if output['dry_run'] and planned['would_change'] else 'inactive_on_branch' if len(inactive) == len(roots) else 'ready_pinned' if all(item['readiness'] == 'ready_pinned' for item in output['data']['scope_readiness']) else 'ready_dev_link'
     if incomplete:
         # Links may already be committed above; the task still did not reach complete readiness.
         output['data']['readiness'] = 'workflow_incomplete'

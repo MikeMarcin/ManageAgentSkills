@@ -323,4 +323,5 @@ class OlderMachine(ForgeFixture):
         self.assertEqual(set(self.reached()), {SCP})
         self.assertEqual(self.machine('ensure')['data']['readiness'], 'ready_pinned')
         again = self.machine('doctor', '--migrate')
-        self.assertEqual(again['error']['code'], 'invocation.invalid')  # Nothing left to canonicalize: the scoped straggler form is what remains.
+        self.assertEqual((again['ok'], again['changed'], again['data']['identity_canonicalization']), (True, False, []))
+        self.assertEqual(self.machine('doctor', '--migrate', '--project', self.project)['error']['code'], 'invocation.invalid')

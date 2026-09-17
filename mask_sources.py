@@ -245,19 +245,14 @@ def package_path(value):
 
 
 def validate_config(value):
-    legacy = value['schema_version'] == 2
     # This machine's own opt-in extends forge equivalence before any of its identities is compared (RFC-MASK-0022).
     ACTIVE_FORGES.clear()
     ACTIVE_FORGES.update(FORGE_HOSTS, forge_hosts(value.get('forge_hosts', [])))
-    if not isinstance(value['sources'], dict) or not (1 if legacy else 0) <= len(value['sources']) <= 256:
+    if not isinstance(value['sources'], dict) or len(value['sources']) > 256:
         c.fail('config.invalid', 'Expected a bounded approved source catalog.')
-    if legacy:
-        alias(value['legacy_source'])
-        if value['legacy_source'] not in value['sources']:
-            c.fail('config.invalid', 'The legacy source binding is missing.')
     for name, entry in value['sources'].items():
         alias(name)
-        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), () if legacy else ('line_endings', 'transport_policy'), family='source')
+        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), ('line_endings', 'transport_policy'), family='source')
         if entry.get('transport_policy', 'derived') not in TRANSPORT_POLICIES:
             c.fail('config.invalid', 'A tap transport policy is derived or pinned.')
         if line_endings(entry) not in LINE_ENDINGS:
@@ -271,8 +266,6 @@ def validate_config(value):
             c.fail('config.invalid', 'Source cache must be an absolute machine-local path.')
         if entry['authoring'] is not None and (not isinstance(entry['authoring'], str) or not Path(entry['authoring']).is_absolute()):
             c.fail('config.invalid', 'Authoring checkout must be an absolute machine-local path.')
-    if legacy and value['sources'][value['legacy_source']]['authoring'] != value['source']['root']:
-        c.fail('config.invalid', 'Legacy source migration must preserve its authoring root.')
 
 
 def cache_path(home, name, identity):

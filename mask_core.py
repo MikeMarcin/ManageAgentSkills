@@ -57,7 +57,6 @@ REMEDIATION = {
     'skill.unknown': "Check the exact skill name with 'mask skill list' or 'mask source show NAME'.",
     'source.unresolved': "Fetch the approved source with 'mask source fetch NAME', or name SOURCE/ID for a resolved source.",
     'lock.resolution_required': "Fetch the approved source with 'mask source fetch NAME' before an offline or dry-run resolution.",
-    'migration.required': "This machine or consumer still uses the retired live-checkout model; preview its conversion to taps with 'mask doctor --migrate --dry-run'.",
     'target.collision': 'Move or delete the conflicting entry yourself, then rerun; MASK never overwrites it.',
     'recovery.required': "Run 'mask recover --inspect' and complete or roll back the pending operation.",
     'lock.busy': 'Another MASK operation holds the lock; retry when it finishes.',
@@ -118,14 +117,6 @@ def string_set(value, family, *, targets=False):
         for item in value:
             skill_id(item)
     return sorted(value)
-
-
-def manifest(value):
-    fields(value, ('schema_version', 'skills'), ('targets',), 'manifest')
-    normalized = dict(schema_version=1, skills=string_set(value['skills'], 'manifest'))
-    if 'targets' in value:
-        normalized['targets'] = string_set(value['targets'], 'manifest', targets=True)
-    return normalized
 
 
 def reparse(info):
@@ -500,48 +491,20 @@ def checkout(root):
     return root
 
 
-MIGRATION_REMEDIATION = ['mask', 'doctor', '--migrate', '--dry-run']
+def unsupported(what, **details):
+    """Input written before taps existed is not read."""
+    fail('manifest.unsupported_version', what + ' predates taps and is no longer supported; recreate it with mask install.', 4, **details)
 
 
-def migration_required(message, **details):
-    """Refuse a retired live-checkout input before any effect; ``mask doctor --migrate`` converts it."""
-    fail('migration.required', message, 4, remediation=MIGRATION_REMEDIATION, **details)
-
-
-def refuse_legacy_config(value):
-    """A v1 (live checkout) or v2 (catalog plus legacy binding) machine configuration is read only for migration."""
-    version = value.get('schema_version') if isinstance(value, dict) else None
-    if type(version) is int and version in (1, 2):
-        migration_required('This machine configuration predates taps; convert it with mask doctor before using this command.', schema_version=version)
-
-
-def config(value, *, legacy=False):
-    """Machine configuration: v3 is a tap catalog; v1 and v2 parse only with ``legacy=True`` (migration and exempt commands)."""
-    if not legacy:
-        refuse_legacy_config(value)
-    version = value.get('schema_version') if isinstance(value, dict) else None
-    if version == 3:
-        fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), ('forge_hosts',), versions=(1, 2, 3))
-    else:
-        required = ('schema_version', 'source', 'default_targets', 'git_timeout_seconds')
-        if version == 2:
-            required += ('sources', 'legacy_source')
-        fields(value, required, versions=(1, 2, 3))
-        source = value['source']
-        fields(source, ('root', 'remote', 'branch'))
-        if not isinstance(source['root'], str) or not Path(source['root']).is_absolute():
-            fail('config.invalid', 'Source root must be an absolute path.')
-        for key in ('remote', 'branch'):
-            item = source[key]
-            if not isinstance(item, str) or not item or item.startswith('-') or any(c.isspace() for c in item) or any(c in item for c in ':\\~^?*[\x00') or '..' in item or '@{' in item:
-                fail('config.invalid', 'Unsafe remote or branch name.', field=key)
+def config(value):
+    """Machine configuration v3: a tap catalog."""
+    fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), ('forge_hosts',), versions=(3,))
     targets = string_set(value['default_targets'], 'config', targets=True)
     timeout = value['git_timeout_seconds']
     if type(timeout) is not int or not 1 <= timeout <= 600:
         fail('config.invalid', 'Git timeout must be an integer from 1 through 600.')
-    if value['schema_version'] in (2, 3):
-        from mask_sources import validate_config
-        validate_config(value)
+    from mask_sources import validate_config
+    validate_config(value)
     return dict(value, default_targets=targets)
 
 
@@ -611,19 +574,17 @@ def state(value):
         fail('state.invalid', 'User and project roots overlap.')
     for key, record in consumer_records(value).items():
         from mask_pinned import is_pinned, validate_record
-        pinned = is_pinned(record)
-        if pinned:
-            if value['schema_version'] != 3:
-                fail('state.invalid', 'Pinned ownership requires state v3.')
-            validate_record(record)
-        else:
-            fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links'), ('native_roles',), family='state')
+        if not is_pinned(record):
+            unsupported('A consumer record without pinned ownership', root=key)
+        if value['schema_version'] != 3:
+            fail('state.invalid', 'Pinned ownership requires state v3.')
+        validate_record(record)
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
             fail('state.invalid', 'Noncanonical registry root.')
         fields(record['root_identity'], ('device', 'inode'), family='state')
         if any(type(v) is not int for v in record['root_identity'].values()):
             fail('state.invalid', 'Invalid root identity.')
-        previous_manifest = selection_manifest(record['last_manifest']) if pinned else manifest(record['last_manifest'])
+        previous_manifest = selection_manifest(record['last_manifest'])
         if not isinstance(record['last_manifest_digest'], str) or record['last_manifest_digest'] != digest(previous_manifest):
             fail('state.invalid', 'Invalid cached manifest digest.')
         revision = record['last_source_revision']
@@ -635,7 +596,7 @@ def state(value):
             from mask_workflow import validate_record_roles
             validate_record_roles(record['native_roles'], consumer_scope(value, key))
         for relative, link in record['links'].items():
-            fields(link, ('skill', 'target', 'link_text'), ('resolution', 'dev') if pinned else (), family='state')
+            fields(link, ('skill', 'target', 'link_text'), ('resolution', 'dev'), family='state')
             skill_id(link['skill'])
             if not isinstance(link['target'], str) or link['target'] not in ADAPTERS or relative != adapters.relative(link['target'], consumer_scope(value, key), link['skill']) or not isinstance(link['link_text'], str) or not link['link_text']:
                 fail('state.invalid', 'Unsafe ownership path or link record.')
@@ -675,11 +636,11 @@ def declaration_path(root, scope='project', home=None):
 
 
 def selection_manifest(value):
-    """Version-dispatched declaration reader; persisted legacy state uses manifest()."""
-    if isinstance(value, dict) and value.get('schema_version') == 2:
-        import mask_resolve
-        return mask_resolve.selection(value)
-    return manifest(value)
+    """A v2 declaration; nothing older is read."""
+    if not isinstance(value, dict) or value.get('schema_version') != 2:
+        unsupported('A declaration that is not schema version 2')
+    import mask_resolve
+    return mask_resolve.selection(value)
 
 
 def registration_safe(root, home, value, scope):

@@ -72,7 +72,7 @@ Fixes every project and your personal skills in one go, without prompts. Files i
 ## Learn more
 
 - [Installation](docs/guides/installation.md) · [Sources, taps and upgrades](docs/guides/sources-and-updates.md) · [Readiness and setup](docs/guides/readiness-and-integrations.md)
-- [Project files and layout](docs/guides/declarations.md) · [Recovery and uninstalling](docs/guides/recovery.md) · [Migrating an older machine](docs/guides/migration-and-pins.md)
+- [Project files and layout](docs/guides/declarations.md) · [Recovery and uninstalling](docs/guides/recovery.md) · [Pins, dev links and per-skill agents](docs/guides/pins-and-agents.md)
 - [CLI contract and exit codes](docs/architecture/cli-contract.md) · [Development](docs/guides/development.md) · [Contributing](CONTRIBUTING.md) · [RFCs](docs/rfcs/README.md)
 
 MASK is pre-release (`0.2.0`). It needs no daemon, account or subscription. What has been verified on which platform is recorded in the [acceptance records](docs/development/readiness-acceptance.md).

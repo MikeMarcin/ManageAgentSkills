@@ -65,5 +65,3 @@ py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin
 ```
 
 The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status` reports the program, interpreter and launcher discovery. Installing the launcher and approving a tap are separate operations; `mask init` creates an empty tap catalog if you want the machine configuration before approving any tap.
-
-A machine where MASK still links skills from a local AgentSkills checkout needs no new bootstrap: preview `mask doctor --migrate --dry-run` and follow [Migrating from a live checkout](migration-and-pins.md).

@@ -14,7 +14,7 @@ import subprocess
 import sys
 import unittest
 
-from tests.legacy_support import LegacyFixture, git, snapshot
+from tests.fixture_files import git, snapshot
 from tests.support import ENTRY, TAP, Fixture
 
 PROGRAM = ENTRY.parent
@@ -174,24 +174,3 @@ class StoreTargetedLinks(Fixture):
         self.assert_store_links()
         self.assertEqual(self.links(), before)
 
-
-class LegacyRecordsYieldNoLinks(LegacyFixture):
-    def test_mode_less_record_refuses_every_planner_entry_and_writes_nothing(self):
-        roots = self.legacy_machine(1, straggler_skills=None)
-        (roots.home / 'config.json').unlink()
-        self.machine('tap', 'add', TAP, roots.upstream)
-        tapped = roots.base / 'tap project'
-        tapped.mkdir()
-        git(tapped, 'init', '-q', '-b', 'main')
-        self.machine('install', 'alpha', '--project', tapped)
-        # The legacy project keeps its mode-less record and clone links but now declares the same pinned v2 selection.
-        for name in ('.mask.json', '.mask.lock.json'):
-            (roots.project / name).write_bytes((tapped / name).read_bytes())
-        observed = snapshot(roots.base, roots.home, roots.project, roots.personal, tapped)
-        self.assertEqual([item['code'] for item in self.machine('plan', '--project', roots.project)['data']['blockers']], ['migration.required'])
-        for args in (('apply', '--project', roots.project), ('ensure', '--project', roots.project),
-                     ('project', 'register', '--project', roots.project, '--apply'), ('project', 'unregister', '--project', roots.project),
-                     ('link', 'adopt', '--project', roots.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', roots.clone / 'skills/alpha')):
-            with self.subTest(args=args):
-                self.assertEqual(self.machine(*args, code=4)['error']['code'], 'migration.required')
-        self.assertEqual(snapshot(roots.base, roots.home, roots.project, roots.personal, tapped), observed)

@@ -13,7 +13,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from tests.legacy_support import write_json
+from tests.fixture_files import write_json
 from tests.public_support import CONSUMER_CONTEXT, PublicFixture
 from tests.support import TAP
 from tests.test_setup import SUBJECT, SetupFixture

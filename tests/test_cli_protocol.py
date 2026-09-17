@@ -33,8 +33,8 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(commands['capabilities']['implemented'])
         self.assertTrue(commands['upgrade']['network'])
         self.assertFalse(commands['apply']['network'])
-        self.assertTrue(commands['project.require']['plan_guard'])
-        self.assertTrue(any(a['name'] == 'ids' and a['repeatable'] for a in commands['project.require']['arguments']))
+        self.assertTrue(commands['install']['plan_guard'])
+        self.assertTrue(any(a['name'] == 'ids' and a['repeatable'] for a in commands['install']['arguments']))
 
     def test_parser_errors_are_json(self):
         for args in [('wat',), ('init', '--source', '.'), ('capabilities', '--wat'), ('project', 'set'), ('project', 'set', '--clear', '--skill', 'foo'), ('project', 'register', '.', '--project', '.')]:

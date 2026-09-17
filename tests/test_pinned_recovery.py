@@ -75,38 +75,6 @@ mask.main(sys.argv[3:])
         self.assertTrue(inventory['rows'])
         self.assertEqual({row['status'] for row in inventory['rows']},{'managed_converged'})
 
-    def legacy_record(self,name,skills):
-        """A mode-less consumer record beside pinned ones, written straight into state with its v1 declaration and links; no legacy command runs."""
-        from tests.legacy_support import create_links,legacy_record,write_json
-        root=self.base/name;root.mkdir()
-        declaration,record=legacy_record(SimpleNamespace(clone=self.source),root,skills)
-        write_json(root/'.mask.json',declaration)
-        create_links(root,record)
-        state=c.read_json(self.home/'state.json',default=c.empty_state())
-        state['projects'][str(root)]=record
-        write_json(self.home/'state.json',state)
-        return root,record
-
-    def test_personal_scope_preserves_legacy_records_and_state3(self):
-        from tests.legacy_support import snapshot
-        legacy,original=self.legacy_record('legacy-project',['beta'])
-        files=snapshot(self.base,legacy)
-        self.register(True)
-        user=self.base/'user-home';user.mkdir()
-        (self.home/'user.json').write_text(json.dumps(self.declaration))
-        self.call('lock','--user')
-        self.call('user','register','--user-home',user,'--apply')
-        state=c.state(c.read_json(self.home/'state.json'))
-        self.assertEqual(state['schema_version'],3)
-        self.assertEqual(c.text_json(state['projects'][str(legacy)]),c.text_json(original))
-        self.assertEqual(state['user']['mode'],'pinned')
-        self.call('user','unregister')
-        state=c.read_json(self.home/'state.json')
-        self.assertEqual(state['schema_version'],3)
-        self.assertEqual(c.text_json(state['projects'][str(legacy)]),c.text_json(original))
-        self.assertEqual(snapshot(self.base,legacy),files)
-        self.assertTrue((self.project/'.agents/skills/alpha').is_symlink())
-
     def test_readiness_exact_authority_and_no_inferred_network(self):
         # Events need approval first; manual JSON readiness gets a typed one-time proposal instead (MASK-0085).
         self.assertEqual(self.call('ensure','--event','startup',code=4)['error']['code'],'integration.approval_required')
@@ -381,18 +349,6 @@ mask.main(sys.argv[3:])
         next(iter(bad['projects'][str(self.project)]['links'].values()))['resolution']['source']=[]
         with self.assertRaises(c.MaskError):c.state(bad)
 
-    def test_recovery_cannot_silently_convert_existing_consumer_mode(self):
-        self.register(True)
-        state=c.state(c.read_json(self.home/'state.json'))
-        journal=fs.make_pending(fs.plan(self.config,state,[self.project],home=self.home),self.home)
-        record=journal['after_state']['projects'][str(self.project)]
-        record.pop('mode');record.pop('last_lock')
-        record.update(last_manifest=dict(schema_version=1,skills=['alpha']),last_manifest_digest=c.digest(dict(schema_version=1,skills=['alpha'])),links={})
-        journal['after_state']['generation']+=1
-        journal['after_state_text']=c.text_json(journal['after_state'])
-        with self.assertRaises(c.MaskError) as error:fs.validate_pending(journal,self.home)
-        self.assertEqual(error.exception.code,'recovery.conflict')
-
     def test_saved_journal_cannot_strip_pinned_extension(self):
         self.register()
         state=c.state(c.read_json(self.home/'state.json'))
@@ -406,30 +362,6 @@ mask.main(sys.argv[3:])
         abandon=fs.make_pending(fs.plan(self.config,state,[self.project],home=self.home,unregister=[str(self.project)],keep_links=True,operation='project.unregister'),self.home)
         self.assertNotIn('pinned',abandon)
         fs.validate_pending(abandon,self.home)
-
-    def test_saved_journal_selecting_a_legacy_record_is_retired(self):
-        # Split from test_saved_journal_cannot_strip_pinned_extension. A journal over mode-less ownership records a retired
-        # live-checkout transition: inspection reports it, and neither completion nor rollback replays it.
-        self.register()
-        legacy,record=self.legacy_record('legacy-selected',['beta'])
-        state=c.state(c.read_json(self.home/'state.json'))
-        planned=fs.plan(self.config,state,[legacy],home=self.home)
-        self.assertEqual(planned['blockers'][0]['code'],'migration.required')
-        journal=fs.make_pending(planned,self.home)
-        with self.assertRaises(c.MaskError) as error:fs.validate_pending(journal,self.home)
-        self.assertEqual((error.exception.code,error.exception.details.get('retired')),('recovery.conflict','legacy_ownership'))
-        (self.home/'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
-        before=self.snapshot()
-        self.assertEqual(self.call('recover','--inspect')['data']['retired'],'legacy_ownership')
-        for mode in ('--complete','--rollback'):
-            refused=self.call('recover',mode,code=8)['error']
-            self.assertEqual((refused['code'],refused['details'].get('retired')),('recovery.conflict','legacy_ownership'))
-        self.assertEqual(before,self.snapshot())
-        (self.home/'pending.json').unlink()
-        self.call('self','install','--bin-dir',self.base/'bin')
-        state=c.read_json(self.home/'state.json')
-        self.assertEqual(state['schema_version'],3)
-        self.assertEqual(state['projects'][str(legacy)],record)
 
     def test_retarget_unlink_crash_and_transient_create_failure_recover(self):
         self.register(True)

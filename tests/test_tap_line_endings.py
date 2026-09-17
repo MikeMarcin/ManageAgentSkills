@@ -18,7 +18,7 @@ from unittest.mock import patch
 from mask_packages import PayloadFile
 import mask_provenance as provenance
 import mask_sources as sources
-from tests.legacy_support import LegacyFixture, write_json
+from tests.fixture_files import write_json
 from tests.support import ENTRY, TAP, Fixture
 
 ALPHA = TAP + '/alpha'
@@ -250,50 +250,6 @@ class EntryWrittenBeforeThePolicy(LineEndingFixture):
         refused = self.call('tap', 'add', TAP, self.upstream, '--checkout', self.source, '--autocrlf', code=4)
         self.assertEqual(refused['error']['code'], 'source.alias_conflict')
         self.assertEqual(config.read_bytes(), written)
-
-
-class MigrationWritesTheDefault(AutocrlfGit, LegacyFixture):
-    """doctor --migrate writes line_endings exact on every tap: the new v1 tap and the kept, renamed and extra v2 taps."""
-
-    def setUp(self):
-        self.force_autocrlf()
-        super().setUp()
-
-    def policies(self, catalog):
-        return {name: entry.get('line_endings') for name, entry in catalog.items()}
-
-    def migrate(self, alias, names, *args):
-        """The doctor report, the dry run and the written configuration all carry the exact default."""
-        # The plain report takes no --alias, so it proposes the default alias; the dry run proposes the chosen one.
-        self.assertEqual(self.machine('doctor')['data']['migration']['proposed_tap']['line_endings'], 'exact')
-        preview = self.machine('doctor', '--migrate', *args, '--dry-run')['data']['migration']
-        self.assertEqual((preview['proposed_tap']['alias'], preview['proposed_tap']['line_endings']), (alias, 'exact'))
-        self.assertEqual(self.policies(preview['config_after']['sources']), dict.fromkeys(names, 'exact'))
-        self.machine('doctor', '--migrate', *args)
-        catalog = json.loads((self.roots.home / 'config.json').read_text(encoding='utf-8'))['sources']
-        self.assertEqual(self.policies(catalog), dict.fromkeys(names, 'exact'))
-        return catalog
-
-    def without_policy(self, entry):
-        return {key: value for key, value in entry.items() if key != 'line_endings'}
-
-    def test_v1_machine_migrates_to_an_exact_tap(self):
-        roots = self.legacy_machine(1)
-        catalog = self.migrate('agentskills', ['agentskills'])
-        self.assertEqual(catalog['agentskills'], sources.binding(roots.home, 'agentskills', str(roots.upstream), 'main', 'skills', str(roots.clone)))
-
-    def test_v2_machine_keeps_its_legacy_and_extra_taps_with_the_exact_default(self):
-        roots = self.legacy_machine(2)
-        self.assertFalse(any('line_endings' in entry for entry in roots.config['sources'].values()))
-        catalog = self.migrate('legacy', ['legacy', 'extra'])
-        self.assertEqual({name: self.without_policy(entry) for name, entry in catalog.items()}, roots.config['sources'])
-
-    def test_v2_machine_renames_its_legacy_tap_with_the_exact_default(self):
-        roots = self.legacy_machine(2)
-        catalog = self.migrate('other', ['other', 'extra'], '--alias', 'other')
-        legacy = roots.config['sources']['legacy']
-        self.assertEqual(catalog['other'], sources.binding(roots.home, 'other', legacy['transport'], 'main', 'skills', legacy['authoring']))
-        self.assertEqual(self.without_policy(catalog['extra']), roots.config['sources']['extra'])
 
 
 class PolicySurfaces(LineEndingFixture):

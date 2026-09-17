@@ -84,19 +84,3 @@ class SelectionMembershipTests(Fixture):
         self.call('install', 'alpha', '--project', self.project, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertEqual(self.selected(), ['alpha'])
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
-
-    def test_retired_string_mutations_refuse_without_writing(self):
-        self.declare_pinned()
-        mutations = (('project', 'require', 'beta'), ('project', 'unrequire', 'alpha'), ('project', 'set', '--clear'))
-        for args in mutations:
-            with self.subTest(declaration=2, args=args):
-                before = self.snapshot()
-                self.assertEqual(self.call(*args, code=4)['error']['code'], 'selection.command_unsupported')
-                self.assertEqual(before, self.snapshot())
-        (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n')
-        (self.project / '.mask.lock.json').unlink()
-        for args in mutations:
-            with self.subTest(declaration=1, args=args):
-                before = self.snapshot()
-                self.assertEqual(self.call(*args, code=4)['error']['code'], 'migration.required')
-                self.assertEqual(before, self.snapshot())

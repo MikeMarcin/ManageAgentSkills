@@ -295,8 +295,6 @@ def validate_after_links(pending, home, after_policy):
     for key in pending['selected']:
         record = records[key]
         root = Path(key)
-        if not pinned.is_pinned(record):
-            c.fail('recovery.conflict', 'Legacy live-checkout ownership has no effective selection authority to recover.', 8)
         expected = pinned.expected_links(home, record['last_manifest'], record['last_lock'], config,
                                          root=root, scope=c.consumer_scope(pending['after_state'], root),
                                          policy_value=after_policy, devs=record.get('dev_links', {}))
@@ -347,8 +345,6 @@ def dispatch(args, output, home):
         else:
             root = Path(state['user']['root']) if state.get('user') else home
         declaration = c.selection_manifest(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
-        if setter and declaration['schema_version'] == 1:
-            c.migration_required('A v1 declaration must be migrated to a v2 declaration before setting agents or targets.', path=str(c.declaration_path(root, scope, home)))
         record = records.get(str(root))
         if not pinned.is_pinned(record):
             c.fail(scope + '.not_registered', 'Register this v2 consumer explicitly with ' + scope + ' register before setting agents or compatibility policy.', 4)

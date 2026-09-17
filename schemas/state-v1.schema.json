@@ -51,7 +51,7 @@
             }
           },
           "last_manifest": {
-            "$ref": "project.schema.json"
+            "$ref": "project-v2.schema.json"
           },
           "last_manifest_digest": {
             "type": "string"

@@ -302,7 +302,7 @@ def render_projects(data, output):
     if not projects:
         lines.append("  None yet. 'mask install ID' in a project registers it.")
     for record in projects:
-        extras = ([] if record.get('available') else ['unavailable']) + ([clean(record['mode'])] if record.get('mode', 'legacy') != 'pinned' else [])
+        extras = ([] if record.get('available') else ['unavailable']) + ([clean(record['mode'])] if record.get('mode') != 'pinned' else [])
         lines.append(f"  {clean(record.get('root'))}  {plural(len(record.get('links', {})), 'link')}" + (f" ({', '.join(extras)})" if extras else ''))
     return lines
 
@@ -328,27 +328,8 @@ def render_show(data, output):
     return lines + plan_guard(data, output)
 
 
-def render_migrate(data, output):
-    """doctor --migrate: the conversion preview or its applied result."""
-    migration = data.get('migration') or {}
-    tap = migration.get('proposed_tap') or {}
-    lines = [f"doctor --migrate: {clean(migration.get('machine'))} to taps ({outcome(output)})",
-             f"  tap: {clean(tap.get('alias'))} {clean(tap.get('repository'))}"]
-    for row in migration.get('changes', []) or []:
-        lines.append(f"  legacy {clean(row.get('scope'))}: {clean(row.get('root'))}")
-    acquisition = migration.get('acquisition') or {}
-    if acquisition:
-        lines.append(f"  cache: {clean(acquisition.get('commit'))} from {clean(acquisition.get('source'))}")
-    lines.extend(actions(output))
-    if output['dry_run'] and data.get('plan_hash'):
-        lines.append(f"  apply this preview with 'mask doctor --migrate --expect-plan-hash {clean(data['plan_hash'])}'")
-    return lines
-
-
 def render_doctor(data, output):
-    if 'config_after' in (data.get('migration') or {}):
-        return render_migrate(data, output)
-    if 'migration' not in data and 'identity_canonicalization' in data:  # doctor --migrate on a tap machine (RFC-MASK-0022)
+    if 'identity_canonicalization' in data and 'config' in data:  # doctor --migrate (RFC-MASK-0022)
         rows = data['identity_canonicalization']
         if not rows:
             return ['Every tap already uses its transport-neutral identity. Nothing to do.']
@@ -368,24 +349,12 @@ def render_doctor(data, output):
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
     lines.extend(workflow_lines(data, verb='would be deployed by'))
-    migration = data.get('migration') or {}
-    if migration.get('required'):
-        lines.append(f"  migration: required ({clean(migration.get('machine'))})")
-        tap = migration.get('proposed_tap') or {}
-        if tap:
-            lines.append(f"  proposed tap: {clean(tap.get('alias'))} {clean(tap.get('repository'))}")
-        for blocker in migration.get('blockers', []) or []:
-            lines.append(f"  migration blocked: {clean(blocker.get('message'))}")
-        for row in migration.get('consumers', []) or []:
-            state = 'migratable' if row.get('migratable') else 'blocked'
-            lines.append(f"  legacy {clean(row.get('scope'))}: {clean(row.get('root'))} ({state})")
-        lines.append("  preview the conversion with 'mask doctor --migrate --dry-run'")
     if output['would_change']:
         lines.append("  Links or roles differ from the declaration; 'mask ensure' reconciles them.")
     return lines + note(data)
 
 
-READINESS_WORDS = dict(ready_pinned='ready', ready_legacy_unpinned='ready (legacy, unpinned)', inactive_on_branch='inactive on this branch',
+READINESS_WORDS = dict(ready_pinned='ready', ready_dev_link='ready (development link, not pinned)', inactive_on_branch='inactive on this branch',
                        would_reconcile='changes needed', workflow_incomplete='setup incomplete', approval_required='approval required',
                        confirmation_required='confirmation required', drifted='drifted', blocked='blocked')
 
@@ -564,13 +533,9 @@ def render_config(data, output):
     else:
         head = 'Would change the configuration (dry run: nothing written).' if output['dry_run'] and output['would_change'] else \
             'Configuration updated.' if output['changed'] else 'Configuration already says that. Nothing to do.'
-    source = config.get('source') or {}
     lines = [head] + pairs([('taps', sorted(config.get('sources') or {}) or ('none' if 'sources' in config else None)),
-                            ('legacy source', f"{source.get('root')} ({source.get('remote')}/{source.get('branch')})" if source else None),
                             ('default agents', config.get('default_targets')), ('git timeout', f"{config['git_timeout_seconds']} s" if 'git_timeout_seconds' in config else None),
                             ('extra forge hosts', config.get('forge_hosts')), ('machine state', data.get('home')), ('program', data.get('program_root'))])
-    if data.get('migration_required'):
-        lines.append("  This machine predates taps; preview the conversion with 'mask doctor --migrate --dry-run'.")
     return lines
 
 
@@ -833,11 +798,9 @@ RENDERERS = {
     'skill.show': render_skill, 'skill.where-used': render_where_used, 'inventory': render_inventory,
     'install': render_task, 'remove': render_task, 'list': render_list,
     'skill.import': render_provenance, 'skill.provenance': render_provenance, 'skill.record-adaptation': render_provenance,
-    'project.init': summary('project init', SCOPE_SPEC), 'project.show': render_show, 'project.set': render_manifest,
-    'project.require': render_manifest, 'project.unrequire': render_manifest, 'project.set-agents': render_manifest, 'project.set-targets': render_manifest,
+    'project.init': summary('project init', SCOPE_SPEC), 'project.show': render_show, 'project.set-agents': render_manifest, 'project.set-targets': render_manifest,
     'project.register': render_manifest, 'project.unregister': render_forget, 'project.list': render_projects,
-    'user.init': summary('user init', SCOPE_SPEC), 'user.show': render_show, 'user.set': render_manifest, 'user.require': render_manifest,
-    'user.unrequire': render_manifest, 'user.set-agents': render_manifest, 'user.set-targets': render_manifest, 'user.register': render_manifest, 'user.unregister': render_forget,
+    'user.init': summary('user init', SCOPE_SPEC), 'user.show': render_show, 'user.set-agents': render_manifest, 'user.set-targets': render_manifest, 'user.register': render_manifest, 'user.unregister': render_forget,
     'selection-policy.set': change('selection policy', [('policy', 'selection_policy'), ('affected scopes', 'affected_scopes')]),
     'selection-policy.clear': change('selection policy', [('policy', 'selection_policy'), ('affected scopes', 'affected_scopes')]),
     'compatibility.override': change('compatibility override', SCOPE_SPEC), 'compatibility.clear': change('compatibility clear', SCOPE_SPEC),
@@ -1039,7 +1002,7 @@ def compact_help(version, groups):
               '  mask doctor --all --check        Check all registered scopes',
               '  mask inventory --all             List skills across registered scopes',
               '  mask upgrade --help              Understand upgrade scope before fetching',
-              '  mask doctor --migrate --dry-run  Preview converting a live-checkout machine to taps', '',
+              '',
               'Options:', '  --dry-run   Preview changes without applying or fetching (mutating commands)',
               '  --yes       Accept ordinary confirmation; never authorizes package setup',
               '  --json      Emit structured output for scripts; never prompt',
@@ -1060,7 +1023,7 @@ COMMAND_HELP = {
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
     'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update            # update MASK and fetch taps\nmask upgrade --dry-run # see what the fetched taps would change\nmask upgrade           # move every registered project and your personal skills'),
     'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --expect-plan-hash HASH.\nIf required setup is missing after an upgrade, run ensure for the named consumer.\nUse mask update to update the MASK program.'),
-    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found, including while migration to taps is required. On a machine whose configuration predates taps, only capabilities, config show, doctor, recover and self commands run: doctor reports what migration would convert, and doctor --migrate converts the machine and its registered consumers in one recoverable transaction (--alias NAME names the new tap). On a tap machine, doctor --migrate --project PATH --alias NAME (or --user --alias NAME) converts one leftover v1 declaration to use the approved tap NAME. On a tap machine whose catalog still records an older spelling of a tap identity, doctor reports migration.identity_canonicalization and a plain doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH\nmask doctor --migrate --project /path/to/project --alias agentskills --dry-run'),
+    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found. When the tap catalog still records an older spelling of a tap identity, doctor says so, and doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
     'apply': ('Reconcile managed links for the selected registered scopes. Does not run package setup.', 'mask apply --project . --dry-run\nmask apply --project .'),
@@ -1084,7 +1047,7 @@ COMMAND_HELP = {
     'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
-    'config.show': ('Show the machine configuration and its approved taps, and whether the machine still needs migration to taps.', None),
+    'config.show': ('Show the machine configuration and its approved taps.', None),
     'config.set': ('Change local default agent targets, the Git timeout, or the extra hosts on which this machine treats HTTPS and SSH URLs as one tap identity. github.com, gitlab.com, bitbucket.org and codeberg.org are always such hosts; add a self-hosted forge only when both URLs really reach the same repositories.', 'mask config set --forge-host git.example.com\nmask config set --clear-forge-hosts'),
     'compatibility.override': ('Record an explicit exception to advertised compatibility, with a reason.', None),
     'compatibility.clear': ('Remove a recorded compatibility exception.', None),
@@ -1093,8 +1056,9 @@ COMMAND_HELP = {
     'integration.revoke': ('Remove persistent readiness authority for the selected boundary.', None),
     'launch': ('Check readiness, then launch the selected agent with arguments after --.', None),
     'link.adopt': ('Record ownership of an existing link only when its source matches the explicit expectation.', None),
-    'project.set-agents': ('Choose which agents receive one pinned skill in this project.', None),
     'project.set-targets': ('Replace the project\'s agent targets, or restore inherited defaults.', None),
+    'user.set-targets': ('Replace personal agent targets, or restore inherited defaults.', None),
+    'project.set-agents': ('Choose which agents receive one pinned skill in this project.', None),
     'selection-policy.set': ('Set machine-level agent selection policy.', None),
     'selection-policy.clear': ('Clear machine-level agent selection policy.', None),
     'skill.import': ('Import skill content from a Git source using an explicit mode and destination.', None),
@@ -1117,15 +1081,8 @@ COMMAND_HELP = {
     'user.register': ('Register the personal home in which MASK will manage skill links.', None),
     'user.unregister': ('Stop managing personal links, preserving the declaration and changed files.', None),
     'user.set-agents': ('Choose which agents receive one pinned personal skill.', None),
-    'user.set-targets': ('Replace personal agent targets, or restore inherited defaults.', None),
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
-# Owner decision Q4 (RFC-MASK-0021): only install and remove edit a v2 declaration; set, require and unrequire refuse.
-COMMAND_HELP.update({f'{scope}.{action}': (
-    'Does not edit v2 declarations: it refuses with selection.command_unsupported. '
-    f'Add skills with mask install ID{flag} and remove them with mask remove ID{flag}; other selections are kept.',
-    f'mask install wizard{flag}\nmask remove wizard{flag}') for scope, flag in (('project', ''), ('user', ' --user')) for action in ('set', 'require', 'unrequire')})
-
 OPTION_HELP = {
     'json': 'Emit a structured result for scripts; never prompt',
     'debug': 'Include diagnostic details', 'help': 'Show this help', 'version': 'Show MASK version',
@@ -1147,7 +1104,7 @@ OPTION_HELP = {
     'complete': 'Complete the pending transaction', 'rollback': 'Roll back the pending transaction',
     'bin-dir': 'Existing directory in which to create the launcher',
     'allow-ref-rebind': 'Allow a moved tag or a branch that is not a fast-forward to replace a locked commit',
-    'apply': 'Also deploy the resulting selection', 'clear': 'Explicitly select no skills',
+    'apply': 'Also deploy the resulting selection',
     'target': 'Agent target; repeat for multiple targets', 'targets': 'Agent targets to select',
     'agents': 'Agents to select for this skill', 'inherit': 'Use the configured default selection',
     'path': 'Filesystem path', 'url': 'Git repository URL', 'name': 'Tap name',
@@ -1170,8 +1127,7 @@ OPTION_HELP = {
     'push': 'Explicitly push the source changes', 'message': 'Commit message',
     'authoring-root': 'Local checkout to use while editing this skill',
     'to-pinned': 'Return the skill from its authoring checkout to its pinned store payload',
-    'alias': 'Tap name: the new tap for a migrated live checkout, or the approved tap for one leftover v1 declaration (doctor --migrate)',
-    'migrate': 'Convert a live-checkout machine or consumer to taps through one recoverable transaction',
+    'migrate': 'Rewrite older tap identity spellings in the machine catalog, in one atomic write',
     'packages': 'Package directory inside the tap repository (default: skills)',
     'checkout': 'Authoring checkout for source publish and source dev-link; never a link target',
     'autocrlf': 'Opt this tap in to Git core.autocrlf=true line-ending conversion (default: exact bytes)',

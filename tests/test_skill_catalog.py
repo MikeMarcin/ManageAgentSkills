@@ -69,8 +69,8 @@ class CatalogTests(Fixture):
             with self.assertRaises(core.MaskError): core.parse_json(text)
         for value in ['../x', '-x', 'CON', 'con', 'lpt1', 'synced', 'A', 'x/y', 'C:x', 'a '*40]:
             with self.assertRaises(core.MaskError): core.skill_id(value)
-        for value in [dict(schema_version=True, skills=[]), dict(schema_version=2, skills=[]), dict(schema_version=1, skills=[], typo=0), dict(schema_version=1, skills=['alpha', 'alpha']), dict(schema_version=1, skills=[], targets=[])]:
-            with self.assertRaises(core.MaskError): core.manifest(value)
+        for value in [dict(schema_version=True, skills=[]), dict(schema_version=1, skills=[]), dict(schema_version=2, skills=[]), dict(schema_version=2, sources={}, skills=[], typo=0)]:
+            with self.assertRaises(core.MaskError): core.selection_manifest(value)
         self.init()
         path = self.home / 'config.json'
         value = json.loads(path.read_text()); value['git_timeout_seconds'] = True; path.write_text(json.dumps(value))

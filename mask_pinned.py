@@ -53,7 +53,7 @@ def target(link, config, home):
         return Path(link['dev']['root']) / link['dev']['path']
     if 'resolution' in link:
         return store.location(home, link['resolution']['payload_digest'], link['skill'])[1]
-    c.migration_required('A live-checkout link record has no store payload; migrate its consumer before MASK derives a target.', skill=link['skill'])
+    c.fail('state.invalid', 'A link record names neither a store payload nor a development checkout.', skill=link['skill'])
 
 
 def simple_targets(declaration):
@@ -151,9 +151,6 @@ def file_path(entry, home):
     role, root = entry['role'], Path(entry['root'])
     if role == 'selection_policy' and root == home:
         return home / 'selection-policy.json'
-    if role == 'machine_config' and root == home:
-        # Only a doctor.migrate journal records the machine configuration (validate_files and mask_migrate.validate_journal).
-        return home / 'config.json'
     if role == 'project_declaration':
         return root / '.mask.json'
     if role == 'project_lock':
@@ -190,11 +187,6 @@ def validate_files(pending, home):
             change = pending.get('selection_change', {})
             if entry != dict(root=str(home), role='selection_policy', before=change.get('policy_before'), after=change.get('policy_after')):
                 c.fail('recovery.conflict', 'Selection policy role differs from its explicit transition.', 8)
-            continue
-        if entry['role'] == 'machine_config':
-            migration = pending.get('migration') if pending['operation'] == 'doctor.migrate' else None
-            if not isinstance(migration, dict) or entry != dict(root=str(home), role='machine_config', before=migration.get('config_before'), after=migration.get('config_after')):
-                c.fail('recovery.conflict', 'Machine configuration role differs from its doctor migration.', 8)
             continue
         key = (entry['root'], entry['role'])
         if key in seen or entry['root'] not in pending['selected']:
@@ -268,8 +260,7 @@ def check_observations(pending, home):
         c.fail('recovery.conflict', 'Local selection policy is no longer readable.', 8, cause=error.as_dict())
     if current_policy not in (policy_before, pending.get('selection_change', {}).get('policy_after', policy_before)):
         c.fail('recovery.conflict', 'Local selection policy changed.', 8)
-    # Only a machine migration (a doctor.migrate journal with a ``migration`` field) changes the configuration.
-    config_after = pending['migration']['config_after'] if pending['operation'] == 'doctor.migrate' and 'migration' in pending else pending['pinned']['config_text']
+    config_after = pending['pinned']['config_text']
     if c.read_text(home / 'config.json', missing=True) not in (pending['pinned']['config_text'], config_after) or c.read_text(home / 'integration.json', missing=True) not in (pending['pinned']['policy_text'], pending.get('controls', {}).get('policy_after', pending['pinned']['policy_text'])):
         c.fail('recovery.conflict', 'Pinned configuration or authority changed.', 8)
     for expected in observations:
@@ -296,13 +287,7 @@ def validate_observations(pending, home):
     c.fields(value, ('workspaces', 'config_text', 'policy_text'), ('selection_policy_text', 'home_identity'), family='recovery')
     if not isinstance(value['workspaces'], list) or sorted(item.get('root', '') for item in value['workspaces'] if isinstance(item, dict)) != sorted(pending['selected']):
         c.fail('recovery.conflict', 'Pinned observations must cover selected consumers exactly.', 8)
-    if pending['operation'] == 'doctor.migrate' and 'migration' in pending:
-        # A machine migration's intent config is the converted one; the observation is its exact before bytes.
-        # A tap-machine migration keeps its configuration, so it takes the ordinary equality below.
-        if not isinstance(value['config_text'], str) or value['config_text'] != (pending.get('migration') or {}).get('config_before'):
-            c.fail('recovery.conflict', 'Pinned config observation differs from the migration before bytes.', 8)
-    # Pinned journals on a v2 machine stay recoverable before its migration, so both sides parse legacy-readable.
-    elif not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text']), legacy=True) != c.config(pending['config'], legacy=True):
+    if not isinstance(value['config_text'], str) or c.config(c.parse_json(value['config_text'])) != c.config(pending['config']):
         c.fail('recovery.conflict', 'Pinned config observation differs from intent.', 8)
     if value.get('selection_policy_text') is not None:
         import mask_selection as selection
@@ -400,8 +385,6 @@ def prepare_dispatch(args, output, home):
         record = records.get(str(root))
         if record is not None and record.get('mode') == 'dev-link':
             c.fail('dev_link.active', 'Return to pins explicitly before ordinary reconciliation.', 4)
-        if record is not None and not is_pinned(record):
-            c.migration_required('Existing legacy ownership requires explicit migration.', root=str(root))
         if command == 'apply' and record is None:
             c.fail(scope + '.not_registered', 'Register this consumer explicitly before apply.', 4)
         # Same rule as readiness itself: events need approval, while manual readiness reaches its one-time consent.
@@ -596,8 +579,6 @@ def dev_dispatch(args, output, home):
     root = mask.selected_roots(args, state)[0]
     scope = c.consumer_scope(state, root)
     record = c.consumer_records(state).get(str(root))
-    if not is_pinned(record):
-        c.migration_required('Migrate the selected legacy consumer before adding a scope-local development exception.', root=str(root))
     c.registered_root(root, record, scope)
     declaration, locked = r.read_exact_lock(root, scope, home, config, verify=False)
     if args.id not in {r.coordinate(row) for row in locked['packages']}:

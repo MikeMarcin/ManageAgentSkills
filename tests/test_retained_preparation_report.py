@@ -20,7 +20,7 @@ from unittest.mock import patch
 import mask
 import mask_core as c
 import mask_store as store
-from tests.legacy_support import write_json
+from tests.fixture_files import write_json
 from tests.public_support import PublicFixture
 from tests.support import TAP
 

@@ -4,8 +4,7 @@ A machine starts the way a user's does: ``tap add`` on an empty MASK_HOME approv
 local bare repository as a ``file`` tap and creates machine config v3 and state. New
 consumers are v2 declarations with locks and links into ``MASK_HOME/store``.
 ``self.source`` is only the test author's checkout; it reaches MASK solely through
-``publish`` and a fetch. Legacy starting states for doctor
-migration come from ``tests.legacy_support``.
+``publish`` and a fetch.
 """
 import json
 import os

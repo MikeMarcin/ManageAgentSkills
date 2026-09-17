@@ -1,6 +1,6 @@
 # MASK CLI contract v1
 
-Current CLI contract through RFC-MASK-0021 (tap-only deployment), with the lock, artifact store, pinned-consumer engine and authoring slices of RFC-MASK-0008, the inventory slice of RFC-MASK-0011 and the tap line-ending policy of MASK-0109. A skill source is a tap: an approved Git repository that MASK fetches into its own bare cache. Every project and personal selection is pinned by a lock and deployed from `MASK_HOME/store`; only an explicit `source dev-link` links an authoring checkout. The result envelope remains v1. Machine configuration is v3, new declarations are v2 with v1 locks, and ownership state and pending journals read v1/v2/v3. Machine configuration v1/v2 and v1 declarations, left by the retired live-checkout model, are read only to report, recover and convert them with `doctor --migrate`. Native evidence is recorded in the corresponding RFC closeouts; RFC-MASK-0021 native qualification is pending.
+Current CLI contract through RFC-MASK-0021 (tap-only deployment), with the lock, artifact store, pinned-consumer engine and authoring slices of RFC-MASK-0008, the inventory slice of RFC-MASK-0011 and the tap line-ending policy of MASK-0109. A skill source is a tap: an approved Git repository that MASK fetches into its own bare cache. Every project and personal selection is pinned by a lock and deployed from `MASK_HOME/store`; only an explicit `source dev-link` links an authoring checkout. The result envelope remains v1. Machine configuration is v3, new declarations are v2 with v1 locks, and ownership state and pending journals read v1/v2/v3. Native evidence is recorded in the corresponding RFC closeouts; RFC-MASK-0021 native qualification is pending.
 
 ## Common options
 
@@ -16,7 +16,7 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 |---|---|---|---|
 | `capabilities` | none | None | No |
 | `init` | `[--target TARGET ...] [--git-timeout SECONDS]` | Machine config v3 with an empty tap catalog, plus empty state, when no config exists; an existing config that matches the explicit options is kept, otherwise `config.already_initialized` (4) | No |
-| `config show` | none | None; reports `migration_required` | No |
+| `config show` | none | None | No |
 | `config set` | `[--target TARGET ...] [--git-timeout SECONDS] [--forge-host HOST ...] [--clear-forge-hosts]`, at least one | Machine defaults and this machine's extra forge hosts only | No |
 | `tap add` | `NAME URL [--ref REF] [--packages PATH] [--checkout PATH] [--autocrlf] [--pin-transport]` | Approved catalog entry and its line-ending policy; creates machine config v3 and empty state when no config exists | No |
 | `tap transport` | `NAME [URL \| --derive]` | The catalog entry's `transport` and `transport_policy` only; never its identity | No |
@@ -36,7 +36,6 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `lock` | `[--project PATH \| --user] [--refresh] [--skill SOURCE/ID ...] [--allow-ref-rebind]` | Lock file only; a changed lock of a registered consumer refuses `lock.active` | No |
 | `project init` | `[--project PATH]` | When `.mask.json` is missing: an empty v2 declaration, plus an empty `.mask.lock.json` if none exists | No |
 | `project show` | `[--project PATH]` | None | No |
-| `project set` / `require` / `unrequire` | `--skill ID ...` or `--clear`; `ID ...`; plus project/apply options | None. Not implemented for v2 declarations: refuses `selection.command_unsupported` (4) and points to `install` and `remove`; a v1 declaration refuses `migration.required` (4) | No |
 | `project set-targets` | `TARGET ...` or `--inherit`, plus project/apply options | v2 `default_agents`; links only with `--apply` | No |
 | `project set-agents` | `SOURCE/ID AGENT ...`, `--all` or `--inherit`, plus project/apply options | Per-binding `agents`; links only with `--apply` | No |
 | `project register` | `[PATH \| --project PATH] [--apply]` | Registry (pinned record); store artifacts and links with `--apply` | No |
@@ -44,7 +43,6 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `project list` | none | None | No |
 | `user init` | none | When `MASK_HOME/user.json` is missing: an empty v2 declaration, plus an empty `MASK_HOME/user.lock.json` if none exists | No |
 | `user show` | none | None | No |
-| `user set` / `require` / `unrequire` | `--skill ID ...` or `--clear`; `ID ...`; optional `--apply` | None. Refuses like the project forms and points to `install --user` and `remove --user` | No |
 | `user set-targets` | `TARGET ...` or `--inherit`, optional `--apply` | Personal `default_agents`; links only with `--apply` | No |
 | `user set-agents` | `SOURCE/ID AGENT ...`, `--all` or `--inherit`, optional `--apply` | Personal per-binding `agents`; links only with `--apply` | No |
 | `user register` | `[--user-home PATH] [--apply]` | Pinned home and registry; optional store artifacts and links | No |
@@ -63,8 +61,7 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `workspace forget` | `PATH --expect-identity ID` | Registry; unchanged owned links of an existing path | No |
 | `link adopt` | `(--project PATH \| --user) --skill ID --target TARGET --expect-source PATH` | Ownership record only | No |
 | `recover` | Exactly one of `--inspect`, `--complete`, `--rollback` | Only complete/rollback modes | No |
-| `doctor` | `[--project PATH \| --user \| --all] [--check]` | None | No |
-| `doctor --migrate` | v1/v2 machine: `[--all] [--alias NAME]`; tap machine: `(--project PATH \| --user) --alias NAME [--offline]` | v1/v2 machine: config v3, tap cache, store, declarations, locks, links and state through one `doctor.migrate` journal; tap machine: one consumer's declaration, lock, registration, store artifacts, links and state | v1/v2 machine: no (file transport from the local checkout); tap machine: only for live resolution |
+| `doctor` | `[--project PATH \| --user \| --all] [--check] [--migrate]` | None; with `--migrate` (no scope option), only the tap catalog entries in `config.json` that record an older spelling of a tap identity, in one atomic write | No |
 | `source fetch` | `[NAME]` or `--locked [--project PATH \| --user] [--offline]` | Without a name, every approved tap's cache; with `NAME`, that tap's cache; `--locked`, exact locked objects and store artifacts | Yes |
 | `source list` | none | None | No |
 | `source show` | `NAME` | None | No |
@@ -76,22 +73,14 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `self uninstall` | none | Each recorded launcher whose bytes MASK still recognizes, and its ownership record, one launcher journal each; an edited launcher is kept. Never the program checkout, `MASK_HOME` or any consumer | No |
 | `update` | none | Program checkout (fast-forward through one journal), then the caches of every approved tap. No declaration, lock, link or consumer state | Yes, unless `--dry-run` |
 
-`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks the machine and every registered consumer of both scopes. `upgrade` with no selector updates every registered consumer; `--project`, `--user`, `--all` and `--skill` narrow it (see [update](#explicit-migration-selected-updates-and-authoring-exceptions)). The vocabulary is that of `brew` and `apt`: `update` makes new versions available (the program and every tap) and changes no consumer, `upgrade` fetches what its consumers reference and applies, and `source fetch` fetches taps only.
+`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks the machine and every registered consumer of both scopes. `upgrade` with no selector updates every registered consumer; `--project`, `--user`, `--all` and `--skill` narrow it (see [update](#selected-updates-and-authoring-exceptions)). The vocabulary is that of `brew` and `apt`: `update` makes new versions available (the program and every tap) and changes no consumer, `upgrade` fetches what its consumers reference and applies, and `source fetch` fetches taps only.
 
 A configuration default change does not relink anything until an explicit apply. No command silently relocates ownership to another tap; binding a different repository, ref, package path, authoring checkout or line-ending policy under an existing alias refuses `source.alias_conflict`. `project init`, `user init` and inspection can run before a machine configuration exists where they do not need a catalog or registry. Other commands refuse `config.missing` (exit 3), whose remediation is `mask tap add NAME URL`.
-
-### Migration gate and retired commands
-
-On a machine whose `config.json` has `schema_version` 1 or 2, the retired live-checkout configurations, every command except `capabilities`, `config show`, `doctor` (including `--migrate`), `recover`, `update` (which then skips the taps) and `self status|install|uninstall` refuses before any effect with `migration.required` (exit 4) and `details.remediation` `["mask", "doctor", "--migrate", "--dry-run"]`. A missing or unreadable configuration is not gated; the command that reads it reports it. The gate also covers `project unregister --keep-links` and `workspace forget`, so a consumer that doctor migration cannot convert is restored on disk before migrating ([doctor migration](#explicit-migration-selected-updates-and-authoring-exceptions)).
-
-On a tap machine, a v1 declaration and a registered record without a deployment mode refuse ordinary consumer commands with the same code and remediation. That remediation argv alone is `invocation.invalid` (exit 2) on a tap machine; add `--project PATH --alias NAME` or `--user --alias NAME`.
-
-The live-checkout model's commands are not registered: the checkout-binding options of `init`, the checkout-status and catalog-migration subcommands of `source`, and the top-level consumer-migration command. They are absent from `capabilities`, and invoking one is an argument error, `invocation.invalid` (exit 2), on every machine. The [migration guide](../guides/migration-and-pins.md)'s old-command table names each with its replacement.
 
 ### Taps, payloads and caches
 
 Machine configuration v3 ([schema](../../schemas/machine-v3.schema.json)) holds `schema_version` 3, `default_targets`, `git_timeout_seconds` and `sources`, a catalog of 0 to 256 taps. A tap entry has `repository` (normalized credential-free identity), `transport`, `cache` (`MASK_HOME/sources/<alias>-<16 hex>.git`), `ref` (the update selector), `packages`, `authoring` (absolute checkout path or `null`) and `line_endings` (`exact` or `autocrlf`; absent means `exact`). Every cache is a MASK-owned bare repository. `tap add --checkout PATH` binds an authoring checkout whose `origin` must normalize to the tap identity (`source.identity_mismatch`); a checkout without an origin is identified by its own path. Curated imports, provenance, `source publish` and `source dev-link` use it, and install, list, ensure and update never read it. Whether or not the checkout has an origin, `tap add --checkout`, an import destination, `skill record-adaptation`, `source publish` and `source dev-link` refuse before any effect when it is on a branch other than the tap's configured one (`source.identity_mismatch`, exit 4, with `details.branch` and `details.configured_branch`) or has a detached HEAD (`source.detached`, exit 4). `tap add` never fetches. A fetch never checks out or activates payloads; reads and previews never fetch. Missing cached resolution is reported as `resolution_required`. Approved identities
-normalize scheme/host/default port while preserving repository case. **Identity and transport (RFC-MASK-0022).** A tap's `repository` names which repository is trusted; its transport is how this machine reaches it. On a forge host, `https://H/P`, `ssh://git@H/P` and `git@H:P`, each with or without `.git`, are one identity, canonically `https://H/P.git`. The forge hosts are `github.com`, `gitlab.com`, `bitbucket.org` and `codeberg.org`, plus the machine's own `forge_hosts` (`config set --forge-host HOST`, `--clear-forge-hosts`); a declaration or lock can never extend that set and refuses an unknown field. `ssh://git@H/~/P`, which is how MASK spelled the scp form before this RFC and which no forge serves, is read as the same identity. A non-default port, an SSH user other than `git` and every other host stay strict: there HTTPS and SSH are distinct identities, and scp home-relative paths stay distinct from absolute SSH paths. Every identity comparison goes through the normalizer. A file keeps the spelling it recorded, so its recorded `selection_digest` still verifies; `ensure`, `list`, `doctor` and fetches never rewrite a file for its spelling, and `install`, `remove` and an `upgrade` that writes anyway record the canonical identity with unchanged commits and digests. A tap entry has a `transport_policy`, `derived` (the default, and the reading of an entry without the field) or `pinned`. A pinned tap uses its `transport` and nothing else (`tap add --pin-transport`, `tap transport NAME URL`; `tap transport NAME --derive` unpins; a URL naming another identity refuses `source.identity_mismatch` without effect). For a derived tap on a forge host each fetch tries, in order and without prompting: the `origin` scheme of the one selected project consumer when it is on the same host; the transport a previous fetch proved; `gh config get git_protocol -h HOST` when `gh` is on PATH (no `gh` failure is fatal); the URL typed at `tap add`; then the other scheme. SSH always uses the scp form, never the `/~/` URI. Only an authentication or reachability failure (`git.auth_required`, `git.failed`, `git.timeout` from `ls-remote`) moves to the next candidate; a rewritten endpoint, a redirect policy or a malformed advertisement refuses at once, and when every candidate fails the result is `git.auth_required` with `details.tried`. A bare `upgrade` over several consumers skips the origin step. The proven transport is remembered in `mask-transport.json` beside the cache rather than in `config.json`, because fetches run inside journals that bind the configuration's bytes. Fetch results report `transport`, `transport_policy`, `chosen_by` and `tried` (under `data.transports`, or per tap in `data.fetches`), and `source show` reports the first three. A cache stays keyed as it was created: a catalog that recorded an older spelling keeps its cache path, which is accepted for any spelling of the same identity. On a tap machine an unscoped `doctor --migrate [--dry-run] [--expect-plan-hash HASH]` rewrites such catalog entries to the canonical identity, a usable transport and an explicit policy in one atomic write, reported by `doctor` as `migration.identity_canonicalization`; it changes no project file, state record or cache. Transport never changes content trust: commits, object format and payload digests are verified exactly as before. Passwords, tokens, unsupported protocols,
+normalize scheme/host/default port while preserving repository case. **Identity and transport (RFC-MASK-0022).** A tap's `repository` names which repository is trusted; its transport is how this machine reaches it. On a forge host, `https://H/P`, `ssh://git@H/P` and `git@H:P`, each with or without `.git`, are one identity, canonically `https://H/P.git`. The forge hosts are `github.com`, `gitlab.com`, `bitbucket.org` and `codeberg.org`, plus the machine's own `forge_hosts` (`config set --forge-host HOST`, `--clear-forge-hosts`); a declaration or lock can never extend that set and refuses an unknown field. `ssh://git@H/~/P`, which is how MASK spelled the scp form before this RFC and which no forge serves, is read as the same identity. A non-default port, an SSH user other than `git` and every other host stay strict: there HTTPS and SSH are distinct identities, and scp home-relative paths stay distinct from absolute SSH paths. Every identity comparison goes through the normalizer. A file keeps the spelling it recorded, so its recorded `selection_digest` still verifies; `ensure`, `list`, `doctor` and fetches never rewrite a file for its spelling, and `install`, `remove` and an `upgrade` that writes anyway record the canonical identity with unchanged commits and digests. A tap entry has a `transport_policy`, `derived` (the default, and the reading of an entry without the field) or `pinned`. A pinned tap uses its `transport` and nothing else (`tap add --pin-transport`, `tap transport NAME URL`; `tap transport NAME --derive` unpins; a URL naming another identity refuses `source.identity_mismatch` without effect). For a derived tap on a forge host each fetch tries, in order and without prompting: the `origin` scheme of the one selected project consumer when it is on the same host; the transport a previous fetch proved; `gh config get git_protocol -h HOST` when `gh` is on PATH (no `gh` failure is fatal); the URL typed at `tap add`; then the other scheme. SSH always uses the scp form, never the `/~/` URI. Only an authentication or reachability failure (`git.auth_required`, `git.failed`, `git.timeout` from `ls-remote`) moves to the next candidate; a rewritten endpoint, a redirect policy or a malformed advertisement refuses at once, and when every candidate fails the result is `git.auth_required` with `details.tried`. A bare `upgrade` over several consumers skips the origin step. The proven transport is remembered in `mask-transport.json` beside the cache rather than in `config.json`, because fetches run inside journals that bind the configuration's bytes. Fetch results report `transport`, `transport_policy`, `chosen_by` and `tried` (under `data.transports`, or per tap in `data.fetches`), and `source show` reports the first three. A cache stays keyed as it was created: a catalog that recorded an older spelling keeps its cache path, which is accepted for any spelling of the same identity. An unscoped `doctor --migrate [--dry-run] [--expect-plan-hash HASH]` rewrites such catalog entries to the canonical identity, a usable transport and an explicit policy in one atomic write, reported by `doctor` as `migration.identity_canonicalization`; it changes no project file, state record or cache. Transport never changes content trust: commits, object format and payload digests are verified exactly as before. Passwords, tokens, unsupported protocols,
 transport rewrites to other identities and effective redirect policies refuse.
 Catalog mutation guards bind the before/after config. `tap remove` preserves all
 cache files and refuses while a registered consumer's declaration or lock names
@@ -150,7 +139,7 @@ suspended process and returns `git.containment_unavailable`; there is no
 uncontained fallback. Job termination includes helpers after their parent exits.
 POSIX uses a separate process group. Output-reader failures refuse incomplete
 observations through the same cleanup path.
-Which fetches `upgrade`, `source fetch` and a live `install` perform is described under [update](#explicit-migration-selected-updates-and-authoring-exceptions) and [Task commands](#task-commands-rfc-mask-0018-mask-0086).
+Which fetches `upgrade`, `source fetch` and a live `install` perform is described under [update](#selected-updates-and-authoring-exceptions) and [Task commands](#task-commands-rfc-mask-0018-mask-0086).
 
 ### Curated copy imports and provenance
 
@@ -249,7 +238,7 @@ Every normal machine-mode response includes:
 - `rolled_back`: core planned effects were restored; any retained empty created directories are separately reported and keep `changed=true`.
 - `partial`: some persistent effects remain or source/operation state is indeterminate; nonzero exit and recovery guidance are mandatory.
 
-An operation cannot set `ok=true` with `partial`. `transaction` describes the consumer transaction, not MASK-owned preparation. A refusal before any consumer effect, after preparation created store artifacts or cache objects, reports `transaction: not_started` with `changed: true` and lists the retained effects in `data.retained_preparation`. Examples are `plan.stale` found under the writer lock, a collision, or withheld readiness consent (`confirmation.required` or `confirmation.declined`) after `install`, `remove`, `upgrade`, `apply`, `ensure` or `doctor --migrate` prepared new payloads. No declaration, lock, link, registration, policy or project byte changed, no journal is pending and nothing needs recovery. A refusal after consumer effects keeps its `committed`, `rolled_back` or `partial` status. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
+An operation cannot set `ok=true` with `partial`. `transaction` describes the consumer transaction, not MASK-owned preparation. A refusal before any consumer effect, after preparation created store artifacts or cache objects, reports `transaction: not_started` with `changed: true` and lists the retained effects in `data.retained_preparation`. Examples are `plan.stale` found under the writer lock, a collision, or withheld readiness consent (`confirmation.required` or `confirmation.declined`) after `install`, `remove`, `upgrade`, `apply` or `ensure` prepared new payloads. No declaration, lock, link, registration, policy or project byte changed, no journal is pending and nothing needs recovery. A refusal after consumer effects keeps its `committed`, `rolled_back` or `partial` status. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
 
 Exactly one JSON document is guaranteed for errors MASK handles after Python starts, including parser errors, ordinary exceptions, timeout and caught interruption. SIGKILL, interpreter startup failure, disk-full stdout, a terminated host or power loss can prevent any response; recovery is on disk. Do not promise impossible output guarantees.
 
@@ -280,21 +269,20 @@ Remediation may include a validated argv example for an observational command; d
 | 10 | Internal invariant failure |
 | 130 | Caught user interruption; persistent effects still determine transaction/recovery data |
 
-Initial error families: `invocation.invalid`; `config.*`; `manifest.missing/invalid/unsupported_version`; `project.not_found/not_registered/unavailable/identity_changed`; `skill.unknown/invalid/metadata_unsupported/path_escape`; `target.collision/unmanaged_link/drift/parent_link/symlink_unsupported`; `source.missing/dirty/detached/remote_unknown/identity_mismatch/candidate_invalid`; `state.invalid/drift`; `plan.stale`; `recovery.required/conflict`; `lock.busy`; `git.failed/timeout/auth_required`; `filesystem.failed`; `internal.invariant`. The tap model adds `migration.required/unborn/declaration_unsupported`, `source.unresolved/alias_conflict/referenced`, `upgrade.incomplete` and `selection.command_unsupported`.
+Initial error families: `invocation.invalid`; `config.*`; `manifest.missing/invalid/unsupported_version`; `project.not_found/not_registered/unavailable/identity_changed`; `skill.unknown/invalid/metadata_unsupported/path_escape`; `target.collision/unmanaged_link/drift/parent_link/symlink_unsupported`; `source.missing/dirty/detached/remote_unknown/identity_mismatch/candidate_invalid`; `state.invalid/drift`; `plan.stale`; `recovery.required/conflict`; `lock.busy`; `git.failed/timeout/auth_required`; `filesystem.failed`; `internal.invariant`. The tap model adds `source.unresolved/alias_conflict/referenced` and `upgrade.incomplete`.
 
 Error strings are stable once shipped. Additive output fields require consumers to ignore unknown fields; persisted configuration rejects unknown fields to catch typos. A major protocol/schema change is explicit, not a silent migration. Supply JSON Schemas as documentation and validate equivalently in the stdlib runtime; no schema library is required to execute MASK.
 
 ## Discovery data
 
-Capabilities includes every command's canonical name, positional arguments, options (type/required/repeatable/conflicts), effect category, network flag, dry-run/guard support and exit classes. Keep descriptors beside command registration and snapshot-test them so the protocol cannot drift from argparse. The command list is exactly the registered command table, so retired commands are absent. The per-command `network: false` of `doctor` describes its live-checkout migration; a tap-machine straggler conversion may fetch.
+Capabilities includes every command's canonical name, positional arguments, options (type/required/repeatable/conflicts), effect category, network flag, dry-run/guard support and exit classes. Keep descriptors beside command registration and snapshot-test them so the protocol cannot drift from argparse. The command list is exactly the registered command table.
 
 Capabilities also publishes:
 
 - `schemas`: `result` 1, `project` 2, `user` 2, `lock` 1, `machine` 3, `state` 3, `pending` 3.
-- `readable_versions`: `machine` [1, 2, 3], `project` and `user` [1, 2], `lock` [1], `state` and `pending` [1, 2, 3]. Machine versions 1 and 2 and declaration version 1 are read only to report, recover and convert them.
+- `readable_versions`: `machine` [3], `project` and `user` [2], `lock` [1], `state` and `pending` [1, 2, 3].
 - `deployment_model: "taps"`: selections are pinned by locks and deployed from `MASK_HOME/store`.
-- `migration: "doctor"`: live-checkout inputs convert only through `doctor --migrate`.
-- `line_endings`: `{"default": "exact", "values": ["exact", "autocrlf"], "opt_in": "tap add --autocrlf"}` (see Tap line endings under [authoring exceptions](#explicit-migration-selected-updates-and-authoring-exceptions)).
+- `line_endings`: `{"default": "exact", "values": ["exact", "autocrlf"], "opt_in": "tap add --autocrlf"}` (see Tap line endings under [authoring exceptions](#selected-updates-and-authoring-exceptions)).
 - `scopes`, `targets`, `adapter_contracts`, `pinned_deployment`, `per_binding_targeting`, `python_minimum`, `program_root` and `workflow`.
 
 Skill list returns ID, asset path, description, validation status and issues. Project show reports the declaration, mode, requested and effective agents, expected and actual links, ownership, outcomes, shadowing and blockers. Project list retains unavailable projects. `source show` reports the tap binding, its `line_endings` policy, the cached revision of its configured ref and `resolution_required`. Self status reports the program installation independently of any tap.
@@ -347,18 +335,16 @@ of both scopes.
 
 State v2 preserves `projects` and `launchers` and adds a nullable `user` record
 with the same root identity, manifest cache, revision, and link fields as a
-project record. Root identity is unique across scopes. The first user registration
-is the sole v1-to-v2 transition, journaled even without `--apply`. Reads and
-project-only writes preserve v1 until that transition. Unregistering the user
-retains v2 with `user: null`.
+project record. Root identity is unique across scopes. Registering a consumer
+is journaled even without `--apply` and writes state v3. Reads preserve the
+stored version. Unregistering the user retains `user: null`.
 
 Journal v2 derives consumer scope from its validated before/after registries;
 manifest destinations are recomputed as `<project>/.mask.json` or the current
 `MASK_HOME/user.json`, never accepted as arbitrary serialized write paths.
-V1 journals remain recoverable. V2 upgrade rollback restores exact v1 state
-bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
+Rollback restores the exact prior state bytes. Mutators refuse pending recovery; unknown schema versions fail closed.
 Current capabilities report readable state versions `[1, 2, 3]` and state version 3. The readiness and pinned extensions use journal v3 while preserving the v1/v2 readers.
-A v1 personal declaration refuses `migration.required`; on a tap machine `doctor --migrate --user --alias NAME` converts it. The result envelope remains v1. Machine configurations v1 and v2 are read only by the migration-exempt commands.
+The result envelope remains v1.
 
 ## Task commands (RFC-MASK-0018, MASK-0086)
 
@@ -372,7 +358,7 @@ are folded into the same operation; a dry run of that case reports
 `declaration_created` and computes no plan. A new consumer is always an empty v2
 selection with the machine's default agents and an empty lock.
 
-A v1 declaration refuses `migration.required` (see the [migration gate](#migration-gate-and-retired-commands)).
+A declaration of any other version refuses `manifest.unsupported_version` (exit 4).
 Install and remove resolve only the new bindings and retain unrelated exact
 resolutions, source declarations, conditions and agents.
 `--agent` selects the agents of the newly requested bindings; a no-op reinstall
@@ -550,9 +536,8 @@ Additional error families are `user.not_registered`, `user.not_found`,
 `user.already_registered`, `user.unavailable`, `user.identity_changed`, and
 `target.overlap`. Ownership, stale-plan, and recovery errors retain existing codes.
 
-## Legacy inventory (unreleased RFC-MASK-0011 slice)
+## Inventory (unreleased RFC-MASK-0011 slice)
 
-The heading keeps its original name for existing links; inventory reports pinned consumers.
 `inventory [--project PATH | --user | --all] [--include-unmanaged]` reports the
 selected registered consumers from their live declarations, locks and owned links.
 Without a selector it uses the current project.
@@ -577,8 +562,7 @@ owned, the observed leaf, and a status: `managed_converged`, `managed_drifted`,
 `unavailable_consumer`. `recorded_source_revision` is always null. A consumer whose
 live controls cannot be read is reported from its cached pinned selection
 (`declaration_basis: cached_pinned_selection`) as a diagnostic, with no claim that
-it is current. A registered record without a deployment mode is listed under
-`data.consumers` with a `migration.required` error and contributes no rows.
+it is current.
 Compatibility is unspecified for development links and wherever locked store
 metadata is not observable, and host loading is unverified.
 Profile/fleet fields and full update-impact reports remain unimplemented RFC work.
@@ -600,12 +584,11 @@ File repository URIs are machine-local fixtures/inputs; output reports
 `portable: false` and makes no cross-machine portability claim for them.
 
 The explicit `project-v2.schema.json` and `lock-v1.schema.json` contracts are
-closed. `project.schema.json` remains the historical v1 contract, including its
-references from state v1/v2; the user declaration schema accepts either version.
-`core.manifest` retains strict v1 persisted-state semantics. The separate
-`selection_manifest` reader dispatches declaration versions. V2 consumer commands report `lock.missing` or `lock.stale` when required. New
-v2 project/user consumers support pinned registration/apply/ensure, doctor
-migration of v1 declarations, per-binding targets and local compatibility policy.
+closed; the user declaration schema is the same v2 contract. The
+`selection_manifest` reader refuses any other declaration version
+(`manifest.unsupported_version`, exit 4). V2 consumer commands report `lock.missing` or `lock.stale` when required. New
+v2 project/user consumers support pinned registration/apply/ensure,
+per-binding targets and local compatibility policy.
 
 Canonical bytes are sorted-key compact UTF-8 JSON without ASCII escaping or a
 trailing newline. Duplicate keys, floats, nonfinite numbers, unsafe/negative
@@ -681,18 +664,14 @@ The evaluator reports implicit metadata exclusions and blocks explicit incompati
 intent. Different-coordinate invocation collisions fail at a shared consumer/agent
 destination; disjoint agents are permitted. Attributed contribution semantics
 are described below.
-A registered record without a deployment mode, left by the live-checkout model,
-refuses ordinary consumer commands with `migration.required`; `doctor --migrate`
-converts it. Ordinary
+Ordinary
 `mask lock` refuses a changed active pinned lock with `lock.active`; lock changes
 must go through the journaled update seam, not a separate file write.
 
 State v3 adds pinned records containing cached selection/lock models and exact
 resolution identities on owned links. User and launcher operations cannot
-downgrade state v3. Historical state v1/v2
-and journal v1/v2 readers keep their original manifest semantics. A journal that
-records a retired live-checkout transition is shown by `recover --inspect` and
-refused `recovery.conflict`.
+downgrade state v3. State v1/v2 hold no consumer record: every consumer
+record is pinned or dev-link and requires state v3.
 
 The existing engine derives old and new artifact targets independently and only
 retains an old raw link spelling when it still names the desired target. Journal
@@ -733,90 +712,21 @@ before any consumer effect `not_started` (MASK-0112; see
 [JSON envelope](#json-envelope)), and keeps a consumer `committed`, `rolled_back`
 or `partial` status.
 
-### Explicit migration, selected updates and authoring exceptions
+### Selected updates and authoring exceptions
 
-**Doctor report.** `doctor` reports `data.migration` on every machine: `required`,
-`machine` (`legacy_v1`, `legacy_v2` or `current`), `proposed_tap`, `clone` (`root`,
-`head`, `branch`, `dirty`, `unborn`, `published`), `consumers[]` (`root`, `scope`,
-`registered`, `declaration_version`, `mode`, `skills`, `links` with a per-link
-`ok`, `drift`, `missing` or `collision` state, `migratable`, `blockers`), machine
-`blockers` and `migratable`. On a v1 or v2 machine `doctor` plans nothing and
-reports the `migration.required` issue; a legacy consumer adds the same issue on
-any machine. `doctor --check` exits 7 while migration is required. An unregistered
-v1 declaration is reported when `--project PATH` or `--user` names it. `--migrate`
-conflicts with `--check`; `--alias`, `--offline`, `--dry-run`, `--yes` and
-`--expect-plan-hash` without `--migrate` are `invocation.invalid`.
-
-**Doctor migration.** Migration is best effort. On a v1 or v2 machine,
-`doctor --migrate [--all] [--alias NAME] [--dry-run] [--expect-plan-hash HASH]`
-converts the machine configuration and every registered legacy consumer in one
-recoverable `doctor.migrate` journal, all or nothing; `--project` and `--user` are
-`invocation.invalid`. The configured checkout becomes a tap. Its alias is `--alias`,
-else the v2 legacy alias, else the lowercased basename of the checkout's remote when
-that is a valid alias (`AgentSkills` becomes `agentskills`), else `legacy`. On a v1
-machine its `repository` and `transport` are the checkout's configured remote, or,
-without one, the checkout path as a machine-local `file` identity with warning
-`migration.local_only_source`; `ref` is the configured branch and `packages` is
-`skills`. A v2 machine keeps its legacy binding and every other tap; another alias
-renames the legacy binding. `authoring` keeps the checkout path and `line_endings`
-is `exact`. Each v1 declaration becomes a v2 declaration bound to that alias with
-`ref: refs/heads/<branch>` and its targets (or the machine defaults) as
-`default_agents`. Each lock row names the checkout HEAD, with warning
-`migration.unpublished_commit` when HEAD is not on the remote-tracking branch.
-Before the writer lock, HEAD is acquired from the checkout into the tap cache over
-file transport, retained as `refs/mask/frozen/<head>`, and materialized into the
-store. The planner then retargets owned links from `<checkout>/skills/<id>` to the
-store and records `mode: pinned`. An empty registry migrates the configuration
-only, and a dirty or unborn checkout is then a warning. `--dry-run` discloses the
-configuration change, the proposed tap, each consumer's declaration, lock and link
-changes and the acquisition, and writes nothing; `--expect-plan-hash` binds that
-plan. MASK never resets, stashes, deletes, pushes or edits the checkout.
-Migration never upgrades the executable; install the reviewed program first (for
-example `python3 /reviewed/ManageAgentSkills/mask.py self install --bin-dir PATH --json`,
-which the migration gate allows) and keep its direct entrypoint available for
-recovery. The first `upgrade` afterwards fetches the tap's remote.
-
-Refusals are typed. Blockers found by the report refuse with the first blocker's code and list every blocker in `details.blockers`; the other refusals are raised directly:
-
-- `recovery.required` (8) while a journal is pending.
-- `source.missing` (3) for a missing checkout or one that is not a Git checkout root.
-- `source.identity_mismatch` (4) for a detached HEAD or another branch, for a v2 remote that no longer matches the approved identity, and, with `details.reason: diverged`, when HEAD and its remote-tracking branch each hold commits the other lacks.
-- `migration.unborn` (4) and `source.dirty` (4), only while a registered consumer would lock HEAD. Dirty means edits, untracked files, sparse checkout, skip-worktree or assume-unchanged flags, or an unfinished merge, rebase, cherry-pick or revert.
-- `source.alias_conflict` (4) when the alias names a different tap, or a pinned consumer still names the legacy alias being renamed.
-- `project.unavailable`, `project.identity_changed`, `target.drift` and `target.collision` (4) for a consumer, and `skill.unknown` (4) for a declared skill that is not exactly one package at HEAD.
-- `migration.declaration_unsupported` (4) for a registered legacy record whose declaration is already v2.
-- `source.fetch_limit` (4) during acquisition, and `plan.stale` (4) when the configuration, registry, a consumer control, an owned link or the checkout changed between preparation and the writer lock.
-
-The `migration.declaration_unsupported` remediation names `unregister --keep-links`,
-but on a v1 or v2 machine the migration gate refuses that command and `workspace
-forget`. Restore a consumer that migration cannot convert on disk first, as its
-blocker names (its v1 declaration, its recorded link, its project directory or the
-declared package at the checkout HEAD), then retry.
-
-`recover --rollback` restores the exact prior configuration, declarations, links
-and state and removes created locks; prepared cache objects and store artifacts are
-retained. `recover --complete` first rechecks the checkout's HEAD, branch, staged
-index, root identity and object format, and on a v1 machine the remote URL that
-became the tap transport. It does not recheck worktree cleanliness, so unstaged
-edits or untracked files made after planning do not block completion. Recovery
-never writes to the checkout.
-
-On a tap machine, `doctor --migrate (--project PATH | --user) --alias NAME
-[--offline] [--dry-run] [--expect-plan-hash HASH]` converts one straggler: an
-unregistered v1 declaration, or a registered legacy record whose declaration is v1.
-It uses install semantics. The declaration becomes a v2 declaration bound to the
-approved tap `NAME` (`source.unknown` otherwise) without a ref, each binding
-resolves through the ordinary resolver, fetching on demand unless `--offline` or
-`--dry-run`, and one `doctor.migrate` journal without a `migration` field registers
-or converts the consumer and links it from the store. The configuration is
-unchanged and no checkout is read. Any other form is `invocation.invalid`; a scope
-with nothing to convert is a no-op.
+**Doctor.** `doctor` reports a tap catalog entry that records an older spelling of
+its identity as `migration.identity_canonicalization`. `doctor --migrate [--dry-run]
+[--expect-plan-hash HASH]` rewrites those entries (see
+[Taps, payloads and caches](#taps-payloads-and-caches)). `--migrate` conflicts with
+`--check`, and `--project`, `--user` or `--all` with `--migrate` is
+`invocation.invalid`; `--dry-run`, `--yes` and `--expect-plan-hash` without
+`--migrate` are `invocation.invalid`.
 
 **Update.** `upgrade [--project PATH | --user | --all] [--skill SOURCE/ID ...]
 [--allow-ref-rebind] [--offline] [--dry-run] [--expect-plan-hash HASH]` fetches
 and applies the selected consumers' updates end to end:
 
-1. A pending journal refuses `recovery.required` (8). No scope, or `--all`, selects every registered consumer; an empty selection exits 0 with warning `project.empty_registry` and fetches nothing. Every selected root must still be available (`project.unavailable` and similar refuse before any fetch), and a selected legacy record refuses `migration.required`. `--skill` coordinates must be unique and declared by the selected consumers (`invocation.invalid`, 2); they narrow both the consumers and the taps. A dev-link consumer is skipped with warning `dev_link.active` by the unscoped form and `--all`, and refused (4) by `--project` or `--user`.
+1. A pending journal refuses `recovery.required` (8). No scope, or `--all`, selects every registered consumer; an empty selection exits 0 with warning `project.empty_registry` and fetches nothing. Every selected root must still be available (`project.unavailable` and similar refuse before any fetch). `--skill` coordinates must be unique and declared by the selected consumers (`invocation.invalid`, 2); they narrow both the consumers and the taps. A dev-link consumer is skipped with warning `dev_link.active` by the unscoped form and `--all`, and refused (4) by `--project` or `--user`.
 2. The referenced taps are the union of the selected declarations' sources, or of the `--skill` bindings' taps. Unless `--dry-run`, `--offline` or `--expect-plan-hash` is given, MASK takes the writer lock for the whole fetch round and fetches each tap exactly once, after listing its remote refs, with one `git fetch` that also acquires the objects the selected bindings' declared selectors name. Another writer meanwhile fails `lock.busy` (6). `data.fetches[alias]` reports `attempted`, `ok`, `before`, `after`, `remote_refs_changed` and `error`. Git and source errors are captured per tap; any other error propagates.
 3. Consumers that reference a failed tap are `blocked` and left out of the plan. With `--project` or `--user`, a failed tap is a plain refusal with its Git error (exit 5).
 4. Every remaining consumer is resolved from the cache. A moved tag or a branch not proven fast-forward (`lock.ref_rebound`) refuses the whole invocation (4) unless `--allow-ref-rebind`. In a run that did not fetch, `lock.resolution_required` marks the consumer `blocked` with `requires_fetch: true`. Every other resolution error, and `lock.resolution_required` after a fetch, refuses the whole invocation (4) before any plan or journal; the fetch effects stay disclosed and the fetched objects stay in the caches.
@@ -838,10 +748,7 @@ fetches only that tap's configured ref, and `source fetch --locked` is described
 under [Exact artifact preparation](#exact-artifact-preparation).
 
 **Switching executables.** Finish a pending journal with this program before
-switching executables; a previous program does not recover one. The base
-live-checkout program (`b92372f`) cannot read a v3 configuration
-(`config.invalid`, exit 3) and refuses a `doctor.migrate` journal left before the
-configuration was rewritten (`recovery.conflict`). A previous tap-era program
+switching executables; a previous program does not recover one. A previous program
 refuses a tap entry that carries `line_endings` (`source.invalid`, exit 3), so it
 does not recover a pending `upgrade` journal either.
 
@@ -878,7 +785,7 @@ publication never updates consumer locks. File-URI fixtures remain machine-local
 Tap line endings (MASK-0109, amending the RFC-MASK-0021 tap entry shape). A tap
 keeps exact bytes: its catalog entry's `line_endings` is `exact`, or absent in an
 entry written before the policy existed. `tap add --autocrlf` is the only opt-in
-and records `autocrlf`; `tap add` and `doctor --migrate` write the field, and
+and records `autocrlf`; `tap add` writes the field, and
 `tap add`, `source show`, `source publish` and `source dev-link` report it.
 Changing an existing tap's policy is an alias conflict. Caches are bare and read
 raw Git objects, so the policy governs only the bytes MASK derives from an
@@ -904,8 +811,7 @@ tap-era program refuses a catalog entry that carries `line_endings`.
 ### Targeting and machine-local compatibility policy
 
 `project set-agents SOURCE/ID AGENT ...|--all|--inherit [--apply]` and its
-`user` counterpart require an explicitly registered v2 consumer. On a v1
-declaration `set-targets` and `set-agents` refuse `migration.required`; on v2,
+`user` counterpart require an explicitly registered v2 consumer.
 `set-targets AGENT ...|--inherit` changes
 `default_agents`. Without apply, exact package rows and actual owned links remain
 while selection/lock digests and cached desired controls change together. With

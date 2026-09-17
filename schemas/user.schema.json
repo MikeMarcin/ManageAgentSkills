@@ -1,13 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:user",
-  "oneOf": [
-    {
-      "$ref": "project.schema.json"
-    },
-    {
-      "$ref": "project-v2.schema.json"
-    }
-  ],
-  "$comment": "Personal declaration versions; v2 deployment is not yet implemented. Persisted state v1/v2 manifests remain v1-only."
+  "$ref": "project-v2.schema.json",
+  "$comment": "The personal declaration, MASK_HOME/user.json, has the shape of a project declaration."
 }

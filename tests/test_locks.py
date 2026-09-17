@@ -46,9 +46,9 @@ class ModelTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(c.MaskError):
                 r.selection(bad)
         self.assertEqual(c.selection_manifest(self.selection())['schema_version'], 2)
-        with self.assertRaises(c.MaskError):
-            c.manifest(self.selection())
-        self.assertEqual(c.manifest(dict(schema_version=1, skills=['beta', 'alpha']))['skills'], ['alpha', 'beta'])
+        with self.assertRaises(c.MaskError) as refused:  # Nothing older than a v2 declaration is read.
+            c.selection_manifest(dict(schema_version=1, skills=['beta', 'alpha']))
+        self.assertEqual(refused.exception.code, 'manifest.unsupported_version')
 
 
 class LockTests(Fixture):
@@ -180,12 +180,12 @@ class LockTests(Fixture):
         self.assertEqual(before, self.target.read_bytes())
         self.assertEqual(self.locked('--refresh')['data']['lock']['packages'][0], r.lock(json.loads(before))['packages'][0])
 
-    def test_v2_missing_stale_coherent_guards_and_legacy_mutations(self):
+    def test_v2_missing_stale_coherent_guards(self):
         # Events still need approval first; manual readiness needs none, so the missing lock is its first refusal.
         self.assertEqual(self.call('ensure', '--event', 'startup', code=4)['error']['code'], 'integration.approval_required')
         self.assertEqual(self.call('ensure', code=4)['error']['code'], 'lock.missing')
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'project.not_registered')
-        for args in [('project', 'show'), ('project', 'set', '--clear'), ('project', 'register')]:
+        for args in [('project', 'show'), ('project', 'register')]:
             self.assertEqual(self.call(*args, code=4)['error']['code'], 'lock.missing')
         self.fetch()
         self.locked()
@@ -198,8 +198,6 @@ class LockTests(Fixture):
         self.assertTrue(shown['data']['outcomes'])
         self.call('ensure', '--offline')
         self.assertFalse(self.call('apply')['changed'])
-        self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'selection.command_unsupported')
-        # The v1 half is retired: RetiredLockInputTests.test_v1_declaration_refuses_project_require.
 
     def test_tampered_identity_path_format_digests_and_metadata_refuse(self):
         self.fetch()
@@ -303,30 +301,4 @@ class LockTests(Fixture):
         self.target.write_text(json.dumps(bad))
         self.assertEqual(self.locked(code=4)['error']['code'], 'lock.resolution_required')
         self.target.write_text(json.dumps(refreshed))
-        # The legacy-state half is RetiredLockInputTests.test_legacy_record_cannot_carry_a_v2_selection.
 
-
-class RetiredLockInputTests(Fixture):
-    """Retired live-checkout inputs beside locks: a v1 declaration refuses, and a mode-less record never carries a v2 selection."""
-
-    def test_v1_declaration_refuses_project_require(self):
-        # Split from LockTests.test_v2_missing_stale_coherent_guards_and_legacy_mutations; v1 string mutation is retired (RFC-MASK-0021).
-        self.init()
-        (self.project / '.mask.json').write_text(json.dumps(dict(schema_version=1, skills=['alpha'])) + '\n')
-        before = self.snapshot()
-        self.assertEqual(self.call('project', 'require', 'beta', code=4)['error']['code'], 'migration.required')
-        self.assertEqual(before, self.snapshot())
-        self.assertFalse((self.project / '.mask.lock.json').exists())
-
-    def test_legacy_record_cannot_carry_a_v2_selection(self):
-        # Split from LockTests.test_frozen_index_missing_object_and_legacy_state_isolation: a direct state-parser check with no machine.
-        from types import SimpleNamespace
-        from tests.legacy_support import legacy_record, legacy_state
-        _, record = legacy_record(SimpleNamespace(clone=self.source), self.project, ['beta'])
-        state = legacy_state([record])
-        self.assertEqual(c.state(copy.deepcopy(state)), state)
-        declaration = dict(schema_version=2, sources=self.binding(), skills=[dict(source=TAP, id='alpha'), dict(source=TAP, id='beta', when={'platforms': ['windows']})])
-        record['last_manifest'] = declaration
-        record['last_manifest_digest'] = c.digest(declaration)
-        with self.assertRaises(c.MaskError):
-            c.state(state)

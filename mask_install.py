@@ -131,8 +131,7 @@ def uninstall(output, home, root, state, config):
 def dispatch(args, output, home, root):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config_raw = c.read_json(home / 'config.json', default={})
-    # self commands stay usable on a v1/v2 machine before its migration, so they read any machine configuration.
-    config = c.config(config_raw, legacy=True) if config_raw else None
+    config = c.config(config_raw) if config_raw else None
     if args.command == 'self.status':
         output['data'] = dict(program_root=str(root), interpreter=sys.executable, launchers=state['launchers'], path_command=shutil.which('mask'))
         return

@@ -150,8 +150,7 @@ class SourcesTests(Fixture):
         self.init()
         config = (self.home / 'config.json').read_bytes()
         caps = self.call('capabilities')['data']
-        # Machine config v3 is written; v1 and v2 stay readable for migration only (RFC-MASK-0021, MASK-0101).
-        self.assertEqual((caps['schemas']['machine'], caps['readable_versions']['machine'], caps['deployment_model']), (3, [1, 2, 3], 'taps'))
+        self.assertEqual((caps['schemas']['machine'], caps['readable_versions']['machine'], caps['deployment_model']), (3, [3], 'taps'))
         commands = {item['name']: item for item in caps['commands']}
         self.assertFalse(commands['tap.add']['network'])
         self.assertTrue(commands['tap.add']['plan_guard'])

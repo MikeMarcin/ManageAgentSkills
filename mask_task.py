@@ -67,11 +67,6 @@ def fresh_declaration(config=None):
     return r.selection(dict(schema_version=2, sources={}, default_agents=config['default_targets'], skills=[]))
 
 
-def require_v2(declaration, path):
-    if declaration['schema_version'] == 1:
-        c.migration_required('A v1 declaration must be migrated to a v2 declaration before task commands manage it.', path=str(path))
-
-
 def parse_request(identifiers):
     """Requested ``ID`` or ``SOURCE/ID`` operands; duplicates are an invocation error."""
     requested = []
@@ -212,7 +207,6 @@ def mutate(args, output, home):
         created[path] = c.text_json(fresh)
         created[r.lock_path(root, scope, home)] = c.text_json(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(fresh), packages=[]))
     declaration = c.selection_manifest(c.parse_json(text if text is not None else created[path], 'manifest'))
-    require_v2(declaration, path)
     proposal, lock, changed, unchanged, payload_views, previous = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
     acquisitions = output['data'].get('acquisitions', [])
     task = dict(root=key, scope=scope, declaration_path=str(path), registered=record is not None, declaration_created=bool(created),
@@ -302,7 +296,6 @@ def listing(args, output, home):
         data['mode'] = None
         return
     declaration = c.selection_manifest(c.parse_json(text, 'manifest'))
-    require_v2(declaration, path)
     data['mode'] = data['mode'] or 'pinned'
     planned = fs.plan(config, state, [root], register=[] if record else [key], home=home, user_root=root if scope == 'user' else None, operation='list')
     for blocker in planned['blockers']:

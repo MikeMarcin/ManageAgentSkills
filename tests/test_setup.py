@@ -17,7 +17,7 @@ import sys
 import time
 import unittest
 
-from tests.legacy_support import write_json
+from tests.fixture_files import write_json
 from tests.public_support import CONSUMER_CONTEXT, ENTRY, PACK, PublicFixture
 from tests.support import TAP
 
