@@ -84,11 +84,41 @@ def inventory(root):
     return found
 
 
+BYTECODE = ('.pyc', '.pyo')
+
+
+def shed_bytecode(root):
+    """Remove interpreter bytecode from an owned artifact before its exact inventory is taken.
+
+    A host that imports a skill's script through the managed link writes ``__pycache__`` beside it, which the
+    inventory rightly refuses as an extra entry. Bytecode is never tolerated in place, because Python prefers
+    a matching ``.pyc`` to the reviewed source; it is removed, and only when the directory holds nothing but
+    regular bytecode files. Anything else stays for verification to refuse and a human to inspect.
+    """
+    directories = [root / 'payload'] if c.kind(root / 'payload') == 'directory' else []
+    for directory in directories:
+        with os.scandir(directory) as entries:
+            children = [directory / entry.name for entry in entries]
+        for child in children:
+            if c.kind(child) != 'directory':
+                continue
+            if child.name != '__pycache__':
+                directories.append(child)
+                continue
+            with os.scandir(child) as entries:
+                droppings = [child / entry.name for entry in entries]
+            if all(c.kind(item) == 'file' and item.suffix in BYTECODE for item in droppings):
+                for item in droppings:
+                    item.unlink()
+                child.rmdir()
+
+
 def verify_tree(root, row):
     r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest='sha256:' + '0' * 64, packages=[row]))
     if c.kind(root) != 'directory':
         c.fail('artifact.corrupt', 'Existing artifact root must be a real directory.', 4)
     original = c.identity(root)
+    shed_bytecode(root)
     found = inventory(root)
     if found.get('manifest.json') != 'file':
         c.fail('artifact.corrupt', 'Artifact manifest is missing.', 4)

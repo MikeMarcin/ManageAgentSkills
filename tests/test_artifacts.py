@@ -93,6 +93,27 @@ class ArtifactTests(Fixture):
             manifest_path.write_bytes(manifest_raw)
             manifest_path.chmod(0o444)
 
+    def test_interpreter_bytecode_never_corrupts_a_published_artifact(self):
+        import subprocess
+        import sys
+        store.materialize(self.home, self.row, self.payload)
+        root, target = store.location(self.home, self.row['payload_digest'], 'alpha')
+        # A host imports a skill script through the managed link, and the interpreter leaves bytecode beside it.
+        module = "import sys; sys.path.insert(0, sys.argv[1])\ntry:\n    import run\nexcept RuntimeError:\n    pass"
+        environment = {key: value for key, value in os.environ.items() if key not in ('PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX')}
+        subprocess.run([sys.executable, '-c', module, str(target)], env=environment, check=True)
+        self.assertTrue(list((target / '__pycache__').glob('run.*.pyc')))
+        self.assertTrue(store.materialize(self.home, self.row, self.payload)['reused'])
+        self.assertFalse((target / '__pycache__').exists())
+        # Anything that is not plainly bytecode is never deleted; it is refused and kept for inspection.
+        (target / '__pycache__').mkdir()
+        (target / '__pycache__/run.cpython-313.pyc').write_bytes(b'bytecode')
+        (target / '__pycache__/notes.txt').write_text('not bytecode')
+        with self.assertRaises(c.MaskError) as error:
+            store.materialize(self.home, self.row, self.payload)
+        self.assertEqual(error.exception.code, 'artifact.corrupt')
+        self.assertEqual(sorted(item.name for item in (target / '__pycache__').iterdir()), ['notes.txt', 'run.cpython-313.pyc'])
+
     def test_forwarded_dataclass_cannot_bypass_raw_validation(self):
         mutations = [replace(self.payload, digest='sha256:'+'0'*64), replace(self.payload, files=self.payload.files+(self.payload.files[0],)), replace(self.payload, files=(p.PayloadFile('../escape','100644',b'bad'),)), replace(self.payload, files=(p.PayloadFile('SKILL.md','120000',b'target'),)), replace(self.payload, files=(p.PayloadFile('SKILL.md','100644',b'---\nname: alpha\ndescription: a\nhooks: live\n---\n'),))]
         for payload in mutations:
