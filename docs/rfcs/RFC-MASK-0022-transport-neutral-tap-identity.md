@@ -1,14 +1,14 @@
 ---
 id: "RFC-MASK-0022"
 title: "Transport-neutral tap identity and convention-following transport"
-status: "Proposed"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-16"
 ---
 
 # RFC-MASK-0022: Transport-neutral tap identity and convention-following transport
 
-**Proposed; not accepted, implemented or qualified.** Filed at the owner's request on September 16, 2026, after an HTTPS/SSH tap mismatch blocked `mask ensure` on a working machine. Closeout: [MASK-0113](../issues/10-backlog/MASK-0113-close-transport-neutral-tap-identity.md).
+**Implementing; not qualified.** Filed at the owner's request on September 16, 2026, after an HTTPS/SSH tap mismatch blocked `mask ensure` on a working machine. The owner directed implementation the same day with this RFC's proposed answers to its open questions; AC08 (the SSH-approved machine) remains open, so the closeout is open. Closeout: [MASK-0113](../issues/10-backlog/MASK-0113-close-transport-neutral-tap-identity.md).
 
 Amends RFC-MASK-0007 (source identity normalization) and RFC-MASK-0021 (machine config v3 tap entries and doctor migration). It changes the current contract sentence "HTTPS and SSH stay distinct" in [cli-contract.md](../architecture/cli-contract.md#taps-payloads-and-caches) for recognized forge hosts only. Historical RFCs and evidence remain unchanged.
 
@@ -114,6 +114,18 @@ For SSH, MASK uses the scp form (`git@H:P`), never the `/~/` URI. Every candidat
 - **Canonical spelling:** `https://H/P.git` minimizes churn, but a scheme-free `H/P` would read as neutral. This RFC proposes the HTTPS spelling.
 - **Forge list:** should the built-in set be only `github.com`, until another host is actually used?
 - **Transport memory:** should a successful derived transport be remembered per consumer as well as per tap?
+
+## Implementation notes
+
+Decisions taken during implementation, each narrower than or different from the text above. The contract of record is [cli-contract.md](../architecture/cli-contract.md#taps-payloads-and-caches).
+
+- **Open questions.** Canonical spelling is `https://H/P.git`. The built-in forge set is the four named hosts. A proven transport is remembered per tap, not per consumer.
+- **`/~/` on a forge host is read as the scp form, not kept strict.** AC02 lists an explicit `/~/` path as strict, while AC05 requires pre-RFC `ssh://…/~/` files to deploy unchanged. Both cannot hold: `ssh://git@H/~/P` is exactly what MASK recorded for `git@H:P` before this RFC, and no forge serves a home-relative path, so that spelling can only be MASK's own older output. It folds to the forge identity everywhere. A non-`git` user and a non-default port stay strict.
+- **Candidate order.** The Decision, the Contract list and AC03 order `gh` and the hint differently. Implemented: origin; a transport a fetch *proved*; `gh`; the URL typed at `tap add` (unproven); the other scheme. A proven hint outranks a stated preference, and an unproven one does not, which satisfies AC03's personal-scope order on a fresh machine and the Contract's order afterwards.
+- **The hint lives beside the cache, not in `config.json`.** Fetches run inside journaled operations that bind the configuration's bytes; rewriting `transport` mid-operation would turn a successful fetch into a `recovery.conflict`. `mask-transport.json` in the tap's cache records it, and `source show` reports it. `config.json`'s `transport` is the typed or pinned URL.
+- **`doctor --migrate` converts the catalog only, in one atomic write without a journal.** Project files are never rewritten for a spelling, and a consumer's state records mirror those files, so converting state would only make it disagree with the lock it describes; state takes the canonical spelling when its files are next written. The cache is reused in place under its existing key, which `cache_root` accepts for any spelling of the same identity, so there is no directory move to journal. One atomic replace leaves the old bytes or the new, so there are no journal checkpoints to crash at; AC05's crash-recovery clause has nothing to exercise.
+- **`forge_hosts` is set with `mask config set --forge-host HOST` / `--clear-forge-hosts`**, since editing `MASK_HOME` by hand is not a supported path.
+- **Rollout.** The machine and pending schemas changed (this RFC and the `update`/`upgrade` rename), so a previous program refuses to self-update to this revision (`source.candidate_invalid`); pull that checkout with Git once.
 
 ## Closeout
 

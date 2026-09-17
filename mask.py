@@ -344,6 +344,15 @@ def diagnostics(args, output, home):
     if migration['required'] and not any(item['code'] == 'migration.required' for item in issues):
         issues.append(consumer_issue)
     output['warnings'].extend(migration_warnings)
+    if config['schema_version'] == 3:
+        # RFC-MASK-0022: an older identity spelling in the catalog still works, so it is reported, never an unhealthy machine.
+        forges = dict(built_in=sorted(sources_ops.FORGE_HOSTS), machine=config.get('forge_hosts', []))
+        stale = [dict(source=name, code='migration.identity_canonicalization', repository=config['sources'][name]['repository'],
+                      canonical=sources_ops.repository(config['sources'][name]['repository'])) for name in sources_ops.noncanonical(config)]
+        output['data'].update(forge_hosts=forges, identity_canonicalization=stale)
+        if stale:
+            output['warnings'].append(dict(code='migration.identity_canonicalization', sources=', '.join(row['source'] for row in stale),
+                                           message="The tap catalog records an older identity spelling; it still works. Convert it with 'mask doctor --migrate --dry-run', then without --dry-run."))
     output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift, migration=migration,
                           host_load='not_verified', symlink_capability='unknown' if os.name == 'nt' else 'available')
     if getattr(args, 'check', False) and (issues or drift):

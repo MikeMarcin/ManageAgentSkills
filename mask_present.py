@@ -72,7 +72,7 @@ QUIET_ACTIONS = ('state.record', 'declaration.write', 'declaration.create', 'loc
 
 
 def plural(count, noun):
-    return f"{count} {noun}{'' if count == 1 else 's'}"
+    return f"{count} {noun[:-1] + 'ies' if count != 1 and noun.endswith('y') else noun + ('' if count == 1 else 's')}"
 
 
 def joined(items):
@@ -291,10 +291,20 @@ def render_migrate(data, output):
 def render_doctor(data, output):
     if 'config_after' in (data.get('migration') or {}):
         return render_migrate(data, output)
+    if 'migration' not in data and 'identity_canonicalization' in data:  # doctor --migrate on a tap machine (RFC-MASK-0022)
+        rows = data['identity_canonicalization']
+        lines = [f"doctor --migrate: {plural(len(rows), 'tap identity')} to canonicalize ({outcome(output)})" if rows else 'doctor --migrate: every tap identity is already canonical']
+        for row in rows:
+            lines.append(f"  {clean(row.get('source'))}: {clean(row.get('before'))} -> {clean(row.get('after'))}")
+            lines.append(f"    reached over {clean(row.get('transport'))}; cache reused in place; no project file changes")
+        return lines + plan_guard(data, output)
     lines = [f"doctor: {'healthy' if data.get('healthy') else 'problems found'}"]
     for issue in data.get('issues', []) or []:
         lines.append(f"  issue: {clean(issue.get('message') if isinstance(issue, dict) else issue)}")
     lines.extend(fields(data, [('symlinks', 'symlink_capability'), ('host loading', 'host_load')]))
+    extra = (data.get('forge_hosts') or {}).get('machine')
+    if extra:
+        lines.append(f'  extra forge hosts on this machine: {clean(extra)}')
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
     lines.extend(workflow_lines(data, verb='would be deployed by'))
@@ -931,7 +941,7 @@ COMMAND_HELP = {
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
     'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update            # update MASK and fetch taps\nmask upgrade --dry-run # see what the fetched taps would change\nmask upgrade           # move every registered project and your personal skills'),
     'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --expect-plan-hash HASH.\nIf required setup is missing after an upgrade, run ensure for the named consumer.\nUse mask update to update the MASK program.'),
-    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found, including while migration to taps is required. On a machine whose configuration predates taps, only capabilities, config show, doctor, recover and self commands run: doctor reports what migration would convert, and doctor --migrate converts the machine and its registered consumers in one recoverable transaction (--alias NAME names the new tap). On a tap machine, doctor --migrate --project PATH --alias NAME (or --user --alias NAME) converts one leftover v1 declaration to use the approved tap NAME.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH\nmask doctor --migrate --project /path/to/project --alias agentskills --dry-run'),
+    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found, including while migration to taps is required. On a machine whose configuration predates taps, only capabilities, config show, doctor, recover and self commands run: doctor reports what migration would convert, and doctor --migrate converts the machine and its registered consumers in one recoverable transaction (--alias NAME names the new tap). On a tap machine, doctor --migrate --project PATH --alias NAME (or --user --alias NAME) converts one leftover v1 declaration to use the approved tap NAME. On a tap machine whose catalog still records an older spelling of a tap identity, doctor reports migration.identity_canonicalization and a plain doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH\nmask doctor --migrate --project /path/to/project --alias agentskills --dry-run'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
     'apply': ('Reconcile managed links for the selected registered scopes. Does not run package setup.', 'mask apply --project . --dry-run\nmask apply --project .'),
@@ -950,7 +960,7 @@ COMMAND_HELP = {
     'integration.approve': ('Grant persistent automatic-readiness authority to an explicitly selected project or boundary.', 'mask integration approve --project /path/to/project --dry-run'),
     'integration.inspect': ('Inspect project readiness authority and installed integrations.', 'mask integration inspect --project .'),
     'source.list': ('List approved taps.', 'mask source list'),
-    'source.show': ('Show one approved tap: its binding, line-ending policy and cached revision.', 'mask source show NAME'),
+    'source.show': ('Show one approved tap: its identity, the transport this machine uses to reach it and why (pinned, the project origin, a transport that worked before, gh, the typed URL or a probe), its line-ending policy and cached revision.', 'mask source show NAME'),
     'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
@@ -973,7 +983,7 @@ COMMAND_HELP = {
     'source.dev-link': ('Switch a pinned skill to a local authoring checkout, or return it to pinned deployment.', None),
     'source.inspect': ('Inspect an approved tap, named by alias or repository URL, at a ref or path and list its packages without selecting them for deployment.', None),
     'source.publish': ('Inspect selected source changes; commit or push only when explicitly requested by the corresponding flags.', None),
-    'tap.add': ('Approve a Git repository as a named tap. Only the catalog is written and nothing is fetched; install, update, upgrade or source fetch '
+    'tap.add': ('Approve a Git repository as a named tap. On github.com, gitlab.com, bitbucket.org and codeberg.org an HTTPS URL and an SSH URL name the same tap, and the URL you type only suggests how to reach it; --pin-transport makes this machine always use exactly that URL (see mask tap transport --help). Only the catalog is written and nothing is fetched; install, update, upgrade or source fetch '
                 'later fetches the tap into a MASK-owned cache. On a machine without configuration this also creates the machine configuration '
                 'and state. --checkout binds an authoring checkout whose origin matches the tap; source publish, source dev-link and skill import '
                 'use it, install, update, list and ensure never read it, and it is never a link target. A tap keeps exact bytes: MASK never converts line endings '

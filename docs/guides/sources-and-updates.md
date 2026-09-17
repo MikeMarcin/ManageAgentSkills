@@ -28,6 +28,21 @@ A tap that cannot be fetched blocks only the consumers that reference it. The ot
 
 `mask source fetch` without a name fetches every approved tap into its cache and deploys nothing; a failing tap is named in the error while the others are still fetched. `mask source fetch NAME` fetches one tap, and `source fetch --locked` prepares exact locked artifacts.
 
+### One tap, however each machine signs in
+
+A tap names a repository, not a way of reaching it. On GitHub, GitLab, Bitbucket and Codeberg, `https://github.com/O/R`, `ssh://git@github.com/O/R.git` and `git@github.com:O/R.git` are the same tap, written in project files as `https://github.com/O/R.git`. A project file committed from a machine that uses HTTPS therefore works unchanged on a machine that uses SSH keys, and the other way round. Files written before this rule, including the old `ssh://git@github.com/~/O/R.git` spelling, keep working byte for byte.
+
+How a machine reaches the tap is its own business and never enters a project file. By default MASK works it out on each fetch, without ever prompting: it follows the project's own `origin` (if your project clones over SSH, so does the tap), then whatever worked last time, then your `gh` `git_protocol` setting, then the URL you typed at `tap add`, and finally the other scheme. It moves on only when a transport cannot authenticate or connect, and tells you when it had to.
+
+```sh
+mask source show agentskills                                                # which transport is in use, and why
+mask tap transport agentskills git@github.com:MikeMarcin/AgentSkills.git    # always use SSH on this machine
+mask tap transport agentskills --derive                                     # work it out again
+mask config set --forge-host git.example.com                                # a self-hosted forge where both URLs reach the same repositories
+```
+
+Every other host stays strict: there an HTTPS URL and an SSH URL are different taps, because nothing says they serve the same repositories. Only this machine's configuration can say so; a project file cannot. A machine set up before this rule still works; `mask doctor` mentions it, and `mask doctor --migrate --dry-run` previews the one-step catalog cleanup.
+
 Additional repositories are approved as taps:
 
 ```sh

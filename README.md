@@ -114,6 +114,11 @@ without deploying. Run upgrades
 between active tasks: a running agent may cache instructions, and a changed file
 does not prove a host reloaded it.
 
+A tap is the same tap over HTTPS or SSH: on GitHub, GitLab, Bitbucket and Codeberg, project files record one
+identity (`https://github.com/O/R.git`), and each machine reaches it the way it already signs in, following the
+project's `origin`, what worked last, then `gh`. `mask tap transport NAME URL` pins one on this machine only. See
+[Sources and updates](docs/guides/sources-and-updates.md#one-tap-however-each-machine-signs-in).
+
 Use `--dry-run` to preview local or cached changes without fetching or applying.
 Use `--json` for structured machine output; without it MASK prints human text and
 never asks a question when stdin or stdout is not a terminal. Declining a required

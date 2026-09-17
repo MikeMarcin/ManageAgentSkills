@@ -284,3 +284,43 @@ class Boundaries(ForgeFixture):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OlderMachine(ForgeFixture):
+    """AC05: a machine approved before the RFC keeps working, is told so, and converts its catalog in one atomic write."""
+
+    def older(self):
+        self.assertTrue(self.machine('tap', 'add', TAP, SCP)['ok'])
+        config = self.document(self.home / 'config.json')
+        entry = config['sources'][TAP]
+        # What the previous program wrote for ``tap add git@github.com:...``: a strict identity, its cache key, and no transport policy.
+        entry.update(repository=LEGACY_SSH, cache=str(sources.cache_path(self.home, TAP, LEGACY_SSH)))
+        del entry['transport_policy']
+        (self.home / 'config.json').write_text(c.text_json(config), encoding='utf-8')
+        self.assertEqual(self.human('install', 'alpha').returncode, 0)
+        return entry
+
+    def test_doctor_reports_and_migrate_converts_only_the_catalog(self):
+        entry = self.older()
+        report = self.machine('doctor')
+        self.assertEqual([(row['source'], row['code'], row['canonical']) for row in report['data']['identity_canonicalization']], [(TAP, 'migration.identity_canonicalization', HTTPS)])
+        self.assertIn('migration.identity_canonicalization', [warning['code'] for warning in report['warnings']])
+        self.assertEqual(report['data']['forge_hosts']['built_in'], sorted(sources.FORGE_HOSTS))
+        everything = {path: path.read_bytes() for path in (self.home / 'config.json', self.home / 'state.json', self.project / '.mask.json', self.project / '.mask.lock.json')}
+        preview = self.machine('doctor', '--migrate', '--dry-run')
+        self.assertEqual((preview['would_change'], preview['changed'], [row['after'] for row in preview['data']['identity_canonicalization']]), (True, False, [HTTPS]))
+        self.assertEqual({path: path.read_bytes() for path in everything}, everything)
+        self.assertEqual(self.machine('doctor', '--migrate', '--expect-plan-hash', 'sha256:' + '0' * 64)['error']['code'], 'plan.stale')
+        done = self.machine('doctor', '--migrate', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.assertEqual((done['changed'], done['transaction']), (True, 'committed'))
+        after = self.document(self.home / 'config.json')['sources'][TAP]
+        self.assertEqual((after['repository'], after['transport'], after['transport_policy'], after['cache']), (HTTPS, SCP, 'derived', entry['cache']))
+        for path in (self.home / 'state.json', self.project / '.mask.json', self.project / '.mask.lock.json'):
+            self.assertEqual(path.read_bytes(), everything[path], path)
+        self.assertEqual(self.machine('doctor')['data']['identity_canonicalization'], [])
+        self.reached()
+        self.assertEqual(self.human('upgrade').returncode, 0)  # The reused cache and the unchanged state still serve the consumer.
+        self.assertEqual(set(self.reached()), {SCP})
+        self.assertEqual(self.machine('ensure')['data']['readiness'], 'ready_pinned')
+        again = self.machine('doctor', '--migrate')
+        self.assertEqual(again['error']['code'], 'invocation.invalid')  # Nothing left to canonicalize: the scoped straggler form is what remains.

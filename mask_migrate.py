@@ -317,6 +317,8 @@ def migrate_straggler(args, output, home):
     import mask_store as store
     import mask_task as task
     project, user, alias = getattr(args, 'project', None), getattr(args, 'user', False), getattr(args, 'alias', None)
+    if not (project or user or alias) and sources.noncanonical(c.config(c.read_json(home / 'config.json'))):
+        return sources.canonicalize(args, output, home)  # RFC-MASK-0022: unscoped, a tap machine converts its catalog's older identity spellings.
     if getattr(args, 'all', False) or alias is None or not (project or user):
         c.fail('invocation.invalid', 'A tap machine migrates one straggler declaration: doctor --migrate --project PATH --alias NAME (or --user --alias NAME).', 2)
     config_text = c.read_text(home / 'config.json')

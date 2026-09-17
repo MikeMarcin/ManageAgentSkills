@@ -124,6 +124,60 @@ def scp(identity):
     return None if forge is None else 'git@' + forge[0] + ':' + forge[1].lstrip('/') + '.git'
 
 
+def equivalents(identity):
+    """Every strict spelling an older program could have recorded for one identity; just itself off the forge hosts."""
+    forge = forge_path(repository(identity))
+    if forge is None:
+        return [identity]
+    host, path = forge
+    return [prefix + path + suffix for prefix in ('https://' + host, 'ssh://git@' + host, 'ssh://git@' + host + '/~') for suffix in ('.git', '')]
+
+
+def canonical_entry(entry):
+    """A catalog entry as RFC-MASK-0022 writes it: canonical identity, a transport Git can use, an explicit policy.
+
+    The cache stays where it is: it is this identity's cache under an older key, and cache_root accepts that key.
+    """
+    identity = repository(entry['repository'])
+    transport = entry['transport']
+    if forge_path(identity) is not None and scheme(transport) == 'ssh':
+        transport = scp(identity)  # Never the /~/ URI an older catalog derived from the scp form.
+    return dict(entry, repository=identity, transport=transport, transport_policy=transport_policy(entry))
+
+
+def noncanonical(config):
+    """Tap aliases whose catalog entry still carries a pre-RFC-MASK-0022 spelling."""
+    return sorted(name for name, entry in config.get('sources', {}).items() if canonical_entry(entry) != dict(entry, transport_policy=transport_policy(entry)))
+
+
+def canonicalize(args, output, home):
+    """``doctor --migrate`` on a tap machine with no scope: rewrite the catalog's identities in one atomic, previewable write.
+
+    Nothing else changes. Project files are never rewritten for a spelling, the state records mirror those files, and
+    the caches are reused in place. A single atomic replace leaves the old bytes or the new ones, so no journal is needed.
+    """
+    original = c.read_text(home / 'config.json')
+    config = c.config(c.parse_json(original))
+    names = noncanonical(config)
+    proposal = c.config(dict(config, sources={name: canonical_entry(entry) if name in names else entry for name, entry in config['sources'].items()}))
+    plan_hash = c.digest(dict(before=config, after=proposal))
+    rows = [dict(source=name, code='migration.identity_canonicalization', before=config['sources'][name]['repository'], after=proposal['sources'][name]['repository'],
+                 transport=proposal['sources'][name]['transport'], cache_reused=config['sources'][name]['cache']) for name in names]
+    output['data'] = dict(identity_canonicalization=rows, config=proposal, plan_hash=plan_hash, network='none')
+    output['would_change'] = bool(names)
+    if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
+        c.fail('plan.stale', 'The machine catalog changed; review a new preview.', 4)
+    if not names or output['dry_run']:
+        return
+    output['actions'] = [dict(kind='config.migrate', status='planned', path=str(home / 'config.json'))]
+    with c.writer_lock(home):
+        if c.kind(home / 'pending.json') != 'missing':
+            c.fail('recovery.required', 'Recover the pending operation before migrating.', 8)
+        c.atomic_text(home / 'config.json', c.text_json(proposal), original)
+    output['actions'][0]['status'] = 'applied'
+    output.update(changed=True, transaction='committed')
+
+
 def spelling(value):
     """Normalize one transport spelling without equating HTTPS and SSH authority; what files recorded before RFC-MASK-0022."""
     if not isinstance(value, str) or not value or value.startswith('-') or any(ch in value for ch in '\0\r\n'):
@@ -382,7 +436,7 @@ def network_options(root, transport):
 
 def cache_root(home, name, entry):
     # Keyed by the canonical identity; a catalog from before RFC-MASK-0022 keeps the key of its recorded spelling until doctor --migrate.
-    allowed = {cache_path(home, name, identity) for identity in (repository(entry['repository']), entry['repository'])}
+    allowed = {cache_path(home, name, identity) for identity in [entry['repository'], *equivalents(entry['repository'])]}
     expected = Path(entry['cache'])
     if expected not in allowed:
         c.fail('source.cache_invalid', 'Cache location is outside the selected source binding.', 4)
