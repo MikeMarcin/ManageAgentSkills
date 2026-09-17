@@ -715,6 +715,7 @@ def main(argv=None):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(encoding='utf-8')
     argv = list(sys.argv[1:] if argv is None else argv)
+    core.FROZEN.clear()  # Object-addressed Git answers are reused within one invocation only.
     before_separator = argv[:argv.index('--')] if '--' in argv else argv
     machine = '--json' in before_separator
     output = result()

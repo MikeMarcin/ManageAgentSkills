@@ -212,7 +212,7 @@ def materialize(home, row, payload, *, dry_run=False, effects=None):
 def exact_cached(home, row, entry):
     """Whether the approved tap cache already holds the exact locked commit; never fetches."""
     cache = s.cached(home, row['source'], entry)
-    return cache is not None and c.git(cache, 'rev-parse', '--verify', row['commit'] + '^{commit}', optional=True) == row['commit']
+    return cache is not None and c.peeled_commit(cache, row['commit']) == row['commit']
 
 
 def cached_payload(home, row, config):

@@ -434,10 +434,12 @@ def dispatch(args, output, home):
 
 
 def object_blob(root, oid, limit=1024 * 1024):
-    size = c.git(root, 'cat-file', '-s', oid, max_output=32)
-    if not size.isdecimal() or int(size) > limit:
+    try:  # One bounded read: the output allowance is the size gate, so an oversized blob is never buffered.
+        return c.git_frozen(root, 'cat-file', 'blob', oid, binary=True, max_output=limit)
+    except c.MaskError as error:
+        if error.code != 'git.output_limit':
+            raise
         c.fail('source.limit', 'Selected metadata exceeds its byte limit.', 4)
-    return c.git(root, 'cat-file', 'blob', oid, binary=True, max_output=limit)
 
 
 def object_text(root, oid):

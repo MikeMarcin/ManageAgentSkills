@@ -100,3 +100,35 @@ class SubprocessTests(Fixture):
         self.assertTrue(ready.exists())
         time.sleep(2)
         self.assertFalse(marker.exists())
+
+
+class SpawnBudgetTests(Fixture):
+    """Every Git question is a process. These bounds fail loudly when a change reintroduces per-call latency or fan-out."""
+
+    @unittest.skipIf(os.name == 'nt', 'Windows process creation alone exceeds this bound')
+    def test_a_fast_child_is_noticed_without_waiting_out_a_poll_tick(self):
+        # Twenty finished children used to cost twenty fixed 10 ms sleeps; the bound is loose enough for a loaded machine.
+        c.git(self.source, 'rev-parse', 'HEAD')
+        best = min(self.timed(lambda: c.git(self.source, 'rev-parse', 'HEAD')) for _ in range(20))
+        self.assertLess(best, 0.008, 'one trivial Git call should not pay a supervision tick')
+
+    def timed(self, action):
+        start = time.perf_counter()
+        action()
+        return time.perf_counter() - start
+
+    def test_one_install_stays_within_its_git_process_budget(self):
+        import contextlib
+        import io
+        import mask
+        self.init()
+        spawned, real = [], c.contained_run
+        def counting(command, *args, **kwargs):
+            spawned.append(command)
+            return real(command, *args, **kwargs)
+        with patch.object(c, 'contained_run', counting), patch.dict(os.environ, self.environment()), \
+                contextlib.redirect_stdout(io.StringIO()) as stdout:
+            code = mask.main(['install', 'alpha', '--project', str(self.project), '--home', str(self.home), '--json'])
+        self.assertEqual(code, 0, stdout.getvalue())
+        # 83 when written: about 50 are deliberate re-observations of the workspace immediately before each effect.
+        self.assertLessEqual(len(spawned), 90, 'install spawns more Git processes than its budget; look for repeated object-addressed questions')

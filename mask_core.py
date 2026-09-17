@@ -334,6 +334,8 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
     buffers = [bytearray(), bytearray()]
     exceeded = threading.Event()
     read_failed = threading.Event()
+    wake = threading.Event()  # Set on every state change, so a fast child is noticed at once instead of on a fixed tick.
+    finished = []  # One entry per drained pipe, recorded before the wake-up; a thread's is_alive() lags its last statement.
     def drain(stream, buffer, limit):
         try:
             while True:
@@ -351,6 +353,8 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
                 stream.close()
             except Exception:
                 read_failed.set()
+            finished.append(stream)
+            wake.set()
     readers = [threading.Thread(target=drain, args=(stream, buffer, limit), daemon=True)
                for stream, buffer, limit in ((process.stdout, buffers[0], max_output),
                                               (process.stderr, buffers[1], max_error))]
@@ -365,11 +369,22 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
                 fail(family + '.output_limit', f'{name} exceeded its bounded output allowance.', 5)
             if monitor is not None:
                 monitor()
-            if process.poll() is not None and not any(reader.is_alive() for reader in readers):
+            drained = len(finished) == len(readers)
+            if process.poll() is not None and drained:
                 break
-            if time.monotonic() >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 raise subprocess.TimeoutExpired(command, timeout)
-            exceeded.wait(0.01)
+            if drained and monitor is None:
+                # Both pipes reached EOF, so the leader is exiting: reap it rather than spin on poll().
+                try:
+                    process.wait(timeout=remaining)
+                except subprocess.TimeoutExpired:
+                    pass
+                continue
+            # State is re-read on every pass, so a wake-up lost to clear() costs one tick, never a wrong answer.
+            wake.wait(min(remaining, 0.01 if monitor is not None or drained else 0.05))
+            wake.clear()
         if read_failed.is_set():
             fail(family + '.output_failed', f'{name} output could not be read completely.', 5)
         if exceeded.is_set():
@@ -417,6 +432,33 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
         if job is not None:
             job.close()
     return process.returncode, stdout, stderr
+
+
+FROZEN = {}  # (root, argv, binary) -> answer, for one invocation; mask.main() clears it.
+
+
+def git_frozen(root, *args, optional=False, binary=False, max_output=16 * 1024 * 1024):
+    """``git`` for questions whose answer an object id fixes: a blob's bytes, a full commit's tree, a full oid's existence.
+
+    Never for HEAD, refs, the index, a worktree or configuration. Only successes are kept, since an absent
+    object can arrive with a later fetch, and a kept answer still honours the asking caller's output bound.
+    """
+    key = (str(root), args, binary)
+    if key not in FROZEN:
+        answer = git(root, *args, optional=optional, binary=binary, max_output=max_output)
+        if answer is None:
+            return None
+        FROZEN[key] = answer
+    answer = FROZEN[key]
+    if len(answer if binary else answer.encode('utf-8')) > max_output:
+        fail('git.output_limit', 'Git exceeded its bounded output allowance.', 5)
+    return answer
+
+
+def peeled_commit(root, revision):
+    """The commit ``revision`` peels to, or None. A full object id is a frozen question; anything else is observed afresh."""
+    ask = git_frozen if re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', revision) else git
+    return ask(root, 'rev-parse', '--verify', revision + '^{commit}', optional=True)
 
 
 def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,

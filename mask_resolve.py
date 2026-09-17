@@ -270,7 +270,7 @@ def cached(home, name, entry):
 
 
 def verify_commit(root, row):
-    observed = c.git(root, 'rev-parse', '--verify', row['commit'] + '^{commit}', optional=True)
+    observed = c.peeled_commit(root, row['commit'])
     if observed != row['commit']:
         c.fail('lock.resolution_required', 'Exact locked commit is unavailable; fetch that commit explicitly without substituting another revision.', 4, commit=row['commit'])
     if c.git(root, 'rev-parse', '--show-object-format') != row['git_object_format']:
@@ -315,7 +315,7 @@ def resolve_binding(home, declaration, binding, entry, payload_views=None):
         if chosen['ref'] not in refs:
             c.fail('lock.resolution_required', 'Selected ref has no cached advertisement; fetch explicitly first.', 4, ref=chosen['ref'])
         commit = refs[chosen['ref']]
-    observed = c.git(root, 'rev-parse', '--verify', commit + '^{commit}', optional=True)
+    observed = c.peeled_commit(root, commit)
     if observed is None or 'commit' in chosen and observed != commit:
         c.fail('lock.resolution_required', 'Selected Git object cannot resolve to the required commit in the approved cache; explicitly inspect/fetch that selector first.', 4, object=commit, selector=chosen)
     commit = observed

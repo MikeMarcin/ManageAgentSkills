@@ -159,7 +159,7 @@ def validate(root, commit, path, identifier):
     for mode, kind, oid, name in rows:
         if mode not in ('100644', '100755') or kind != 'blob':
             c.fail('skill.entry_unsupported', 'Packages require regular blobs; links and submodules are unsupported.', 4)
-        size = c.git(root, 'cat-file', '-s', oid, max_output=32)
+        size = c.git_frozen(root, 'cat-file', '-s', oid, max_output=32)
         if not size.isdecimal() or int(size) > FILE_BYTES:
             c.fail('skill.limit', 'Package exceeds its per-file byte limit.', 4)
         total += int(size)
@@ -168,7 +168,7 @@ def validate(root, commit, path, identifier):
         sizes.append(int(size))
     files = []
     for (mode, kind, oid, name), size in zip(rows, sizes):
-        data = c.git(root, 'cat-file', 'blob', oid, binary=True, max_output=size)
+        data = c.git_frozen(root, 'cat-file', 'blob', oid, binary=True, max_output=size)
         if len(data) != size:
             c.fail('skill.object_invalid', 'Frozen blob size changed during validation.', 4)
         files.append(PayloadFile(name, mode, data))

@@ -1,15 +1,24 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ENTRY = Path(__file__).resolve().parents[1] / 'mask.py'
 
 
 class ProtocolTests(unittest.TestCase):
+    def setUp(self):
+        # A private machine home, personal home and working directory: never the developer's own state or this checkout.
+        self.temp = tempfile.TemporaryDirectory(prefix='mask-protocol-')
+        self.addCleanup(self.temp.cleanup)
+        self.options = dict(capture_output=True, encoding='utf-8', cwd=self.temp.name,
+                            env=dict(os.environ, MASK_HOME=str(Path(self.temp.name) / 'machine'), HOME=self.temp.name, USERPROFILE=self.temp.name))
+
     def invoke(self, *args):
-        run = subprocess.run([sys.executable, str(ENTRY), *args], capture_output=True, encoding="utf-8")
+        run = subprocess.run([sys.executable, str(ENTRY), *args], **self.options)
         payload = json.loads(run.stdout)
         self.assertEqual(run.stderr, '')
         self.assertEqual(payload['ok'], run.returncode == 0)
@@ -40,6 +49,6 @@ class ProtocolTests(unittest.TestCase):
             self.assertTrue(self.invoke(*args, '--json')[1]['ok'])
 
     def test_operand_json_is_not_a_flag(self):
-        run = subprocess.run([sys.executable, str(ENTRY), 'skill', 'show', '--', '--json'], capture_output=True, encoding="utf-8")
+        run = subprocess.run([sys.executable, str(ENTRY), 'skill', 'show', '--', '--json'], **self.options)
         self.assertEqual(run.stdout, '')
         self.assertNotEqual(run.returncode, 0)

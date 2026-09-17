@@ -83,7 +83,9 @@ def tree(root, revision, path='', recursive=False, *, max_output=16 * 1024 * 102
     args.append(revision + (':' + path if path else ''))
     if exact is not None:
         args = ['--literal-pathspecs', *args, '--', exact]
-    raw = c.git(root, *args, binary=True, max_output=max_output)
+    # A full object id names one tree for ever; any other revision (HEAD, a ref) is observed afresh.
+    ask = c.git_frozen if re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', revision) else c.git
+    raw = ask(root, *args, binary=True, max_output=max_output)
     rows = []
     for item in raw.split(b'\0'):
         if not item:
