@@ -31,7 +31,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(first, second)
         commands = {c['name']: c for c in first['data']['commands']}
         self.assertTrue(commands['capabilities']['implemented'])
-        self.assertTrue(commands['update']['network'])
+        self.assertTrue(commands['upgrade']['network'])
         self.assertFalse(commands['apply']['network'])
         self.assertTrue(commands['project.require']['plan_guard'])
         self.assertTrue(any(a['name'] == 'ids' and a['repeatable'] for a in commands['project.require']['arguments']))

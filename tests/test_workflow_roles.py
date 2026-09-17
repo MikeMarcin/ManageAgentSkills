@@ -226,7 +226,7 @@ mask.main(sys.argv[3:])
             # Package bytes reach a pinned consumer only through publish, an explicit fetch and a pinned update.
             self.publish('workflow candidate')
             self.call('source', 'fetch', TAP)
-            return self.call('update', '--project', self.project, code=code)
+            return self.call('upgrade', '--project', self.project, code=code)
         asset.write_bytes(original + b'# drifted\n')
         self.assertEqual(candidate(4)['error']['code'], 'workflow.invalid')
         self.assertFalse((self.project / '.agents/skills/implement-rfc').exists())

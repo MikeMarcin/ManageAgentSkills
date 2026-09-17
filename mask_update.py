@@ -1,9 +1,10 @@
-"""Fetching, isolated updates of selected consumers (RFC-MASK-0021 AC03; contracts/CLI.md, Update semantics).
+"""``update`` and ``upgrade``, named as brew and apt name them (RFC-MASK-0021 AC03; contracts/CLI.md, Update semantics).
 
-``dispatch`` owns the whole ``update`` command: select consumers, fetch each referenced tap
-once, resolve every remaining consumer from the cache, disclose per-consumer lock changes
-and activate one ordinary journaled plan. ``fetch_all`` is ``source fetch`` without a name.
-Only Git and source family errors are captured per tap; every other error propagates.
+``refresh`` owns ``update``: advance this program, then fetch every approved tap. It touches no consumer.
+``dispatch`` owns ``upgrade``: select consumers, fetch each referenced tap once, resolve every remaining
+consumer from the cache, disclose per-consumer lock changes and activate one ordinary journaled plan.
+``fetch_all`` is ``source fetch`` without a name. Only Git and source family errors are captured per tap;
+every other error propagates.
 """
 from __future__ import annotations
 
@@ -62,6 +63,39 @@ def fetch_all(args, output, home):
         raise c.MaskError(first.code, str(first), first.exit_code, details=dict(first.details, failed=sorted(failed)))
 
 
+# A program checkout in one of these states is somebody's deliberate work, not a failed refresh: say so and still fetch the taps.
+PROGRAM_HELD = {'source.ahead': 'this checkout is ahead of its remote', 'source.diverged': 'this checkout has diverged from its remote',
+                'source.dirty': 'this checkout has uncommitted changes', 'source.detached': 'this checkout is detached',
+                'source.identity_mismatch': 'this checkout is not on main from the ManageAgentSkills remote'}
+
+
+def refresh(args, output, home, root):
+    """``update``: fast-forward the MASK program, then fetch every approved tap; no declaration, lock, link or consumer changes."""
+    import mask_install
+    failure = None
+    try:
+        mask_install.dispatch(args, output, home, root)
+        program = dict(output['data'], status='updated' if output['changed'] else 'behind' if output['would_change'] else 'current')
+    except c.MaskError as error:
+        if error.code not in PROGRAM_HELD and not error.code.startswith('git.'):
+            raise
+        program = dict(status='held' if error.code in PROGRAM_HELD else 'failed', reason=PROGRAM_HELD.get(error.code, str(error)), code=error.code)
+        failure = None if error.code in PROGRAM_HELD else error
+    program_changed, program_would_change = output['changed'], output['would_change']
+    raw = c.read_json(home / 'config.json', default={})
+    output['data'] = dict(fetches={}, network='none')  # Stays so with no configuration yet, or on a machine that predates taps.
+    try:
+        if raw and c.config(raw, legacy=True)['schema_version'] == 3:
+            fetch_all(args, output, home)
+    finally:  # A tap that fails to fetch still discloses what happened to the program.
+        output['data']['program'] = program
+        if not output['dry_run']:
+            output['data']['network'] = 'fetch'
+        output.update(changed=program_changed, would_change=program_would_change)
+    if failure is not None:
+        raise failure
+
+
 def changes(previous, proposal):
     """Per-coordinate lock differences for the disclosure."""
     before = {r.coordinate(row): row for row in previous['packages']}
@@ -117,7 +151,7 @@ def dispatch(args, output, home):
             if scoped:
                 c.fail('dev_link.active', 'Return the development link to pins before updating this consumer.', 4, root=str(item['root']))
             item['row']['status'] = 'skipped'
-            output['warnings'].append(dict(code='dev_link.active', message='A dev-link consumer was skipped; return it to pins to update it.', root=str(item['root'])))
+            output['warnings'].append(dict(code='dev_link.active', message='A dev-link consumer was skipped; return it to pins to upgrade it.', root=str(item['root'])))
             continue
         declaration = item['declaration']
         r.approved(declaration, config)
@@ -167,7 +201,7 @@ def dispatch(args, output, home):
         row.update(status='unchanged' if proposal == previous else 'updated', changes=changes(previous, proposal))
         planned_consumers.append(item)
     planned = fs.plan(config, state, [item['root'] for item in planned_consumers], home=home, lock_proposals=locks,
-                      operation='update', payload_views=payload_views)
+                      operation='upgrade', payload_views=payload_views)
     # The guard binds which roots were left out; fetch effects are not bound, so a dry run and a guarded rerun agree.
     planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=blocked,
                                          skipped=[row['root'] for row in rows if row['status'] == 'skipped']))
@@ -195,4 +229,4 @@ def dispatch(args, output, home):
             raise
         workflow = error.details  # The applied consumers' workflow verdict joins the blocked roots instead of masking them.
     if blocked:
-        c.fail('update.incomplete', 'Some selected consumers were blocked and not updated; the others were applied.', 4, blocked=blocked, **workflow)
+        c.fail('upgrade.incomplete', 'Some selected consumers were blocked and not upgraded; the others were applied.', 4, blocked=blocked, **workflow)

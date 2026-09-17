@@ -202,10 +202,10 @@ class LegacyRecordsOnATapCatalog(LegacyFixture):
         git(tapped, 'init', '-q', '-b', 'main')
         self.machine('install', 'alpha', '--project', tapped)
         observed = snapshot(roots.base, roots.home, roots.project, roots.personal, tapped)
-        for args in (('update',), ('update', '--project', roots.project), ('update', '--user')):
+        for args in (('upgrade',), ('upgrade', '--project', roots.project), ('upgrade', '--user')):
             refused = self.machine(*args, code=4)
             self.assertEqual(refused['error']['code'], 'migration.required', args)
-        self.assertIn(str(roots.project), self.machine('update', code=4)['error']['details']['roots'])
+        self.assertIn(str(roots.project), self.machine('upgrade', code=4)['error']['details']['roots'])
         adopt = self.machine('link', 'adopt', '--project', roots.project, '--skill', 'alpha', '--target', 'codex',
                              '--expect-source', roots.clone / 'skills/alpha', code=4)
         self.assertEqual(adopt['error']['code'], 'migration.required')

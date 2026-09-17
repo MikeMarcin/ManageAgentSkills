@@ -113,7 +113,7 @@ class HelpAndCapabilities(unittest.TestCase):
             env = dict(os.environ, MASK_HOME=home, NO_COLOR='1')
             run = lambda *args: subprocess.run([sys.executable, '-B', str(ENTRY), *args], capture_output=True, encoding='utf-8',
                                                env=env, stdin=subprocess.DEVNULL, timeout=60)
-            for args in (('--help',), ('update', '--help'), ('doctor', '--help')):
+            for args in (('--help',), ('upgrade', '--help'), ('doctor', '--help')):
                 with self.subTest(args=args):
                     shown = run(*args)
                     self.assertEqual((shown.returncode, shown.stderr), (0, ''))

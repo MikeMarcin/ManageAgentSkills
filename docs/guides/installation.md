@@ -5,7 +5,7 @@ Program installation, the launcher and the first tap in detail, including the na
 ## Requirements
 
 - Python 3.11+ and Git. The runtime uses the Python standard library; there is no pip installation.
-- A local clone of ManageAgentSkills. The launcher runs the program from that clone, and `mask self update` fast-forwards it. You do not need an AgentSkills checkout: MASK fetches each approved tap into its own bare cache under `MASK_HOME/sources` (normally `~/.mask/sources`). Cloning and fetching use your existing Git access.
+- A local clone of ManageAgentSkills. The launcher runs the program from that clone, and `mask update` fast-forwards it. You do not need an AgentSkills checkout: MASK fetches each approved tap into its own bare cache under `MASK_HOME/sources` (normally `~/.mask/sources`). Cloning and fetching use your existing Git access.
 - Directory symlink support. Windows needs existing symlink privileges; MASK does not elevate or substitute junctions or copies.
 
 > [!NOTE]

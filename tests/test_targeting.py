@@ -72,7 +72,7 @@ class TargetingTests(Fixture):
         declaration['skills'][0]['when'] = {'platforms': ['windows' if selection.device()['platform'] != 'windows' else 'linux']}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
         self.call('source', 'fetch', TAP)
-        self.call('update', '--project', self.project)
+        self.call('upgrade', '--project', self.project)
         remove_tree(self.home / 'store')
         remove_tree(self.home / 'sources')
         before = self.snapshot()

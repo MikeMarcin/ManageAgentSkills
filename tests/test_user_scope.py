@@ -100,7 +100,7 @@ class UserScopeTests(Fixture):
         self.assertEqual(caps['readable_versions']['state'], [1, 2, 3])
         commands = {item['name']: item for item in caps['commands']}
         self.assertIn('user.set-agents', commands)
-        for name in ('install', 'remove', 'list', 'update'):
+        for name in ('install', 'remove', 'list', 'upgrade'):
             self.assertIn('--user', [flag for argument in commands[name]['arguments'] for flag in argument['flags']], name)
 
     def test_collision_preflights_both_scopes_and_declaration_edit(self):
@@ -164,7 +164,7 @@ class UserScopeTests(Fixture):
         preview = self.call('plan', '--user')
         self.assertTrue(preview['would_change'])
         for args in (('user', 'show'), ('doctor', '--user'), ('list', '--user'), ('apply', '--user', '--dry-run'),
-                     ('install', BETA, '--user', '--dry-run'), ('remove', ALPHA, '--user', '--dry-run'), ('update', '--user', '--dry-run')):
+                     ('install', BETA, '--user', '--dry-run'), ('remove', ALPHA, '--user', '--dry-run'), ('upgrade', '--user', '--dry-run')):
             self.call(*args)
         self.assertEqual(before, self.snapshot())
         self.call('user', 'set-agents', ALPHA, 'claude')
@@ -264,7 +264,7 @@ class UserScopeTests(Fixture):
         parked.rename(self.project)
         moved = self.personal.rename(self.base / 'moved home')
         before = self.snapshot()
-        for args in (('update', '--user'), ('update',), ('user', 'set-agents', ALPHA, 'codex', '--apply'), ('user', 'unregister'),
+        for args in (('upgrade', '--user'), ('upgrade',), ('user', 'set-agents', ALPHA, 'codex', '--apply'), ('user', 'unregister'),
                      ('apply', '--user'), ('apply', '--all'), ('ensure', '--user'), ('ensure', '--all'),
                      ('source', 'dev-link', ALPHA, '--user', '--to-pinned')):
             refused = self.call(*args, code=4)['error']
@@ -292,7 +292,7 @@ class UserUpdateTests(Fixture):
         self.git(self.source, 'rm', '-r', '-q', 'skills/beta')
         self.publish('remove the personal requirement')
         before = self.controls()
-        refused = self.call('update', code=4)
+        refused = self.call('upgrade', code=4)
         self.assertEqual((refused['error']['code'], refused['error']['details']['skill'], refused['transaction']), ('skill.unknown', BETA, 'not_started'))
         self.assertTrue(refused['data']['fetches'][TAP]['ok'])
         self.assertEqual(before, self.controls())
@@ -304,7 +304,7 @@ class UserUpdateTests(Fixture):
         self.publish('upstream moves')
         self.personal.rename(self.base / 'moved personal')
         before = self.snapshot()  # Includes the tap cache: a fetch would change it.
-        for args in (('update',), ('update', '--user')):
+        for args in (('upgrade',), ('upgrade', '--user')):
             refused = self.call(*args, code=4)
             self.assertEqual((refused['error']['code'], refused['error']['details']['root']), ('user.unavailable', str(self.personal)), args)
             self.assertNotIn('fetches', refused['data'])

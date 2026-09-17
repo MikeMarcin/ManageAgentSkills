@@ -6,10 +6,10 @@ import subprocess
 import sys
 from tests.support import Fixture, ENTRY
 
-# The runtime modules self update requires in a program candidate (mask_install.validate_program).
+# The runtime modules update requires in a program candidate (mask_install.validate_program).
 PROGRAM_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py')
 
-# Runs self update from a program checkout with one injected fault: a crash at the Git checkpoint after the checkout
+# Runs update from a program checkout with one injected fault: a crash at the Git checkpoint after the checkout
 # advanced, a failing fast-forward merge, or a failure of the journal effects after the checkout advanced.
 FAULT = """
 import os, sys
@@ -32,7 +32,7 @@ elif fault == 'fails-after-advance':
             raise OSError('injected failure after the checkout advanced')
         return original_restore(pending, home, side, **kwargs)
     mask_fs.restore = restore
-raise SystemExit(mask.main(['self', 'update', '--home', sys.argv[2], '--json']))
+raise SystemExit(mask.main(['update', '--home', sys.argv[2], '--json']))
 """
 
 
@@ -102,24 +102,24 @@ class LauncherTests(Fixture):
         source_head = self.git(self.source, 'rev-parse', 'HEAD'); before = self.snapshot(self.project)
         state_before = (self.home / 'state.json').read_bytes()
         self.publish_program(author, 'compatible')
-        self.assertTrue(self.program(program, 'self', 'update')['data']['next_invocation_required'])
+        self.assertTrue(self.program(program, 'update')['data']['program']['next_invocation_required'])
         self.assertEqual(source_head, self.git(self.source, 'rev-parse', 'HEAD'))
         self.assertEqual(before, self.snapshot(self.project))
         self.assertEqual(state_before, (self.home / 'state.json').read_bytes())
-        self.assertFalse(self.program(program, 'self', 'update')['changed'])
+        self.assertFalse(self.program(program, 'update')['changed'])
         schema = author / 'schemas/machine.schema.json'
         original_schema = schema.read_bytes()
         changed_schema = json.loads(original_schema)
         changed_schema['title'] = 'Changed contract fixture'
         schema.write_text(json.dumps(changed_schema))
         self.git(author, 'add', 'schemas/machine.schema.json'); self.git(author, 'commit', '-m', 'changed schema'); self.git(author, 'push', 'origin', 'main')
-        self.assertEqual(self.program(program, 'self', 'update', code=4)['error']['code'], 'source.candidate_invalid')
+        self.assertEqual(self.program(program, 'update', code=4)['error']['code'], 'source.candidate_invalid')
         schema.write_bytes(original_schema)
         path = author / 'mask.py'; path.write_text(path.read_text().replace('PROTOCOL_VERSION = 1', 'PROTOCOL_VERSION = 2'))
         self.git(author, 'add', 'mask.py', 'schemas/machine.schema.json'); self.git(author, 'commit', '-m', 'incompatible'); self.git(author, 'push', 'origin', 'main')
-        self.assertEqual(self.program(program, 'self', 'update', code=4)['error']['code'], 'source.candidate_invalid')
+        self.assertEqual(self.program(program, 'update', code=4)['error']['code'], 'source.candidate_invalid')
 
-    # The self update checkout journal (mask_git.advance, mask_git.recover_git and the git branch of mask_fs.execute):
+    # The update checkout journal (mask_git.advance, mask_git.recover_git and the git branch of mask_fs.execute):
     # the program checkout only ever moves forward to the reviewed candidate and is never reset.
 
     def test_crash_after_program_advance_completes_and_never_resets_the_checkout(self):

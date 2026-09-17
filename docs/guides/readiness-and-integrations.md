@@ -101,11 +101,11 @@ a pair. Unlisted input changes still require setup, and malformed declarations
 are rejected. Setup consent continues to fingerprint the complete current package.
 
 Every public entrypoint shares that one prerequisite verdict. `install`, `remove`
-and `update` report `workflow_readiness` and a per-scope
+and `upgrade` report `workflow_readiness` and a per-scope
 `workflow` summary after their link transaction commits; a declared role or input
 that is still unmet makes them exit 4 with `workflow.incomplete` while the links
 stay committed and the phases stay truthful. They never run setup: run
-`mask ensure` for the consent path. `update` evaluates roles from the selected
+`mask ensure` for the consent path. `upgrade` evaluates roles from the selected
 candidate, so an added, renamed or re-routed role is deployed, retired or reported
 from the candidate bytes, and an edited legacy-name file is preserved. `doctor`
 observes the same roles and inputs without deploying or running package code,

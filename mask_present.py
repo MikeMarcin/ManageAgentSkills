@@ -512,22 +512,22 @@ def consumer_count(rows):
     return ' and '.join(parts) or 'no consumers'
 
 
-def render_consumer_update(data, output):
-    """update: one sentence for the outcome, then only the consumers, taps and follow-ups that carry news."""
+def render_upgrade(data, output):
+    """upgrade: one sentence for the outcome, then only the consumers, taps and follow-ups that carry news."""
     rows = data.get('consumers') or []
     moved = sum(len(row.get('changes') or []) for row in rows)
     touched = consumer_count([row for row in rows if row.get('changes')])
     if output['dry_run']:
-        head = f"Would update {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
-            'Would repair links; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to update (dry run: cached taps only).'
+        head = f"Would upgrade {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
+            'Would repair links; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to upgrade (dry run: cached taps only).'
     elif output['changed']:
-        head = f"Updated {plural(moved, 'skill')} in {touched}." if moved else 'Repaired managed links; no skill versions changed.'
+        head = f"Upgraded {plural(moved, 'skill')} in {touched}." if moved else 'Repaired managed links; no skill versions changed.'
         if output['transaction'] != 'committed':
             head += f" Transaction: {output['transaction']}."
     elif output['would_change']:
-        head = 'Update proposed; nothing applied.'
+        head = 'Upgrade proposed; nothing applied.'
     else:
-        head = f'Already up to date ({consumer_count(rows)}).' if rows else 'Nothing to update.'
+        head = f'Already up to date ({consumer_count(rows)}).' if rows else 'Nothing to upgrade.'
     lines = [head]
     width = max((len(clean(item.get('coordinate'))) for row in rows for item in row.get('changes') or []), default=0)
     for row in rows:
@@ -539,7 +539,7 @@ def render_consumer_update(data, output):
             label += f": {clean(row.get('status'))}" + (f" - {clean(error.get('message'))} ({clean(error.get('code'))})" if error else '')
         lines += ['', f'  {label}']
         if row.get('requires_fetch'):
-            lines.append("    not in the cache yet; run 'mask update' without --dry-run, --offline or --expect-plan-hash to fetch it")
+            lines.append("    not in the cache yet; run 'mask upgrade' without --dry-run, --offline or --expect-plan-hash to fetch it")
         lines.extend(f"    {clean(item.get('coordinate')).ljust(width)}  {clean((item.get('before_commit') or 'new')[:7])} -> {clean((item.get('after_commit') or 'removed')[:7])}"
                      for item in row.get('changes') or [])
     notes = fetch_lines(data)
@@ -554,12 +554,25 @@ def render_consumer_update(data, output):
     return lines + ([''] + notes if notes else []) + plan_guard(data, output)
 
 
-def render_update(data, output):
-    if output['command'] == 'update' and isinstance(data.get('consumers'), list):
-        return render_consumer_update(data, output)
+def render_refresh(data, output):
+    """update: what became available. The program first, then each tap, then the one next step if there is one."""
+    program = data.get('program') or {}
+    before, after = clean((program.get('program_before') or '-')[:7]), clean((program.get('program_after') or '-')[:7])
+    lines = [{'updated': f'MASK updated: {before} -> {after}. The new version runs from the next command.',
+              'behind': 'A newer MASK is available (dry run: not fetched or applied).',
+              'current': f"MASK is up to date ({before})." + (' Dry run: the remote was not contacted.' if output['dry_run'] else ''),
+              'held': f"MASK was not updated: {clean(program.get('reason'))}.",
+              'failed': f"MASK could not be updated: {clean(program.get('reason'))} ({clean(program.get('code'))})."}.get(program.get('status'), headline(output, 'update'))]
+    taps = fetch_lines(data)
+    lines.extend(taps or ["  No taps are approved yet; add one with 'mask tap add NAME URL'."])
+    if any(row.get('remote_refs_changed') for row in (data.get('fetches') or {}).values()):
+        lines.append("  Run 'mask upgrade' to move your projects and personal skills to the new versions.")
+    return lines
+
+
+def render_fetch(data, output):
     lines = [headline(output, output['command'].replace('.', ' '))]
-    lines.extend(fields(data, [('program before', 'program_before'), ('program after', 'program_after'),
-                               ('remote', 'remote_freshness'), ('fetch required', 'requires_fetch'), ('next invocation required', 'next_invocation_required'), ('network', 'network')]))
+    lines.extend(fields(data, [('network', 'network')]))
     if isinstance(data.get('scope'), str):
         lines.append(f"  scope: {clean(data['scope'])}")
     lines.extend(fetch_lines(data))
@@ -710,11 +723,10 @@ RENDERERS = {
     'integration.approve': render_integration, 'integration.revoke': render_integration, 'integration.inspect': render_integration,
     'integration.enable': render_integration, 'integration.disable': render_integration, 'launch': render_launch,
     'workspace.forget': render_forget, 'link.adopt': summary('link adopt', [('root', 'root'), ('scope', 'scope'), ('path', 'path'), ('link', 'link_text')]),
-    'source.fetch': render_update, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
+    'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
     'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources,
-    'lock': render_lock, 'update': render_update,
+    'lock': render_lock, 'update': render_refresh, 'upgrade': render_upgrade,
     'self.status': render_self_status, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
-    'self.update': render_update,
 }
 
 
@@ -821,7 +833,7 @@ def workflow_next_steps(data):
         else:
             selection = '--user' if entry.get('scope') == 'user' else '--project ' + shlex.quote(str(entry.get('root')))
             lines.append(f"  next: Resolve any missing inputs above, then run mask ensure {clean(selection)}")
-            lines.append('    Answer the setup question in a terminal if prompted; update never runs setup.')
+            lines.append('    Answer the setup question in a terminal if prompted; upgrade never runs setup.')
     return lines
 
 
@@ -867,9 +879,9 @@ EVERYDAY = [
     ('remove ID...', 'Remove selections and their managed links'),
     ('list', 'Show this project\'s selected skills and link status'),
     ('ensure', 'Reconcile this project; offer required setup'),
-    ('update', 'Fetch taps and update ALL registered projects and personal skills'),
+    ('update', 'Update MASK itself and fetch your taps; changes no project'),
+    ('upgrade', 'Move ALL registered projects and personal skills to the newest versions'),
     ('doctor --check', 'Check health without changing files'),
-    ('self update', 'Update the MASK program itself'),
 ]
 
 
@@ -887,13 +899,13 @@ def compact_help(version, groups):
     lines += ['', 'Choose where:',
               '  install / remove / list / ensure use the current project by default.',
               '  Add --project DIR for another project or --user for personal skills.',
-              '  Bare update fetches each referenced tap once and updates every registered consumer.',
-              '  update --project DIR, --user or --skill SOURCE/ID narrows what it updates.', '',
+              '  Bare upgrade fetches each referenced tap once and upgrades every registered consumer.',
+              '  upgrade --project DIR, --user or --skill SOURCE/ID narrows what it upgrades.', '',
               'Preview and diagnose:',
               '  mask ensure --dry-run            Preview this project without running setup',
               '  mask doctor --all --check        Check all registered scopes',
               '  mask inventory --all             List skills across registered scopes',
-              '  mask update --help               Understand update scope before fetching',
+              '  mask upgrade --help              Understand upgrade scope before fetching',
               '  mask doctor --migrate --dry-run  Preview converting a live-checkout machine to taps', '',
               'Options:', '  --dry-run   Preview changes without applying or fetching (mutating commands)',
               '  --yes       Accept ordinary confirmation; never authorizes package setup',
@@ -913,7 +925,8 @@ COMMAND_HELP = {
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
-    'update': ('Fetch approved taps and update pinned skills. With no scope options, update ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with update.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask update --dry-run              # preview from cached taps; never fetches\nmask update                        # fetch taps; update every registered consumer\nmask update --project .            # update only this project\nmask update --user                 # update only your personal skills\nmask update --skill agentskills/implement-rfc  # update one selection wherever declared\n\nTo review fresh content before applying it, run mask source fetch, then\nmask update --dry-run, then mask update --expect-plan-hash HASH.\nIf required setup is missing after update, run ensure for the named consumer.\nUse mask self update to update the MASK program.'),
+    'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update            # update MASK and fetch taps\nmask upgrade --dry-run # see what the fetched taps would change\nmask upgrade           # move every registered project and your personal skills'),
+    'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --expect-plan-hash HASH.\nIf required setup is missing after an upgrade, run ensure for the named consumer.\nUse mask update to update the MASK program.'),
     'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found, including while migration to taps is required. On a machine whose configuration predates taps, only capabilities, config show, doctor, recover and self commands run: doctor reports what migration would convert, and doctor --migrate converts the machine and its registered consumers in one recoverable transaction (--alias NAME names the new tap). On a tap machine, doctor --migrate --project PATH --alias NAME (or --user --alias NAME) converts one leftover v1 declaration to use the approved tap NAME.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate --expect-plan-hash HASH\nmask doctor --migrate --project /path/to/project --alias agentskills --dry-run'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
@@ -922,7 +935,6 @@ COMMAND_HELP = {
     'skill.list': ('List the skills in the fetched caches of your approved taps. A tap that is not fetched yet is named instead; run mask source fetch first.', 'mask skill list'),
     'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask skill show implement-rfc\nmask skill show implement-rfc --content'),
     'self.install': ('Create a MASK launcher in an existing bin directory.', 'mask self install --bin-dir /path/to/bin'),
-    'self.update': ('Update the MASK program checkout using its configured Git remote.', 'mask self update --dry-run\nmask self update'),
     'self.status': ('Show the MASK program, interpreter and installed launchers.', 'mask self status'),
     'project.init': ('Create a project skill declaration without installing skills. For the everyday install task, use mask install ID.', 'mask project init --project .'),
     'project.show': ('Show a project\'s declared skill selections and targets.', 'mask project show --project .'),
@@ -935,7 +947,7 @@ COMMAND_HELP = {
     'integration.inspect': ('Inspect project readiness authority and installed integrations.', 'mask integration inspect --project .'),
     'source.list': ('List approved taps.', 'mask source list'),
     'source.show': ('Show one approved tap: its binding, line-ending policy and cached revision.', 'mask source show NAME'),
-    'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run update to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
+    'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
     'config.show': ('Show the machine configuration and its approved taps, and whether the machine still needs migration to taps.', None),
@@ -957,7 +969,7 @@ COMMAND_HELP = {
     'source.dev-link': ('Switch a pinned skill to a local authoring checkout, or return it to pinned deployment.', None),
     'source.inspect': ('Inspect an approved tap, named by alias or repository URL, at a ref or path and list its packages without selecting them for deployment.', None),
     'source.publish': ('Inspect selected source changes; commit or push only when explicitly requested by the corresponding flags.', None),
-    'tap.add': ('Approve a Git repository as a named tap. Only the catalog is written and nothing is fetched; install, update or source fetch '
+    'tap.add': ('Approve a Git repository as a named tap. Only the catalog is written and nothing is fetched; install, update, upgrade or source fetch '
                 'later fetches the tap into a MASK-owned cache. On a machine without configuration this also creates the machine configuration '
                 'and state. --checkout binds an authoring checkout whose origin matches the tap; source publish, source dev-link and skill import '
                 'use it, install, update, list and ensure never read it, and it is never a link target. A tap keeps exact bytes: MASK never converts line endings '

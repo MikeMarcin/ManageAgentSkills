@@ -47,7 +47,7 @@ in the same command. Run it from the project or use `--project PATH`.
 Packages that declare native agent roles have them copied exactly with the links;
 roles you keep checked in are used as they are. When a declared role or consumer
 input is still missing, `install` keeps the links and exits 4 naming it, the same
-verdict `ensure`, `update`, `doctor --check` and `launch` share. `install` needs no confirmation. `ensure` asks before it changes anything in
+verdict `ensure`, `upgrade`, `doctor --check` and `launch` share. `install` needs no confirmation. `ensure` asks before it changes anything in
 an unapproved project (each invocation; `mask integration approve` in the
 [readiness guide](docs/guides/readiness-and-integrations.md) makes that automatic)
 and reports what is still missing: required consumer facts (for
@@ -93,20 +93,24 @@ persistent startup approval. Restart active agents to load changed roles.
 | Check or reconcile declared setup | `mask ensure` |
 | Repair every registered project and personal scope | `mask ensure --all --repair` |
 | Remove a selection here | `mask remove ID` |
-| Update every registered project and personal scope | `mask update` |
-| Update only this project | `mask update --project .` |
-| Update only personal skills | `mask update --user` |
-| Update MASK itself | `mask self update` |
+| Update MASK itself and fetch your taps | `mask update` |
+| Upgrade every registered project and personal scope | `mask upgrade` |
+| Upgrade only this project | `mask upgrade --project .` |
+| Upgrade only personal skills | `mask upgrade --user` |
 
-`mask update` fetches each tap your selections use once, resolves every registered
+The two commands mean what they mean in `brew` and `apt`. `mask update` refreshes what
+is available: it fast-forwards the MASK program clone and fetches every approved tap,
+and changes no project. `mask upgrade` moves your skills to it.
+
+`mask upgrade` fetches each tap your selections use once, resolves every registered
 project and your personal scope against the branch or tag each selection follows,
 shows each lock change and applies them together. `--project DIR` or `--user`
 limits it to one scope; `--all` names the default explicitly. A tap that cannot be
-fetched blocks only the scopes that use it: the others still update, and the
-command exits 4 (`update.incomplete`) naming the blocked roots. When a tag moved or
-a branch is no longer a fast-forward of the locked commit, update refuses until you
-review it and pass `--allow-ref-rebind`. `mask source fetch` fetches without
-deploying, and `mask self update` updates only the program clone. Run updates
+fetched blocks only the scopes that use it: the others still upgrade, and the
+command exits 4 (`upgrade.incomplete`) naming the blocked roots. When a tag moved or
+a branch is no longer a fast-forward of the locked commit, upgrade refuses until you
+review it and pass `--allow-ref-rebind`. `mask source fetch NAME` fetches one tap
+without deploying. Run upgrades
 between active tasks: a running agent may cache instructions, and a changed file
 does not prove a host reloaded it.
 
@@ -119,14 +123,14 @@ If setup is blocked by existing agent role files, repeating `ensure` cannot
 replace them. The error lists their project and paths; follow the
 [role-file recovery guide](docs/guides/recovery.md#when-ensure-preserves-existing-role-files)
 to restore a matching lock or review the files. `mask ensure --help` and
-`mask update --help` explain setup, scope, and examples.
+`mask upgrade --help` explain setup, scope, and examples.
 
 ## Reference
 
 - [Installation reference](docs/guides/installation.md): requirements, launcher, the first tap and Windows PowerShell.
 - [Declarations and file layout](docs/guides/declarations.md): explicit `project`/`user` commands, plan hashes, what belongs where.
 - [Readiness and integrations](docs/guides/readiness-and-integrations.md): approval, `launch`, Git/host startup adapters, inventory.
-- [Sources and updates](docs/guides/sources-and-updates.md): taps, fetching updates, package validation, imports, provenance, `self update`.
+- [Sources and updates](docs/guides/sources-and-updates.md): taps, fetching updates, package validation, imports, provenance, `update` and `upgrade`.
 - [Migrating from a live checkout](docs/guides/migration-and-pins.md): `doctor --migrate`, the old-command table, per-skill agents and local compatibility.
 - [Recovery](docs/guides/recovery.md): interrupted operations, unregistering and removing the program.
 - [Development](docs/guides/development.md), [CLI contract and exit codes](docs/architecture/cli-contract.md), [Contributing](CONTRIBUTING.md), [RFCs](docs/rfcs/README.md) and the [issue board](docs/issues/README.md).

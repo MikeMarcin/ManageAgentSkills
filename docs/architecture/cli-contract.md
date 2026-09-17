@@ -31,7 +31,7 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `remove` | `ID-or-SOURCE/ID ... [--project PATH \| --user]` | Declaration, lock, owned unchanged links, state | No |
 | `list` | `[--project PATH \| --user]` | None | No |
 | `inventory` | `[--project PATH \| --user \| --all] [--include-unmanaged] [--limit N] [--offset N]` | None | No |
-| `update` | `[--project PATH \| --user \| --all] [--skill SOURCE/ID ...] [--allow-ref-rebind] [--offline]` | Caches of the referenced taps; then the selected consumers' locks, store artifacts, links and state through one journal | Fetches each referenced tap once unless `--dry-run`, `--offline` or `--expect-plan-hash` |
+| `upgrade` | `[--project PATH \| --user \| --all] [--skill SOURCE/ID ...] [--allow-ref-rebind] [--offline]` | Caches of the referenced taps; then the selected consumers' locks, store artifacts, links and state through one journal | Fetches each referenced tap once unless `--dry-run`, `--offline` or `--expect-plan-hash` |
 | `lock` | `[--project PATH \| --user] [--refresh] [--skill SOURCE/ID ...] [--allow-ref-rebind]` | Lock file only; a changed lock of a registered consumer refuses `lock.active` | No |
 | `project init` | `[--project PATH]` | When `.mask.json` is missing: an empty v2 declaration, plus an empty `.mask.lock.json` if none exists | No |
 | `project show` | `[--project PATH]` | None | No |
@@ -72,15 +72,15 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `source dev-link` | `SOURCE/ID (--project PATH \| --user) (--authoring-root PATH \| --to-pinned)` | Scope-local development links into the approved authoring checkout, or their return to store links; state | No |
 | `self status` | none | None | No |
 | `self install` | `--bin-dir PATH` | Recognized launcher + ownership record | No |
-| `self update` | none | Program checkout only | Yes |
+| `update` | none | Program checkout (fast-forward through one journal), then the caches of every approved tap. No declaration, lock, link or consumer state | Yes, unless `--dry-run` |
 
-`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks the machine and every registered consumer of both scopes. `update` with no selector updates every registered consumer; `--project`, `--user`, `--all` and `--skill` narrow it (see [update](#explicit-migration-selected-updates-and-authoring-exceptions)). There is no separate source-update command: `source fetch` only fetches, and `update` fetches and applies.
+`plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks the machine and every registered consumer of both scopes. `upgrade` with no selector updates every registered consumer; `--project`, `--user`, `--all` and `--skill` narrow it (see [update](#explicit-migration-selected-updates-and-authoring-exceptions)). The vocabulary is that of `brew` and `apt`: `update` makes new versions available (the program and every tap) and changes no consumer, `upgrade` fetches what its consumers reference and applies, and `source fetch` fetches taps only.
 
 A configuration default change does not relink anything until an explicit apply. No command silently relocates ownership to another tap; binding a different repository, ref, package path, authoring checkout or line-ending policy under an existing alias refuses `source.alias_conflict`. `project init`, `user init` and inspection can run before a machine configuration exists where they do not need a catalog or registry. Other commands refuse `config.missing` (exit 3), whose remediation is `mask tap add NAME URL`.
 
 ### Migration gate and retired commands
 
-On a machine whose `config.json` has `schema_version` 1 or 2, the retired live-checkout configurations, every command except `capabilities`, `config show`, `doctor` (including `--migrate`), `recover` and `self status|install|update` refuses before any effect with `migration.required` (exit 4) and `details.remediation` `["mask", "doctor", "--migrate", "--dry-run"]`. A missing or unreadable configuration is not gated; the command that reads it reports it. The gate also covers `project unregister --keep-links` and `workspace forget`, so a consumer that doctor migration cannot convert is restored on disk before migrating ([doctor migration](#explicit-migration-selected-updates-and-authoring-exceptions)).
+On a machine whose `config.json` has `schema_version` 1 or 2, the retired live-checkout configurations, every command except `capabilities`, `config show`, `doctor` (including `--migrate`), `recover`, `update` (which then skips the taps) and `self status|install` refuses before any effect with `migration.required` (exit 4) and `details.remediation` `["mask", "doctor", "--migrate", "--dry-run"]`. A missing or unreadable configuration is not gated; the command that reads it reports it. The gate also covers `project unregister --keep-links` and `workspace forget`, so a consumer that doctor migration cannot convert is restored on disk before migrating ([doctor migration](#explicit-migration-selected-updates-and-authoring-exceptions)).
 
 On a tap machine, a v1 declaration and a registered record without a deployment mode refuse ordinary consumer commands with the same code and remediation. That remediation argv alone is `invocation.invalid` (exit 2) on a tap machine; add `--project PATH --alias NAME` or `--user --alias NAME`.
 
@@ -150,7 +150,7 @@ suspended process and returns `git.containment_unavailable`; there is no
 uncontained fallback. Job termination includes helpers after their parent exits.
 POSIX uses a separate process group. Output-reader failures refuse incomplete
 observations through the same cleanup path.
-Which fetches `update`, `source fetch` and a live `install` perform is described under [update](#explicit-migration-selected-updates-and-authoring-exceptions) and [Task commands](#task-commands-rfc-mask-0018-mask-0086).
+Which fetches `upgrade`, `source fetch` and a live `install` perform is described under [update](#explicit-migration-selected-updates-and-authoring-exceptions) and [Task commands](#task-commands-rfc-mask-0018-mask-0086).
 
 ### Curated copy imports and provenance
 
@@ -239,7 +239,7 @@ Every normal machine-mode response includes:
 
 `data` contains command-specific results, including resolved consumer root and declaration, registration state, lock changes, fetch and preparation effects, expected/actual links and plan hash as applicable. Actions have stable kinds and statuses. No fabricated revision is emitted for an unborn repository; use null plus an explicit condition.
 
-`changed` reports actual remaining changes to managed configuration, registry, declarations and locks, links, store artifacts, launchers, authoring commits and refs created by `source publish`, or the program checkout. Fetch transfers are reported in `data.fetch_effects` (`source fetch NAME`) or per tap in `data.fetches` (`update`, `source fetch` without a name); named-source cache creation is reported in `data.cache_effects`. These fetch effects do not set `changed` and do not imply skill activation. Store artifacts and exact acquisitions retained by preparation are reported in `data.preparation` and do set `changed`; `data.retained_preparation` summarizes them as `artifacts` (created store payload paths), `directories` (retained created store directories) and `acquisitions` (`cache` and `commit`), apart from the consumer `transaction`. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
+`changed` reports actual remaining changes to managed configuration, registry, declarations and locks, links, store artifacts, launchers, authoring commits and refs created by `source publish`, or the program checkout. Fetch transfers are reported in `data.fetch_effects` (`source fetch NAME`) or per tap in `data.fetches` (`upgrade`, `source fetch` without a name); named-source cache creation is reported in `data.cache_effects`. These fetch effects do not set `changed` and do not imply skill activation. Store artifacts and exact acquisitions retained by preparation are reported in `data.preparation` and do set `changed`; `data.retained_preparation` summarizes them as `artifacts` (created store payload paths), `directories` (retained created store directories) and `acquisitions` (`cache` and `commit`), apart from the consumer `transaction`. `would_change` is the preflight proposal. A dry run has `changed=false`, `transaction=not_started` (or `not_needed` when empty), even when actions are proposed.
 
 `transaction` values:
 
@@ -249,7 +249,7 @@ Every normal machine-mode response includes:
 - `rolled_back`: core planned effects were restored; any retained empty created directories are separately reported and keep `changed=true`.
 - `partial`: some persistent effects remain or source/operation state is indeterminate; nonzero exit and recovery guidance are mandatory.
 
-An operation cannot set `ok=true` with `partial`. `transaction` describes the consumer transaction, not MASK-owned preparation. A refusal before any consumer effect, after preparation created store artifacts or cache objects, reports `transaction: not_started` with `changed: true` and lists the retained effects in `data.retained_preparation`. Examples are `plan.stale` found under the writer lock, a collision, or withheld readiness consent (`confirmation.required` or `confirmation.declined`) after `install`, `remove`, `update`, `apply`, `ensure` or `doctor --migrate` prepared new payloads. No declaration, lock, link, registration, policy or project byte changed, no journal is pending and nothing needs recovery. A refusal after consumer effects keeps its `committed`, `rolled_back` or `partial` status. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
+An operation cannot set `ok=true` with `partial`. `transaction` describes the consumer transaction, not MASK-owned preparation. A refusal before any consumer effect, after preparation created store artifacts or cache objects, reports `transaction: not_started` with `changed: true` and lists the retained effects in `data.retained_preparation`. Examples are `plan.stale` found under the writer lock, a collision, or withheld readiness consent (`confirmation.required` or `confirmation.declined`) after `install`, `remove`, `upgrade`, `apply`, `ensure` or `doctor --migrate` prepared new payloads. No declaration, lock, link, registration, policy or project byte changed, no journal is pending and nothing needs recovery. A refusal after consumer effects keeps its `committed`, `rolled_back` or `partial` status. `ok=true` for observational `plan` means the plan was computed, **not** that it is applicable: `data.applicable=false` and `data.blockers` can describe safe-to-read precondition failures. `doctor` without `--check` likewise reports diagnostic health in data; `--check` converts actionable failures/drift into a nonzero result. Malformed input/state that prevents inspection is an ordinary command error.
 
 Exactly one JSON document is guaranteed for errors MASK handles after Python starts, including parser errors, ordinary exceptions, timeout and caught interruption. SIGKILL, interpreter startup failure, disk-full stdout, a terminated host or power loss can prevent any response; recovery is on disk. Do not promise impossible output guarantees.
 
@@ -280,7 +280,7 @@ Remediation may include a validated argv example for an observational command; d
 | 10 | Internal invariant failure |
 | 130 | Caught user interruption; persistent effects still determine transaction/recovery data |
 
-Initial error families: `invocation.invalid`; `config.*`; `manifest.missing/invalid/unsupported_version`; `project.not_found/not_registered/unavailable/identity_changed`; `skill.unknown/invalid/metadata_unsupported/path_escape`; `target.collision/unmanaged_link/drift/parent_link/symlink_unsupported`; `source.missing/dirty/detached/remote_unknown/identity_mismatch/candidate_invalid`; `state.invalid/drift`; `plan.stale`; `recovery.required/conflict`; `lock.busy`; `git.failed/timeout/auth_required`; `filesystem.failed`; `internal.invariant`. The tap model adds `migration.required/unborn/declaration_unsupported`, `source.unresolved/alias_conflict/referenced`, `update.incomplete` and `selection.command_unsupported`.
+Initial error families: `invocation.invalid`; `config.*`; `manifest.missing/invalid/unsupported_version`; `project.not_found/not_registered/unavailable/identity_changed`; `skill.unknown/invalid/metadata_unsupported/path_escape`; `target.collision/unmanaged_link/drift/parent_link/symlink_unsupported`; `source.missing/dirty/detached/remote_unknown/identity_mismatch/candidate_invalid`; `state.invalid/drift`; `plan.stale`; `recovery.required/conflict`; `lock.busy`; `git.failed/timeout/auth_required`; `filesystem.failed`; `internal.invariant`. The tap model adds `migration.required/unborn/declaration_unsupported`, `source.unresolved/alias_conflict/referenced`, `upgrade.incomplete` and `selection.command_unsupported`.
 
 Error strings are stable once shipped. Additive output fields require consumers to ignore unknown fields; persisted configuration rejects unknown fields to catch typos. A major protocol/schema change is explicit, not a silent migration. Supply JSON Schemas as documentation and validate equivalently in the stdlib runtime; no schema library is required to execute MASK.
 
@@ -308,8 +308,8 @@ mask install implement-rfc --project /work/example-project --json
 mask list --project /work/example-project --json
 
 mask source fetch --json
-mask update --dry-run --json
-mask update --expect-plan-hash <returned-hash> --json
+mask upgrade --dry-run --json
+mask upgrade --expect-plan-hash <returned-hash> --json
 
 mask doctor --migrate --dry-run --json
 mask doctor --migrate --expect-plan-hash <returned-hash> --json
@@ -342,7 +342,7 @@ scopes. Without selectors, plan/apply retain project discovery, while doctor
 inspects every consumer. `project list` remains project-only; `user show` reports
 personal scope. Plans retain `data.projects` and add `data.users`, each with
 explicit scope, root, and manifest location. Adoption accepts exactly one
-explicit scope selector. An unscoped `update` selects every registered consumer
+explicit scope selector. An unscoped `upgrade` selects every registered consumer
 of both scopes.
 
 State v2 preserves `projects` and `launchers` and adds a nullable `user` record
@@ -774,7 +774,7 @@ plan. MASK never resets, stashes, deletes, pushes or edits the checkout.
 Migration never upgrades the executable; install the reviewed program first (for
 example `python3 /reviewed/ManageAgentSkills/mask.py self install --bin-dir PATH --json`,
 which the migration gate allows) and keep its direct entrypoint available for
-recovery. The first `update` afterwards fetches the tap's remote.
+recovery. The first `upgrade` afterwards fetches the tap's remote.
 
 Refusals are typed. Blockers found by the report refuse with the first blocker's code and list every blocker in `details.blockers`; the other refusals are raised directly:
 
@@ -812,7 +812,7 @@ or converts the consumer and links it from the store. The configuration is
 unchanged and no checkout is read. Any other form is `invocation.invalid`; a scope
 with nothing to convert is a no-op.
 
-**Update.** `update [--project PATH | --user | --all] [--skill SOURCE/ID ...]
+**Update.** `upgrade [--project PATH | --user | --all] [--skill SOURCE/ID ...]
 [--allow-ref-rebind] [--offline] [--dry-run] [--expect-plan-hash HASH]` fetches
 and applies the selected consumers' updates end to end:
 
@@ -822,18 +822,18 @@ and applies the selected consumers' updates end to end:
 4. Every remaining consumer is resolved from the cache. A moved tag or a branch not proven fast-forward (`lock.ref_rebound`) refuses the whole invocation (4) unless `--allow-ref-rebind`. In a run that did not fetch, `lock.resolution_required` marks the consumer `blocked` with `requires_fetch: true`. Every other resolution error, and `lock.resolution_required` after a fetch, refuses the whole invocation (4) before any plan or journal; the fetch effects stay disclosed and the fetched objects stay in the caches.
 5. `data.consumers[]` rows carry `root`, `scope`, `status` (`updated`, `unchanged`, `blocked` or `skipped`), `changes` (`coordinate`, `before_commit`, `after_commit`, `before_digest`, `after_digest`, `selector`) and `error`, followed by the ordinary public plan. The plan hash also binds which roots were blocked or skipped, but not the fetch effects, so a dry run and a guarded rerun agree; a guarded rerun never fetches.
 6. Apply prepares store artifacts offline, retakes the writer lock and rechecks the consumer snapshot (`plan.stale`, 4, reported `not_started` with `data.retained_preparation` when preparation created artifacts). It then activates one journal with `operation: update` and reports the shared readiness final status.
-7. When any consumer was blocked, the others are applied or no-oped and the command ends `update.incomplete` (4), naming the blocked roots in `details.blocked`; its `transaction` reflects what was applied to the other consumers (`committed` when any changed), and its details add the workflow verdict when declared roles are also incomplete.
+7. When any consumer was blocked, the others are applied or no-oped and the command ends `upgrade.incomplete` (4), naming the blocked roots in `details.blocked`; its `transaction` reflects what was applied to the other consumers (`committed` when any changed), and its details add the workflow verdict when declared roles are also incomplete.
 
 **Fetching without deploying.** `source fetch` without a name fetches each approved
 tap's configured ref once and deploys nothing; `data.fetches` has the same rows as
-`update`. A failed tap does not stop the others, and the command then refuses with
+`upgrade`. A failed tap does not stop the others, and the command then refuses with
 the first failure's code and `details.failed`. `--dry-run` fetches nothing. It does
 not acquire objects that consumers' declared selectors name. A later
-`update --dry-run` review of a consumer whose declared tag or branch names an object
+`upgrade --dry-run` review of a consumer whose declared tag or branch names an object
 that the configured ref did not bring into the cache, such as an annotated tag
 object or a commit that is only on another branch, reports that consumer `blocked`
 with `requires_fetch: true` until `source inspect NAME --ref REF` acquires the
-object; a lightweight tag at a fetched commit resolves. A plain `update` acquires those objects in its own fetch. `source fetch NAME`
+object; a lightweight tag at a fetched commit resolves. A plain `upgrade` acquires those objects in its own fetch. `source fetch NAME`
 fetches only that tap's configured ref, and `source fetch --locked` is described
 under [Exact artifact preparation](#exact-artifact-preparation).
 
@@ -843,7 +843,7 @@ live-checkout program (`b92372f`) cannot read a v3 configuration
 (`config.invalid`, exit 3) and refuses a `doctor.migrate` journal left before the
 configuration was rewritten (`recovery.conflict`). A previous tap-era program
 refuses a tap entry that carries `line_endings` (`source.invalid`, exit 3), so it
-does not recover a pending `update` journal either.
+does not recover a pending `upgrade` journal either.
 
 `source dev-link SOURCE/ID (--project PATH | --user) --authoring-root PATH`
 creates a scope-local live exception to an existing pinned selection. It is the only
@@ -853,7 +853,7 @@ passive validation. State records `mode: dev-link`, exact root identity/path and
 per-link overrides; the retained selection/lock still identifies the pinned
 return destination. Dev-link is explicitly unpinned, not fleet eligible, and has
 no automatic writeback. Ordinary `apply` and `ensure` refuse an active override;
-`update` skips it without a scope and refuses it with `--project` or `--user`.
+`upgrade` skips it without a scope and refuses it with `--project` or `--user`.
 Use the same command with `--to-pinned` to preview and perform a guarded return.
 Its typed development journal binds both old/new roots and the currently observed
 package bytes; source changes during recovery refuse without overwriting edits.

@@ -341,7 +341,7 @@ def selected_consumers(args, state, home):
         record = state.get('user')
         root = Path(record['root']) if record else Path(getattr(args, 'user_home', Path.home())).expanduser().resolve()
         return [(root, 'user')]
-    if getattr(args, 'all', False) or command in ('update', 'inventory', 'skill.where-used') or command == 'doctor' and not getattr(args, 'project', None):
+    if getattr(args, 'all', False) or command in ('upgrade', 'inventory', 'skill.where-used') or command == 'doctor' and not getattr(args, 'project', None):
         return [(Path(root), c.consumer_scope(state, root)) for root in c.consumer_records(state)]
     requested = getattr(args, 'project', getattr(args, 'path', None))
     result = []
@@ -390,7 +390,7 @@ def prepare_dispatch(args, output, home):
     records = c.consumer_records(state)
     for root, scope in consumers:
         if str(root) in records:
-            # A moved or replaced registered root refuses typed, as plan, doctor and update do, before it is observed.
+            # A moved or replaced registered root refuses typed, as plan, doctor and upgrade do, before it is observed.
             c.registered_root(root, records[str(root)], scope)
     before = snapshot(home, consumers)
     config = c.config(c.parse_json(before['controls']['config.json']))
@@ -490,9 +490,9 @@ def merge_preparation(output, *, completed):
 
 
 def validate_live_lock(value, declaration, pending):
-    """Only explicit update can repair a stale, separately approved disk lock."""
+    """Only explicit upgrade can repair a stale, separately approved disk lock."""
     import mask_sources as sources
-    if pending['operation'] != 'update':
+    if pending['operation'] != 'upgrade':
         return r.lock(value, declaration)
     locked = r.lock(value)
     for row in locked['packages']:

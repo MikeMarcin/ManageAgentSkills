@@ -97,10 +97,11 @@ COMMANDS = {
     'tap.add': (True, False, [('name', 'pos'), ('url', 'pos'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag')]),
     'tap.remove': (True, False, [('name', 'pos')]),
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
-    'update': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
+    # brew/apt vocabulary: update refreshes what is available (this program and the taps); upgrade moves consumers to it.
+    'update': (True, True, []),
+    'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
-    'self.update': (True, True, []),
 }
 for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'set-agents', 'register', 'unregister'):
     mutates, network, arguments = COMMANDS['project.' + action]
@@ -108,7 +109,7 @@ for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'se
     if action == 'register':
         user_arguments.append(('user-home', 'value'))
     COMMANDS['user.' + action] = (mutates, network, user_arguments)
-GUARDED = {'apply', 'link.adopt', 'update', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
+GUARDED = {'apply', 'link.adopt', 'upgrade', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'project.register', 'project.unregister'}
 GUARDED.update(name.replace('project.', 'user.') for name in tuple(GUARDED) if name.startswith('project.'))
 GUARDED.update({'integration.approve', 'integration.revoke'})
 GUARDED.update({'integration.enable', 'integration.disable'})
@@ -198,7 +199,7 @@ def capabilities(leaves):
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                 readable_versions=dict(project=[1, 2], user=[1, 2], lock=[1], machine=[1, 2, 3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 deployment_model='taps', migration='doctor', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
-                workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'update', 'doctor', 'launch'], host_load='not_verified'))
+                workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {
@@ -214,7 +215,7 @@ CONFLICTS = {
 }
 for action in ('set', 'set-targets'):
     CONFLICTS['user.' + action] = CONFLICTS['project.' + action]
-for command in ('plan', 'apply', 'doctor', 'inventory', 'update', 'ensure'):
+for command in ('plan', 'apply', 'doctor', 'inventory', 'upgrade', 'ensure'):
     CONFLICTS[command] = {key: [other for other in ('project', 'user', 'all') if other != key] for key in ('project', 'user', 'all')}
 CONFLICTS['doctor'].update(check=['migrate'], migrate=['check'])
 CONFLICTS['link.adopt'] = {'project': ['user'], 'user': ['project']}
@@ -283,8 +284,8 @@ MIGRATION_EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover'}
 
 def migration_gate(command, home):
     """Refuse every other command on a v1/v2 machine before any effect; a missing configuration is not gated."""
-    if command in MIGRATION_EXEMPT or command.startswith('self.'):
-        return
+    if command in MIGRATION_EXEMPT or command.startswith('self.') or command == 'update':
+        return  # update still advances the program on a v1/v2 machine; it skips the taps such a machine does not have.
     try:
         value = core.read_json(home / 'config.json', default={})
     except MaskError:
@@ -544,6 +545,9 @@ def local_dispatch(args, output, leaves):
         return
     if command.startswith('self.'):
         return install_ops.dispatch(args, output, home, PROGRAM_ROOT)
+    if command == 'update':
+        import mask_update
+        return mask_update.refresh(args, output, home, PROGRAM_ROOT)
     if command == 'recover':
         mode = 'inspect' if getattr(args, 'inspect', False) else 'complete' if getattr(args, 'complete', False) else 'rollback'
         pending = core.read_json(home / 'pending.json', 'recovery', default={})
@@ -642,7 +646,7 @@ def dispatch_impl(args, output, leaves):
     import mask_task
     if mask_selection.dispatch(args, output, home) or mask_task.dispatch(args, output, home):
         return
-    if args.command == 'update':
+    if args.command == 'upgrade':
         import mask_update
         return mask_update.dispatch(args, output, home)
     if args.command == 'source.dev-link':

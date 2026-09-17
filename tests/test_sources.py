@@ -88,12 +88,12 @@ class SourcesTests(Fixture):
             self.assertNotIn('fetch', names, args)
             return result
 
-        for args in (('source', 'fetch'), ('source', 'fetch', TAP), ('update', '--project', self.project)):
+        for args in (('source', 'fetch'), ('source', 'fetch', TAP), ('upgrade', '--project', self.project)):
             self.assertEqual(rewritten(*args)['error']['code'], 'source.identity_mismatch', args)
         # The unscoped update isolates the refused tap: both consumers on it are blocked by the same refusal and nothing applies.
-        result = rewritten('update')
+        result = rewritten('upgrade')
         self.assertEqual((result['error']['code'], sorted(result['error']['details']['blocked']), result['changed']),
-                         ('update.incomplete', sorted([str(self.personal), str(self.project)]), False))
+                         ('upgrade.incomplete', sorted([str(self.personal), str(self.project)]), False))
         self.assertEqual({row['status']: row['error']['code'] for row in result['data']['consumers']}, {'blocked': 'source.identity_mismatch'})
         self.assertEqual(result['data']['fetches'][TAP]['error']['code'], 'source.identity_mismatch')
         self.assertEqual(before, self.snapshot())
@@ -164,7 +164,7 @@ mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.project), str(self.home)], capture_output=True, env=self.environment())
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
-        for args in (('install', TAP + '/beta'), ('update',), ('source', 'fetch', TAP)):
+        for args in (('install', TAP + '/beta'), ('upgrade',), ('source', 'fetch', TAP)):
             self.assertEqual(self.call(*args, code=8)['error']['code'], 'recovery.required', args)
         self.call('recover', '--complete')
         self.assertEqual(config, (self.home / 'config.json').read_bytes())

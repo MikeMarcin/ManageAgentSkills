@@ -12,7 +12,7 @@ from tests.legacy_support import ENTRY, LegacyFixture, git, snapshot, write_json
 from tests.support import TAP
 
 REMEDIATION = ['mask', 'doctor', '--migrate', '--dry-run']
-EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover', 'self.status', 'self.install', 'self.update'}
+EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover', 'self.status', 'self.install', 'update'}
 RETIRED = {'source.status', 'source.migrate', 'migrate'}
 # Values for required operands. The gate refuses before any operand is interpreted, so they only need to parse.
 VALUES = {'id': 'agentskills/alpha', 'ids': 'alpha', 'name': 'agentskills', 'url': 'file:///nowhere.git', 'path': '{project}',
@@ -87,8 +87,8 @@ class MigrationGate(LegacyFixture):
         self.assertIsNone(self.machine('recover', '--inspect')['data']['pending'])
         self.assertEqual(self.machine('self', 'status')['data']['program_root'], str(ENTRY.parent))
         self.assertTrue(self.machine('self', 'install', '--bin-dir', places['bin'], '--dry-run')['would_change'])
-        # self update inspects this program's own checkout read-only; a dirty or detached checkout is a typed refusal, never the gate.
-        code, updated = self.raw('self', 'update', '--dry-run')
+        # update inspects this program's own checkout read-only; a dirty or detached checkout is a typed refusal, never the gate.
+        code, updated = self.raw('update', '--dry-run')
         self.assertIn(code, (0, 4), updated)
         self.assertNotEqual((updated['error'] or {}).get('code'), 'migration.required')
         self.assertEqual(snapshot(roots.base, roots.base), before)
@@ -113,9 +113,9 @@ class MigrationGate(LegacyFixture):
         journals = (
             ('migration', dict(common, schema_version=3, operation='migrate', files=[], migration=dict(config_before=config_text, config_after=config_text, source={}))),
             # Only doctor.migrate may record a migration or the machine configuration; on any other operation both stay retired.
-            ('migration', dict(common, schema_version=3, operation='update', files=[], migration=migration)),
+            ('migration', dict(common, schema_version=3, operation='upgrade', files=[], migration=migration)),
             ('migration', dict(common, schema_version=3, operation='apply', files=[dict(root=str(roots.home), role='machine_config', before=config_text, after=config_text)])),
-            ('shared_checkout_update', dict(common, operation='update', git=shared)),
+            ('shared_checkout_update', dict(common, operation='upgrade', git=shared)),
             ('shared_checkout_update', dict(common, schema_version=3, operation='doctor.migrate', files=[], migration=migration, git=shared)),
             ('legacy_ownership', dict(common, operation='apply')),
             # A plain journal replaying a live-checkout link text is legacy ownership, never a replay.
@@ -148,7 +148,7 @@ class LegacyConsumerRemediation(LegacyFixture):
         for name in ('.mask.json', '.mask.lock.json'):
             (roots.project / name).write_bytes((tapped / name).read_bytes())
         before = snapshot(roots.base, roots.base)
-        for args in (('update',), ('apply', '--project', roots.project),
+        for args in (('upgrade',), ('apply', '--project', roots.project),
                      ('source', 'dev-link', TAP + '/alpha', '--project', roots.project, '--to-pinned')):
             with self.subTest(args=args):
                 error = self.machine(*args, code=4)['error']

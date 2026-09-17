@@ -133,7 +133,7 @@ class LiveCheckoutBaseline(LegacyFixture):
 
     def test_registered_clone_links_are_refused_not_reconciled(self):
         roots = self.legacy_machine(1)
-        for args in (('apply', '--all'), ('ensure', '--project', roots.project), ('update',), ('update', '--user'),
+        for args in (('apply', '--all'), ('ensure', '--project', roots.project), ('upgrade',), ('upgrade', '--user'),
                      ('link', 'adopt', '--project', roots.project, '--skill', 'alpha', '--target', 'codex', '--expect-source', roots.clone / 'skills/alpha')):
             self.assert_refused(*args, code=4, error='migration.required')
 
@@ -153,6 +153,6 @@ class LiveCheckoutBaseline(LegacyFixture):
     def test_pin_migration_and_cache_updates_are_retired_on_a_v2_machine(self):
         roots = self.legacy_machine(2)
         self.assert_refused('migrate', '--to-pinned', '--project', roots.project, code=2, error='invocation.invalid')
-        for args in (('source', 'fetch', 'legacy'), ('update', '--project', roots.project), ('lock', '--project', roots.project)):
+        for args in (('source', 'fetch', 'legacy'), ('upgrade', '--project', roots.project), ('lock', '--project', roots.project)):
             self.assert_refused(*args, code=4, error='migration.required')
         self.assertEqual(c.kind(roots.home / 'sources'), 'missing')

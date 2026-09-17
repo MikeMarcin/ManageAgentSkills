@@ -129,7 +129,7 @@ class SetupFixture(PublicFixture):
         """Publish the package edit and adopt it: fetch the tap, then the pinned update of the consumer (it never runs setup)."""
         self.publish(message)
         self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
-        return self.machine('update', '--project', self.project)
+        return self.machine('upgrade', '--project', self.project)
 
     def launches(self):
         return len(self.sentinel.read_text(encoding='utf-8').splitlines()) if self.sentinel.exists() else 0

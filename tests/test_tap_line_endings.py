@@ -233,7 +233,7 @@ class EntryWrittenBeforeThePolicy(LineEndingFixture):
         (self.source / SKILL).write_bytes((self.source / SKILL).read_bytes() + b'\nA later LF revision.\n')
         head = self.publish('later revision')
         self.call('source', 'fetch', TAP)
-        self.assertTrue(self.call('update', '--project', self.project)['changed'])
+        self.assertTrue(self.call('upgrade', '--project', self.project)['changed'])
         self.assertEqual(json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'], head)
         unchanged = self.mask_publish()
         self.assertEqual((unchanged['would_change'], unchanged['data']['line_endings']), (False, 'exact'))

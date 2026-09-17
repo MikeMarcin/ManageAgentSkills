@@ -16,7 +16,7 @@ described below.
 manages. Permission to run setup does not grant permission to replace other
 files. If existing role files have no matching verification record, setup is
 blocked before prompting or running the generator. Repeating `ensure`, using
-`--yes`, or running `update` cannot clear that conflict.
+`--yes`, or running `upgrade` cannot clear that conflict.
 
 The error groups files under their project or personal root. Paths below that
 root, such as `.codex/agents/rfc-integrator.toml`, identify the files to inspect.

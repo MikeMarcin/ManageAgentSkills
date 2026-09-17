@@ -31,7 +31,7 @@ def status(root, remote='origin', branch='main', timeout=30):
 
 
 def checkout_preconditions(root, remote, branch, expected_name=None, timeout=30, *, clean=True):
-    """A checkout on its branch with a known remote; ``expected_name`` is the remote repository basename (``self update``)."""
+    """A checkout on its branch with a known remote; ``expected_name`` is the remote repository basename (``update``)."""
     observed = status(root, remote, branch, timeout)
     if observed['branch'] is None:
         c.fail('source.detached', 'Checkout is detached.', 4)
@@ -101,7 +101,7 @@ def tree(root, revision, path='', recursive=False, *, max_output=16 * 1024 * 102
 
 
 def validate_git_intent(entry, program_root):
-    """Only ``self update`` advances a checkout through a journal, and only this program's own root."""
+    """Only ``update`` advances a checkout through a journal, and only this program's own root."""
     c.fields(entry, ('scope', 'root', 'before', 'candidate'), family='recovery')
     if entry['scope'] != 'program' or entry['root'] != str(program_root) or any(not isinstance(entry[key], str) or not re.fullmatch('[0-9a-f]{40,64}', entry[key]) for key in ('before', 'candidate')):
         c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
@@ -125,7 +125,7 @@ def advance(root, candidate, pending, home, output, timeout):
 
 
 def recover_git(pending, home, output, mode):
-    """Recover a ``self update`` program fast-forward: roll back only an unadvanced checkout, or complete the reviewed candidate."""
+    """Recover an ``update`` program fast-forward: roll back only an unadvanced checkout, or complete the reviewed candidate."""
     entry = pending['git']
     root = Path(entry['root'])
     timeout = (pending['config'] or {}).get('git_timeout_seconds', 30)

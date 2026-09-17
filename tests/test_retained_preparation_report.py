@@ -189,7 +189,7 @@ class ConcurrentWriterDuringPreparation(ColdStore):
         (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Fixture skill\n---\n\nChanged upstream.\n', encoding='utf-8', newline='\n')
         self.publish('alpha changed upstream')
         before = self.consumer_bytes()
-        code, refused = self.dispatch('update', '--project', self.project)
+        code, refused = self.dispatch('upgrade', '--project', self.project)
         self.assertEqual(code, 4)
         change = refused['data']['consumers'][0]['changes'][0]
         self.assertTrue(refused['data']['fetches'][TAP]['ok'])

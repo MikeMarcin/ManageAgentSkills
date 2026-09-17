@@ -30,13 +30,13 @@ class UpdateTests(Fixture):
         self.publish('next')
         self.call('source', 'fetch', TAP)
         snapshot = self.snapshot()
-        preview = self.call('update', '--project', self.project, '--skill', ALPHA, '--dry-run')
+        preview = self.call('upgrade', '--project', self.project, '--skill', ALPHA, '--dry-run')
         self.assertEqual(snapshot, self.snapshot())
-        self.call('update', '--project', self.project, '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
+        self.call('upgrade', '--project', self.project, '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertEqual(c.read_json(self.home / 'state.json')['projects'][str(other)], before)
         self.assertEqual(os.readlink(other / '.agents/skills/alpha'), old)
         self.assertNotEqual(os.readlink(self.project / '.agents/skills/alpha'), old)
-        self.assertFalse(self.call('update', '--project', self.project)['changed'])
+        self.assertFalse(self.call('upgrade', '--project', self.project)['changed'])
 
     def test_all_selected_skill_preserves_disjoint_consumer(self):
         self.call('source', 'fetch', TAP)
@@ -58,11 +58,11 @@ class UpdateTests(Fixture):
         before = self.snapshot()
         for skills in ([TAP + '/absent'], [ALPHA, ALPHA]):
             arguments = [operand for skill in skills for operand in ('--skill', skill)]
-            self.call('update', '--all', *arguments, code=2)
+            self.call('upgrade', '--all', *arguments, code=2)
             self.assertEqual(before, self.snapshot())
-        preview = self.call('update', '--all', '--skill', ALPHA, '--dry-run')
+        preview = self.call('upgrade', '--all', '--skill', ALPHA, '--dry-run')
         self.assertEqual(before, self.snapshot())
-        self.call('update', '--all', '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
+        self.call('upgrade', '--all', '--skill', ALPHA, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertNotEqual(os.readlink(self.project / '.agents/skills/alpha'), alpha_link)
         self.assertEqual(c.read_json(self.home / 'state.json')['projects'][str(other)], record)
         self.assertEqual((other / '.mask.lock.json').read_bytes(), lock_bytes)
@@ -85,7 +85,7 @@ class UpdateTests(Fixture):
         self.assertFalse(self.call('inventory')['data']['consumers'][0]['reproducible'])
         self.assertEqual(self.call('apply', code=4)['error']['code'], 'dev_link.active')
         self.call('source', 'fetch', TAP)
-        self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'dev_link.active')
+        self.assertEqual(self.call('upgrade', '--project', self.project, code=4)['error']['code'], 'dev_link.active')
         (self.source / 'skills/alpha/local').write_text('later edit')
         self.call('source', 'dev-link', ALPHA, '--project', self.project, '--to-pinned')
         self.assertEqual(os.readlink(self.project / '.agents/skills/alpha'), old)
@@ -134,19 +134,19 @@ class UpdateTests(Fixture):
         declaration = c.read_json(self.project / '.mask.json')
         declaration['skills'][0]['version'] = {'ref': 'refs/tags/release'}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
-        self.call('update', '--project', self.project)
+        self.call('upgrade', '--project', self.project)
         (self.source / 'skills/alpha/new').write_text('new')
         self.publish('tag moved')
         self.git(self.source, 'tag', '-f', 'release')
         self.git(self.source, 'push', '-q', '--force', str(self.upstream), 'refs/tags/release')
         self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
-        self.assertEqual(self.call('update', '--project', self.project, code=4)['error']['code'], 'lock.ref_rebound')
-        self.call('update', '--project', self.project, '--allow-ref-rebind')
+        self.assertEqual(self.call('upgrade', '--project', self.project, code=4)['error']['code'], 'lock.ref_rebound')
+        self.call('upgrade', '--project', self.project, '--allow-ref-rebind')
         declaration['skills'][0]['version'] = {'commit': original}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
-        self.call('update', '--project', self.project)
+        self.call('upgrade', '--project', self.project)
         self.assertEqual(c.read_json(self.project / '.mask.lock.json')['packages'][0]['commit'], original)
-        self.assertFalse(self.call('update', '--project', self.project)['changed'])
+        self.assertFalse(self.call('upgrade', '--project', self.project)['changed'])
 
 
 class RecoveryUpdateTests(UpdateTests):
@@ -171,7 +171,7 @@ class RecoveryUpdateTests(UpdateTests):
         declaration = c.read_json(self.project / '.mask.json')
         declaration['skills'][0]['version'] = {'commit': commit}
         (self.project / '.mask.json').write_text(json.dumps(declaration))
-        self.crash(['update', '--project', str(self.project)])
+        self.crash(['upgrade', '--project', str(self.project)])
         original = (self.project / '.mask.lock.json').read_bytes()
         (self.project / '.mask.lock.json').write_bytes(original + b' ')
         before = self.snapshot()
@@ -203,9 +203,9 @@ class RecoveryUpdateTests(UpdateTests):
         self.publish('cold generic update')
         self.call('source', 'fetch', TAP)
         before = self.snapshot()
-        preview = self.call('update', '--project', self.project, '--dry-run')
+        preview = self.call('upgrade', '--project', self.project, '--dry-run')
         self.assertEqual(before, self.snapshot())
-        result = self.call('update', '--project', self.project, '--expect-plan-hash', preview['data']['plan_hash'])
+        result = self.call('upgrade', '--project', self.project, '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertTrue(result['changed'])
         self.assertFalse(self.call('apply')['changed'])
 

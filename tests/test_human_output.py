@@ -16,7 +16,7 @@ from tests.support import TAP
 
 class RendererRegistry(unittest.TestCase):
     def test_workflow_failures_group_files_by_consumer_without_flat_duplicate_list(self):
-        output = mask.result('update')
+        output = mask.result('upgrade')
         output['error'] = dict(code='workflow.incomplete', message='Incomplete',
                                details={'workflow': ['implement-rfc codex/rfc-integrator: setup_required'] * 2},
                                remediation=[{'message': 'Run ensure --project ROOT again'}])
@@ -83,7 +83,7 @@ class HumanTerminal(PublicFixture):
     def test_task_help_explains_scope_options_and_examples(self):
         for command, expected in (
             ('ensure', ('Examples:', '--allow-setup', 'SOURCE/ID:ACTION', 'Normal ensure', 'mask ensure --user', 'mask ensure --all --repair')),
-            ('update', ('Examples:', 'ALL registered consumers', 'fetched once', 'update.incomplete', '--allow-ref-rebind', 'mask self update')),
+            ('upgrade', ('Examples:', 'ALL registered consumers', 'fetched once', 'upgrade.incomplete', '--allow-ref-rebind', 'mask update')),
             ('install', ('Examples:', 'Other selections are kept', 'every approved tap', 'never with --offline', 'mask install wizard --user')),
             ('doctor', ('Examples:', 'doctor --migrate', '--project PATH --alias NAME', 'mask doctor --migrate --dry-run')),
         ):
@@ -96,8 +96,8 @@ class HumanTerminal(PublicFixture):
                 self.assertEqual(machine['data']['help'], run.stdout)
         root = self.human('--help').stdout
         self.assertIn('Start here:', root)
-        self.assertIn('Bare update fetches each referenced tap once', root)
-        self.assertIn('mask update --help', root)
+        self.assertIn('Bare upgrade fetches each referenced tap once', root)
+        self.assertIn('mask upgrade --help', root)
         self.assertIn('mask doctor --migrate --dry-run', root)
 
     def test_v2_selection_setters_refuse_and_point_to_install_and_remove(self):

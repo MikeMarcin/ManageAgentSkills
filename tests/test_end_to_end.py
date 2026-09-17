@@ -71,13 +71,13 @@ def verify(program):
         git(author, 'add', 'skills'); git(author, 'commit', '-m', 'upstream'); git(author, 'push', 'origin', 'main')
         head = git(author, 'rev-parse', 'HEAD')
         # A dry run reviews only the fetched cache: the upstream push stays unseen until update fetches it.
-        preview = call('update', '--dry-run')
+        preview = call('upgrade', '--dry-run')
         assert preview['data']['network'] == 'none' and not preview['data']['fetches']['agentskills']['attempted']
         assert head not in [change['after_commit'] for row in preview['data']['consumers'] for change in row['changes']]
-        updated = call('update')
+        updated = call('upgrade')
         assert updated['data']['network'] == 'fetch' and updated['changed']
         assert [row['commit'] for row in json.loads((project / '.mask.lock.json').read_text(encoding='utf-8'))['packages']] == [head]
-        assert not call('update')['changed']
+        assert not call('upgrade')['changed']
         call('project', 'show', '--project', project); call('project', 'set-targets', '--project', project, '--inherit')
         call('project', 'unregister', project)
         assert (project / '.mask.json').is_file() and not (project / '.agents/skills/alpha').is_symlink()

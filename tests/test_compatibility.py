@@ -137,7 +137,7 @@ class CompatibilityTests(Fixture):
         declaration['sources']['second'] = dict(declaration['sources'][TAP])
         declaration['skills'].append(dict(source='second', id='alpha'))
         (self.project / '.mask.json').write_text(json.dumps(declaration))
-        self.call('update', '--project', self.project, code=4)
+        self.call('upgrade', '--project', self.project, code=4)
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
 
 

@@ -415,7 +415,7 @@ def dispatch(args, output, home):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     record = state.get('user') if scope == 'user' else state['projects'].get(str(root))
     if changed and record is not None and record.get('mode') in ('pinned', 'dev-link'):
-        c.fail('lock.active', 'Use the journaled pinned update flow to change an active consumer lock.', 4)
+        c.fail('lock.active', 'Use mask upgrade to change an active consumer lock.', 4)
     plan_hash = c.digest(dict(command='lock', declaration=c.digest(declaration_raw), before=c.digest(before) if before is not None else None, after=proposal, config=c.digest(config_raw.encode('utf-8')), path=str(target), identities=identities))
     output['data'] = dict(scope=scope, lock_path=str(target), lock=proposal, plan_hash=plan_hash, network='none', portable=all(not entry['repository'].startswith('file:') for entry in declaration['sources'].values()), targeting='not_evaluated', deployment='not_requested')
     output['would_change'] = changed

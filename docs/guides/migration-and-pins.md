@@ -29,7 +29,7 @@ The dry run writes nothing. It discloses the configuration before and after, the
 - Payloads are materialized in the store, owned links are retargeted from the clone to the store, and the consumer records become pinned.
 - With no registered consumers, only the configuration migrates, and a dirty or unborn clone is only a warning.
 
-If HEAD is not on the remote-tracking branch, migration warns `migration.unpublished_commit`: other machines cannot reproduce those locks until you push that commit. The first `mask update` afterwards fetches the remote normally.
+If HEAD is not on the remote-tracking branch, migration warns `migration.unpublished_commit`: other machines cannot reproduce those locks until you push that commit. The first `mask upgrade` afterwards fetches the remote normally.
 
 Migration never resets, stashes, deletes or pushes anything. It refuses with a typed error, writing nothing, when the clone is:
 
@@ -65,7 +65,7 @@ Use `--user --alias NAME` for the personal declaration. The declaration is rewri
 | `mask source status` | `mask source show NAME` and `mask doctor` |
 | `mask source migrate` | `mask doctor --migrate` |
 | `mask migrate --to-pinned` | `mask doctor --migrate`; on a tap machine, `mask doctor --migrate --project PATH --alias NAME` or `--user --alias NAME` |
-| `mask update` fast-forwarding the shared checkout | `mask update`, which fetches every referenced tap and updates locks and store links. Push authoring changes first, or use `mask source dev-link` for unpublished edits. |
+| `mask upgrade` fast-forwarding the shared checkout | `mask upgrade`, which fetches every referenced tap and updates locks and store links. Push authoring changes first, or use `mask source dev-link` for unpublished edits. |
 | `mask project require ID`, `mask user require ID` | `mask install ID`, with `--user` for personal skills |
 | `mask project unrequire ID`, `mask user unrequire ID` | `mask remove ID`, with `--user` for personal skills |
 | `mask project set --skill ID`, `mask project set --clear` and the `user set` forms | `mask install` and `mask remove` for each skill that differs |
@@ -74,7 +74,7 @@ The removed commands and `init` options exit 2 with `invocation.invalid`. The `p
 
 ## Pinned updates and development links
 
-`mask update --project PATH --skill SOURCE/ID` fetches that binding's tap and updates only that pin through one recoverable lock/link operation. Preview it with `--dry-run`, which uses cached objects and never fetches. Exact commit requirements stay fixed.
+`mask upgrade --project PATH --skill SOURCE/ID` fetches that binding's tap and updates only that pin through one recoverable lock/link operation. Preview it with `--dry-run`, which uses cached objects and never fetches. Exact commit requirements stay fixed.
 
 For scoped authoring, `mask source dev-link SOURCE/ID --project PATH
 --authoring-root PATH --json` makes an explicit dirty/unpinned exception from the

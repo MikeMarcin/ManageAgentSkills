@@ -41,12 +41,12 @@ class NormalUpdate(TapUpdateFixture):
 
     def test_plain_update_fetches_and_activates_in_one_invocation(self):
         candidate = self.push_upstream()
-        run = self.human('update')
+        run = self.human('upgrade')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
         self.assertNotIn('sha256:', run.stdout)
         self.assertIn(f'tap {TAP}: fetched new commits', run.stdout)
-        self.assertIn('Updated 1 skill in 1 project.', run.stdout)
+        self.assertIn('Upgraded 1 skill in 1 project.', run.stdout)
         self.assertIn(f'  {self.project}\n', run.stdout)
         self.assertIn(f'    {TAP}/alpha  ', run.stdout)
         self.assertIn(f'-> {candidate[:7]}', run.stdout)
@@ -54,15 +54,23 @@ class NormalUpdate(TapUpdateFixture):
         self.assertEqual(self.locked(), candidate)
         self.assertIn('Updated instructions.', (self.project / '.claude/skills/alpha/SKILL.md').read_text(encoding='utf-8'))
         self.assertFalse((self.home / 'pending.json').exists())
-        again = self.human('update')
+        again = self.human('upgrade')
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertIn('Already up to date (1 project).', again.stdout)
         self.assertNotIn(str(self.project), again.stdout)
 
+    def test_the_retired_program_spelling_is_gone(self):
+        # update against a real program clone is proven in tests.test_readme_journeys; this checkout is never fetched by a test.
+        gone = self.raw('self', 'update')
+        self.assertEqual((gone.returncode, gone.stdout), (2, ''), gone.stderr)
+        preview = self.human('update', '--dry-run')
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertIn(f'tap {TAP}: used the cached copy (not fetched)', preview.stdout)
+
     def test_json_reports_the_same_effects_as_one_document(self):
         before = self.locked()
         candidate = self.push_upstream()
-        done = self.machine('update')
+        done = self.machine('upgrade')
         self.assertEqual((done['changed'], done['transaction'], done['data']['network']), (True, 'committed', 'fetch'))
         self.assertEqual((done['data']['fetches'][TAP]['ok'], done['data']['fetches'][TAP]['after']), (True, candidate))
         [row] = done['data']['consumers']
@@ -78,12 +86,12 @@ class PreviewAndGuard(TapUpdateFixture):
     def test_dry_run_and_offline_do_not_fetch(self):
         old, cache, lock = self.locked(), self.cached(), (self.project / '.mask.lock.json').read_bytes()
         self.push_upstream()
-        preview = self.machine('update', '--dry-run')
+        preview = self.machine('upgrade', '--dry-run')
         self.assertEqual((preview['data']['fetches'][TAP]['attempted'], preview['data']['network']), (False, 'none'))
         self.assertFalse(preview['would_change'])  # Nothing new is known until an explicit or normal fetch.
         self.assertEqual(preview['data']['consumers'][0]['status'], 'unchanged')
         self.assertEqual((self.cached(), (self.project / '.mask.lock.json').read_bytes()), (cache, lock))
-        offline = self.human('update', '--offline')
+        offline = self.human('upgrade', '--offline')
         self.assertEqual(offline.returncode, 0, offline.stderr)
         self.assertIn(f'tap {TAP}: used the cached copy (not fetched)', offline.stdout)
         self.assertEqual((self.cached(), (self.project / '.mask.lock.json').read_bytes(), self.locked()), (cache, lock, old))
@@ -91,16 +99,16 @@ class PreviewAndGuard(TapUpdateFixture):
     def test_guard_applies_the_previewed_candidate_even_after_the_remote_moves(self):
         reviewed = self.push_upstream()
         self.assertTrue(self.machine('source', 'fetch')['ok'])
-        preview = self.machine('update', '--dry-run')
+        preview = self.machine('upgrade', '--dry-run')
         self.assertTrue(preview['would_change'])
         newer = self.push_upstream('Later revision')
-        done = self.machine('update', '--expect-plan-hash', preview['data']['plan_hash'])
+        done = self.machine('upgrade', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertTrue(done['changed'])
         self.assertFalse(done['data']['fetches'][TAP]['attempted'])
         self.assertEqual(self.locked(), reviewed)
         self.assertNotEqual(self.locked(), newer)
         self.assertTrue(self.machine('source', 'fetch')['ok'])
-        stale = self.machine('update', '--expect-plan-hash', preview['data']['plan_hash'])
+        stale = self.machine('upgrade', '--expect-plan-hash', preview['data']['plan_hash'])
         self.assertEqual(stale['error']['code'], 'plan.stale')
         self.assertEqual(self.locked(), reviewed)
 
@@ -116,7 +124,7 @@ class RecoveryAndBusy(TapUpdateFixture):
         self.push_upstream()
         pending = self.home / 'pending.json'
         pending.write_text('{"schema_version": 3}\n', encoding='utf-8')
-        run = self.human('update')
+        run = self.human('upgrade')
         self.assertEqual(run.returncode, 8, run.stderr)
         self.assertIn('recovery.required', run.stderr)
         self.assertEqual(pending.read_text(encoding='utf-8'), '{"schema_version": 3}\n')
@@ -134,7 +142,7 @@ class RecoveryAndBusy(TapUpdateFixture):
                 import fcntl
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             try:
-                run = self.human('update')
+                run = self.human('upgrade')
             finally:
                 if os.name == 'nt':
                     handle.seek(0)

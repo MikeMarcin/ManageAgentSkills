@@ -8,7 +8,7 @@ substitutions:
 - ``python3`` is this test's interpreter.
 - The ManageAgentSkills GitHub URL is a local bare remote holding this working tree's runtime, so
   ``ManageAgentSkills/mask.py`` is the entrypoint of the disposable clone the README's ``git clone`` makes. Every
-  later command runs that clone, and ``mask self update`` updates it, never this repository's checkout.
+  later command runs that clone, and ``mask update`` updates it, never this repository's checkout.
 - The AgentSkills GitHub URL is the fixture's local bare tap upstream.
 - ``$HOME`` is the fixture's personal home, and ``mkdir -p`` is ``Path.mkdir`` (native Windows has no such executable).
 - ``mask`` and ``"$HOME/.local/bin/mask"`` are the launcher ``self install`` wrote (``mask.cmd`` on Windows).
@@ -55,10 +55,10 @@ EVERYDAY = {
     'Check or reconcile declared setup': 'mask ensure',
     'Repair every registered project and personal scope': 'mask ensure --all --repair',
     'Remove a selection here': 'mask remove ID',
-    'Update every registered project and personal scope': 'mask update',
-    'Update only this project': 'mask update --project .',
-    'Update only personal skills': 'mask update --user',
-    'Update MASK itself': 'mask self update',
+    'Update MASK itself and fetch your taps': 'mask update',
+    'Upgrade every registered project and personal scope': 'mask upgrade',
+    'Upgrade only this project': 'mask upgrade --project .',
+    'Upgrade only personal skills': 'mask upgrade --user',
 }
 FENCE = re.compile(r'^```[^\n]*\n(.*?)^```$', re.M | re.S)
 
@@ -109,7 +109,7 @@ class ReadmeRecipes(PublicFixture):
         self.git(author, 'config', 'user.email', 'fixture@example.invalid')
         self.git(author, 'add', '.')
         self.git(author, 'commit', '-q', '-m', 'program')
-        remote = self.base / 'program remote' / 'ManageAgentSkills.git'  # self update requires this repository name.
+        remote = self.base / 'program remote' / 'ManageAgentSkills.git'  # update requires this repository name.
         remote.parent.mkdir()
         self.git(self.base, 'init', '-q', '--bare', '-b', 'main', str(remote))
         self.git(author, 'push', '-q', str(remote), 'main')
@@ -272,22 +272,30 @@ class ReadmeRecipes(PublicFixture):
         project_lock, user_lock = self.project / '.mask.lock.json', self.home / 'user.lock.json'
         installed = self.locked(user_lock)
         first = push_upstream('First upstream change.')
-        run('Update only this project')
+        run('Upgrade only this project')
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (first, installed))
-        run('Update only personal skills')
+        run('Upgrade only personal skills')
         self.assertEqual(self.locked(user_lock), first)
         second = push_upstream('Second upstream change.')
-        self.assertIn(f'tap {TAP}: fetched new commits', run('Update every registered project and personal scope').stdout)
+        self.assertIn(f'tap {TAP}: fetched new commits', run('Upgrade every registered project and personal scope').stdout)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
         self.assertIn('Second upstream change.', (self.personal / '.claude/skills/alpha/SKILL.md').read_text(encoding='utf-8'))
 
-        # "Update MASK itself" fast-forwards the disposable program clone to a published compatible change.
+        # "Update MASK itself and fetch your taps" fast-forwards the disposable program clone to a published compatible change.
         with (self.program_author / 'mask.py').open('a', encoding='utf-8') as handle:
             handle.write('\n# compatible fixture update\n')
         self.git(self.program_author, 'commit', '-q', '-a', '-m', 'compatible fixture update')
         self.git(self.program_author, 'push', '-q', str(self.program_remote), 'main')
-        run('Update MASK itself')
+        # The same command fetches the taps, as brew update does, and moves no consumer: upgrade does that.
+        third = push_upstream('Third upstream change.')
+        refreshed = run('Update MASK itself and fetch your taps').stdout
         self.assertEqual(self.git(self.program, 'rev-parse', 'HEAD'), self.git(self.program_author, 'rev-parse', 'HEAD'))
+        self.assertIn('MASK updated: ', refreshed)
+        self.assertIn(f'tap {TAP}: fetched new commits', refreshed)
+        self.assertIn("Run 'mask upgrade'", refreshed)
+        self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
+        self.assertEqual(self.shell('mask upgrade --offline').returncode, 0)
+        self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (third, third))
 
         self.assertEqual(replayed, set(EVERYDAY))
 
