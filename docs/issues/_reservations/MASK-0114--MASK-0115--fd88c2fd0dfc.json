@@ -1,0 +1,11 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0114",
+    "MASK-0115"
+  ],
+  "reserve_for": "doctor-field-findings-2026-09-16",
+  "purpose": "",
+  "created": "2026-09-17T05:47:11.405982+00:00",
+  "base": "7ccf671a726e073d6768551e460c6f1fbeca3c9b"
+}
