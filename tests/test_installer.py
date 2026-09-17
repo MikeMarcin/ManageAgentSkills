@@ -56,6 +56,7 @@ class ShellInstaller(unittest.TestCase):
         self.assertTrue((program / 'mask.py').is_file())
         self.assertIn(str(program / 'mask.py'), launcher.read_text(encoding='utf-8'))
         self.assertIn('is not on your PATH', first.stdout)
+        self.assertRegex(first.stdout, r'Installed mask \S+ \([0-9a-f]+\)')
         self.assertIn(f'{launcher} tap add agentskills', first.stdout)
         version = subprocess.run([str(launcher), '--version'], capture_output=True, encoding='utf-8', env=dict(os.environ, HOME=str(self.home)))
         self.assertEqual((version.returncode, version.stdout.startswith('mask ')), (0, True), version.stderr)
@@ -67,8 +68,32 @@ class ShellInstaller(unittest.TestCase):
         again = self.install(PATH=str(launcher.parent) + os.pathsep + os.environ['PATH'])
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertIn('Updating MASK', again.stdout)
+        self.assertRegex(again.stdout, r'Updated mask \S+ \([0-9a-f]+ -> [0-9a-f]+\)')
+        self.assertIn('Already up to date: mask ', self.install().stdout)
         self.assertNotIn('is not on your PATH', again.stdout)
         self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), self.git(self.author, 'rev-parse', 'HEAD'))
+
+    def test_uninstall_removes_its_own_launcher_and_says_what_is_left(self):
+        self.assertEqual(self.install().returncode, 0)
+        launcher, env = self.home / '.local/bin/mask', dict(os.environ, HOME=str(self.home), MASK_HOME=str(self.base / 'machine'), PYTHONDONTWRITEBYTECODE='1')
+        def mask(*args):
+            return subprocess.run([str(launcher) if launcher.exists() else sys.executable, *([] if launcher.exists() else [str(self.home / '.local/share/mask/mask.py')]), *args],
+                                  capture_output=True, encoding='utf-8', env=env, cwd=str(self.base))
+        preview = mask('self', 'uninstall', '--dry-run')
+        self.assertEqual((preview.returncode, launcher.exists()), (0, True), preview.stderr)
+        self.assertIn('Would remove 1 launcher', preview.stdout)
+        done = mask('self', 'uninstall')
+        self.assertEqual((done.returncode, launcher.exists()), (0, False), done.stderr)
+        self.assertIn('Removed 1 launcher.', done.stdout)
+        self.assertIn('rm -rf', done.stdout)
+        self.assertTrue((self.home / '.local/share/mask/mask.py').is_file())  # Folders are never deleted for you.
+        self.assertIn('No MASK launcher is recorded', mask('self', 'uninstall').stdout)
+        # An edited launcher is somebody's file: kept, and said so.
+        self.assertEqual(self.install().returncode, 0)
+        launcher.write_text(launcher.read_text(encoding='utf-8') + '# mine\n', encoding='utf-8')
+        kept = mask('self', 'uninstall')
+        self.assertEqual((kept.returncode, launcher.exists()), (0, True), kept.stderr)
+        self.assertIn('edited since MASK wrote it', kept.stdout)
 
     def test_refuses_without_effect_when_the_target_is_something_else_or_python_is_too_old(self):
         occupied = self.base / 'occupied'

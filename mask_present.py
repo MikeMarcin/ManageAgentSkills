@@ -52,7 +52,7 @@ def note(data):
 ACTION_VERBS = {'link.create': 'create link', 'link.remove': 'remove link', 'link.replace': 'replace link', 'link.adopt': 'adopt link', 'link.abandon': 'release link',
                 'native_role.write': 'write role', 'retired_file.remove': 'remove retired file', 'declaration.write': 'write', 'declaration.create': 'create',
                 'lock.write': 'write', 'native_role_lock.write': 'write', 'launcher.install': 'install launcher', 'setup.run': 'run setup', 'config.create': 'create configuration',
-                'config.migrate': 'convert configuration', 'source.catalog': 'update tap catalog', 'integration.record': 'record integration', 'skill.import': 'import skill'}
+                'config.migrate': 'convert configuration', 'launcher.remove': 'remove launcher', 'source.catalog': 'update tap catalog', 'integration.record': 'record integration', 'skill.import': 'import skill'}
 
 
 def action_lines(output, roots=()):
@@ -541,6 +541,22 @@ def render_self_status(data, output):
                                                         ('launchers', list(launchers) if isinstance(launchers, dict) and launchers else None)])
 
 
+def render_uninstall(data, output):
+    removed, kept = data.get('removed') or [], data.get('kept') or []
+    lines = [(f"Would remove {plural(len(removed), 'launcher')} (dry run: nothing removed)." if output['dry_run'] else f"Removed {plural(len(removed), 'launcher')}.") if removed
+             else 'No MASK launcher is recorded on this machine.']
+    lines.extend(f'  - {clean(path)}' for path in removed)
+    lines.extend(f"  kept {clean(item.get('path'))}: {clean(item.get('reason'))}" for item in kept)
+    linked = data.get('linked_consumers') or []
+    lines += ['', 'MASK never deletes folders for you. To finish by hand:']
+    if linked:
+        lines.append(f"  {plural(len(linked), 'project')} still link skills from MASK's store; first run 'mask project unregister PATH' (or 'mask user unregister') for each:")
+        lines.extend(f'      {clean(path)}' for path in linked)
+    lines.append(f"  rm -rf {shlex.quote(str(data.get('home')))}          # taps, store and state")
+    lines.append(f"  rm -rf {shlex.quote(str(data.get('program_root')))}  # the program")
+    return lines
+
+
 def render_config(data, output):
     config = data.get('config') or {}
     if output['command'] == 'config.show':
@@ -832,7 +848,7 @@ RENDERERS = {
     'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
     'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources, 'tap.transport': render_sources,
     'lock': render_lock, 'update': render_refresh, 'upgrade': render_upgrade,
-    'self.status': render_self_status, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
+    'self.status': render_self_status, 'self.uninstall': render_uninstall, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
 }
 
 
@@ -1053,6 +1069,7 @@ COMMAND_HELP = {
     'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask skill show implement-rfc\nmask skill show implement-rfc --content'),
     'self.install': ('Create a MASK launcher in an existing bin directory.', 'mask self install --bin-dir /path/to/bin'),
     'self.status': ('Show the MASK program, interpreter and installed launchers.', 'mask self status'),
+    'self.uninstall': ('Remove the mask launchers this program wrote. A launcher edited since MASK wrote it is kept. MASK never deletes folders, so the command ends by listing what is left (the projects that still link skills, the machine state and the program clone) with the commands that remove them.', 'mask self uninstall --dry-run\nmask self uninstall'),
     'project.init': ('Create a project skill declaration without installing skills. For the everyday install task, use mask install ID.', 'mask project init --project .'),
     'project.show': ('Show a project\'s declared skill selections and targets.', 'mask project show --project .'),
     'project.register': ('Register this physical project so MASK can manage its links.', 'mask project register /path/to/project'),

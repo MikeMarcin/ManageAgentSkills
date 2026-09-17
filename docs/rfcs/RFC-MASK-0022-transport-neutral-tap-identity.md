@@ -125,7 +125,6 @@ Decisions taken during implementation, each narrower than or different from the 
 - **The hint lives beside the cache, not in `config.json`.** Fetches run inside journaled operations that bind the configuration's bytes; rewriting `transport` mid-operation would turn a successful fetch into a `recovery.conflict`. `mask-transport.json` in the tap's cache records it, and `source show` reports it. `config.json`'s `transport` is the typed or pinned URL.
 - **`doctor --migrate` converts the catalog only, in one atomic write without a journal.** Project files are never rewritten for a spelling, and a consumer's state records mirror those files, so converting state would only make it disagree with the lock it describes; state takes the canonical spelling when its files are next written. The cache is reused in place under its existing key, which `cache_root` accepts for any spelling of the same identity, so there is no directory move to journal. One atomic replace leaves the old bytes or the new, so there are no journal checkpoints to crash at; AC05's crash-recovery clause has nothing to exercise.
 - **`forge_hosts` is set with `mask config set --forge-host HOST` / `--clear-forge-hosts`**, since editing `MASK_HOME` by hand is not a supported path.
-- **Rollout.** The machine and pending schemas changed (this RFC and the `update`/`upgrade` rename), so a previous program refuses to self-update to this revision (`source.candidate_invalid`); pull that checkout with Git once.
 
 ## Closeout
 

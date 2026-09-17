@@ -34,12 +34,16 @@ main() {
     "$python" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || fail "$python is older than Python 3.11."
 
     if [ -d "$dir/.git" ]; then
+        verb=Updated
+        before=$(git -C "$dir" rev-parse --short HEAD)
         say "Updating MASK in $dir"
         # Only a clean fast-forward: local work in the clone is never discarded.
         git -C "$dir" pull --quiet --ff-only || fail "Could not fast-forward $dir. Resolve it with Git, or remove the directory and run this again."
     elif [ -e "$dir" ]; then
         fail "$dir exists and is not a MASK clone. Move it away, or set MASK_INSTALL_DIR."
     else
+        verb=Installed
+        before=
         say "Installing MASK into $dir"
         mkdir -p "$(dirname "$dir")"
         git clone --quiet "$repo" "$dir" || fail "Could not clone $repo. If it needs credentials, sign in to Git first (for GitHub: gh auth login)."
@@ -47,7 +51,12 @@ main() {
 
     mkdir -p "$bin"
     "$python" "$dir/mask.py" self install --bin-dir "$bin" >/dev/null || fail "The launcher could not be written to $bin."
-    say "Installed $("$bin/mask" --version) as $bin/mask"
+    after=$(git -C "$dir" rev-parse --short HEAD)
+    if [ "$verb" = Updated ] && [ "$before" = "$after" ]; then
+        say "Already up to date: $("$bin/mask" --version) ($after) at $bin/mask"
+    else
+        say "$verb $("$bin/mask" --version) (${before:+$before -> }$after) at $bin/mask"
+    fi
 
     case ":$PATH:" in
         *":$bin:"*) mask=mask ;;
@@ -63,6 +72,7 @@ main() {
     say "  $mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a tap"
     say "  cd your-project && $mask install implement-rfc                            # add a skill"
     say "  $mask update                                                              # later: update MASK and fetch taps"
+    say "  $mask self uninstall                                                      # remove the launcher and see what else to delete"
 }
 
 say() { printf '%s\n' "$*"; }

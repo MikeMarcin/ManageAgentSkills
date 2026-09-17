@@ -103,6 +103,7 @@ COMMANDS = {
     'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
+    'self.uninstall': (True, False, []),
 }
 for action in ('init', 'show', 'set', 'require', 'unrequire', 'set-targets', 'set-agents', 'register', 'unregister'):
     mutates, network, arguments = COMMANDS['project.' + action]

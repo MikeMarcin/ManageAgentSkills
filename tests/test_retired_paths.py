@@ -12,7 +12,7 @@ from tests.legacy_support import ENTRY, LegacyFixture, git, snapshot, write_json
 from tests.support import TAP
 
 REMEDIATION = ['mask', 'doctor', '--migrate', '--dry-run']
-EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover', 'self.status', 'self.install', 'update'}
+EXEMPT = {'capabilities', 'config.show', 'doctor', 'recover', 'self.status', 'self.install', 'self.uninstall', 'update'}
 RETIRED = {'source.status', 'source.migrate', 'migrate'}
 # Values for required operands. The gate refuses before any operand is interpreted, so they only need to parse.
 VALUES = {'id': 'agentskills/alpha', 'ids': 'alpha', 'name': 'agentskills', 'url': 'file:///nowhere.git', 'path': '{project}',

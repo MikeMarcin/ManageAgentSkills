@@ -38,6 +38,8 @@ function Install-Mask {
     $rest = @($python | Select-Object -Skip 1)
 
     if (Test-Path (Join-Path $dir '.git')) {
+        $verb = 'Updated'
+        $before = (git -C $dir rev-parse --short HEAD)
         Write-Host "Updating MASK in $dir"
         # Only a clean fast-forward: local work in the clone is never discarded.
         git -C $dir pull --quiet --ff-only
@@ -45,6 +47,8 @@ function Install-Mask {
     } elseif (Test-Path $dir) {
         throw "$dir exists and is not a MASK clone. Move it away, or set MASK_INSTALL_DIR."
     } else {
+        $verb = 'Installed'
+        $before = $null
         Write-Host "Installing MASK into $dir"
         New-Item -ItemType Directory -Force -Path (Split-Path $dir) | Out-Null
         git clone --quiet $repo $dir
@@ -55,7 +59,13 @@ function Install-Mask {
     & $exe @rest (Join-Path $dir 'mask.py') self install --bin-dir $bin | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "The launcher could not be written to $bin." }
     $launcher = Join-Path $bin 'mask.cmd'
-    Write-Host "Installed $(& $launcher --version) as $launcher"
+    $after = (git -C $dir rev-parse --short HEAD)
+    if ($verb -eq 'Updated' -and $before -eq $after) {
+        Write-Host "Already up to date: $(& $launcher --version) ($after) at $launcher"
+    } else {
+        $span = if ($before) { "$before -> $after" } else { $after }
+        Write-Host "$verb $(& $launcher --version) ($span) at $launcher"
+    }
 
     $mask = $launcher
     if (($env:PATH -split ';') -contains $bin) {
@@ -70,6 +80,7 @@ function Install-Mask {
     Write-Host "  $mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a tap"
     Write-Host "  cd your-project; $mask install implement-rfc                              # add a skill"
     Write-Host "  $mask update                                                              # later: update MASK and fetch taps"
+    Write-Host "  $mask self uninstall                                                      # remove the launcher and see what else to delete"
 }
 
 Install-Mask

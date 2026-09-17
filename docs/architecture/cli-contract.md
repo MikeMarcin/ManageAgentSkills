@@ -73,6 +73,7 @@ The table follows the registered command table (`mask.COMMANDS`), which `capabil
 | `source dev-link` | `SOURCE/ID (--project PATH \| --user) (--authoring-root PATH \| --to-pinned)` | Scope-local development links into the approved authoring checkout, or their return to store links; state | No |
 | `self status` | none | None | No |
 | `self install` | `--bin-dir PATH` | Recognized launcher + ownership record | No |
+| `self uninstall` | none | Each recorded launcher whose bytes MASK still recognizes, and its ownership record, one launcher journal each; an edited launcher is kept. Never the program checkout, `MASK_HOME` or any consumer | No |
 | `update` | none | Program checkout (fast-forward through one journal), then the caches of every approved tap. No declaration, lock, link or consumer state | Yes, unless `--dry-run` |
 
 `plan/apply` with no selector use the discovered current registered project. `doctor` with no selector checks the machine and every registered consumer of both scopes. `upgrade` with no selector updates every registered consumer; `--project`, `--user`, `--all` and `--skill` narrow it (see [update](#explicit-migration-selected-updates-and-authoring-exceptions)). The vocabulary is that of `brew` and `apt`: `update` makes new versions available (the program and every tap) and changes no consumer, `upgrade` fetches what its consumers reference and applies, and `source fetch` fetches taps only.
@@ -81,7 +82,7 @@ A configuration default change does not relink anything until an explicit apply.
 
 ### Migration gate and retired commands
 
-On a machine whose `config.json` has `schema_version` 1 or 2, the retired live-checkout configurations, every command except `capabilities`, `config show`, `doctor` (including `--migrate`), `recover`, `update` (which then skips the taps) and `self status|install` refuses before any effect with `migration.required` (exit 4) and `details.remediation` `["mask", "doctor", "--migrate", "--dry-run"]`. A missing or unreadable configuration is not gated; the command that reads it reports it. The gate also covers `project unregister --keep-links` and `workspace forget`, so a consumer that doctor migration cannot convert is restored on disk before migrating ([doctor migration](#explicit-migration-selected-updates-and-authoring-exceptions)).
+On a machine whose `config.json` has `schema_version` 1 or 2, the retired live-checkout configurations, every command except `capabilities`, `config show`, `doctor` (including `--migrate`), `recover`, `update` (which then skips the taps) and `self status|install|uninstall` refuses before any effect with `migration.required` (exit 4) and `details.remediation` `["mask", "doctor", "--migrate", "--dry-run"]`. A missing or unreadable configuration is not gated; the command that reads it reports it. The gate also covers `project unregister --keep-links` and `workspace forget`, so a consumer that doctor migration cannot convert is restored on disk before migrating ([doctor migration](#explicit-migration-selected-updates-and-authoring-exceptions)).
 
 On a tap machine, a v1 declaration and a registered record without a deployment mode refuse ordinary consumer commands with the same code and remediation. That remediation argv alone is `invocation.invalid` (exit 2) on a tap machine; add `--project PATH --alias NAME` or `--user --alias NAME`.
 

@@ -43,6 +43,7 @@
         "user.register",
         "user.unregister",
         "self.install",
+        "self.uninstall",
         "update",
         "project.set-agents",
         "user.set-agents",

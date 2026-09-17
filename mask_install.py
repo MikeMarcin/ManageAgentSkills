@@ -28,8 +28,8 @@ def validate_launcher_intent(pending):
     c.fields(pending['launcher'], ('path',), family='recovery')
     key = pending['launcher']['path']
     before, after = pending['before_state'], pending['after_state']
-    record = after['launchers'].get(key)
-    if pending['operation'] != 'self.install' or pending['selected'] or pending['links'] or pending['manifests'] or before['projects'] != after['projects'] or not record:
+    record = after['launchers'].get(key) if pending['operation'] == 'self.install' else before['launchers'].get(key) if key not in after['launchers'] else None
+    if pending['operation'] not in ('self.install', 'self.uninstall') or pending['selected'] or pending['links'] or pending['manifests'] or before['projects'] != after['projects'] or not record:
         c.fail('recovery.conflict', 'Invalid launcher transaction scope.', 8)
     if record['program_root'] != str(Path(__file__).resolve().parent) or Path(key).name != ('mask.cmd' if os.name == 'nt' else 'mask'):
         c.fail('recovery.conflict', 'Launcher does not belong to this program.', 8)
@@ -93,6 +93,41 @@ def on_path(path):
     return bool(found and path.exists() and os.path.samefile(found, path))
 
 
+def uninstall(output, home, root, state, config):
+    """Remove the launchers this program wrote, each through the launcher journal; an edited launcher is somebody's file and stays.
+
+    MASK never deletes directories it did not create file by file, so the program clone, MASK_HOME and the links in
+    your projects are reported with the commands that remove them, not removed.
+    """
+    removable, kept = [], []
+    for path, record in sorted(state['launchers'].items()):
+        actual = c.read_text(Path(path), 'launcher', missing=True)
+        if actual is not None and (actual != launcher_text(record) or c.digest(actual.encode()) != record['content_digest']):
+            kept.append(dict(path=path, reason='edited since MASK wrote it'))
+        else:
+            removable.append(path)
+    consumers = c.consumer_records(state)
+    output['data'] = dict(removed=[], kept=kept, program_root=str(root), home=str(home),
+                          linked_consumers=sorted(path for path, record in consumers.items() if record.get('links')))
+    output['would_change'] = bool(removable)
+    output['actions'] = [dict(kind='launcher.remove', path=path, status='planned') for path in removable]
+    if output['dry_run']:
+        output['data']['removed'] = removable
+        return
+    for index, path in enumerate(removable):
+        state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+        after = copy.deepcopy(state)
+        del after['launchers'][path]
+        after['generation'] += 1
+        intent = dict(operation='self.uninstall', selected=[], links=[], manifests=[], before_state=state, after_state=after, config=config)
+        pending = fs.make_pending(dict(applicable=True, blockers=[], would_change=True, intent=intent), home)
+        pending['launcher'] = dict(path=path)
+        pending['directories'] = []
+        fs.execute(dict(applicable=True, blockers=[], would_change=True, intent=intent), home, output, pending=pending)
+        output['actions'][index]['status'] = 'applied'
+        output['data']['removed'].append(path)
+
+
 def dispatch(args, output, home, root):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config_raw = c.read_json(home / 'config.json', default={})
@@ -132,6 +167,8 @@ def dispatch(args, output, home, root):
         fs.execute(planned, home, output, pending=pending)
         output['data']['on_path'] = on_path(path)
         return
+    if args.command == 'self.uninstall':
+        return uninstall(output, home, root, state, config)
     timeout = (config or {}).get('git_timeout_seconds', 30)
     observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
     if not output['dry_run']:

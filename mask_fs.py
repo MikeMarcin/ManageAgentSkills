@@ -377,7 +377,7 @@ def validate_pending(pending, home):
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
              ('git', 'launcher', 'controls', 'files', 'pinned', 'migration', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
     migrating = pending['operation'] == 'doctor.migrate'
-    if pending['operation'] not in {'doctor.migrate', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'upgrade', 'update', 'self.install', 'install', 'remove'}:
+    if pending['operation'] not in {'doctor.migrate', 'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set', 'project.require', 'project.unrequire', 'project.set-targets', 'user.register', 'user.unregister', 'user.set', 'user.require', 'user.unrequire', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -407,7 +407,7 @@ def validate_pending(pending, home):
         from mask_migrate import validate_journal
         validate_journal(pending, home)
     elif pending['config'] is None:
-        if pending['operation'] not in ('self.install', 'update') or current_config:
+        if pending['operation'] not in ('self.install', 'self.uninstall', 'update') or current_config:
             c.fail('recovery.conflict', 'Unexpected missing machine configuration.', 8)
     elif c.config(pending['config'], legacy=True) != c.config(current_config, legacy=True):
         c.fail('recovery.conflict', 'Machine configuration changed since the pending operation.', 8)
