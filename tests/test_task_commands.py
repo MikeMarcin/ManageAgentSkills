@@ -23,7 +23,7 @@ class FreshScopes(PublicFixture):
         run = self.human('install', 'alpha')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
-        self.assertIn(f'added: {TAP}/alpha', run.stdout)
+        self.assertIn(f'+ {TAP}/alpha', run.stdout)
         self.assertEqual(links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
         # RFC-MASK-0021: a fresh declaration on a tap catalog machine is a v2 selection of the fixture tap.
         self.assertEqual(json.loads((self.project / '.mask.json').read_text(encoding='utf-8')),
@@ -34,7 +34,7 @@ class FreshScopes(PublicFixture):
         listing = self.human('list')
         self.assertEqual(listing.returncode, 0, listing.stderr)
         self.assertIn('alpha', listing.stdout)
-        self.assertIn('2 of 2 managed links in place', listing.stdout)
+        self.assertIn('all 2 links in place', listing.stdout)
 
     def test_dry_run_from_fresh_project_writes_nothing(self):
         # A dry run never fetches; the machine's tap cache is acquired first, as the live checkout used to exist. The scope stays fresh.

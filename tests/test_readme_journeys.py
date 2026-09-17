@@ -259,7 +259,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(self.links(self.personal), alpha)
         self.assertIn('beta', run("Show this project's skills").stdout)
         self.assertIn('alpha', run('Show personal skills').stdout)
-        self.assertIn(f'removed: {TAP}/beta', run('Remove a selection here', ID='beta').stdout)
+        self.assertIn(f'- {TAP}/beta', run('Remove a selection here', ID='beta').stdout)
         self.assertEqual(self.links(self.project), alpha)
         run('Check or reconcile declared setup')
 
@@ -277,7 +277,7 @@ class ReadmeRecipes(PublicFixture):
         run('Update only personal skills')
         self.assertEqual(self.locked(user_lock), first)
         second = push_upstream('Second upstream change.')
-        self.assertIn(f'fetch {TAP}: fetched, configured ref moved', run('Update every registered project and personal scope').stdout)
+        self.assertIn(f'tap {TAP}: fetched new commits', run('Update every registered project and personal scope').stdout)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
         self.assertIn('Second upstream change.', (self.personal / '.claude/skills/alpha/SKILL.md').read_text(encoding='utf-8'))
 

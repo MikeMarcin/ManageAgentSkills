@@ -83,7 +83,7 @@ class PipedConsentTests(ConsentFixture):
         self.assertEqual(again['data']['approval'], 'not_approved')
         human = self.human('ensure', '--project', self.project, stdin=subprocess.DEVNULL)
         self.assertEqual(human.returncode, 0, human.stderr)
-        self.assertIn('not_approved', human.stdout)
+        self.assertIn('Automatic startup checks: not approved', human.stdout)
         # One-time consent did not become automatic readiness.
         event = self.machine('ensure', '--project', self.project, '--event', 'startup')
         self.assertEqual(event['error']['code'], 'integration.approval_required')

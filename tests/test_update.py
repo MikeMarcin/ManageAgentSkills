@@ -202,7 +202,7 @@ class FetchingUpdate(UpdateFixture):
         self.assert_store_links()
         human = subprocess.run([sys.executable, '-B', str(ENTRY), 'update'], capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
         self.assertEqual((human.returncode, human.stdout), (4, ''), human.stderr)
-        for text in ('code: update.incomplete', str(self.other), 'fetch second: failed (git.failed)', 'fetch agentskills: fetched, configured ref unchanged'):
+        for text in ('code: update.incomplete', str(self.other), 'tap second: fetch failed (git.failed)', 'tap agentskills: fetched, nothing new'):
             self.assertIn(text, human.stderr)
 
     def test_u03_scoped_update_on_an_unreachable_tap_is_a_plain_refusal(self):

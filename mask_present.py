@@ -66,6 +66,38 @@ def actions(output):
     return lines
 
 
+ACTION_NOUNS = {'link.create': ('link', 'created'), 'link.remove': ('link', 'removed'), 'link.replace': ('link', 'replaced'),
+                'native_role.write': ('role file', 'written'), 'retired_file.remove': ('retired file', 'removed')}
+QUIET_ACTIONS = ('state.record', 'declaration.write', 'declaration.create', 'lock.write', 'native_role_lock.write')  # Bookkeeping, not news.
+
+
+def plural(count, noun):
+    return f"{count} {noun}{'' if count == 1 else 's'}"
+
+
+def joined(items):
+    items = [clean(item) for item in items]
+    return ', '.join(items[:-1]) + (' and ' if len(items) > 1 else '') + items[-1] if items else '-'
+
+
+def action_summary(output):
+    """One line of counts in place of one line per action; ``plan``, ``apply`` and ``--json`` keep every path."""
+    counts = {}
+    for action in output.get('actions', []):
+        if action.get('kind') not in QUIET_ACTIONS:
+            key = (action.get('status', 'planned'), action.get('kind'))
+            counts[key] = counts.get(key, 0) + 1
+    parts = []
+    for (status, kind), count in counts.items():
+        noun, verb = ACTION_NOUNS.get(kind, (clean(kind), 'done'))
+        parts.append(f"{plural(count, noun)} {verb if status == 'applied' else 'to be ' + verb if status == 'planned' else verb + ' (' + clean(status) + ')'}")
+    return ['  ' + ', '.join(parts) + '.'] if parts else []
+
+
+def place(data):
+    return 'your personal skills' if data.get('scope') == 'user' else clean(data.get('root'))
+
+
 def plan_guard(data, output):
     lines = []
     if output['would_change'] and not output['changed'] and data.get('plan_hash') and not output['dry_run']:
@@ -283,18 +315,39 @@ def render_doctor(data, output):
     return lines
 
 
+READINESS_WORDS = dict(ready_pinned='ready', ready_legacy_unpinned='ready (legacy, unpinned)', inactive_on_branch='inactive on this branch',
+                       would_reconcile='changes needed', workflow_incomplete='setup incomplete', approval_required='approval required',
+                       confirmation_required='confirmation required', drifted='drifted', blocked='blocked')
+
+
 def render_ensure(data, output):
     if data.get('repair'):
         return repair_lines(data, output) + backup_lines(data)
-    lines = [f"ensure: readiness {clean(data.get('readiness'))}" + (f" ({outcome(output)})" if output['dry_run'] or output['changed'] else '')]
-    for item in data.get('scope_readiness', []) or []:
-        lines.append(f"  {clean(item.get('root'))}: {clean(item.get('readiness'))}")
-    lines.extend(fields(data, [('event', 'event'), ('network', 'network'), ('host loading', 'host_load'), ('approval', 'approval')]))
+    scopes = data.get('scope_readiness', []) or []
+    word = READINESS_WORDS.get(data.get('readiness'), clean(data.get('readiness')))
+    if len(scopes) == 1:
+        head = f"{READINESS_WORDS.get(scopes[0].get('readiness'), clean(scopes[0].get('readiness')))}: {clean(scopes[0].get('root'))}"
+    else:
+        head = f"{word}: {plural(len(scopes), 'scope')}" if scopes else f'Readiness: {word}'
+    if output['dry_run']:
+        head += ' (dry run: changes needed, nothing applied)' if output['would_change'] else ' (dry run: no changes needed)'
+    elif output['changed']:
+        head += ' (fixed just now)' if output['transaction'] == 'committed' else f" ({output['transaction']})"
+    lines = [head[0].upper() + head[1:]]
+    if len(scopes) > 1:
+        lines.extend(f"  {clean(item.get('root'))}: {READINESS_WORDS.get(item.get('readiness'), clean(item.get('readiness')))}" for item in scopes)
+    if data.get('event') not in (None, 'manual'):
+        lines.append(f"  event: {clean(data['event'])}")
+    if data.get('network') not in (None, 'none'):
+        lines.append(f"  network: {clean(data['network'])}")
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
-    lines.extend(workflow_lines(data))
+    # A quiet "ready" is enough until this invocation changed something or ran setup; then the per-skill verdict is the news.
+    lines.extend(workflow_lines(data, quiet_ready=not (output['changed'] or (data.get('setup') or {}).get('actions'))))
     lines.extend(setup_lines(data))
-    lines.extend(actions(output))
+    lines.extend(action_summary(output))
+    if data.get('approval') == 'not_approved' and data.get('readiness') != 'approval_required':
+        lines.append("  Automatic startup checks: not approved ('mask integration approve' enables them).")
     if data.get('readiness') == 'approval_required':
         lines.append("  approve the consumer with 'mask integration approve --project ROOT' before automatic readiness")
     confirmation = data.get('confirmation')
@@ -302,20 +355,27 @@ def render_ensure(data, output):
         lines.append(f"  one-time readiness granted by {clean(confirmation['granted_by'])}; automatic readiness still needs 'mask integration approve'")
     elif confirmation:
         lines.append("  would ask for one-time readiness consent; automatic readiness still needs 'mask integration approve'")
+    if output['changed']:
+        lines.append('  Restart running agents to load the change.')
     return lines + plan_guard(data, output)
 
 
-def workflow_lines(data, verb='will be deployed from'):
-    """Declared native roles and consumer inputs per consumer: what matches, what is preserved, what will be deployed."""
+def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
+    """Declared native roles and consumer inputs per consumer: what matches, what is preserved, what will be deployed.
+
+    ``quiet_ready`` leaves out skills that are complete with nothing pending, for results where only news belongs.
+    """
     lines = []
     for entry in data.get('workflow_readiness', []) or []:
-        declared = [skill for skill in entry.get('skills', []) or [] if skill.get('workflow') == 'declared']
+        declared = [skill for skill in entry.get('skills', []) or [] if skill.get('workflow') == 'declared'
+                    and not (quiet_ready and skill.get('complete') and all(row.get('state') in ('ok', 'not_applicable') for row in skill.get('roles') or [])
+                             and all(row['state'] == 'absent' for row in skill.get('retired_files', [])))]
         if declared:
             lines.append(f"  {clean(entry.get('scope', 'project'))}: {clean(entry.get('root'))}")
         for skill in declared:
             pending_roles = any(row.get('state') not in ('ok', 'not_applicable') for row in skill.get('roles') or [])
             status = 'needs deployment' if skill.get('complete') and pending_roles else 'ready' if skill.get('complete') else 'needs attention'
-            lines.append(f"    {clean(skill.get('skill'))}: {status} (host loading: not verified)")
+            lines.append(f"    {clean(skill.get('skill'))}: {status}" + (' (host loading: not verified)' if status == 'ready' else ''))
             for row in skill.get('retired_files', []):
                 if row['state'] != 'absent':
                     note = {'present': 'retired; use ensure --repair to back up and remove', 'remove_planned': 'will back up and remove',
@@ -446,22 +506,64 @@ def render_sources(data, output):
     return lines + actions(output) + plan_guard(data, output)
 
 
+def consumer_count(rows):
+    projects = sum(row.get('scope') != 'user' for row in rows)
+    parts = ([plural(projects, 'project')] if projects else []) + (['personal skills'] if projects != len(rows) else [])
+    return ' and '.join(parts) or 'no consumers'
+
+
+def render_consumer_update(data, output):
+    """update: one sentence for the outcome, then only the consumers, taps and follow-ups that carry news."""
+    rows = data.get('consumers') or []
+    moved = sum(len(row.get('changes') or []) for row in rows)
+    touched = consumer_count([row for row in rows if row.get('changes')])
+    if output['dry_run']:
+        head = f"Would update {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
+            'Would repair links; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to update (dry run: cached taps only).'
+    elif output['changed']:
+        head = f"Updated {plural(moved, 'skill')} in {touched}." if moved else 'Repaired managed links; no skill versions changed.'
+        if output['transaction'] != 'committed':
+            head += f" Transaction: {output['transaction']}."
+    elif output['would_change']:
+        head = 'Update proposed; nothing applied.'
+    else:
+        head = f'Already up to date ({consumer_count(rows)}).' if rows else 'Nothing to update.'
+    lines = [head]
+    width = max((len(clean(item.get('coordinate'))) for row in rows for item in row.get('changes') or []), default=0)
+    for row in rows:
+        if not row.get('changes') and row.get('status') in ('unchanged', 'updated'):
+            continue
+        label = clean(row.get('root')) + (' (personal)' if row.get('scope') == 'user' else '')
+        if row.get('status') not in ('unchanged', 'updated'):
+            error = row.get('error') or {}
+            label += f": {clean(row.get('status'))}" + (f" - {clean(error.get('message'))} ({clean(error.get('code'))})" if error else '')
+        lines += ['', f'  {label}']
+        if row.get('requires_fetch'):
+            lines.append("    not in the cache yet; run 'mask update' without --dry-run, --offline or --expect-plan-hash to fetch it")
+        lines.extend(f"    {clean(item.get('coordinate')).ljust(width)}  {clean((item.get('before_commit') or 'new')[:7])} -> {clean((item.get('after_commit') or 'removed')[:7])}"
+                     for item in row.get('changes') or [])
+    notes = fetch_lines(data)
+    for blocker in data.get('blockers', []) or []:
+        notes.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
+    differing = [row for row in data.get('shadowing') or [] if not row.get('same_target')]
+    if differing:  # Overlaps that resolve to one target are not news; --json still lists them.
+        notes.append(f"  shadowing: {plural(len(differing), 'scope overlap')} resolving to different targets; see warnings")
+    notes.extend(workflow_lines(data, quiet_ready=True))
+    if output['changed']:
+        notes.append('  Restart running agents to load the new versions.')
+    return lines + ([''] + notes if notes else []) + plan_guard(data, output)
+
+
 def render_update(data, output):
+    if output['command'] == 'update' and isinstance(data.get('consumers'), list):
+        return render_consumer_update(data, output)
     lines = [headline(output, output['command'].replace('.', ' '))]
     lines.extend(fields(data, [('program before', 'program_before'), ('program after', 'program_after'),
                                ('remote', 'remote_freshness'), ('fetch required', 'requires_fetch'), ('next invocation required', 'next_invocation_required'), ('network', 'network')]))
     if isinstance(data.get('scope'), str):
         lines.append(f"  scope: {clean(data['scope'])}")
     lines.extend(fetch_lines(data))
-    for row in data.get('consumers') or []:
-        note = f" ({clean(row['error'].get('code'))})" if row.get('error') else ''
-        if row.get('requires_fetch'):
-            note += '; the cache lacks this selection, so run update without --dry-run, --offline or --expect-plan-hash to fetch it'
-        lines.append(f"  {clean(row.get('scope'))} {clean(row.get('root'))}: {clean(row.get('status'))}{note}")
-        lines.extend(f"    {clean(item.get('coordinate'))}: {clean((item.get('before_commit') or 'none')[:12])} -> {clean((item.get('after_commit') or 'none')[:12])}"
-                     for item in row.get('changes') or [])
-    lines.extend(workflow_lines(data))
-    return lines + change()(data, output)[1:] if 'projects' in data else lines + actions(output) + plan_guard(data, output)
+    return lines + actions(output) + plan_guard(data, output)
 
 
 def fetch_lines(data):
@@ -469,12 +571,12 @@ def fetch_lines(data):
     lines = [f"  fetch: {'fetched' if effects.get('fetched') else 'attempted, nothing new' if effects.get('attempted') else 'not attempted (cached candidate used)'}"] if effects else []
     for name, row in (data.get('fetches') or {}).items():
         if not row.get('attempted'):
-            outcome_text = 'not attempted (cached content used)'
+            outcome_text = 'used the cached copy (not fetched)'
         elif not row.get('ok'):
-            outcome_text = f"failed ({clean((row.get('error') or {}).get('code'))})"
+            outcome_text = f"fetch failed ({clean((row.get('error') or {}).get('code'))})"
         else:
-            outcome_text = 'fetched, configured ref moved' if row.get('remote_refs_changed') else 'fetched, configured ref unchanged'
-        lines.append(f"  fetch {clean(name)}: {outcome_text}")
+            outcome_text = 'fetched new commits' if row.get('remote_refs_changed') else 'fetched, nothing new'
+        lines.append(f"  tap {clean(name)}: {outcome_text}")
     return lines
 
 
@@ -529,48 +631,59 @@ TASK_SPEC = [('scope', 'scope'), ('root', 'root'), ('declaration', 'declaration_
 
 
 def render_task(data, output):
-    """install/remove: what was requested, what changed, what was already so, then the engine actions."""
-    lines = [headline(output, output['command'])] + fields(data, TASK_SPEC)
-    if data.get('declaration_created'):
-        lines.append('  declaration: created for this scope' if output['changed'] else '  declaration: would be created for this scope')
-    if not data.get('registered', True):
-        lines.append('  registration: ' + ('recorded in this operation' if output['changed'] else 'part of this operation'))
-    for label, key in (('added', 'added'), ('removed', 'removed'), ('already selected' if output['command'] == 'install' else 'not selected', 'already')):
-        if data.get(key):
-            lines.append(f"  {label}: {clean(data[key])}")
-    if data.get('agents'):
-        lines.append(f"  agents for new skills: {clean(data['agents'])}")
-    if 'skills' in data:
-        lines.append(f"  selected now: {clean(data['skills'])}")
+    """install/remove: the outcome in one sentence, the skills it touched, then only what needs a human's attention."""
+    install = output['command'] == 'install'
+    moved = data.get('added' if install else 'removed') or []
+    verb, link = ('install', 'into') if install else ('remove', 'from')
+    if not moved:
+        head = (f"Already installed in {place(data)}: " if install else f"Not installed in {place(data)}: ") + joined(data.get('already') or [])
+        head += '. Nothing to do.' if not output['would_change'] and not output['changed'] else '.'
+    elif output['dry_run']:
+        head = f"Would {verb} {plural(len(moved), 'skill')} {link} {place(data)} (dry run: nothing applied)."
+    elif output['changed']:
+        head = f"{verb.capitalize().rstrip('e')}ed {plural(len(moved), 'skill')} {link} {place(data)}."
+    else:
+        head = f"Proposed: {verb} {plural(len(moved), 'skill')} {link} {place(data)}; nothing applied."
+    lines = [head] + [f"  {'+' if install else '-'} {clean(item)}" for item in moved]
+    if moved and data.get('already'):
+        lines.append(f"  {'already installed' if install else 'not installed'}: {joined(data['already'])}")
+    if install and moved and data.get('agents'):
+        lines.append(f"  for: {joined(data['agents'])}")
+    created = ([f"created {clean(data.get('declaration_path'))}"] if data.get('declaration_created') else []) + \
+        ([] if data.get('registered', True) else ['registered this ' + ('home' if data.get('scope') == 'user' else 'project')])
+    if created and (output['changed'] or output['dry_run']):
+        lines.append('  ' + ('Also ' if output['changed'] else 'Would also have ') + joined(created) + '.')
+    lines.extend(action_summary(output))
+    if not install and 'skills' in data and moved:
+        lines.append(f"  still installed: {joined(data['skills']) if data['skills'] else 'nothing'}")
     for blocker in data.get('blockers', []) or []:
         lines.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
-    lines.extend(workflow_lines(data))
-    lines.extend(actions(output))
-    if not output.get('actions') and not data.get('blockers'):
-        lines.append('  nothing to do: the selection and links already match')
+    lines.extend(workflow_lines(data, quiet_ready=True))
+    if output['changed']:
+        lines.append('  Restart running agents to load the change.')
     return lines + plan_guard(data, output)
 
 
 def render_list(data, output):
     """One row per selected skill with a column per agent; footer counts and honest limitations."""
-    scope = clean(data.get('scope'))
-    lines = [f"{scope} skills at {clean(data.get('root'))}"]
+    lines = [f"{'Personal' if data.get('scope') == 'user' else 'Project'} skills in {clean(data.get('root'))}"]
     if not data.get('declared'):
-        lines.append("  no skills are selected here; add one with 'mask install ID'")
+        lines.append("  None yet. Add one with 'mask install ID'; browse with 'mask skill list'.")
         return lines
-    lines.append(f"  sources: {clean((data.get('source') or {}).get('sources'))} (pinned)")
-    if not data.get('registered'):
-        lines.append("  not registered: nothing is deployed; 'mask install ID' or 'mask ensure' deploys the selection")
     agents = data.get('agents', [])
-    rows = [dict(skill=entry['skill'], version=entry.get('commit', '-')[:12] if entry.get('commit') else '-', **{agent: entry['states'].get(agent, 'unknown') for agent in agents}) for entry in data.get('skills', [])]
+    rows = [dict(skill=entry['skill'], version=entry.get('commit', '-')[:7] if entry.get('commit') else '-', **{agent: entry['states'].get(agent, 'unknown') for agent in agents}) for entry in data.get('skills', [])]
+    lines.append('')
     if rows:
         lines.extend(table(rows, [('SKILL', 'skill'), ('PIN', 'version')] + [(agent.upper(), agent) for agent in agents]))
     else:
         lines.append('  no skills selected')
     links = data.get('links') or {}
-    lines.append(f"{len(rows)} skill(s); {clean(links.get('linked', 0))} of {clean(links.get('expected', 0))} managed links in place")
+    linked, expected = links.get('linked', 0), links.get('expected', 0)
+    lines += ['', f"  {plural(len(rows), 'skill')}, " + ('no links expected here.' if not expected else f'all {clean(expected)} links in place.' if linked == expected else f"{clean(linked)} of {clean(expected)} links in place; run 'mask ensure' to fix.")]
+    if not data.get('registered'):
+        lines.append("  Not registered, so nothing is deployed; 'mask ensure' deploys the selection.")
     for limitation in data.get('limitations', []):
-        lines.append(f'  limitation: {clean(limitation)}')
+        lines.append(f'  note: {clean(limitation)}')
     return lines
 
 
@@ -606,11 +719,19 @@ RENDERERS = {
 
 
 def warnings(output):
-    lines = []
+    """One line per distinct message; repeats of a message list their paths beneath it instead of repeating the sentence."""
+    groups = {}
     for warning in output.get('warnings', []):
         detail = warning.get('details') or {key: value for key, value in warning.items() if key not in ('code', 'message')}
         detail = {key: value for key, value in detail.items() if not isinstance(value, (dict, list))} if isinstance(detail, dict) else detail
-        lines.append(f"warning: {clean(warning.get('message'))}" + (f" [{clean(detail)}]" if detail else ''))
+        groups.setdefault(clean(warning.get('message')), []).append(detail)
+    lines = []
+    for message, details in groups.items():
+        if len(details) == 1:
+            lines.append(f'warning: {message}' + (f' [{clean(details[0])}]' if details[0] else ''))
+            continue
+        lines.append(f'warning: {message} ({len(details)} times)')
+        lines.extend(f"  {clean(detail.get('path') or detail.get('root') or detail) if isinstance(detail, dict) else clean(detail)}" for detail in details if detail)
     return lines
 
 
@@ -666,7 +787,7 @@ def render_error(output):
         lines.append(f"  plan hash: {data['plan_hash']}")
     lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
     if output.get('changed') and output['transaction'] != 'not_started':
-        lines.extend(actions(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
+        lines.extend(action_summary(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
     retained = data.get('retained_preparation')
     if retained:
         lines.append(f"  retained preparation: {len(retained['artifacts'])} store artifact(s) and {len(retained['acquisitions'])} cache acquisition(s) "
