@@ -45,6 +45,9 @@ INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
                 'mkdir -p "$HOME/.local/bin"',
                 'python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"',
                 f'"$HOME/.local/bin/mask" tap add agentskills {TAP_URL}')
+# The piped installer is proven against a local program repository in tests.test_installer; this module replays the by-hand recipe.
+INSTALLER = ('curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh',)
+WINDOWS_INSTALLER = ('powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1 | iex"',)
 IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask ensure')
 MAKE_EVERYTHING_WORK = ('mask ensure --all --repair',)
 EVERYDAY = {
@@ -74,7 +77,7 @@ class ReadmeText(unittest.TestCase):
         found = sections(README.read_text(encoding='utf-8'))
         blocks = {name: [tuple(block.splitlines()) for block in FENCE.findall(body)] for name, body in found.items()}
         self.assertEqual({name: rows for name, rows in blocks.items() if rows},
-                         {'Install once': [INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
+                         {'Install once': [INSTALLER, WINDOWS_INSTALLER, INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
         table = [[cell.strip() for cell in line.strip('|').split('|')] for line in found['Everyday commands'].splitlines() if line.startswith('|')]
         self.assertEqual(table, [['Task', 'Command'], ['---', '---'], *([task, f'`{command}`'] for task, command in EVERYDAY.items())])
 

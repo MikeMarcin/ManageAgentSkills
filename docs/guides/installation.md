@@ -13,6 +13,29 @@ Program installation, the launcher and the first tap in detail, including the na
 
 ## Install and approve a tap
 
+### With the installer
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh
+```
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1 | iex"
+```
+
+[`install.sh`](../../install.sh) and [`install.ps1`](../../install.ps1) do exactly what the by-hand steps below do: check for Git and Python 3.11+, clone ManageAgentSkills (or fast-forward an existing clone, never discarding local work), and run `mask.py self install` to write the launcher. They run nothing as root or elevated, do not edit your shell profile or PATH (they print the line to add), and install neither Python nor Git. Running the installer again updates in place; afterwards `mask update` does the same from inside MASK.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MASK_INSTALL_DIR` | `${XDG_DATA_HOME:-~/.local/share}/mask`; `%LOCALAPPDATA%\mask\program` on Windows | Where the program clone lives. Keep it: the launcher runs MASK from there |
+| `MASK_BIN_DIR` | `~/.local/bin`; `%LOCALAPPDATA%\mask\bin` on Windows | Where the `mask` launcher is written |
+| `MASK_REPO` | `https://github.com/MikeMarcin/ManageAgentSkills.git` | The Git URL to clone, for a fork or an SSH URL |
+| `MASK_PYTHON` | first of `python3`, `python` (`py -3`, `python` on Windows) that is 3.11+ | The interpreter the launcher will use |
+
+The raw URLs are served only while the repository is public. With access to a private copy, fetch the script through your GitHub sign-in instead: `gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh -H 'Accept: application/vnd.github.raw' | sh`. Each script is a single function called on its last line, so a download that is cut short runs nothing. `install.sh` is exercised end to end against a local program repository by `tests.test_installer`; `install.ps1` has only been parse-checked, not run on Windows.
+
+### By hand
+
 On macOS or Linux, run the following from the directory that will hold the clone, using a supported `python3`:
 
 ```sh

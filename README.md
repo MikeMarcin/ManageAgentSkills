@@ -6,10 +6,29 @@ MASK installs skills from Git repositories you approve as taps, such as [AgentSk
 
 ## Install once
 
-You need Python 3.11+, Git, a ManageAgentSkills clone and existing
-directory-symlink support. You do not need an AgentSkills checkout. MASK does not
-change privileges or install Python or Git. From the directory that will hold the
-clone, on macOS or Linux:
+You need Python 3.11+, Git and existing directory-symlink support. You do not need an
+AgentSkills checkout. MASK does not change privileges, edit your shell profile or install
+Python or Git.
+
+The installer clones MASK into `~/.local/share/mask`, writes the `mask` launcher into
+`~/.local/bin`, and updates in place when you run it again:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1 | iex"
+```
+
+Those URLs are served only while this repository is public. With access to a private copy,
+`gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh -H 'Accept: application/vnd.github.raw' | sh`
+does the same through your GitHub sign-in. `MASK_INSTALL_DIR`, `MASK_BIN_DIR`, `MASK_REPO` and `MASK_PYTHON`
+override the defaults; read the script first if you prefer, it is short.
+
+Or do the same by hand. From the directory that will hold the clone, on macOS or Linux:
 
 ```sh
 git clone https://github.com/MikeMarcin/ManageAgentSkills.git
