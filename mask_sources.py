@@ -613,7 +613,7 @@ def dispatch(args, output, home):
     config = c.empty_config() if bootstrap else c.config(c.parse_json(original))
     name = getattr(args, 'name', None)
     proposal = copy.deepcopy(config)
-    output['data'] = dict(catalog_only=True)
+    output['data'] = dict(catalog_only=True, **(dict(tap=name) if name else {}))
     if args.command == 'source.list':
         output['data']['sources'] = config['sources']
         return

@@ -65,7 +65,7 @@ class RendererRegistry(unittest.TestCase):
     def test_legacy_fixture_renders_three_skill_rows_for_six_links(self):
         envelope = json.loads((PACK / 'fixtures/legacy-inventory.json').read_text(encoding='utf-8'))
         text = present.render(envelope)
-        self.assertIn('3 skill row(s), 6 link(s)', text)
+        self.assertIn('Inventory: 3 skills, 6 links', text)
         lines = [line for line in text.splitlines() if line.startswith('  legacy/')]
         self.assertEqual(len(lines), 3, text)
         self.assertIn('CODEX', text)
@@ -144,19 +144,19 @@ class HumanTerminal(PublicFixture):
         self.linked_consumer_with_stale_roles()
         run = self.human('inventory', '--project', self.project)
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertIn('3 skill row(s), 6 link(s) shown of 6 total', run.stdout)
+        self.assertIn('Inventory: 3 skills, 6 links', run.stdout)
         lines = [line for line in run.stdout.splitlines() if line.startswith(f'  {TAP}/')]
         self.assertEqual(sorted(line.split()[0] for line in lines), [f'{TAP}/alpha', f'{TAP}/beta', f'{TAP}/implement-rfc'], run.stdout)
-        self.assertTrue(all(line.split()[1:5] == [TAP, 'pinned', 'ok', 'ok'] for line in lines), run.stdout)
+        self.assertTrue(all(line.split()[1:4] == ['pinned', 'ok', 'ok'] for line in lines), run.stdout)
         self.assertIn('CLAUDE', run.stdout)
         self.assertIn('CODEX', run.stdout)
-        self.assertIn('limitation:', run.stdout)
+        self.assertIn('note:', run.stdout)
         self.assertNotIn('legacy', run.stdout)
         self.assertFalse(self.parses_as_result_envelope(run.stdout))
         page = self.human('inventory', '--project', self.project, '--limit', '2')
-        self.assertIn('partial page', page.stdout)
+        self.assertIn('More rows follow this page', page.stdout)
         self.assertIn('--offset 2', page.stdout)
-        self.assertIn('2 link(s) shown of 6 total', page.stdout)
+        self.assertIn('2 links shown of 6', page.stdout)
 
     def test_unregistered_inventory_is_a_readable_refusal(self):
         self.assertTrue(self.machine('project', 'init')['ok'])
