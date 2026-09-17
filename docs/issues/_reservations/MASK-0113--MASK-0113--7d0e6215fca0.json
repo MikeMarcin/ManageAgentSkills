@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0113"
+  ],
+  "reserve_for": "rfc-mask-0022-transport-neutral-tap-identity",
+  "purpose": "",
+  "created": "2026-09-17T03:37:34.699653+00:00",
+  "base": "d19335eeb7e7df0e4f1756bd5267550ec1697048"
+}
