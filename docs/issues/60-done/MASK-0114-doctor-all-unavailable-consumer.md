@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0114"
 title: "Report an unavailable registered consumer instead of failing doctor --all with filesystem.failed"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P1"
 metadata: {"origin":"Field report on macOS after pulling 7ccf671 (2026-09-16)"}
+acceptance: [{"criterion":"Doctor reports unavailable project/user scopes, continues observation/repair and preserves OS error paths","outcome":"pass","revision":"29814c58c4b62b817e5169e35d731b8cf8d15780","evidence":{"kind":"artifact","detail":"docs/development/cache-and-doctor-repair.md: 69 distinct regression tests passed plus final narrow rechecks; documentation gate passes. Reported live cache retained and rebuilt, stale temporary registration removed through guarded public CLI, mask update succeeds and mask doctor --check is healthy."}}]
 ---
 
 # MASK-0114: Report an unavailable registered consumer instead of failing doctor --all with filesystem.failed
