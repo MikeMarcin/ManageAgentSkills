@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0118"
+  ],
+  "reserve_for": "cache-ownership-repair",
+  "purpose": "",
+  "created": "2026-09-19T18:16:20.576953+00:00",
+  "base": "ad327f37aae6a053a409bc0f5e8101c16026c2f6"
+}
