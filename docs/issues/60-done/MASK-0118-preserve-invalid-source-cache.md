@@ -2,9 +2,10 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0118"
 title: "Preserve invalid source caches for an explicit rebuild"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
+acceptance: [{"criterion":"Guarded cache retention preserves suspect bytes and permits fresh approved fetch without consumer changes","outcome":"pass","revision":"29814c58c4b62b817e5169e35d731b8cf8d15780","evidence":{"kind":"artifact","detail":"docs/development/cache-and-doctor-repair.md: 69 distinct regression tests passed plus final narrow rechecks; documentation gate passes. Reported live cache retained and rebuilt, stale temporary registration removed through guarded public CLI, mask update succeeds and mask doctor --check is healthy."}}]
 ---
 
 # MASK-0118: Preserve invalid source caches for an explicit rebuild
