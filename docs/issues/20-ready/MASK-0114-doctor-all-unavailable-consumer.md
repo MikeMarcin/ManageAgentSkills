@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0114"
 title: "Report an unavailable registered consumer instead of failing doctor --all with filesystem.failed"
-status: "Inbox"
+status: "Ready"
 rfcs: []
 depends_on: []
 priority: "P1"
