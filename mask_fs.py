@@ -186,7 +186,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
         after['generation'] = state['generation'] + 1
     # No plan reads a checkout; the retired live-source facts keep the plan's shape and hash, always empty.
     source_data = dict(root=None, revision=None, dirty=None, fingerprint=c.digest({}))
-    pinned_controls = dict(workspaces=pinned.observe(roots, state, home, user_root=user_root), config_text=c.read_text(home / 'config.json'), policy_text=c.read_text(home / 'integration.json', missing=True), selection_policy_text=selection.read_policy(home)[1], home_identity=c.identity(home)) if uses_pinned else None
+    pinned_controls = dict(workspaces=pinned.observe(roots, state, home, user_root=user_root, blockers=blockers), config_text=c.read_text(home / 'config.json'), policy_text=c.read_text(home / 'integration.json', missing=True), selection_policy_text=selection.read_policy(home)[1], home_identity=c.identity(home)) if uses_pinned else None
     payload = dict(protocol=1, adapters=c.ADAPTERS, operation=operation, config=config, generation=state['generation'],
                    state=state, observations=observations, source=source_data, links=links, manifests=[],
                    register=sorted(register), unregister=sorted(unregister), keep_links=keep_links, register_only=register_only, inactive=sorted(inactive))

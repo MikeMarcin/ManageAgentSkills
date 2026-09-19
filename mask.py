@@ -86,6 +86,7 @@ COMMANDS = {
     # Observational unless --migrate, which rewrites the tap catalog's older identity spellings in one atomic write (RFC-MASK-0022).
     'doctor': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('check', 'flag'), ('migrate', 'flag')]),
     'source.fetch': (True, True, [('name', 'optional'), ('locked', 'flag'), ('project', 'value'), ('user', 'flag'), ('offline', 'flag')]),
+    'source.repair-cache': (True, False, [('name', 'pos')]),
     'source.list': (False, False, []),
     'source.show': (False, False, [('name', 'pos')]),
     'source.inspect': (True, True, [('url', 'pos'), ('ref', 'value'), ('path', 'value')]),
@@ -118,6 +119,7 @@ GUARDED.update({'project.set-agents', 'user.set-agents', 'selection-policy.set',
 GUARDED.add('ensure')
 GUARDED.update({'install', 'remove'})
 GUARDED.add('doctor')  # --expect-plan-hash binds a reviewed doctor --migrate preview.
+GUARDED.add('source.repair-cache')
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 
@@ -474,7 +476,7 @@ def local_dispatch(args, output, leaves):
         return sources_ops.publication(args, output, home)
     if command == 'source.inspect':
         return sources_ops.inspect(args, output, home)
-    if command in ('source.list', 'source.show', 'source.fetch', 'tap.add', 'tap.remove', 'tap.transport'):
+    if command in ('source.list', 'source.show', 'source.fetch', 'source.repair-cache', 'tap.add', 'tap.remove', 'tap.transport'):
         return sources_ops.dispatch(args, output, home)
     if command in ('integration.enable', 'integration.disable'):
         return integration_ops.dispatch(args, output, home)
@@ -713,8 +715,10 @@ def main(argv=None):
         if output['transaction'] == 'not_needed':
             output['transaction'] = 'not_started'
         exit_code = 130
-    except OSError:
-        error = MaskError('filesystem.failed', 'A filesystem operation failed.', 5)
+    except OSError as cause:
+        details = {key: value for key, value in dict(errno=cause.errno, filename=cause.filename,
+                                                    filename2=cause.filename2).items() if value is not None}
+        error = MaskError('filesystem.failed', 'A filesystem operation failed.', 5, details=details)
         output.update(ok=False, error=error.as_dict())
         if output['transaction'] == 'not_needed':
             output['transaction'] = 'not_started'

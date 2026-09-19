@@ -446,9 +446,10 @@ def cached(home, name, entry):
     if c.kind(root / 'mask-source.json') != 'file':
         c.fail('source.cache_invalid', 'Source cache has no regular ownership marker.', 4)
     marker = c.read_json(root / 'mask-source.json', 'source')
-    if set(marker) != {'schema_version', 'repository', 'identity'} or marker['schema_version'] != 1 or marker['identity'] != c.identity(root) \
+    if not isinstance(marker, dict) or set(marker) != {'schema_version', 'repository', 'identity'} or marker['schema_version'] != 1 or marker['identity'] != c.identity(root) \
             or not isinstance(marker['repository'], str) or not same(marker['repository'], entry['repository']):
-        c.fail('source.cache_invalid', 'Source cache ownership changed.', 4)
+        c.fail('source.cache_invalid', 'Source cache ownership changed.', 4, source=name, path=str(root),
+               recorded_identity=marker.get('identity') if isinstance(marker, dict) else None, observed_identity=c.identity(root))
     if c.git(root, 'rev-parse', '--is-bare-repository') != 'true':
         c.fail('source.cache_invalid', 'Expected an owned bare source cache.', 4)
     return root
@@ -599,6 +600,46 @@ def references(home, config, state, name):
     return result
 
 
+def repair_cache(args, output, home, config, original):
+    """Retain suspect bytes without trusting them; the next ordinary fetch starts fresh."""
+    output['data'].update(catalog_only=False, cache_only=True)
+    entry = selected(config, args.name)
+    root = cache_root(home, args.name, entry)
+    if c.kind(root) == 'missing':
+        if getattr(args, 'expect_plan_hash', None):
+            c.fail('plan.stale', 'The previewed cache is no longer present; nothing was changed.', 4)
+        output['data'].update(source=args.name, resolution_required=True, cache_retained=None)
+        return
+    marker_path = root / 'mask-source.json'
+    if c.kind(root) != 'directory' or c.kind(marker_path) != 'file':
+        c.fail('source.cache_invalid', 'Only a real directory with a recognized tap marker can be retained.', 4, path=str(root))
+    marker_text = c.read_text(marker_path, 'source')
+    marker = c.parse_json(marker_text, 'source')
+    if (not isinstance(marker, dict) or set(marker) != {'schema_version', 'repository', 'identity'}
+            or marker['schema_version'] != 1 or not isinstance(marker['repository'], str)
+            or not same(marker['repository'], entry['repository'])):
+        c.fail('source.cache_invalid', 'Cache marker does not name the approved tap; content is preserved in place.', 4, path=str(root))
+    actual = c.identity(root)
+    backup = root.with_name(root.name + '.retained-' + c.digest(dict(identity=actual, marker=marker_text))[7:23])
+    if c.kind(backup) != 'missing':
+        c.fail('source.cache_collision', 'Cache retention destination already exists; nothing was replaced.', 4, path=str(backup))
+    plan_hash = c.digest(dict(config=original, path=str(root), identity=actual, marker=marker_text, backup=str(backup)))
+    if getattr(args, 'expect_plan_hash', plan_hash) != plan_hash:
+        c.fail('plan.stale', 'Cache identity or binding changed; preview again.', 4)
+    output['data'].update(source=args.name, path=str(root), cache_retained=str(backup), plan_hash=plan_hash,
+                          recorded_identity=marker.get('identity'), observed_identity=actual, resolution_required=True)
+    output['would_change'] = True
+    output['actions'] = [dict(kind='source.cache_retain', status='planned', path=str(root), destination=str(backup))]
+    if output['dry_run']:
+        return
+    # The normal machine writer lock protects MASK writers. Recheck external replacement;
+    # native no-replace rename preserves the complete directory and refuses collisions.
+    if c.identity(root) != actual or c.read_text(marker_path, 'source') != marker_text or c.read_text(home / 'config.json') != original:
+        c.fail('plan.stale', 'Cache changed before retention; preview again.', 4)
+    c.publish_directory(root, backup)
+    output.update(changed=True, transaction='committed')
+
+
 def dispatch(args, output, home):
     original = c.read_text(home / 'config.json', missing=args.command == 'tap.add')
     # The first tap bootstraps a machine: it creates the v3 catalog (and empty state) in the same guarded write.
@@ -610,6 +651,8 @@ def dispatch(args, output, home):
     if args.command == 'source.list':
         output['data']['sources'] = config['sources']
         return
+    elif args.command == 'source.repair-cache':
+        return repair_cache(args, output, home, config, original)
     elif args.command == 'tap.add':
         policy = 'autocrlf' if getattr(args, 'autocrlf', False) else 'exact'
         entry = binding(home, name, args.url, getattr(args, 'ref', 'main'), getattr(args, 'packages', 'skills'), getattr(args, 'checkout', None), policy,

@@ -242,9 +242,19 @@ def validate_files(pending, home):
                 c.fail('recovery.conflict', 'Effective after controls disagree with pinned ownership state.', 8)
 
 
-def observe(roots, state, home, *, user_root=None):
+def observe(roots, state, home, *, user_root=None, blockers=None):
     import mask_ensure as readiness
-    return [readiness.workspace_observation(root, scope='user' if root == user_root else c.consumer_scope(state, root), home=home) for root in roots]
+    observations = []
+    for root in roots:
+        try:
+            observations.append(readiness.workspace_observation(root, scope='user' if root == user_root else c.consumer_scope(state, root), home=home))
+        except c.MaskError as error:
+            if blockers is None:
+                raise
+            detail = error.as_dict()
+            if not any(item['code'] == detail['code'] and item['details'].get('root') == str(root) for item in blockers):
+                blockers.append(detail)
+    return observations
 
 
 def check_observations(pending, home):

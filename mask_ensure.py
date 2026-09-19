@@ -408,6 +408,8 @@ def dispatch(args, output, home):
 
 
 def workspace_observation(root, *, scope='project', home=None):
+    if not root.is_dir():
+        c.fail(scope + '.unavailable', 'Registered consumer root is unavailable.', 4, root=str(root))
     head = c.git(root, 'rev-parse', '--verify', 'HEAD', optional=True) if scope == 'project' else None
     git_dir = c.git(root, 'rev-parse', '--absolute-git-dir', optional=True) if scope == 'project' else None
     unsafe = False

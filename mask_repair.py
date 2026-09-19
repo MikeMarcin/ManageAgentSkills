@@ -174,6 +174,7 @@ def ensure_all(args, output, home, ensure):
         try:
             if stopped:
                 c.fail('recovery.required', 'A prior scope needs transaction recovery; this scope was not attempted.', 8)
+            c.registered_root(Path(root), c.consumer_records(state)[root], scope)
             ensure(selected, child, home)
         except c.MaskError as error:
             child['error'] = error.as_dict()

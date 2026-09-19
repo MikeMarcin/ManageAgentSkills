@@ -549,6 +549,9 @@ def render_sources(data, output):
     if command == 'source.list' and isinstance(catalog, dict):
         width = max((len(item) for item in catalog), default=0)
         return [plural(len(catalog), 'approved tap')] + ([tap_line(item, entry, width) for item, entry in catalog.items()] or ["  None yet. Approve one with 'mask tap add NAME URL'."])
+    if command == 'source.repair-cache':
+        return [headline(output)] + pairs([('retained cache', data.get('cache_retained')),
+                ('next', 'mask source fetch ' + clean(data.get('source')))]) + plan_guard(data, output)
     if command == 'source.show':
         binding = data.get('binding') or {}
         how = clean(data.get('transport')) + {'pinned': ' (pinned)', 'origin': " (follows the project's origin)", 'hint': ' (worked last time)', 'gh': ' (gh git_protocol)',
@@ -808,7 +811,7 @@ RENDERERS = {
     'integration.approve': render_integration, 'integration.revoke': render_integration, 'integration.inspect': render_integration,
     'integration.enable': render_integration, 'integration.disable': render_integration, 'launch': render_launch,
     'workspace.forget': render_forget, 'link.adopt': summary('link adopt', [('root', 'root'), ('scope', 'scope'), ('path', 'path'), ('link', 'link_text')]),
-    'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources,
+    'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources, 'source.repair-cache': render_sources,
     'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources, 'tap.transport': render_sources,
     'lock': render_lock, 'update': render_refresh, 'upgrade': render_upgrade,
     'self.status': render_self_status, 'self.uninstall': render_uninstall, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
@@ -1044,6 +1047,7 @@ COMMAND_HELP = {
     'integration.inspect': ('Inspect project readiness authority and installed integrations.', 'mask integration inspect --project .'),
     'source.list': ('List approved taps.', 'mask source list'),
     'source.show': ('Show one approved tap: its identity, the transport this machine uses to reach it and why (pinned, the project origin, a transport that worked before, gh, the typed URL or a probe), its line-ending policy and cached revision.', 'mask source show NAME'),
+    'source.repair-cache': ('Retain a recognized tap cache at a sibling path without trusting its old ownership or objects. Preview and apply with the plan hash; the next source fetch rebuilds it. No consumer or catalog changes, deletion, or network access.', 'mask source repair-cache agentskills --dry-run\nmask source repair-cache agentskills --expect-plan-hash HASH\nmask source fetch agentskills'),
     'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),

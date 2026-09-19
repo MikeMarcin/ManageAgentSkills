@@ -28,6 +28,25 @@ A tap that cannot be fetched blocks only the consumers that reference it. The ot
 
 `mask source fetch` without a name fetches every approved tap into its cache and deploys nothing; a failing tap is named in the error while the others are still fetched. `mask source fetch NAME` fetches one tap, and `source fetch --locked` prepares exact locked artifacts.
 
+If a recognized cache refuses with `source.cache_invalid`, inspect its reported
+path and identities. Device numbers can change after a remount; matching inode
+numbers alone do not prove ownership. Do not edit the marker to make it pass.
+Retain the entire cache and rebuild from the approved remote:
+
+```sh
+mask source repair-cache agentskills --dry-run --json
+mask source repair-cache agentskills --expect-plan-hash RETURNED_HASH --json
+mask source fetch agentskills --json
+```
+
+`repair-cache` atomically moves the directory to the reported sibling retention
+path without replacing anything, deleting contents, reading its Git configuration
+or trusting its objects. The next fetch creates a fresh active cache. The operation
+refuses unrecognized markers, symlinks, stale previews and retention collisions.
+Catalog, registry, store, consumers and authentication remain unchanged. Retained
+objects stay available for inspection; old locked commits may need a later exact
+fetch if their store payloads are also unavailable. No automatic cleanup is implied.
+
 ### One tap, however each machine signs in
 
 A tap names a repository, not a way of reaching it. On GitHub, GitLab, Bitbucket and Codeberg, `https://github.com/O/R`, `ssh://git@github.com/O/R.git` and `git@github.com:O/R.git` are the same tap, written in project files as `https://github.com/O/R.git`. A project file committed from a machine that uses HTTPS therefore works unchanged on a machine that uses SSH keys, and the other way round. Files written before this rule, including the old `ssh://git@github.com/~/O/R.git` spelling, keep working byte for byte.

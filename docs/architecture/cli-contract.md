@@ -722,6 +722,24 @@ its identity as `migration.identity_canonicalization`. `doctor --migrate [--dry-
 `invocation.invalid`; `--dry-run`, `--yes` and `--expect-plan-hash` without
 `--migrate` are `invocation.invalid`.
 
+Unavailable registered project/personal roots appear as `project.unavailable` or
+`user.unavailable` with their path and restoration/unregister guidance. Doctor
+continues observing available scopes without changing registry or approval records;
+plain inspection exits 0 with `healthy: false`, and `--check` exits 7 with
+`state.drift`. `ensure --all --repair` likewise retains per-scope failures and attempts
+the remaining roots (aggregate `repair.incomplete`, exit 4). Stale approvals are
+retained: temporary unavailability does not authorize automatic pruning. Unhandled
+filesystem errors preserve available `filename`, `filename2` and `errno` details.
+
+**Cache repair.** `source repair-cache NAME [--dry-run] [--expect-plan-hash HASH]`
+validates the approved cache location and recognized repository marker, then retains
+the entire directory at a reported sibling path with an atomic no-replace move.
+The plan binds the catalog bytes, actual directory identity, marker and destination.
+It never blesses a mismatched identity, reuses objects, deletes content or contacts a
+remote. Unrecognized markers, links and retention collisions refuse. Missing caches
+are already ready for reconstruction. The next ordinary `source fetch NAME` creates
+a fresh owned cache; catalog, registry, store and consumer deployments are unchanged.
+
 **Update.** `upgrade [--project PATH | --user | --all] [--skill SOURCE/ID ...]
 [--allow-ref-rebind] [--offline] [--dry-run] [--expect-plan-hash HASH]` fetches
 and applies the selected consumers' updates end to end:
