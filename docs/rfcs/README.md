@@ -55,3 +55,5 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC | Status | Title |
 |---|---|---|
 | RFC-MASK-0022 | Implementing | Transport-neutral tap identity and convention-following transport |
+
+| RFC-MASK-0023 | Implementing | Selected workflow requirement profiles |
