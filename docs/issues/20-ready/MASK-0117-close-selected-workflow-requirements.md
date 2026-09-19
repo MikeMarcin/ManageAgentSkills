@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0117"
 title: "Close selected workflow requirements"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0023"]
 depends_on: ["MASK-0116"]
 closeout_for: ["RFC-MASK-0023"]
