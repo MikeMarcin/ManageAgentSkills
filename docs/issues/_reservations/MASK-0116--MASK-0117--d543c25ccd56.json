@@ -1,0 +1,11 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0116",
+    "MASK-0117"
+  ],
+  "reserve_for": "selected-workflow-requirements",
+  "purpose": "",
+  "created": "2026-09-19T17:21:34.652032+00:00",
+  "base": "7e38d17d99f8c5546add5020cf64c30575749071"
+}
