@@ -33,7 +33,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None):
     """One observational plan; every owned link text names a store payload or an explicit dev link.
 
     """
@@ -158,7 +158,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                         if payload is not None:
                             package_views[str(location)] = targets[link['skill']]
                     coordinates[link['skill']] = resolve.coordinate(link['resolution'])
-            roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles)
+            roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles, profiles=workflow_profiles)
             from mask_repair import retired_files as plan_retired
             retired = plan_retired(root, roles['reports'], repair_roles)
             retired_files.extend(retired)

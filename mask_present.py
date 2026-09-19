@@ -1084,6 +1084,7 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'workflow-profile': 'Check a declared role subset: SKILL=PROFILE (ensure --check only)',
     'json': 'Emit a structured result for scripts; never prompt',
     'debug': 'Include diagnostic details', 'help': 'Show this help', 'version': 'Show MASK version',
     'home': 'MASK state directory (not the project or personal home)',

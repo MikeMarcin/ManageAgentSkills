@@ -204,3 +204,20 @@ tap. Both commands support `--limit` (1–1000, default
 package path and locked artifact behind each link. See the
 [inventory contract](../architecture/cli-contract.md#inventory-unreleased-rfc-mask-0011-slice)
 for filters and result semantics.
+
+### Selected workflow requirements
+
+A package may declare passive `profiles` alongside each project/user workflow
+contract, for example `"direct": {"native_roles": []}`. Role entries are unique
+`agent/name` references to that scope's declared roles. Profiles retain every
+consumer input and package/binding check; absence of a selector preserves the full
+existing contract. Invalid profiles refuse even when inactive.
+
+`mask ensure --project ROOT --check --workflow-profile implement-rfc=direct --json`
+checks only that declared role subset. Use `--user` for personal scope. This is an
+observational capability, advertised as `workflow_requirement_profiles_v1`; it
+requires an explicit single scope and rejects setup, repair and automatic events.
+It never deploys or retires roles, changes the selected strategy, or proves host
+loading. Missing links, approval, invalid inputs and artifact drift remain blockers.
+Other selected skills keep their normal requirements. Normal `ensure`, installation
+and upgrades still reconcile the complete default role contract.

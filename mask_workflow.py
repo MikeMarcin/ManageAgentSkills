@@ -112,7 +112,7 @@ def descriptor(view, skill, scope='project'):
         c.fail('workflow.invalid', 'The workflow descriptor must be UTF-8 JSON.', 4, skill=skill)
     if scope not in ('project', 'user'):
         c.fail('workflow.invalid', 'Unknown workflow consumer scope.', 4)
-    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks', 'scopes'), family='workflow')
+    c.fields(value, ('schema_version', 'inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks', 'scopes', 'profiles'), family='workflow')
     scopes = value.get('scopes', {})
     if not isinstance(scopes, dict) or set(scopes) - {'user'}:
         c.fail('workflow.invalid', 'Workflow scopes may contain only a complete user contract.', 4)
@@ -120,7 +120,7 @@ def descriptor(view, skill, scope='project'):
     project = parse_contract(base, view, skill, sha256(data))
     personal = None
     if 'user' in scopes:
-        c.fields(scopes['user'], ('inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks'), family='workflow')
+        c.fields(scopes['user'], ('inputs', 'native_roles'), ('setup', 'retired_paths', 'compatible_locks', 'profiles'), family='workflow')
         # A project lock cannot vouch for a different personal contract with fewer inputs.
         personal = parse_contract(dict(scopes['user'], schema_version=1), view, skill, sha256(b'user\0' + data))
     return personal if scope == 'user' and personal is not None else project
@@ -193,7 +193,19 @@ def parse_contract(value, view, skill, digest):
         c.fields(entry, ('contract_sha256', 'role_inputs_sha256'), family='workflow')
         if any(not isinstance(item, str) or not HEX_RE.fullmatch(item) for item in entry.values()):
             c.fail('workflow.invalid', 'Compatible locks require exact lowercase SHA-256 pairs.', 4)
-    return dict(skill=skill, view=view, digest=digest, inputs=inputs, roles=roles, setup=setup,
+    profiles = value.get('profiles', {})
+    if not isinstance(profiles, dict) or len(profiles) > 32:
+        c.fail('workflow.invalid', 'Profiles must be a bounded map of named role subsets.', 4)
+    known = {agent + '/' + name for agent, name in roles}
+    for name, profile in profiles.items():
+        identifier(name, 'profile')
+        c.fields(profile, ('native_roles',), family='workflow')
+        selected = profile['native_roles']
+        if (not isinstance(selected, list) or any(not isinstance(item, str) for item in selected)
+                or len(selected) > LIMITS['native_roles'] or len(set(selected)) != len(selected)
+                or not set(selected) <= known):
+            c.fail('workflow.invalid', 'A profile must select declared agent/name roles once each; an empty list is allowed.', 4)
+    return dict(skill=skill, view=view, digest=digest, inputs=inputs, roles=roles, setup=setup, profiles=profiles,
                 retired_paths=retired, compatible_locks=compatible)
 
 
@@ -335,7 +347,7 @@ def lock_coherent(lock, desc, inputs):
     return all(lock['inputs'].get(row['id']) == row['sha256'] for row in inputs if row['required'] or row['state'] == 'ok')
 
 
-def requirements(root, scope, record, bindings, targets, *, coordinates=None, staged=None, repair=False):
+def requirements(root, scope, record, bindings, targets, *, coordinates=None, staged=None, repair=False, profiles=None):
     """Compute declared roles for the selected bindings and observe every destination without changing it.
 
     ``bindings`` maps skill -> set of selected agents; ``targets`` maps skill -> PackageView
@@ -345,6 +357,9 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
     Returns per-skill readiness rows, journal-ready writes and the next ownership map.
     """
     root = Path(root)
+    profiles = profiles or {}
+    if set(profiles) - set(bindings):
+        c.fail('workflow.profile_unknown', 'Profile selection names a skill not selected in this scope.', 4)
     coordinates, staged = coordinates or {}, staged or {}
     owned = dict((record or {}).get('native_roles', {}))
     contributions, reports = {}, []
@@ -355,17 +370,27 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
             continue
         desc = descriptor(targets[skill], skill, scope)
         if desc is None:
+            if skill in profiles:
+                c.fail('workflow.profile_unknown', 'Selected skill declares no workflow profiles.', 4, skill=skill)
             reports.append(dict(skill=skill, workflow='not_declared', contract=None, inputs=[], roles=[], complete=True))
             continue
         inputs = observe_inputs(root, desc)
+        selected_profile = profiles.get(skill)
+        if selected_profile is not None and selected_profile not in desc['profiles']:
+            c.fail('workflow.profile_unknown', 'Unknown requirement profile for this scope.', 4, skill=skill, profile=selected_profile)
+        selected_roles = set(desc['profiles'][selected_profile]['native_roles']) if selected_profile is not None else None
         lock, lock_state, lock_path = read_lock(root, desc)
         coherent = lock_coherent(lock, desc, inputs)
         report = dict(skill=skill, workflow='declared', contract=dict(descriptor=DESCRIPTOR, sha256=desc['digest'], lock=lock_state if not coherent else 'coherent', lock_path=lock_path),
                       package=dict(coordinate=coordinates.get(skill), root=str(desc['view'].root) if desc['view'].root is not None else None), inputs=inputs, roles=[], complete=True,
                       retired_paths=sorted(set(desc['retired_paths'] + ([legacy_lock_relative(skill)] if desc['setup'] else []))))
+        if selected_profile is not None:
+            report['selected_profile'] = selected_profile
         if any(row['state'] in ('missing', 'invalid') for row in inputs):
             report['complete'] = False
         for (agent, name), role in sorted(desc['roles'].items()):
+            if selected_roles is not None and agent + '/' + name not in selected_roles:
+                continue
             row = dict(skill=skill, agent=agent, name=name, producer='asset' if 'asset' in role else 'setup', path=None, state='not_applicable', ownership=None, route={}, host_load='not_verified')
             if agent in bindings[skill]:
                 row['path'] = adapters.role_relative(agent, scope, name)
@@ -440,6 +465,10 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
                                  reason='deleted outside MASK' if actual is None else 'replaced outside MASK'))
     for relative, holder in sorted(owned.items()):
         if relative in contributions:
+            continue
+        if holder['skill'] in profiles:
+            # A scoped observation never retires outputs belonging to another recipe.
+            next_owned[relative] = holder
             continue
         leaf = root / relative
         c.parents_safe(root, leaf)

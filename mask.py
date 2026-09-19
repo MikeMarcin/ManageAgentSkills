@@ -73,7 +73,7 @@ COMMANDS = {
     'project.list': (False, False, []),
     'plan': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
     'apply': (True, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag')]),
-    'ensure': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag')]),
+    'ensure': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('event', 'value'), ('check', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag'), ('workflow-profile', 'repeat')]),
     'integration.approve': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value'), ('linked-worktrees', 'flag'), ('inactive-branches', 'flag'), ('allow-locked-fetch', 'repeat')]),
     'integration.revoke': (True, False, [('project', 'value'), ('repository', 'value'), ('under', 'value')]),
     'integration.inspect': (False, False, [('project', 'value'), ('agent', 'value')]),
@@ -198,7 +198,7 @@ def capabilities(leaves):
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                 readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
-                workflow=dict(readiness='workflow_readiness_v1', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
+                workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1', profile_selection='ensure --check --workflow-profile SKILL=PROFILE', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {

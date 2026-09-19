@@ -188,6 +188,19 @@ def integration(args, output, home):
 def ensure(args, output, home):
     event = getattr(args, 'event', 'manual')
     repair = getattr(args, 'repair', False)
+    workflow_profiles = {}
+    for selection in getattr(args, 'workflow_profile', []):
+        import mask_workflow as workflow
+        skill, separator, profile = selection.partition('=')
+        if not separator or skill in workflow_profiles:
+            c.fail('invocation.invalid', '--workflow-profile requires unique SKILL=PROFILE selections.', 2)
+        workflow.identifier(skill, 'skill')
+        workflow.identifier(profile, 'profile')
+        workflow_profiles[skill] = profile
+    if workflow_profiles and (not getattr(args, 'check', False) or repair or event != 'manual'
+                             or getattr(args, 'all', False) or getattr(args, 'allow_setup', None)
+                             or not (getattr(args, 'project', None) or getattr(args, 'user', False))):
+        c.fail('invocation.invalid', 'Requirement profiles are observational: use ensure --check with explicit --project or --user, without setup/repair.', 2)
     if repair and event != 'manual':
         c.fail('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
     if event not in EVENTS:
@@ -272,12 +285,12 @@ def ensure(args, output, home):
     def replan(staged=None):
         """A fresh plan over the current registry with unchanged control observations, for setup publication and the final recheck."""
         current = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
-        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, inactive=inactive, staged_roles=staged, repair_roles=repair)
+        fresh = fs.plan(config, current, roots, home=home, user_root=user_root, operation=operation, inactive=inactive, staged_roles=staged, repair_roles=repair, workflow_profiles=workflow_profiles)
         policy_text = c.read_text(home / 'integration.json', 'integration', missing=True)
         fresh['intent']['controls'] = dict(workspaces=observations, policy_before=policy_text, policy_after=policy_text)
         return fresh
 
-    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, inactive=inactive, repair_roles=repair)
+    planned = fs.plan(config, state, roots, register=register, home=home, user_root=user_root, operation=operation, inactive=inactive, repair_roles=repair, workflow_profiles=workflow_profiles)
     policy_before = c.read_text(home / 'integration.json', 'integration', missing=True)
     policy_after = c.text_json(proposed_approval) if proposed_approval != approval else policy_before
     planned['intent']['controls'] = dict(workspaces=observations, policy_before=policy_before, policy_after=policy_after)
