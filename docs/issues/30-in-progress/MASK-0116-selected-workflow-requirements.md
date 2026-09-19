@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0116"
 title: "Selected workflow requirement profiles"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0023"]
 depends_on: []
 ---
