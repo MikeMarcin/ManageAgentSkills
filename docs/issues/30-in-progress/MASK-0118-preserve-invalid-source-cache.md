@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0118"
 title: "Preserve invalid source caches for an explicit rebuild"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 ---
