@@ -4,13 +4,14 @@ Every registered command renders the same structured result object that
 ``--json`` emits; nothing here decides, mutates or re-derives engine facts.
 ``RENDERERS`` is the coverage table: a command without an explicit entry is a
 defect that ``tests.test_human_output`` rejects, not a case for dumping JSON.
-Success text goes to stdout, errors to stderr, plain ASCII, no decoration.
+Success text goes to stdout, errors to stderr; terminal color is applied only at emission.
 """
 from __future__ import annotations
 
 import os
 import re
 import shlex
+import textwrap
 
 CONTROL = re.compile(r'[\x00-\x08\x0b-\x1f\x7f-\x9f]')
 
@@ -28,9 +29,23 @@ def clean(value):
     text = CONTROL.sub('?', str(value)).replace('\n', ' ')
     # A value that is a path under the home directory reads as ~/...; sentences and copy-paste commands are left alone.
     home = os.path.expanduser('~')
-    if len(home) > 1 and text.startswith(home + os.sep) and not text.startswith(home + os.sep + '.mask' + os.sep + 'store'):
+    if text == home:
+        text = '~'
+    elif len(home) > 1 and text.startswith(home + os.sep):
         text = '~' + text[len(home):]
     return text
+
+
+def paint(text, stream, *, tone='success'):
+    """Decorate trusted structure after values are sanitized; pipes stay byte-for-byte plain."""
+    if not stream.isatty() or 'NO_COLOR' in os.environ or os.environ.get('TERM') == 'dumb':
+        return text
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return text
+    color = {'success': '1;32', 'error': '1;31', 'review': '1;36', 'progress': '2'}.get(tone, '1')
+    lines[0] = f'\x1b[{color}m' + lines[0].rstrip('\n') + '\x1b[0m' + ('\n' if lines[0].endswith('\n') else '')
+    return ''.join(lines)
 
 
 def short(commit):
@@ -131,12 +146,14 @@ def action_summary(output):
     counts = {}
     for action in output.get('actions', []):
         if action.get('kind') not in QUIET_ACTIONS:
-            key = (action.get('status', 'planned'), action.get('kind'))
+            status = 'unknown' if action.get('effects') == 'unknown' else action.get('status', 'planned')
+            key = (status, action.get('kind'))
             counts[key] = counts.get(key, 0) + 1
     parts = []
     for (status, kind), count in counts.items():
         noun, verb = ACTION_NOUNS.get(kind, (clean(kind), 'done'))
-        parts.append(f"{plural(count, noun)} {verb if status == 'applied' else 'to be ' + verb if status == 'planned' else verb + ' (' + clean(status) + ')'}")
+        parts.append(f"{plural(count, noun)} " + ('with unconfirmed changes' if status == 'unknown' else
+                     verb if status == 'applied' else 'to be ' + verb if status == 'planned' else verb + ' (' + clean(status) + ')'))
     return ['  ' + ', '.join(parts) + '.'] if parts else []
 
 
@@ -416,6 +433,8 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
 
     ``quiet_ready`` leaves out skills that are complete with nothing pending, for results where only news belongs.
     """
+    if data.get('workflow_readiness_observation') == 'before_setup':
+        return []  # Completed/partial setup below is newer than this snapshot.
     lines = []
     for entry in data.get('workflow_readiness', []) or []:
         declared = [skill for skill in entry.get('skills', []) or [] if skill.get('workflow') == 'declared'
@@ -426,7 +445,7 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
         for skill in declared:
             pending_roles = any(row.get('state') not in ('ok', 'not_applicable') for row in skill.get('roles') or [])
             status = 'needs deployment' if skill.get('complete') and pending_roles else 'ready' if skill.get('complete') else 'needs attention'
-            lines.append(f"    {clean(skill.get('skill'))}: {status}" + (' (host loading: not verified)' if status == 'ready' else ''))
+            lines.append(f"    {clean(skill.get('skill'))}: {status}")
             for row in skill.get('retired_files', []):
                 if row['state'] != 'absent':
                     note = {'present': 'retired; preview cleanup to remove safely', 'remove_planned': 'will back up and remove',
@@ -451,9 +470,11 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
                 groups.setdefault((label, note), []).append(row)
             for (label, note), roles in groups.items():
                 lines.append(f"      {len(roles)} role file(s): {clean(label)}")
+                # Missing generated output needs one diagnosis; conflicts still name every file.
+                if all(row.get('state') == 'setup_required' and not row.get('observed_sha256') for row in roles):
+                    continue
                 lines.append(f"      {clean(note)}")
-                for row in roles:
-                    lines.append(f"        {clean(row.get('path') or str(row.get('agent')) + '/' + str(row.get('name')))}")
+                lines.extend(f"        {clean(row.get('path') or str(row.get('agent')) + '/' + str(row.get('name')))}" for row in roles)
     return lines
 
 
@@ -472,7 +493,17 @@ def setup_lines(data):
     """Declared setup actions: what would run, under which authority, and what happened (never a copy/paste command)."""
     lines = []
     setup = data.get('setup') or {}
-    for row in setup.get('actions', []) or []:
+    rows = setup.get('actions', []) or []
+    if len(rows) > 1:
+        lines.append('  Setup results:')
+        for row in rows:
+            state = {'published': 'done', 'granted': 'not started', 'consent_required': 'needs approval',
+                     'partial': 'recovery needed'}.get(row.get('state'), row.get('state'))
+            lines.append(f"    {clean(row.get('root'))}  {clean(row.get('subject'))}  {clean(state)}")
+            if row.get('state') in ('blocked', 'failed', 'stale', 'partial') and row.get('detail'):
+                lines.append(f"      {clean(row['detail'])}")
+        return lines
+    for row in rows:
         subject = clean(row.get('subject') or f"{row.get('coordinate')}:{row.get('action')}")
         note = SETUP_NOTES.get(row.get('state'), '').format(subject=subject)
         detail = row.get('detail') if row.get('state') not in SETUP_NOTES or row.get('state') in ('blocked', 'partial') else None
@@ -881,7 +912,12 @@ def render(output):
     renderer = RENDERERS.get(output['command'])
     if renderer is None:
         raise KeyError(f"no human renderer registered for {output['command']}")
-    lines = renderer(output['data'], output) + warnings(output)
+    data = output['data']
+    lines = renderer(data, output)
+    if output['dry_run'] and output['would_change'] and (data.get('review') or {}).get('kind') == 'task':
+        # Keep the command's outcome sentence, then the same review shown at the prompt.
+        lines = lines[:1] + [''] + task_review(data['review'], output).splitlines()[2:] + plan_guard(data, output)
+    lines += warnings(output)
     return '\n'.join(CONTROL.sub('?', line) for line in lines) + '\n'
 
 
@@ -891,6 +927,8 @@ PRESERVED = {'not_started': 'no deployment changes were applied', 'not_needed': 
 
 def render_confirmation(proposal, output):
     """The proposal a human answers or automation reviews: scope, planned actions, and the authority it does not grant."""
+    if proposal.get('kind') == 'task':
+        return task_review(proposal, output)
     lines = [f"{output['command'].replace('.', ' ')}: confirmation needed ({clean(proposal.get('reason'))})"]
     if proposal.get('kind') == 'package.setup':
         return '\n'.join(lines + setup_proposal_lines(proposal)) + '\n'
@@ -898,6 +936,64 @@ def render_confirmation(proposal, output):
         lines.append(f"  scope: {clean(root)}")
     lines.extend(actions(dict(actions=proposal.get('actions', []))))
     lines.append('  grants: only the exact actions shown, including any listed setup, replacements or deletions; no persistent approval' if proposal.get('kind') == 'task' else '  grants: this invocation only; no package scripts, new sources, overwrites or persistent approval')
+    return '\n'.join(lines) + '\n'
+
+
+def task_review(proposal, output):
+    """Group ordinary bookkeeping; keep significant code and replacement choices explicit."""
+    roots = proposal.get('scope', [])
+    rows = {root: dict(root=root, links=0, controls=0, setup=[]) for root in roots}
+    shared, exact = {}, []
+    for action in proposal.get('actions', []):
+        kind = action.get('kind')
+        if kind == 'setup.run':
+            key = (action.get('coordinate'), action.get('path'), str(action.get('interpreter')),
+                   action.get('fingerprint'), tuple(action.get('native_roles') or []))
+            shared.setdefault(key, dict(action=action, roots=[]))['roots'].append(action.get('root'))
+            if action.get('root') in rows:
+                rows[action['root']]['setup'].append(action.get('skill'))
+            continue
+        if kind == 'state.record':
+            continue
+        path = str(action.get('path') or action.get('root') or '')
+        root = next((root for root in sorted(roots, key=len, reverse=True) if path == root or path.startswith(root + os.sep)), None)
+        if kind in ('link.create', 'link.replace', 'link.remove') and root:
+            rows[root]['links'] += 1
+        elif kind in QUIET_ACTIONS:
+            if root:
+                rows[root]['controls'] += 1
+        else:
+            exact.append(action)
+    lines = [f"{output['command'].replace('.', ' ').capitalize()}: review {plural(len(roots), 'location')}", '']
+    for root, row in rows.items():
+        parts = []
+        if row['links']:
+            parts.append(plural(row['links'], 'skill link'))
+        if row['controls']:
+            parts.append('save locked versions')
+        if row['setup']:
+            parts.append('setup ' + joined(row['setup']))
+        lines.append(f"  {clean(root)}  {'; '.join(parts) or 'check readiness'}")
+    # One code disclosure can cover several consumers of the same frozen payload.
+    for item in shared.values():
+        action = item['action']
+        script = str(action.get('path', ''))
+        coordinate = action.get('coordinate') or action.get('skill')
+        marker = '/payload/' + str(action.get('skill')) + '/'
+        portable = script.replace('\\', '/')
+        script = portable.split(marker, 1)[-1] if marker in portable else script
+        lines += ['', f"  Run setup: {clean(coordinate)} ({clean(action.get('fingerprint'))})", f"    {clean(script)} (Python: {clean(action.get('interpreter'))})"]
+        lines += textwrap.wrap('In: ' + joined(item['roots']), width=96, initial_indent='    ', subsequent_indent='      ', break_long_words=False, break_on_hyphens=False)
+        lines += textwrap.wrap(f"Generate {plural(len(action.get('native_roles') or []), 'role')}: " + joined(action.get('native_roles') or []), width=96,
+                               initial_indent='    ', subsequent_indent='      ', break_long_words=False, break_on_hyphens=False)
+    if exact:
+        lines += ['', '  File changes:']
+        for action in exact:
+            verb = 'back up and replace' if action.get('kind') == 'file.backup_replace' else ACTION_VERBS.get(action.get('kind'), action.get('kind'))
+            lines.append(f"    {clean(verb)} {clean(action.get('path') or action.get('root'))}")
+    if shared:
+        lines.append('  Setup runs package code with your user permissions.')
+    lines += ['', '  Approval applies only to this task.']
     return '\n'.join(lines) + '\n'
 
 
@@ -915,10 +1011,14 @@ def render_error(output):
     for key, value in (error.get('details') or {}).items():
         if key == 'workflow' and data.get('workflow_readiness'):
             continue
+        if key in ('cause', 'rollback') and isinstance(value, dict):
+            lines.append(f"  {'cause' if key == 'cause' else 'rollback stopped'}: {clean(value.get('message'))} ({clean(value.get('code'))})")
+            lines.extend(f"    {clean(k).replace('_', ' ')}: {clean(v)}" for k, v in (value.get('details') or {}).items())
+            continue
         lines.append(f"  {clean(key).replace('_', ' ')}: {clean(value)}")
     if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
         lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
-    lines.extend(workflow_lines(data, verb='can be deployed by ensure from'))
+    lines.extend(workflow_lines(data, verb='can be restored from'))
     lines.extend(setup_lines(data))
     lines.extend(backup_lines(data))
     setup = data.get('setup') or {}
@@ -972,6 +1072,9 @@ def backup_lines(data):
     for row in data.get('backups') or []:
         groups.setdefault((row.get('directory') or row['path'], row.get('state', 'unknown')), 0)
         groups[(row.get('directory') or row['path'], row.get('state', 'unknown'))] += 1
+    if len(groups) > 1 and len({(os.path.dirname(path), state) for path, state in groups}) == 1:
+        directory, state = next(iter(groups))
+        return [f'  Backups {clean(state)}: {plural(sum(groups.values()), "file")} in {plural(len(groups), "set")} under {clean(os.path.dirname(directory))}.']
     return [f'  backups {clean(state)}: {count} file(s) in {clean(directory)}' for (directory, state), count in groups.items()]
 
 

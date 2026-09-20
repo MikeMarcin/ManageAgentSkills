@@ -680,7 +680,10 @@ def main(argv=None):
                 members = [name.split('.')[1] for name in mask_cli.definitions(COMMANDS) if name.startswith(f"{getattr(args, 'group', '')}.")]
                 raise MaskError('invocation.invalid', f"'mask {args.group}' needs one of these subcommands: {', '.join(members)}." if members else 'A complete command is required.', 2)
             output = result(args.command, getattr(args, 'dry_run', False))
-            mask_cli.dispatch(args, output, leaves)
+            import mask_progress
+            visible = not machine and sys.stdout.isatty() and args.command in ('install', 'uninstall', 'upgrade', 'repair', 'register', 'update', 'cleanup', 'tap', 'tap.fetch', 'recover')
+            with mask_progress.reporting(visible, f"Preparing {args.command.replace('.', ' ')}"):
+                mask_cli.dispatch(args, output, leaves)
     except MaskError as error:
         output.update(ok=False, error=error.as_dict())
         if output['transaction'] == 'not_needed':
@@ -709,9 +712,9 @@ def main(argv=None):
     if machine:
         print(json.dumps(output, ensure_ascii=False, sort_keys=True))
     elif output['error']:
-        sys.stderr.write(present.render_error(output))
+        sys.stderr.write(present.paint(present.render_error(output), sys.stderr, tone='error'))
     else:
-        sys.stdout.write(present.render(output))
+        sys.stdout.write(present.paint(present.render(output), sys.stdout))
     return exit_code
 
 

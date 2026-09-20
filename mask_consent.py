@@ -91,10 +91,16 @@ def require(args, output, proposal):
 
 def ask(proposal, text):
     """Show the proposal on stderr and read one default-no answer. EOF declines; Ctrl-C propagates."""
-    sys.stderr.write(text)
-    sys.stderr.write(f"{proposal['question']} [y/N] ")
-    sys.stderr.flush()
-    answer = sys.stdin.readline()
+    import mask_present
+    import mask_progress
+    with mask_progress.paused():
+        sys.stderr.write(mask_present.paint(text, sys.stderr, tone='review'))
+        sys.stderr.write(f"{proposal['question']} [y/N] ")
+        sys.stderr.flush()
+        answer = sys.stdin.readline()
     if not answer:
         sys.stderr.write('\n')
-    return answer.strip().lower() in ('y', 'yes')
+    accepted = answer.strip().lower() in ('y', 'yes')
+    if accepted:
+        mask_progress.phase('Approved; rechecking the reviewed task')
+    return accepted

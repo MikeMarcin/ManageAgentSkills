@@ -80,6 +80,11 @@ checkout plus personal skills. On `pin` and `unpin`, `--all` replaces ID and mea
 all skills in the selected checkout; combine it with `--user` for personal skills.
 Pinned skills still receive link repairs and required setup during upgrade.
 
+Long tasks show their current phase and setup location while they work. Reviews
+group changes by location; setup and file replacements remain explicit. Terminal
+output uses light color (`NO_COLOR=1` disables it). Pipes stay plain, and `--json`
+returns one structured result without progress messages.
+
 `tap` lists shared sources; `tap NAME URL` adds one; `untap NAME` removes one.
 `search` and `info ID` browse their catalogs. These commands, `update`, and
 `cleanup` are independent of your working directory.

@@ -334,7 +334,9 @@ def execute(output, home, replan, rows):
     groups = {}
     for row in rows:
         groups.setdefault((row['root'], row['skill']), []).append(row)
-    for _, group in sorted(groups.items()):
+    import mask_progress as progress
+    for index, (_, group) in enumerate(sorted(groups.items()), 1):
+        progress.phase(f"Setup {index}/{len(groups)}: {group[0]['skill']}", root=group[0]['root'])
         # A later publication can roll back without undoing committed links or earlier
         # setup groups. Keep its actions and transaction separate, then merge the effects.
         publication = dict(output, actions=[], changed=False, transaction='not_needed')
@@ -355,6 +357,7 @@ def execute(output, home, replan, rows):
 
 
 def publish(output, home, replan, rows):
+    import mask_progress as progress
     root = Path(rows[0]['root'])
     skill = rows[0]['skill']
     base = replan()
@@ -383,9 +386,11 @@ def publish(output, home, replan, rows):
         outputs = {}
         for index, row in enumerate(rows):
             ran = True
+            progress.phase(f"Running {row['subject']}", root=root)
             outputs.update(run_action(stage / f'action-{index}', package_root, root, row))
             fs.checkpoint('setup.exited')
         staged = {(skill, agent, name): data for (agent, name), data in outputs.items()}
+        progress.phase('Validating setup outputs', root=root)
         after = replan(staged={str(root): staged})
         report = recheck(after, rows, ran=True)
         from mask_repair import check_retired_snapshot
@@ -408,6 +413,7 @@ def publish(output, home, replan, rows):
         fs.validate_pending(staged_pending, home)
         c.atomic_text(home / 'pending.json', c.text_json(staged_pending), launched)
         output['actions'].extend(after['actions'])
+        progress.phase('Publishing roles', root=root)
         fs.execute(after, home, output, pending=staged_pending)
         preserved = [f"{role['agent']}/{role['name']}: {role['state']}" for role in report['roles']
                      if (role['agent'], role['name']) in outputs and role['state'] not in ('ok', 'missing', 'stale')]
@@ -415,6 +421,10 @@ def publish(output, home, replan, rows):
             row.update(state='partial' if preserved else 'published', detail='preserved without publication: ' + ', '.join(preserved) if preserved else 'staged outputs were validated and published; readiness is rechecked below')
     except (Exception, KeyboardInterrupt) as error:
         if isinstance(error, c.MaskError) and error.code == 'recovery.required':
+            detail = ('setup process termination is unconfirmed; inspect recovery before retrying'
+                      if error.details.get('indeterminate') else 'setup ran; publication is incomplete and requires recovery')
+            for row in rows:
+                row.update(state='partial', detail=detail)
             raise  # An unconfirmed termination or partial publication keeps its journal for recovery.
         if c.read_text(home / 'pending.json', 'recovery', missing=True) == launched:
             # No consumer effect happened in the launched phase; the task-private stage is discarded, script side effects stay unknown.

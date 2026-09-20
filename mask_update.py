@@ -13,6 +13,7 @@ import mask_fs as fs
 import mask_pinned as pinned
 import mask_resolve as r
 import mask_sources as sources
+import mask_progress as progress
 
 NOT_ATTEMPTED = dict(attempted=False, ok=None, before=None, after=None, remote_refs_changed=None, error=None)
 
@@ -22,6 +23,7 @@ def fetch_tap(home, name, entry, timeout, selectors=(), consumer=None):
 
     Returns the disclosure row and the captured error, if any.
     """
+    progress.phase(f'Fetching tap {name}')
     scratch = dict(data={})
     row, captured = dict(NOT_ATTEMPTED, attempted=True, ok=False), None
     try:
@@ -73,6 +75,7 @@ PROGRAM_HELD = {'source.ahead': 'this checkout is ahead of its remote', 'source.
 def refresh(args, output, home, root):
     """``update``: fast-forward the MASK program, then fetch every approved tap; no declaration, lock, link or consumer changes."""
     import mask_install
+    progress.phase('Checking for MASK updates')
     failure = None
     try:
         mask_install.dispatch(args, output, home, root)

@@ -288,7 +288,8 @@ def check_observations(pending, home):
                 else:
                     actual.pop(field, None)
         if actual != expected:
-            c.fail('recovery.conflict', 'Pinned workspace, index or branch changed.', 8)
+            c.fail('recovery.conflict', 'Pinned workspace, index or branch changed.', 8,
+                   root=str(root), changed_fields=sorted(key for key in actual.keys() | expected.keys() if actual.get(key) != expected.get(key)))
 
 
 def validate_observations(pending, home):

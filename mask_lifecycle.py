@@ -10,6 +10,7 @@ import mask_pinned as pinned
 import mask_resolve as r
 import mask_setup as setup
 import mask_store as store
+import mask_progress as progress
 
 
 def review(args, output, planned, rows):
@@ -61,6 +62,7 @@ def review(args, output, planned, rows):
 
 def execute(args, output, home, config, roots, before, candidate, prepare, *, details=None):
     """The caller supplies frozen resolution; rechecks never resolve a newer candidate."""
+    progress.phase('Checking selected installations')
     planned = candidate()
     rows = setup.proposals(planned, repair=True)
     preparation = dict(output['data'])
@@ -84,6 +86,7 @@ def execute(args, output, home, config, roots, before, candidate, prepare, *, de
         review(args, preview, fresh, fresh_rows)
         if fresh['plan_hash'] != planned['plan_hash']:
             c.fail('plan.stale', 'The task changed during review; no consumer changes were applied.', 4)
+    progress.phase('Preparing locked skill content')
     prepare()
     with c.writer_lock(home):
         if c.kind(home / 'pending.json') != 'missing':
@@ -96,6 +99,7 @@ def execute(args, output, home, config, roots, before, candidate, prepare, *, de
         review(args, preview, fresh, fresh_rows)
         if fresh['plan_hash'] != planned['plan_hash']:
             c.fail('plan.stale', 'The task changed during preparation; no consumer changes were applied.', 4)
+        progress.phase('Applying skill links and version locks')
         fs.execute(planned, home, output)
         operation = 'ensure'  # After activation, every task uses the pinned readiness service.
         def replan(staged=None):
@@ -103,7 +107,13 @@ def execute(args, output, home, config, roots, before, candidate, prepare, *, de
             return fs.plan(config, state, roots, home=home, operation=operation,
                            staged_roles=staged, repair_roles=True, retire_files=False)
         if rows:
-            setup.execute(output, home, replan, [row for row in rows if row['state'] == 'granted'])
+            try:
+                setup.execute(output, home, replan, [row for row in rows if row['state'] == 'granted'])
+            except (Exception, KeyboardInterrupt):
+                # This is the pre-setup snapshot, not a diagnosis of already published roles.
+                output['data']['workflow_readiness_observation'] = 'before_setup'
+                raise
+        progress.phase('Verifying final readiness')
         final = replan()
         output['data']['workflow_readiness'] = final.get('workflow_readiness', [])
     import mask_ensure

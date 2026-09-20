@@ -665,6 +665,17 @@ def clear_pending(home, pending, side='after'):
         discard_stage(home, pending)
 
 
+def failure_detail(error):
+    """Keep actionable failure facts without dumping arbitrary exception text or payloads."""
+    if isinstance(error, c.MaskError):
+        return dict(code=error.code, message=str(error), details=error.details)
+    if isinstance(error, OSError):
+        return dict(code='filesystem.failed', message=error.strerror or 'Filesystem operation failed',
+                    details={key: value for key, value in dict(errno=error.errno, path=error.filename).items() if value is not None})
+    return dict(code='invocation.interrupted' if isinstance(error, KeyboardInterrupt) else 'internal.invariant',
+                message='Interrupted' if isinstance(error, KeyboardInterrupt) else 'An internal operation failed', details={})
+
+
 def execute(planned, home, output, *, pending=None):
     ensure_applicable(planned)
     if not planned['would_change'] and pending is None:
@@ -720,9 +731,12 @@ def execute(planned, home, output, *, pending=None):
             output['data']['retained_directories'] = residual
             for action in output['actions']:
                 action['status'] = 'rolled_back'
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt) as rollback_error:
             output.update(changed=True, transaction='partial')
-            c.fail('recovery.required', 'Partial operation retained its journal; inspect recovery.', 8)
+            for action in output['actions']:
+                action.update(status='failed', effects='unknown')
+            c.fail('recovery.required', 'Could not finish or roll back this operation; its journal is retained.', 8,
+                   cause=failure_detail(error), rollback=failure_detail(rollback_error))
         if isinstance(error, (c.MaskError, KeyboardInterrupt)):
             raise error
         c.fail('filesystem.failed', 'Filesystem operation failed; core effects were rolled back.', 5)

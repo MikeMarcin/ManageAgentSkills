@@ -67,6 +67,20 @@ include `plan_hash`, actions, outcomes and the task review. Setup publications
 retain separate transaction records; failure never erases earlier committed
 effects or claims readiness. Filesystem readiness does not establish host loading.
 
+Human output groups ordinary link/lock changes by location. Reviews name setup
+code and its interpreter, target roles and locations, and exact files to back up
+or replace. Internal store destinations stay in JSON. Terminal output uses
+restrained color; `NO_COLOR` or `TERM=dumb` disables it. Redirected output remains
+plain text. JSON always emits one result document without progress messages.
+
+Long terminal tasks report phases as they begin and elapsed activity every ten
+seconds while a phase is running. Progress pauses during the confirmation question
+and resumes immediately after approval. It describes activity, not estimated
+percentages or successful completion. On failure, setup results distinguish
+published, incomplete and unstarted actions; pre-setup diagnostics are not presented
+as a fresh readiness check. A failed rollback retains both failure causes along
+with the journal for explicit recovery.
+
 Existing v1/v2/v3 state and recovery journal readers remain. Their operation IDs
 are private engine contracts, not public command aliases. Never rerun a package
 script during recovery. Inspect with `recover --inspect`, then explicitly choose
