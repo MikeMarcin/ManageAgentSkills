@@ -2,11 +2,16 @@
 import copy
 import json
 from tests.test_setup import SetupFixture, SUBJECT
+from tests.support import TAP
 import mask_core as core
 import mask_workflow as workflow
 
 
 class WorkflowProfileTests(SetupFixture):
+    def bootstrap(self):
+        self.git(self.source, 'remote', 'add', 'origin', str(self.upstream))
+        self.assertTrue(self.machine('tap', 'add', TAP, self.upstream, '--checkout', self.source)['ok'])
+
     def setUp(self):
         super().setUp()
         self.descriptor_path = self.package / 'mask-workflow.json'
@@ -92,3 +97,32 @@ class WorkflowProfileTests(SetupFixture):
         result = self.selected()
         self.assertFalse(result['ok'], result)
         self.assertEqual(self.launches(), 0)
+
+    def test_development_checks_are_observational_in_both_scopes(self):
+        self.machine('install', 'implement-rfc', '--user')
+        for scope in (('--project', self.project), ('--user',)):
+            command = ('source', 'dev-link', TAP + '/implement-rfc', *scope, '--authoring-root', self.source)
+            preview = self.machine(*command, '--dry-run')
+            self.assertTrue(preview['ok'], preview)
+            applied = self.machine(*command, '--expect-plan-hash', preview['data']['plan_hash'])
+            self.assertTrue(applied['ok'], applied)
+            state = (self.home / 'state.json').read_bytes()
+            selected = self.machine('ensure', *scope, '--check', '--workflow-profile', 'implement-rfc=direct')
+            self.assertTrue(selected['ok'], selected)
+            self.assertEqual(selected['data']['readiness'], 'ready_dev_link')
+            self.assertFalse(selected['changed'])
+            self.assertEqual((self.home / 'state.json').read_bytes(), state)
+            self.assertFalse(self.machine('ensure', *scope, '--check')['ok'])
+            ordinary = self.machine('ensure', *scope)
+            self.assertEqual(ordinary['error']['code'], 'dev_link.active')
+            self.assertEqual((self.home / 'state.json').read_bytes(), state)
+        self.assertEqual(self.launches(), 0)
+        config = self.project / '.mask/skill-config/implement-rfc/project.json'
+        saved = config.read_bytes()
+        config.unlink()
+        self.assertFalse(self.selected()['ok'])
+        config.write_bytes(saved)
+        link = self.project / '.agents/skills/implement-rfc'
+        link.unlink()
+        link.symlink_to(self.deployed(), target_is_directory=True)
+        self.assertFalse(self.selected()['ok'])

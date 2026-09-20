@@ -281,6 +281,8 @@ def ensure(args, output, home):
     register = [str(project) for project in projects if str(project) not in state['projects']]
     import mask_setup as setup
     operation = 'ensure.deactivate' if inactive else 'ensure'
+    if getattr(args, 'check', False) and not inactive:
+        operation = 'ensure.check'
 
     def replan(staged=None):
         """A fresh plan over the current registry with unchanged control observations, for setup publication and the final recheck."""

@@ -777,7 +777,9 @@ must be an approved physical authoring checkout and the package must pass bounde
 passive validation. State records `mode: dev-link`, exact root identity/path and
 per-link overrides; the retained selection/lock still identifies the pinned
 return destination. Dev-link is explicitly unpinned, not fleet eligible, and has
-no automatic writeback. Ordinary `apply` and `ensure` refuse an active override;
+no automatic writeback. Read-only `ensure --check` inspects these declared links,
+including selected workflow profiles, and reports `ready_dev_link` when complete;
+it does not run setup or reconcile the scope. Ordinary `apply` and mutating `ensure` refuse an active override;
 `upgrade` skips it without a scope and refuses it with `--project` or `--user`.
 Use the same command with `--to-pinned` to preview and perform a guarded return.
 Its typed development journal binds both old/new roots and the currently observed

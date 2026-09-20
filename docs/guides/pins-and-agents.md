@@ -9,7 +9,9 @@ Updating one pinned skill, authoring through a development link, per-skill agent
 For scoped authoring, `mask source dev-link SOURCE/ID --project PATH
 --authoring-root PATH --json` makes an explicit dirty/unpinned exception from the
 tap's approved authoring checkout. Return
-with `--to-pinned` in place of `--authoring-root`. Ordinary apply and ensure
+with `--to-pinned` in place of `--authoring-root`. Use `ensure --check` to inspect
+readiness without changing a development scope; complete checks report
+`ready_dev_link`, not pinned readiness. Ordinary apply and mutating ensure
 refuse live overrides, and update skips or refuses them. `mask source publish SOURCE --paths PACKAGE_PATH --json`
 previews exact package publication. Add `--commit` and separately `--push` only
 when those effects are intended. Publication preserves the authoring HEAD/index
