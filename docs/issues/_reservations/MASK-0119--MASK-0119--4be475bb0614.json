@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0119"
+  ],
+  "reserve_for": "dev-link-readiness-check",
+  "purpose": "",
+  "created": "2026-09-20T01:16:11.306623+00:00",
+  "base": "dff17895eb0d82f932bc7e24b87dfe8fd9a42f93"
+}
