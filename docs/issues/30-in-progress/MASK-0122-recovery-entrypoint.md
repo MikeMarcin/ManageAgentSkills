@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0122"
 title: "Guide pending-operation recovery through repair"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
