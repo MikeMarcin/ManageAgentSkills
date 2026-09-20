@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0121"
 title: "Make command output concise and report live progress"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
