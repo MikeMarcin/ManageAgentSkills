@@ -13,6 +13,7 @@ Skills are passive data unless the user approves a declared setup action.
 | Enrollment | `register [PATH]`, `unregister [PATH]` | Current checkout |
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
+| Advanced recovery | `recover`, `recover --complete`, `recover --rollback` | The machine's one pending operation; bare `recover` only inspects |
 
 A checkout is the project root discovered within the current Git worktree.
 Linked worktrees are independent registrations. `--project PATH` selects another
@@ -40,7 +41,13 @@ its existing locked resolution and selector. `unpin` removes that hold without
 changing the resolution. Upgrade resolves only eligible unheld selections; held
 skills still receive missing links, static roles and consented generated setup.
 
-`repair` restores the declared pinned state. `upgrade` resolves newer allowed
+`repair` restores the declared pinned state. If a setup publication is pending,
+it first reviews that operation at its recorded location, regardless of the current
+checkout or scope selector. It completes validated publication or rolls back an
+unvalidated attempt through the usual prompt or preview/hash approval. Recovery
+ends that invocation; the caller can then retry the original command. Other pending
+operation types require advanced inspection and an explicit recovery direction.
+`upgrade` resolves newer allowed
 versions then makes the selected installations ready, even when versions do not
 change. Missing required inputs are diagnosed before consumer mutation.
 
@@ -83,8 +90,10 @@ with the journal for explicit recovery.
 
 Existing v1/v2/v3 state and recovery journal readers remain. Their operation IDs
 are private engine contracts, not public command aliases. Never rerun a package
-script during recovery. Inspect with `recover --inspect`, then explicitly choose
-`--complete` or `--rollback` as permitted by the recorded phase.
+script during recovery. Bare `recover` and `recover --inspect` are observational.
+`repair` guides interrupted setup recovery; advanced `recover --complete` or
+`recover --rollback` select a direction explicitly as permitted by the recorded
+phase.
 
 ## Shared resources and updates
 
@@ -148,7 +157,10 @@ Ordinary consumers link to verified immutable store payloads; authoring checkout
 are used only by explicit development and publication commands. Unknown or corrupt
 cache content is preserved for diagnosis. Read-only checks and previews never
 remove interpreter bytecode; a mutating readiness task may clear recognized cache
-files before verification.
+files before verification. A frozen, role-only recovery may verify source bytes
+while preserving extra `__pycache__` directories containing only unlinked regular
+bytecode files: it never imports or executes the package. Other extra files and
+changed source still refuse recovery.
 
 ## Cached selection locks
 

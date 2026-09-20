@@ -40,6 +40,14 @@ Before-state records whether each leaf was absent or the exact previous owned li
 
 If an existing file or directory or a mismatching symlink appears, recovery refuses and preserves it. An old link is recreated only in an absent destination. Declaration, lock, configuration and registry text is replaced only while the current bytes still match a recorded side. The journal is preserved whenever safe completion cannot be established. Recovery never resets a Git checkout.
 
+A staged setup journal whose only remaining effects are one skill's native roles,
+their lock and matching registry ownership is independent of checkout HEAD and
+index movement. Recovery permits that metadata movement while checking exact
+setup inputs, declaration/lock bytes, physical and Git roots, authority, artifacts,
+destinations and registry text. Journals with link, selection, control, development,
+program or other effects keep the original Git observations. This exception never
+authorizes a script rerun or a changed generated file.
+
 ## Failure boundaries
 
 Tests inject process exit at these points and check completion and rollback where supported:

@@ -1,18 +1,37 @@
 # Recovery, cleanup and retirement
 
-When an operation is interrupted, inspect its pending journal before another mutation:
+If an interrupted setup blocks another command, run:
 
 ```sh
-mask recover --inspect --json
-mask recover --complete --json
+mask repair
 ```
 
-Choose `--rollback` instead when the journal permits restoring the before-state.
-MASK validates current bytes, physical roots, source identity and control snapshots.
-Changed files or Git state can block either direction; preserve them and inspect the
-typed error. Recovery never reruns a setup script. A script that exited before its
-outputs were validated requires rollback of that publication. Earlier committed
-links or setup groups remain reported as committed.
+MASK names the interrupted setup's location, which may be a different checkout
+from the one you are in. It offers to finish publishing validated role files, or
+roll back an attempt whose outputs were never validated. Review and confirm that
+specific recovery. The command stops after recovery; retry your original command
+or run `repair` again to check readiness. Earlier committed links or setup groups
+remain committed. Package script side effects are unknown and are not rolled back.
+
+For automation, preview and approve the exact recovery:
+
+```sh
+mask repair --dry-run --json
+mask repair --approve-plan RETURNED_HASH --json
+```
+
+`mask recover` (also `mask recover --inspect`) is advanced, read-only inspection.
+Non-setup operations still require explicit advanced recovery: inspect first, then
+preview `mask recover --complete --dry-run` or `mask recover --rollback --dry-run`.
+Remove `--dry-run` to apply the chosen direction when its checks pass.
+
+Recovery validates current bytes, physical roots, source identity and control
+snapshots. Changed inputs, controls or destination files block recovery and are
+preserved. For an already validated, role-only setup publication, committing
+unrelated work or unchanged declaration/lock files does not block recovery: Git
+HEAD and index may advance while the exact generation inputs and all other guards
+must still match. Broader operations retain their Git guards. Recovery never
+reruns a setup script.
 
 Old journal versions remain readable even though old public command spellings have
 retired. Program self-update preserves protocol/schema compatibility checks; a

@@ -104,8 +104,8 @@ def shed_bytecode(root):
     """Remove interpreter bytecode from an owned artifact before its exact inventory is taken.
 
     A host that imports a skill's script through the managed link writes ``__pycache__`` beside it, which the
-    inventory rightly refuses as an extra entry. Bytecode is never tolerated in place, because Python prefers
-    a matching ``.pyc`` to the reviewed source; it is removed, and only when the directory holds nothing but
+    inventory normally refuses as an extra entry. Before package reuse, bytecode is removed because Python
+    prefers a matching ``.pyc`` to the reviewed source, and only when the directory holds nothing but
     regular bytecode files. Anything else stays for verification to refuse and a human to inspect.
     """
     directories = [root / 'payload'] if c.kind(root / 'payload') == 'directory' else []
@@ -126,7 +126,7 @@ def shed_bytecode(root):
                 child.rmdir()
 
 
-def verify_tree(root, row, *, clean_bytecode=True):
+def verify_tree(root, row, *, clean_bytecode=True, allow_bytecode=False):
     r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest='sha256:' + '0' * 64, packages=[row]))
     if c.kind(root) != 'directory':
         c.fail('artifact.corrupt', 'Existing artifact root must be a real directory.', 4)
@@ -162,7 +162,18 @@ def verify_tree(root, row, *, clean_bytecode=True):
         if total > p.PACKAGE_BYTES or c.digest(data) != 'sha256:' + entry['sha256']:
             c.fail('artifact.corrupt', 'Artifact bytes differ from its manifest.', 4, path=relative)
         files.append(p.PayloadFile(entry['path'], entry['mode'], data))
-    if found != expected or inventory(root) != found or c.identity(root) != original:
+    incidental = set()
+    if allow_bytecode:
+        # Recovery publishes journaled text without executing/importing the package.
+        # Preserve interpreter caches while checking every locked source byte. Linked,
+        # nested or mixed-content caches are still rejected by the exact inventory.
+        for name, kind in found.items():
+            if kind != 'directory' or name in expected or not name.startswith(prefix + '/') or not name.endswith('/__pycache__'):
+                continue
+            children = [path for path in found if path.startswith(name + '/')]
+            if all(found[path] == 'file' and Path(path).parent.as_posix() == name and Path(path).suffix in BYTECODE for path in children):
+                incidental.update([name, *children])
+    if {key: value for key, value in found.items() if key not in incidental} != expected or inventory(root) != found or c.identity(root) != original:
         c.fail('artifact.corrupt', 'Artifact contains extra entries or changed during verification.', 4)
     payload = p.validate_files(files, row['id'], commit=row['commit'], path=row['path'])
     checked_payload(payload, row)
@@ -171,11 +182,11 @@ def verify_tree(root, row, *, clean_bytecode=True):
     return root / prefix
 
 
-def verify(home, row):
+def verify(home, row, *, frozen_recovery=False):
     root, target = location(home, row['payload_digest'], row['id'])
     if c.kind(root) == 'missing':
         c.fail('artifact.unavailable', 'Exact artifact is absent from the local store.', 4, payload_digest=row['payload_digest'])
-    return verify_tree(root, row)
+    return verify_tree(root, row, clean_bytecode=not frozen_recovery, allow_bytecode=frozen_recovery)
 
 
 def cleanup(stage, identity):

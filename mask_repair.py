@@ -14,6 +14,48 @@ import re
 import mask_core as c
 import mask_workflow as workflow
 
+
+def resume_pending(args, output, home):
+    """A pending setup is its own frozen repair task, reviewed before any recovery write."""
+    import mask_fs as fs
+    import mask_consent as consent
+    import mask_present as present
+    import mask_progress as progress
+    import mask_store as store
+    raw = c.read_text(home / 'pending.json', 'recovery', missing=True)
+    if raw is None:
+        return False
+    pending = c.parse_json(raw, 'recovery')
+    if 'setup' not in pending:
+        c.fail('recovery.required', 'An interrupted operation needs advanced inspection with mask recover before repair can proceed.', 8)
+    fs.recover(home, output, 'inspect')
+    with store.observational():
+        fs.check_current(pending, home)
+    mode = 'complete' if pending['setup']['phase'] == 'staged' else 'rollback'
+    digest = c.digest(dict(command='repair', recovery=raw, mode=mode))
+    recovery = dict(mode=mode, root=pending['setup']['root'], skill=pending['setup']['skill'], plan_hash=digest)
+    output['data'].update(recovery=recovery, plan_hash=digest)
+    output['would_change'] = True
+    if getattr(args, 'expect_plan_hash', digest) != digest:
+        c.fail('plan.stale', 'The interrupted operation changed; preview repair again.', 4)
+    if output['dry_run']:
+        return True
+    if not getattr(args, 'expect_plan_hash', None):
+        if not consent.interactive(args):
+            c.fail('confirmation.required', 'Preview mask repair --dry-run, then approve its recovery plan with --approve-plan HASH.', 4)
+        verb = 'Finish publishing validated setup' if mode == 'complete' else 'Roll back the unvalidated setup attempt'
+        proposal = dict(question=f"{verb} in {present.clean(recovery['root'])}?")
+        if not consent.ask(proposal, '\n'.join(present.render_recover(output['data'], output)) + '\n'):
+            c.fail('confirmation.declined', 'Recovery declined; the interrupted operation is preserved.', 4)
+    progress.phase('Recovering interrupted setup', root=recovery['root'])
+    with c.writer_lock(home):
+        if c.read_text(home / 'pending.json', 'recovery', missing=True) != raw:
+            c.fail('plan.stale', 'The interrupted operation changed during review; inspect it again.', 4)
+        fs.recover(home, output, mode)
+    output['data'].update(recovery=recovery, plan_hash=digest)
+    return True
+
+
 UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
 

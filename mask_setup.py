@@ -507,6 +507,51 @@ def check_journal(pending):
         lock_state(pending)
 
 
+def frozen_publication(pending):
+    """Only a role-only setup journal is independent of Git HEAD/index movement.
+
+    The validated journal still binds all registry bytes, locked content, roots and
+    destinations. No selection, links, source update or unrelated ownership may change.
+    """
+    facts = pending.get('setup') or {}
+    if facts.get('phase') != 'staged' or any(pending.get(key) for key in
+            ('git', 'launcher', 'controls', 'development', 'selection_change', 'links', 'files', 'manifests', 'retired_files')):
+        return False
+    root = facts['root']
+    if any(entry['root'] != root or entry['skill'] != facts['skill'] for entry in pending.get('native_roles', [])):
+        return False
+    import copy
+    before, after = copy.deepcopy(pending['before_state']), copy.deepcopy(pending['after_state'])
+    before['generation'] = after['generation']
+    old, new = c.consumer_records(before).get(root), c.consumer_records(after).get(root)
+    if old is None or new is None or old.get('mode') != 'pinned' or new.get('mode') != 'pinned':
+        return False
+    expected_roles = dict(old.get('native_roles', {}))
+    for entry in pending.get('native_roles', []):
+        if entry['after'] is None:
+            expected_roles.pop(entry['relative'], None)
+        else:
+            expected_roles[entry['relative']] = new.get('native_roles', {}).get(entry['relative'])
+    if expected_roles != new.get('native_roles', {}):
+        return False
+    old['native_roles'] = new.get('native_roles', {})
+    return before == after
+
+
+def check_frozen_inputs(pending):
+    """A commit may advance, but the exact inputs used to generate these roles may not."""
+    facts = pending['setup']
+    root = Path(facts['root'])
+    for action in facts['actions']:
+        for row in action['inputs']:
+            path = root / row['path']
+            c.parents_safe(root, path)
+            kind = c.kind(path)
+            digest = workflow.sha256(path.read_bytes()) if kind == 'file' else None
+            if kind not in ('file', 'missing') or digest != row['sha256']:
+                c.fail('recovery.conflict', 'An input used to generate the pending roles changed.', 8, path=str(path))
+
+
 def restore_journal(pending, side):
     facts = pending['setup']
     if facts['phase'] == 'launched':

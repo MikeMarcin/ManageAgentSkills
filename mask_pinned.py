@@ -259,6 +259,10 @@ def observe(roots, state, home, *, user_root=None, blockers=None):
 
 def check_observations(pending, home):
     import mask_ensure as readiness
+    from mask_setup import frozen_publication, check_frozen_inputs
+    frozen = frozen_publication(pending)
+    if frozen:
+        check_frozen_inputs(pending)
     observations = pending['pinned']['workspaces']
     if 'home_identity' in pending['pinned'] and c.identity(home) != pending['pinned']['home_identity']:
         c.fail('recovery.conflict', 'Pinned machine home identity changed.', 8)
@@ -278,6 +282,10 @@ def check_observations(pending, home):
         if not root.is_dir() or root.resolve() != root:
             c.fail('recovery.conflict', 'Pinned consumer root changed.', 8)
         actual = readiness.workspace_observation(root, scope=expected.get('scope', 'project'), home=home)
+        if frozen:
+            # These outputs were generated from exact inputs and immutable locks,
+            # not the checkout's HEAD or staging state. All other guards still apply.
+            actual['head'], actual['index'] = expected['head'], expected['index']
         for entry in pending.get('files', []):
             if entry['root'] == str(root) and entry['role'] not in ('selection_policy', 'machine_config'):
                 field = 'lock' if entry['role'].endswith('_lock') else 'manifest'
@@ -435,6 +443,8 @@ def verify_transition(pending, home, entry=None, *, journaled=True):
     Before its journal exists (``journaled=False``) an unverifiable artifact refuses with its own typed error.
     """
     import mask_store as store
+    from mask_setup import frozen_publication
+    frozen = frozen_publication(pending)
     seen = set()
     try:
         for side in ('before', 'after'):
@@ -451,7 +461,7 @@ def verify_transition(pending, home, entry=None, *, journaled=True):
                     row = link['resolution']
                     key = (row['payload_digest'], row['id'], row['metadata_digest'], row.get('provenance_digest'))
                     if key not in seen:
-                        store.verify(home, row)
+                        store.verify(home, row, frozen_recovery=frozen)
                         seen.add(key)
     except c.MaskError as error:
         if not journaled:

@@ -682,6 +682,8 @@ def main(argv=None):
             output = result(args.command, getattr(args, 'dry_run', False))
             import mask_progress
             visible = not machine and sys.stdout.isatty() and args.command in ('install', 'uninstall', 'upgrade', 'repair', 'register', 'update', 'cleanup', 'tap', 'tap.fetch', 'recover')
+            if args.command == 'recover' and not any(getattr(args, mode, False) for mode in ('complete', 'rollback')):
+                visible = False
             with mask_progress.reporting(visible, f"Preparing {args.command.replace('.', ' ')}"):
                 mask_cli.dispatch(args, output, leaves)
     except MaskError as error:

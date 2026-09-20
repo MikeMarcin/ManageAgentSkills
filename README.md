@@ -62,7 +62,7 @@ checkout without upgrading versions.
 | Show this checkout's skills | `mask list` |
 | Show personal skills | `mask list --user` |
 | Register and prepare this checkout | `mask register` |
-| Restore this checkout's pinned setup | `mask repair` |
+| Restore pinned setup, or review an interrupted setup | `mask repair` |
 | Remove a skill here | `mask uninstall ID` |
 | Hold a skill at its installed version | `mask pin ID` |
 | Release a version hold | `mask unpin ID` |
@@ -79,6 +79,12 @@ checkout without upgrading versions.
 checkout plus personal skills. On `pin` and `unpin`, `--all` replaces ID and means
 all skills in the selected checkout; combine it with `--user` for personal skills.
 Pinned skills still receive link repairs and required setup during upgrade.
+
+An interrupted setup can block changes across MASK. `repair` first names that
+operation's location and offers to finish its validated files or roll back the
+attempt, without rerunning setup. This recovery ends the command; retry your
+original command afterward. Advanced `mask recover` inspects the pending operation
+without changing anything. See the [recovery guide](docs/guides/recovery.md).
 
 Long tasks show their current phase and setup location while they work. Reviews
 group changes by location; setup and file replacements remain explicit. Terminal

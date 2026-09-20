@@ -152,7 +152,7 @@ class HumanTerminal(EngineFixture):
         self.assertEqual(preview.returncode, 0, preview.stderr)
         self.assertIn('Would install 1 skill', preview.stdout)
         self.assertIn('dry run: nothing applied', preview.stdout)
-        self.assertIn('2 links to be created', preview.stdout)
+        self.assertIn('2 skill links; save locked versions', preview.stdout)
         self.assertFalse((self.project / '.agents/skills/alpha').exists())
         applied = self.human('install', 'alpha')
         self.assertEqual(applied.returncode, 0, applied.stderr)

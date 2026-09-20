@@ -535,6 +535,26 @@ def render_recover(data, output):
     if not data.get('pending'):
         return ['recover: nothing pending']
     pending = data['pending']
+    if pending.get('setup'):
+        setup = pending['setup']
+        root, skill = clean(setup['root']), clean(setup['skill'])
+        recovered = output['changed'] and output['transaction'] in ('committed', 'rolled_back')
+        if recovered:
+            verb = 'Completed' if output['transaction'] == 'committed' else 'Rolled back'
+            return [f'{verb} interrupted setup: {skill}', f'  Location: {root}',
+                    '  No setup scripts were rerun.', '  Run mask repair again to check readiness, or retry your previous command.']
+        staged = setup['phase'] == 'staged'
+        lines = [f'Interrupted setup: {skill}', f'  Location: {root}',
+                 f"  {len(pending.get('native_roles', []))} role files were validated before publication stopped." if staged else
+                 '  Setup outputs were not validated; this attempt must be rolled back.',
+                 '  Package script side effects are unknown and are not rolled back.']
+        if data.get('recovery'):
+            lines += ['  Repair will ' + ('finish the recorded publication' if staged else 'roll back this attempt') + '; no setup script will run.']
+            if output['dry_run']:
+                lines += plan_guard(data, output)
+        else:
+            lines += ['  Next: mask repair', '  Advanced: mask recover --complete --dry-run' if staged else '  Advanced: mask recover --rollback --dry-run']
+        return lines
     lines = [f"recover: pending {clean(pending.get('operation') or pending.get('kind'))} ({clean(data.get('recovery_mode', 'inspect'))})"]
     lines.extend(fields(pending, [('generation', 'generation'), ('phase', 'phase'), ('scope', 'scope')]))
     if data.get('setup'):
@@ -840,6 +860,8 @@ def render_forget(data, output):
 
 
 def render_lifecycle(data, output):
+    if data.get('recovery'):
+        return render_recover(data, output)
     return [headline(output, output['command'])] + actions(output) + workflow_lines(data, quiet_ready=True) + plan_guard(data, output)
 
 
@@ -1008,6 +1030,8 @@ def render_error(output):
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
     if data.get('repair'):
         lines.extend(repair_lines(data, output)[1:])
+    if (data.get('pending') or {}).get('setup'):
+        lines.extend('  ' + line for line in render_recover(data, output))
     for key, value in (error.get('details') or {}).items():
         if key == 'workflow' and data.get('workflow_readiness'):
             continue
@@ -1096,7 +1120,7 @@ def repair_lines(data, output):
                 if (error.get('details') or {}).get(key):
                     lines.append(f"    {clean(error['details'][key])}")
             if error.get('code') in ('recovery.required', 'state.pending'):
-                lines.append('    Run mask recover --inspect before retrying.')
+                lines.append('    Run mask repair to review the interrupted operation before retrying.')
     if not output['dry_run']:
         roles = sum(row.get('kind') == 'native_role.write' and row.get('status') == 'applied' for row in output.get('actions') or [])
         links = sum(row.get('kind') == 'link.create' and row.get('status') == 'applied' for row in output.get('actions') or [])

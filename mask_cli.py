@@ -55,7 +55,8 @@ HELP = {
     'uninstall': ('Remove selected skills from this checkout and its managed deployment. Shared cached versions remain until cleanup.', 'mask uninstall implement-rfc\nmask uninstall implement-rfc --user'),
     'list': ('List selected skills and versions in this checkout. --user selects personal skills; --all lists every registered checkout and personal skills.', 'mask list\nmask list --all'),
     'upgrade': ('Upgrade this checkout and make its skills ready. --user selects personal skills; --all upgrades every registered checkout plus personal skills. IDs optionally select skills.', 'mask upgrade\nmask upgrade --user\nmask upgrade --all'),
-    'repair': ('Restore this checkout to its declared, pinned state, including required setup. --user selects personal skills; --all restores every registered installation.', 'mask repair\nmask repair --all'),
+    'repair': ('Restore this checkout to its declared, pinned state, including required setup. Interrupted setup is reviewed first at its recorded location, even in another checkout. --user selects personal skills; --all restores every registered installation.', 'mask repair\nmask repair --all'),
+    'recover': ('Inspect an interrupted operation. Bare recover changes nothing. Advanced modes complete validated effects or roll back journaled changes without rerunning package scripts; repair offers guided recovery.', 'mask recover\nmask repair\nmask recover --complete --dry-run\nmask recover --rollback --dry-run'),
     'pin': ('Hold SKILL at its installed version. --all holds every skill in this checkout; --user selects personal skills. Upgrade still completes readiness.', 'mask pin implement-rfc\nmask pin --all --user'),
     'unpin': ('Release a version hold without upgrading immediately. --all releases every skill in this checkout; --user selects personal skills.', 'mask unpin implement-rfc\nmask unpin --all --user'),
     'status': ('Inspect readiness in this checkout without changing files. --user selects personal skills; --all checks every registered installation. --check exits nonzero for problems.', 'mask status\nmask status --all --check'),
@@ -134,6 +135,8 @@ def normalize(argv):
 
 
 def validate(args):
+    if args.command == 'recover' and not any(getattr(args, mode, False) for mode in ('inspect', 'complete', 'rollback')):
+        args.inspect = True
     scope = [name for name in ('project', 'user', 'all') if getattr(args, name, False)]
     if args.command in ('pin', 'unpin'):
         scope = [name for name in scope if name != 'all']
@@ -220,6 +223,10 @@ def dispatch(args, output, leaves):
                 import mask_pin
                 return mask_pin.dispatch(args, output, home)
             if public in ('register', 'repair'):
+                if public == 'repair':
+                    import mask_repair
+                    if mask_repair.resume_pending(args, output, home):
+                        return
                 return mask_lifecycle.restore(args, output, home, registering=public == 'register')
             if public == 'cleanup':
                 import mask_cleanup
@@ -340,8 +347,10 @@ This checkout:
   pin / unpin SKILL       Hold or release an installed version
                           --all selects every skill in this checkout (or --user)
   upgrade [SKILL ...]     Upgrade this checkout and make it ready
-  repair                  Restore readiness using pinned versions
+  repair                  Recover interrupted setup, or restore pinned readiness
   status                  Explain readiness and problems (also bare mask)
+
+Interrupted setup: repair first reviews recovery at its recorded location.
 
 Targets:
   --user                  Personal skills instead of this checkout
@@ -354,5 +363,6 @@ Review:
   --json                  Structured output; never prompts
 
 Run 'mask COMMAND --help' for details. Advanced groups: config, skill, project,
-user, integration, selection-policy, compatibility, self. Recovery: recover.
+user, integration, selection-policy, compatibility, self.
+Advanced recovery: recover (inspect), recover --complete, recover --rollback.
 '''
