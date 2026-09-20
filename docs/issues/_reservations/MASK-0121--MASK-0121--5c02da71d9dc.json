@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0121"
+  ],
+  "reserve_for": "human-output-progress",
+  "purpose": "",
+  "created": "2026-09-20T21:05:36.469739+00:00",
+  "base": "ffc8a31a0a94b1dbee484668c50c8f2ca740f1b3"
+}
