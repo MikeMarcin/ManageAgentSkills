@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0123"
+  ],
+  "reserve_for": "command-diagnostics",
+  "purpose": "",
+  "created": "2026-09-20T22:00:44.480677+00:00",
+  "base": "43c984c764e9427060e0d60767bde73da254924a"
+}
