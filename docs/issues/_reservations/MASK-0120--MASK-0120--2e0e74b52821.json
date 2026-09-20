@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0120"
+  ],
+  "reserve_for": "upgrade-readiness",
+  "purpose": "",
+  "created": "2026-09-20T19:02:38.481297+00:00",
+  "base": "0b2e41fcabe629a8916bc3820b3394f8240e255a"
+}
