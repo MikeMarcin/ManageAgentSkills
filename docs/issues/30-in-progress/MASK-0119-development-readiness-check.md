@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0119"
 title: "Inspect approved development links without reconciliation"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0023"]
 depends_on: ["MASK-0116"]
 ---
