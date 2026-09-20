@@ -32,7 +32,7 @@ PRODUCERS = {
 }
 # The only directories pinned.target derives; a link record with neither refuses migration.required.
 TARGETS = {"Path(link['dev']['root']) / link['dev']['path']", "store.location(home, link['resolution']['payload_digest'], link['skill'])[1]"}
-CRASH = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;mask.main(sys.argv[3:])"
+CRASH = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])"
 
 
 # Every spelling that creates a link or computes a link text: pathlib, os (also imported bare), the Win32 API through

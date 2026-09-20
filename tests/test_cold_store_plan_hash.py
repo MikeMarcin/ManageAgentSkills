@@ -14,7 +14,7 @@ import shutil
 import tempfile
 
 from tests.fixture_files import write_json
-from tests.public_support import CONSUMER_CONTEXT, PublicFixture
+from tests.public_support import CONSUMER_CONTEXT, EngineFixture
 from tests.support import TAP
 from tests.test_setup import SUBJECT, SetupFixture
 
@@ -27,7 +27,7 @@ def declaration(upstream, skills, agents=('claude', 'codex')):
     return value
 
 
-class ColdStorePreview(PublicFixture):
+class ColdStorePreview(EngineFixture):
     def setUp(self):
         super().setUp()
         traces = tempfile.TemporaryDirectory(prefix='mask-trace-')

@@ -161,7 +161,7 @@ class RecoveryUpdateTests(UpdateTests):
     def crash(self, command, label='intent'):
         import subprocess, sys
         from tests.support import ENTRY
-        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;mask.main(sys.argv[3:])"
+        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])"
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, *command, '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
 
@@ -225,7 +225,7 @@ class RecoveryUpdateTests(UpdateTests):
             if args and args[0] == 'write-tree':
                 c.fail('fixture.write_tree', 'Injected tree failure.', 5)
             return original(root, *args, **kwargs)
-        parser, leaves = mask.make_parser()
+        parser, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
         args = parser.parse_args(['source', 'publish', TAP, '--paths', 'skills/alpha', '--commit', '--home', str(self.home)])
         output = mask.result('source.publish')
         with patch.object(c, 'git', side_effect=fail), self.assertRaises(c.MaskError):
@@ -257,7 +257,7 @@ class RecoveryUpdateTests(UpdateTests):
             if 'push' in args:
                 c.fail('git.timeout', 'Injected lost push acknowledgement.', 5)
             return result
-        parser, leaves = mask.make_parser()
+        parser, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
         args = parser.parse_args(['source', 'publish', 'publisher', '--paths', 'skills/alpha', '--commit', '--push', '--home', str(self.home)])
         output = mask.result('source.publish')
         with patch.object(c, 'git', side_effect=uncertain), self.assertRaises(c.MaskError):

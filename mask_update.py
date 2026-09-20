@@ -113,7 +113,6 @@ def changes(previous, proposal):
 
 def dispatch(args, output, home):
     import mask
-    import mask_ensure as readiness
     import mask_selection as selection
     import mask_store as store
     if c.kind(home / 'pending.json') != 'missing':
@@ -121,8 +120,8 @@ def dispatch(args, output, home):
     config = c.config(c.read_json(home / 'config.json'))
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     records = c.consumer_records(state)
-    scoped = bool(getattr(args, 'project', None) or getattr(args, 'user', False))
-    roots = mask.selected_roots(args, state, all_default=True)
+    scoped = not getattr(args, 'all', False)
+    roots = mask.selected_roots(args, state)
     requested = getattr(args, 'skill', None) or []
     consumers, declared = [], set()
     for root in roots:
@@ -161,7 +160,7 @@ def dispatch(args, output, home):
                 selectors.setdefault(binding['source'], []).append(chosen)
         active.append(item)
     rows = [item['row'] for item in consumers]
-    fetching = not (output['dry_run'] or getattr(args, 'offline', False) or getattr(args, 'expect_plan_hash', None) is not None)
+    fetching = not (output['dry_run'] or getattr(args, 'catalog_refreshed', False) or getattr(args, 'offline', False) or getattr(args, 'expect_plan_hash', None) is not None)
     fetches = {name: dict(NOT_ATTEMPTED) for name in sorted(taps)}
     disclosure = dict(consumers=rows, fetches=fetches, network='fetch' if fetching and taps else 'none')
     output['data'] = dict(disclosure)  # A refusal after the fetch phase still discloses its effects.
@@ -200,33 +199,29 @@ def dispatch(args, output, home):
         locks[row['root']] = proposal
         row.update(status='unchanged' if proposal == previous else 'updated', changes=changes(previous, proposal))
         planned_consumers.append(item)
-    planned = fs.plan(config, state, [item['root'] for item in planned_consumers], home=home, lock_proposals=locks,
-                      operation='upgrade', payload_views=payload_views)
-    # The guard binds which roots were left out; fetch effects are not bound, so a dry run and a guarded rerun agree.
-    planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=blocked,
-                                         skipped=[row['root'] for row in rows if row['status'] == 'skipped']))
-    fs.public_plan(planned, output)
-    output['data'].update(disclosure)
-    output['warnings'][:] = [warning for warning in output['warnings'] if warning['code'] != 'project.empty_registry']
-    fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-    if output['dry_run']:
-        return
-    effects = output['data']['preparation'] = []
-    for item in planned_consumers:
-        observation = dict(root=item['row']['root'], effects={})
-        effects.append(observation)
-        store.ensure(home, item['declaration'], locks[item['row']['root']], config, offline=True,
-                     coordinates=selection.applicable_coordinates(item['declaration']), effects=observation['effects'])
-    with c.writer_lock(home):
+    selected = [item['root'] for item in planned_consumers]
+
+    def candidate_plan():
+        planned = fs.plan(config, state, selected, home=home, lock_proposals=locks,
+                          operation='upgrade', payload_views=payload_views, repair_roles=True, retire_files=False)
+        planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=blocked,
+                                             skipped=[row['root'] for row in rows if row['status'] == 'skipped']))
+        return planned
+
+    # Only selected consumers participate in the activation; the snapshot still
+    # binds all originally observed roots, including a failed tap's consumers.
+    before_selected = pinned.snapshot(home, [(item['root'], item['scope']) for item in planned_consumers])
+    def prepare():
         if pinned.snapshot(home, observed) != before:
-            c.fail('plan.stale', 'Consumer controls, registry or configuration changed during the update; nothing was applied.', 4)
-        fs.execute(planned, home, output)
-    workflow = {}
-    try:
-        readiness.final_status(output)
-    except c.MaskError as error:
-        if error.code != 'workflow.incomplete' or not blocked:
-            raise
-        workflow = error.details  # The applied consumers' workflow verdict joins the blocked roots instead of masking them.
-    if blocked:
-        c.fail('upgrade.incomplete', 'Some selected consumers were blocked and not upgraded; the others were applied.', 4, blocked=blocked, **workflow)
+            c.fail('plan.stale', 'Consumer controls changed during update preparation.', 4)
+        effects = output['data']['preparation'] = []
+        for item in planned_consumers:
+            observation = dict(root=item['row']['root'], effects={})
+            effects.append(observation)
+            store.ensure(home, item['declaration'], locks[item['row']['root']], config, offline=True,
+                         coordinates=selection.applicable_coordinates(item['declaration']), effects=observation['effects'])
+    import mask_lifecycle
+    mask_lifecycle.execute(args, output, home, config, selected, before_selected, candidate_plan, prepare,
+                           details=dict(disclosure, host_load='not_verified'))
+    if blocked and not output['dry_run']:
+        c.fail('upgrade.incomplete', 'Some selected consumers were blocked and not upgraded; the others were applied.', 4, blocked=blocked)

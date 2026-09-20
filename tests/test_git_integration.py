@@ -154,7 +154,7 @@ import sys,os
 sys.path.insert(0,sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint=lambda label: os._exit(99) if label=='integration-entry' else None
-mask.main(['integration','enable','--git','--project',sys.argv[3],'--home',sys.argv[2],'--json'])
+__import__('tests.engine_cli', fromlist=['main']).main(['integration','enable','--git','--project',sys.argv[3],'--home',sys.argv[2],'--json'])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True)
         self.assertEqual(run.returncode, 99, run.stdout)

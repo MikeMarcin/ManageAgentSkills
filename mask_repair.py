@@ -1,6 +1,6 @@
 """Explicit all-scope repair and durable backups for typed native role replacement.
 
-Repair broadens only a manual ensure's declared-role authority. It does not
+Repair broadens a manual ensure or upgrade's declared-role authority. It does not
 invent consumer inputs, follow unsafe destinations, change persistent approval,
 or replay package scripts during recovery. Existing transaction before-bytes
 remain the rollback source; backups survive both success and rollback.
@@ -55,7 +55,7 @@ def retired_files(root, reports, repair=False):
 
 def validate_retired(pending):
     entries = pending['retired_files']
-    if pending['operation'] != 'ensure' or not isinstance(entries, list) or not entries or len(entries) > 4096:
+    if pending['operation'] not in ('ensure', 'upgrade') or not isinstance(entries, list) or not entries or len(entries) > 4096:
         c.fail('recovery.conflict', 'Unsafe retired-file repair journal.', 8)
     seen = set()
     for entry in entries:
@@ -101,7 +101,7 @@ def backup_files(pending, home):
     files.extend((entry['root'], entry['relative'], entry['before']) for entry in pending.get('retired_files', []))
     setup = pending.get('setup') or {}
     lock = setup.get('lock') or {}
-    if setup.get('granted_by') == 'repair' and lock.get('before') is not None and lock['before'] != lock['after']:
+    if setup.get('granted_by') in ('repair', 'approve-plan', 'prompt') and lock.get('before') is not None and lock['before'] != lock['after']:
         files.append((setup['root'], lock['relative'], lock['before']))
     if not files:
         return []

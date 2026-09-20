@@ -10,7 +10,7 @@
   "milestones": [
     {
       "id": "ready",
-      "outcome": "Upgrade makes existing registered consumers ready, including consented setup.",
+      "outcome": "A uniform CLI manages checkout, personal and all-registered installations through complete reviewed tasks.",
       "work": [
         {
           "issue": "MASK-0120"
@@ -18,10 +18,10 @@
       ],
       "depends_on": [],
       "exit_criteria": [
-        "MASK-0120 AC1 through AC4 pass through public CLI tests.",
-        "Current docs describe upgrade setup and the retained ensure worktree/pinned use."
+        "MASK-0120 amended AC5 through AC11 pass through public CLI tests; AC1 through AC4 engine obligations remain where not superseded.",
+        "Current help, docs and integration callers use the accepted command lifecycle and scope defaults."
       ],
-      "boundary": "Registered consumers only; no live migration or publication."
+      "boundary": "Direct source implementation and disposable fixtures; no live consumer migration or publication."
     }
   ],
   "coverage": "complete",

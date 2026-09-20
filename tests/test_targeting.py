@@ -101,7 +101,7 @@ class TargetingTests(Fixture):
         self.assertFalse(self.call('selection-policy', 'set', '--agent', 'codex')['changed'])
         self.call('selection-policy', 'clear')
         self.assertFalse((self.home / 'selection-policy.json').exists())
-        parser, leaves = mask.make_parser()
+        parser, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
         args = parser.parse_args(['selection-policy', 'set', '--agent', 'codex', '--home', str(self.home)])
         output = mask.result('selection-policy.set')
         import mask_store as store

@@ -66,6 +66,8 @@ class TapBootstrap(unittest.TestCase):
         return env
 
     def machine(self, *args, code=0, home=None):
+        if args and args[0] in ('install', 'upgrade'):
+            args = (*args, '--no-update')
         run = subprocess.run([sys.executable, '-B', str(ENTRY), *map(str, args), '--json'], capture_output=True, encoding='utf-8',
                              cwd=str(self.project), env=self.environment(home), timeout=120)
         self.assertEqual(run.stderr, '', run.stderr)
@@ -97,12 +99,12 @@ class TapBootstrap(unittest.TestCase):
 
     def test_tap_add_bootstraps_an_empty_machine_without_fetching(self):
         before = self.snapshot()
-        preview = self.machine('tap', 'add', TAP, self.upstream.as_uri(), '--dry-run')
+        preview = self.machine('tap', TAP, self.upstream.as_uri(), '--dry-run')
         self.assertEqual([(a['kind'], a['status']) for a in preview['actions']], [('config.create', 'planned'), ('source.catalog', 'planned')])
         self.assertTrue(preview['would_change'])
         self.assertEqual(self.snapshot(), before)
         self.assertEqual(c.kind(self.home / 'config.json'), 'missing')
-        added = self.machine('tap', 'add', TAP, self.upstream.as_uri(), '--expect-plan-hash', preview['data']['plan_hash'])
+        added = self.machine('tap', TAP, self.upstream.as_uri(), '--approve-plan', preview['data']['plan_hash'])
         self.assertEqual([(a['kind'], a['status']) for a in added['actions']], [('config.create', 'applied'), ('source.catalog', 'applied')])
         config = self.read(self.home / 'config.json')
         self.assertEqual(sorted(config), ['default_targets', 'git_timeout_seconds', 'schema_version', 'sources'])
@@ -113,11 +115,10 @@ class TapBootstrap(unittest.TestCase):
         self.assertEqual(Path(entry['cache']).parent, self.home / 'sources')
         self.assertEqual(self.read(self.home / 'state.json'), c.empty_state())
         self.assertEqual(c.kind(self.home / 'sources'), 'missing')
-        self.assertFalse(self.machine('tap', 'add', TAP, self.upstream.as_uri())['changed'])
-        self.assertFalse(self.machine('init')['changed'])
+        self.assertFalse(self.machine('tap', TAP, self.upstream.as_uri())['changed'])
 
     def test_install_deploys_v2_consumers_from_the_store_with_no_checkout_on_disk(self):
-        self.machine('tap', 'add', TAP, self.upstream)
+        self.machine('tap', TAP, self.upstream)
         installed = self.machine('install', 'alpha', '--project', self.project)
         self.assertEqual((installed['data']['network'], len(installed['data']['acquisitions']), installed['transaction']), ('fetch', 1, 'committed'))
         declaration = self.read(self.project / '.mask.json')
@@ -145,10 +146,10 @@ class TapBootstrap(unittest.TestCase):
         self.assertEqual(outside, [])
         work_trees = sorted(str(path.parent) for path in self.base.rglob('.git'))
         self.assertEqual(work_trees, [str(self.project)])
-        self.assertTrue(self.machine('doctor', '--all', '--check')['data']['healthy'])
+        self.assertTrue(self.machine('status', '--all', '--check')['data']['healthy'])
 
     def test_offline_install_before_any_fetch_names_the_tap_and_writes_nothing(self):
-        self.machine('tap', 'add', TAP, self.upstream)
+        self.machine('tap', TAP, self.upstream)
         before = self.snapshot()
         refused = self.machine('install', 'alpha', '--offline', '--project', self.project, code=4)
         # A bare ID cannot be resolved while its only tap is unfetched (contract: source.unresolved names the taps).
@@ -159,31 +160,27 @@ class TapBootstrap(unittest.TestCase):
         self.assertEqual((qualified['error']['code'], qualified['error']['details']['source']), ('lock.resolution_required', TAP))
         self.assertEqual(self.snapshot(), before)
 
-    def test_init_writes_an_empty_catalog_and_refuses_the_retired_source_option(self):
+    def test_retired_init_refuses_and_catalog_options_use_config(self):
         for args in (('--source', self.base), ('--source', self.base, '--remote', 'origin', '--branch', 'main')):
             refused = self.machine('init', *args, code=2)
             self.assertEqual(refused['error']['code'], 'invocation.invalid')
         self.assertEqual(c.kind(self.home), 'missing')
-        self.machine('init', '--target', 'codex', '--git-timeout', '60')
-        self.assertEqual(self.read(self.home / 'config.json'), dict(schema_version=3, default_targets=['codex'], git_timeout_seconds=60, sources={}))
+        self.machine('tap', TAP, self.upstream)
+        self.machine('config', 'set', '--target', 'codex', '--git-timeout', '60')
+        config = self.read(self.home / 'config.json')
+        self.assertEqual((config['default_targets'], config['git_timeout_seconds']), (['codex'], 60))
         self.assertEqual(self.read(self.home / 'state.json'), c.empty_state())
-        self.assertFalse(self.machine('init')['changed'])
-        self.assertEqual(self.machine('init', '--target', 'claude', code=4)['error']['code'], 'config.already_initialized')
-        added = self.machine('tap', 'add', TAP, self.upstream)
-        self.assertEqual([a['kind'] for a in added['actions']], ['source.catalog'])
         self.machine('install', 'alpha', '--project', self.project)
         self.assertEqual(self.read(self.project / '.mask.json')['default_agents'], ['codex'])
         self.assert_store_link(self.project / '.agents/skills/alpha')
         self.assertEqual(c.kind(self.project / '.claude/skills/alpha'), 'missing')
 
-    def test_capabilities_publish_machine_v3_and_the_new_init_arguments(self):
+    def test_capabilities_publish_machine_v3_and_tap_bootstrap(self):
         caps = self.machine('capabilities')['data']
         self.assertEqual((caps['schemas']['machine'], caps['readable_versions']['machine']), (3, [3]))
         commands = {item['name']: item for item in caps['commands']}
-        names = {argument['name'] for argument in commands['init']['arguments']}
-        self.assertLessEqual({'target', 'git_timeout'}, names)
-        self.assertFalse(names & {'source', 'remote', 'branch'})
-        self.assertEqual((commands['tap.add']['network'], commands['tap.add']['plan_guard']), (False, True))
+        self.assertNotIn('init', commands)
+        self.assertEqual((commands['tap']['network'], commands['tap']['plan_guard']), (False, True))
         schema = json.loads((ENTRY.parent / 'schemas/machine-v3.schema.json').read_text(encoding='utf-8'))
         self.assertEqual((schema['properties']['schema_version']['const'], sorted(schema['required'])), (3, ['default_targets', 'git_timeout_seconds', 'schema_version', 'sources']))
         union = json.loads((ENTRY.parent / 'schemas/machine.schema.json').read_text(encoding='utf-8'))

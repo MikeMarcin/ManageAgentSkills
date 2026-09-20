@@ -144,13 +144,17 @@ def selection(value):
     defaults = agents(value.get('default_agents', 'all'))
     bindings, seen = [], set()
     for binding in value['skills']:
-        closed(binding, ('source', 'id'), ('version', 'agents', 'when', 'introduced_by'))
+        closed(binding, ('source', 'id'), ('version', 'agents', 'when', 'introduced_by', 'pinned'))
         name, identifier = c.skill_id(binding['source']), c.skill_id(binding['id'])
         key = (name, identifier)
         if name not in sources or key in seen:
             invalid('selection', 'Unknown source or duplicate source/package binding.')
         seen.add(key)
         row = dict(source=name, id=identifier)
+        if 'pinned' in binding:
+            if binding['pinned'] is not True:
+                invalid('selection', 'An explicit pinned flag must be true; omit it to follow updates.')
+            row['pinned'] = True
         if 'agents' in binding:
             row['agents'] = agents(binding['agents'])
         if 'version' in binding:
@@ -346,14 +350,18 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
     for key, binding in bindings.items():
         prior = previous_rows.get(key)
         entry = entries[binding['source']]
-        update = refresh and (not selected or key in selected)
+        update = refresh and (not selected or key in selected) and not binding.get('pinned', False)
         if prior is not None and not update:
             chosen = declared_selector(declaration, binding)
             if not s.same(prior['repository'], entry['repository']) or chosen is not None and chosen != prior['selector']:
                 c.fail('lock.stale', 'Changed binding requires an explicit selected --refresh.', 4, skill=key)
-            payload = verify_resolution(home, binding['source'], entry, prior)
-            if payload_views is not None:
-                payload_views[prior['payload_digest']] = payload
+            import mask_store
+            if c.kind(mask_store.location(home, prior['payload_digest'], prior['id'])[0]) == 'directory':
+                mask_store.verify(home, prior)
+            else:
+                payload = verify_resolution(home, binding['source'], entry, prior)
+                if payload_views is not None:
+                    payload_views[prior['payload_digest']] = payload
             rows.append(prior)
             continue
         row = resolve_binding(home, declaration, binding, entry, payload_views)

@@ -316,14 +316,18 @@ def validate_observations(pending, home):
                     r.approved(record['last_manifest'], pending['config'])
         for item in value['workspaces']:
             if item['manifest'] is None:
-                if pending['operation'] != 'ensure.deactivate':
-                    c.fail('recovery.conflict', 'Only proven inactive readiness can observe an absent declaration.', 8)
+                creation = any(entry['root'] == item['root'] and entry['role'].endswith('_declaration') and entry['before'] is None and entry['after'] is not None for entry in pending.get('files', []))
+                if pending['operation'] != 'ensure.deactivate' and not (creation and pending['operation'] in ('install', 'ensure') and item['root'] not in c.consumer_records(pending['before_state'])):
+                    c.fail('recovery.conflict', 'Absent declaration requires typed enrollment or proven inactive readiness.', 8)
                 continue
             declaration = c.selection_manifest(r.parse(item['manifest'], 'manifest'))
             if declaration['schema_version'] == 2:
                 if item.get('lock') is None:
-                    c.fail('recovery.conflict', 'Pinned workspace observation needs its exact lock.', 8)
-                validate_live_lock(r.parse(item['lock'], 'lock'), declaration, pending)
+                    creation = any(entry['root'] == item['root'] and entry['role'].endswith('_lock') and entry['before'] is None and entry['after'] is not None for entry in pending.get('files', []))
+                    if not creation or pending['operation'] not in ('install', 'ensure'):
+                        c.fail('recovery.conflict', 'An absent lock requires a typed installation transition.', 8)
+                else:
+                    validate_live_lock(r.parse(item['lock'], 'lock'), declaration, pending)
                 r.approved(declaration, pending['config'])
     except c.MaskError as error:
         c.fail('recovery.conflict', 'Pinned journal controls or source authority are inconsistent.', 8, cause=error.as_dict())

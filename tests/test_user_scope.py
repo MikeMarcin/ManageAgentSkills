@@ -31,7 +31,7 @@ class UserScopeTests(Fixture):
 
     def crash(self, label, *command):
         script = ("import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;"
-                  "mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;raise SystemExit(mask.main(sys.argv[3:]))")
+                  "mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:]))")
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, *map(str, command), '--json'],
                              capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
         self.assertEqual(run.returncode, 99, (run.stdout, run.stderr))

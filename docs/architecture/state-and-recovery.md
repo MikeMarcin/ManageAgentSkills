@@ -4,22 +4,22 @@ The public API is the CLI, not these internal files. This page describes the cur
 
 ## config.json
 
-`schemas/machine-v3.schema.json`. Version 3 holds `default_targets`, `git_timeout_seconds` and `sources`, 0 to 256 taps keyed by alias. A tap entry records `repository` (a normalized, credential-free identity), `transport`, `cache`, `ref`, `packages`, `authoring` and the optional `line_endings`: `exact`, or `autocrlf` from `tap add --autocrlf`. An entry without `line_endings` keeps exact bytes. `authoring` is null or the tap's authoring checkout, which `source publish`, `source dev-link` and curated imports use; it is never an ordinary link target. `init` and a bootstrapping `tap add` write an empty catalog.
+`schemas/machine-v3.schema.json`. Version 3 holds `default_targets`, `git_timeout_seconds` and `sources`, 0 to 256 taps keyed by alias. A tap entry records `repository` (a normalized, credential-free identity), `transport`, `cache`, `ref`, `packages`, `authoring` and the optional `line_endings`: `exact`, or `autocrlf` from `tap --autocrlf`. An entry without `line_endings` keeps exact bytes. `authoring` is null or the tap's authoring checkout, which `tap publish`, `skill dev-link` and curated imports use; it is never an ordinary link target. A bootstrapping `tap` write an empty catalog.
 
 ## state.json
 
-`schemas/state.schema.json` selects `state-v1`, `state-v2` or `state-v3.schema.json`. `init` and a bootstrapping `tap add` write the empty version 1 registry; storing the first pinned or dev-link record writes version 3.
+`schemas/state.schema.json` selects `state-v1`, `state-v2` or `state-v3.schema.json`. A bootstrapping `tap` write the empty version 1 registry; storing the first pinned or dev-link record writes version 3.
 
 - The registry holds `generation`, `projects` keyed by canonical root, `user` (the personal-scope record or null) and `launchers` (owned launcher path to program root, interpreter and content digest; not a command list loaded from a project).
 - A current consumer record has `mode` `pinned` or `dev-link`, `root`, `root_identity`, `last_manifest` (its v2 declaration, `project-v2.schema.json`) with `last_manifest_digest`, `last_lock` (`lock-v1.schema.json`), `last_source_revision` null and optional `native_roles` (owned role files with their SHA-256).
 - `links` maps each agent-relative path to `skill`, `target`, the exact owned `link_text` and `resolution`, the lock row it deploys. The link text names `MASK_HOME/store/v1/<payload hex>/payload/<id>`; on native Windows it is the extended `\\?\` spelling that readlink returns.
-- A `dev-link` record adds `dev_links` and a per-link `dev` binding (source, ID, authoring root and identity, package path). Only an explicit `source dev-link` produces a link text into an authoring checkout.
+- A `dev-link` record adds `dev_links` and a per-link `dev` binding (source, ID, authoring root and identity, package path). Only an explicit `skill dev-link` produces a link text into an authoring checkout.
 
 The root identity is an available-platform consistency check, not a globally stable UUID or proof of ownership; never infer that a replacement directory is owned because it occupies the same path. Validate each registry key against its canonical root and recompute each relative link path from its agent and skill; the on-disk link's raw value must still agree before unlink. Desired links derive from the live declaration and lock, not the cached `last_manifest`. A true no-op does not increment `generation` or rewrite cached fields, and read-only inspections write nothing.
 
 ## Caches and store
 
-- `MASK_HOME/sources/<alias>-<digest prefix>.git` is one bare Git cache per tap, marked by `mask-source.json`. `tap add` never fetches; `install`, `upgrade` and `source fetch` acquire into it.
+- `MASK_HOME/sources/<alias>-<digest prefix>.git` is one bare Git cache per tap, marked by `mask-source.json`. `tap` never fetches; `install`, `upgrade` and `tap fetch` acquire into it.
 - `MASK_HOME/store/v1/<payload hex>/` holds `manifest.json` (`schemas/artifact-v1.schema.json`) and `payload/<id>`: content-addressed payloads, verified before reuse and shared by identical content.
 
 Cache and store writes are MASK-owned preparation effects made before a journal exists. They are reported (`preparation`, `retained_directories` and the `retained_preparation` summary) and retained: neither a failed operation nor `recover --rollback` removes them, and nothing prunes them. They are not a consumer transaction: a command that refuses after preparation but before any consumer effect reports `transaction: not_started`, and nothing needs recovery. A plan whose store artifact is still absent reads the exact locked bytes from the tap cache instead, without fetching or writing.
@@ -32,7 +32,7 @@ The intent is written before the first effect. Recovery validates the whole inte
 
 **`upgrade`.** `upgrade` fetches each referenced tap once under the writer lock and materializes store payloads before it writes its journal. One `upgrade` journal then carries the lock and link changes of every applied consumer. It recovers like any pinned journal, and the fetched objects and payloads stay.
 
-Finish pending recovery with this program before switching program revisions; a previous program does not recover this program's journals (see "Switching executables" in the [CLI contract](cli-contract.md#selected-updates-and-authoring-exceptions)).
+Finish pending recovery with this program before switching program revisions; a previous program does not recover this program's journals (see the [CLI contract](cli-contract.md#integrations-and-advanced-controls)).
 
 ## Recovery invariants
 

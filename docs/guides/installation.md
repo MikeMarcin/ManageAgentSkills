@@ -42,15 +42,15 @@ On macOS or Linux, run the following from the directory that will hold the clone
 git clone https://github.com/MikeMarcin/ManageAgentSkills.git
 mkdir -p "$HOME/.local/bin"
 python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
-"$HOME/.local/bin/mask" tap add agentskills https://github.com/MikeMarcin/AgentSkills.git
+"$HOME/.local/bin/mask" tap agentskills https://github.com/MikeMarcin/AgentSkills.git
 "$HOME/.local/bin/mask" capabilities
-"$HOME/.local/bin/mask" source fetch
+"$HOME/.local/bin/mask" tap fetch
 "$HOME/.local/bin/mask" skill list
 ```
 
 MASK writes a launcher that records the selected interpreter and program clone. It leaves PATH unchanged. Use the absolute launcher path immediately, or add its directory to PATH yourself before using the shorter `mask` commands. An unrelated or edited existing launcher is preserved and causes a refusal.
 
-`tap add` approves the repository under the name `agentskills`. When `MASK_HOME/config.json` and the state file are missing, it creates them, so this one command bootstraps the machine; it does not use the network. `capabilities` confirms the program, interpreter and supported commands. `skill list` reads only fetched taps: before any fetch it lists nothing and names the unfetched tap, so `source fetch` fills the tap's cache first without deploying anything. You can skip both and run `mask install ID` in a project instead, which fetches the tap on demand.
+`tap NAME URL` approves the repository under the name `agentskills`. When `MASK_HOME/config.json` and the state file are missing, it creates them, so this one command bootstraps the machine; it does not use the network. `capabilities` confirms the program, interpreter and supported commands. `search` reads only fetched taps: before any fetch it lists nothing and names the unfetched tap, so `tap fetch` fills the tap's cache first without deploying anything. You can skip both and run `mask install ID` in a project instead, which fetches the tap on demand.
 
 On Windows, use PowerShell with a known supported Python installation. For example, if Python 3.14 is installed and the clone goes under `C:\work`:
 
@@ -59,9 +59,9 @@ git clone https://github.com/MikeMarcin/ManageAgentSkills.git 'C:\work\ManageAge
 $maskBin = Join-Path $env:LOCALAPPDATA 'Programs\MASK'
 New-Item -ItemType Directory -Force -Path $maskBin | Out-Null
 py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin
-& "$maskBin\mask.cmd" tap add agentskills https://github.com/MikeMarcin/AgentSkills.git
-& "$maskBin\mask.cmd" source fetch
+& "$maskBin\mask.cmd" tap agentskills https://github.com/MikeMarcin/AgentSkills.git
+& "$maskBin\mask.cmd" tap fetch
 & "$maskBin\mask.cmd" skill list
 ```
 
-The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status` reports the program, interpreter and launcher discovery. Installing the launcher and approving a tap are separate operations; `mask init` creates an empty tap catalog if you want the machine configuration before approving any tap.
+The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status` reports the program, interpreter and launcher discovery. Approving the first tap initializes the machine configuration; registering a checkout is a separate operation.

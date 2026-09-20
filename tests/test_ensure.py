@@ -117,7 +117,7 @@ import os,sys
 sys.path.insert(0,sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint=lambda label: os._exit(99) if label=='intent' else None
-mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
+__import__('tests.engine_cli', fromlist=['main']).main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True)
         self.assertEqual(run.returncode, 99)
@@ -207,7 +207,7 @@ mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
         import mask_resolve as r
         import mask_store as store
         self.approve()
-        parser, leaves = mask.make_parser()
+        parser, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
         args = parser.parse_args(['ensure', '--offline', '--project', str(self.project), '--home', str(self.home)])
         output = mask.result('ensure')
         with patch.object(store, 'verify_tree', wraps=store.verify_tree) as trees, patch.object(store, 'materialize', wraps=store.materialize) as materialized, \

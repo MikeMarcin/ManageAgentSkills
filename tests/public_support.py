@@ -4,7 +4,7 @@ Unlike ``tests.support.Fixture.call``, nothing here appends ``--json``. Three
 helpers are kept separate on purpose: ``raw`` returns the completed process,
 ``machine`` requests the JSON protocol explicitly, and ``human`` is the plain
 terminal invocation whose output is the thing under test. Starting states are
-prepared only up to the one-time source prerequisite, which is ``tap add`` of a
+prepared only up to the one-time source prerequisite, which is ``tap NAME URL`` of a
 local bare upstream on an empty MASK_HOME (RFC-MASK-0021); no helper registers a
 consumer, approves readiness, renders roles or applies a change on behalf of the
 command under test.
@@ -32,6 +32,8 @@ STALE_ROLE = 'rfc-worker'
 
 
 class PublicFixture(unittest.TestCase):
+    entrypoint = ENTRY
+
     """A source with three skills, a private MASK_HOME and no registered consumer."""
 
     def setUp(self):
@@ -65,7 +67,7 @@ class PublicFixture(unittest.TestCase):
 
     def bootstrap(self):
         """The one-time source prerequisite: approve the fixture upstream as a tap on an empty MASK_HOME."""
-        self.assertTrue(self.machine('tap', 'add', TAP, self.upstream)['ok'])
+        self.assertTrue(self.machine('tap', TAP, self.upstream)['ok'])
 
     def publish(self, message='fixture change', *, force=False):
         """Commit the author's skill edits and push them to the tap upstream; MASK sees them only after a fetch."""
@@ -89,7 +91,7 @@ class PublicFixture(unittest.TestCase):
 
     def raw(self, *args, cwd=None, env=None, stdin=subprocess.DEVNULL):
         """Run the CLI exactly as given; nothing is appended."""
-        return subprocess.run([sys.executable, '-B', str(ENTRY), *map(str, args)], capture_output=True, encoding='utf-8',
+        return subprocess.run([sys.executable, '-B', str(self.entrypoint), *map(str, args)], capture_output=True, encoding='utf-8',
                               cwd=str(cwd or self.project), env=self.environment(env), stdin=stdin, timeout=60)
 
     def machine(self, *args, **kwargs):
@@ -121,7 +123,7 @@ class PublicFixture(unittest.TestCase):
         import pty
         replies = list(answer) if isinstance(answer, list) else [answer]
         master, slave = pty.openpty()
-        process = subprocess.Popen([sys.executable, '-B', str(ENTRY), *map(str, args)], stdin=slave, stdout=slave, stderr=slave,
+        process = subprocess.Popen([sys.executable, '-B', str(self.entrypoint), *map(str, args)], stdin=slave, stdout=slave, stderr=slave,
                                    cwd=str(self.project), env=self.environment(), close_fds=True)
         os.close(slave)
         transcript = b''
@@ -180,3 +182,14 @@ class PublicFixture(unittest.TestCase):
             self.assertTrue((self.project / f'.agents/skills/implement-rfc').is_symlink())
             self.assertFalse(any((self.project / f'.{agent}/agents').glob(MISSING_ROLE + '.*')))
         return self.machine('project', 'list')
+
+
+class EngineFixture(PublicFixture):
+    """Private operation fixture for retained reconciliation/recovery contracts.
+
+    New end-to-end command journeys use PublicFixture and the shipped entrypoint.
+    """
+    entrypoint = ENTRY.parent / 'tests/engine_cli.py'
+
+    def bootstrap(self):
+        self.assertTrue(self.machine('tap', 'add', TAP, self.upstream)['ok'])

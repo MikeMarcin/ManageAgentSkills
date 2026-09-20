@@ -162,7 +162,7 @@ import os,sys
 sys.path.insert(0,sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint = lambda label: os._exit(99) if label == 'link' else None
-mask.main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
+__import__('tests.engine_cli', fromlist=['main']).main(['apply','--project',sys.argv[2],'--home',sys.argv[3],'--json'])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.project), str(self.home)], capture_output=True, env=self.environment())
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)

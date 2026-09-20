@@ -21,11 +21,11 @@ import mask
 import mask_core as c
 import mask_store as store
 from tests.fixture_files import write_json
-from tests.public_support import PublicFixture
+from tests.public_support import EngineFixture
 from tests.support import TAP
 
 
-class ColdStore(PublicFixture):
+class ColdStore(EngineFixture):
     """A declared and locked project whose tap cache holds the locked commit while the store holds no artifact."""
 
     def setUp(self):
@@ -167,7 +167,7 @@ class ConcurrentWriterDuringPreparation(ColdStore):
 
         stdout = io.StringIO()
         with patch.object(store, 'ensure', side_effect=prepare_then_write), contextlib.redirect_stdout(stdout):
-            code = mask.main([*map(str, argv), '--home', str(self.home), '--json'])
+            code = __import__('tests.engine_cli', fromlist=['main']).main([*map(str, argv), '--home', str(self.home), '--json'])
         return code, json.loads(stdout.getvalue())
 
     def test_install_refused_after_preparation_reports_no_consumer_transaction(self):

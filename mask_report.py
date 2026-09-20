@@ -132,6 +132,7 @@ def dispatch(args, output, home):
             # Diagnostic only: the cached pinned selection is not a claim about the current declaration.
             consumer['declaration_basis'] = 'cached_pinned_selection'
         entries = {}
+        held = {r.coordinate(binding) for binding in declaration['skills'] if binding.get('pinned')}
         for binding in declaration['skills']:
             agents = binding.get('agents', declaration['default_agents'])
             for agent in sorted(c.ADAPTERS) if agents == 'all' else agents:
@@ -186,7 +187,7 @@ def dispatch(args, output, home):
                 status = 'inapplicable'
             else:
                 status = 'declared_not_deployed'
-            rows.append(dict(skill=coordinate, name=relative.rsplit('/', 1)[1],
+            rows.append(dict(skill=coordinate, name=relative.rsplit('/', 1)[1], pinned=coordinate in held,
                              source=dict(alias=row['source'], repository=row['repository']) if row else None,
                              package_path=row['path'] if row else None,
                              artifact={field: row[field] for field in ARTIFACT} if row else None,

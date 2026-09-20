@@ -150,7 +150,7 @@ import mask, mask_fs
 def checkpoint(label):
     if label == 'retired_file': os._exit(97)
 mask_fs.checkpoint = checkpoint
-raise SystemExit(mask.main(sys.argv[2:]))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:]))
 '''
         for disposition in ('--rollback', '--complete'):
             run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'ensure', '--project', str(self.project), '--repair', '--json'],
@@ -184,7 +184,7 @@ import os, sys
 sys.path.insert(0, sys.argv[1])
 import mask, mask_fs
 mask_fs.checkpoint = lambda label: os._exit(97) if label == 'retired_file' else None
-raise SystemExit(mask.main(sys.argv[2:]))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:]))
 '''
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'ensure', '--project', str(self.project), '--repair', '--json'],
                              capture_output=True, text=True, env=self.environment(), timeout=60)

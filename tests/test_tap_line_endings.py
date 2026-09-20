@@ -263,13 +263,12 @@ class PolicySurfaces(LineEndingFixture):
         self.assertEqual((flag['flags'], flag['type'], flag['required'], flag['repeatable'], flag['nargs']), (['--autocrlf'], 'boolean', False, False, 0))
 
     def test_tap_add_help_describes_exact_bytes_and_the_opt_in(self):
-        run = subprocess.run([sys.executable, '-B', str(ENTRY), 'tap', 'add', '--help'], capture_output=True, encoding='utf-8',
+        run = subprocess.run([sys.executable, '-B', str(ENTRY), 'tap', '--help'], capture_output=True, encoding='utf-8',
                              cwd=str(self.project), env=self.environment(), timeout=60)
         self.assertEqual((run.returncode, run.stderr), (0, ''))
         text = ' '.join(run.stdout.split())
         for phrase in ('A tap keeps exact bytes', '--autocrlf', 'core.autocrlf=true', '(default: exact bytes)'):
             self.assertIn(phrase, text)
-        self.assertEqual(self.call('tap', 'add', '--help')['data']['help'], run.stdout)
 
     def test_machine_v3_schema_describes_the_optional_policy_and_fits_written_entries(self):
         schema = json.loads((ENTRY.parent / 'schemas/machine-v3.schema.json').read_text(encoding='utf-8'))

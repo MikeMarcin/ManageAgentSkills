@@ -130,7 +130,7 @@ class UpdateFixture(Fixture):
 
     def crash(self, args, label='intent'):
         script = ("import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;"
-                  "mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;raise SystemExit(mask.main(sys.argv[3:]))")
+                  "mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None;raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:]))")
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, *map(str, args), '--json'],
                              capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
@@ -200,7 +200,7 @@ class FetchingUpdate(UpdateFixture):
         self.assertEqual(self.lock_path(self.other).read_bytes(), untouched)
         self.assertEqual(os.readlink(self.other / '.agents/skills/gamma'), link)
         self.assert_store_links()
-        human = subprocess.run([sys.executable, '-B', str(ENTRY), 'upgrade'], capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
+        human = subprocess.run([sys.executable, '-B', str(ENTRY), 'upgrade', '--all', '--no-update'], capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
         self.assertEqual((human.returncode, human.stdout), (4, ''), human.stderr)
         for text in ('code: upgrade.incomplete', str(self.other), 'tap second: fetch failed (git.failed)', 'tap agentskills: fetched, nothing new'):
             self.assertIn(text, human.stderr)
@@ -408,7 +408,7 @@ class UpdateSafetyOnTaps(UpdateFixture):
         self.move_alpha_and_beta('rolled back')
         script = ("import sys\nsys.path.insert(0, sys.argv[1])\nimport mask, mask_fs\n"
                   "def fail(label):\n    if label == 'lock':\n        raise OSError('injected late failure')\n"
-                  "mask_fs.checkpoint = fail\nraise SystemExit(mask.main(sys.argv[2:]))\n")
+                  "mask_fs.checkpoint = fail\nraise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:]))\n")
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'upgrade', '--json'],
                              capture_output=True, encoding='utf-8', cwd=self.project, env=self.environment())
         data = json.loads(run.stdout)
@@ -418,21 +418,24 @@ class UpdateSafetyOnTaps(UpdateFixture):
         self.assert_store_links()
         self.assertEqual(self.statuses(self.call('upgrade')), ['updated', 'updated', 'unchanged'])
 
-    def test_blocked_consumer_keeps_update_incomplete_beside_incomplete_workflow_roles(self):
-        # Product check: mask_update.dispatch ends upgrade.incomplete with the blocked roots plus the workflow details the shared
-        # final status raised for the applied consumers; workflow.incomplete no longer masks the blocked consumer.
-        shutil.copytree(GENERATED, self.source / 'skills/implement-rfc')
-        self.publish('add a package whose integrator role needs setup')
+    def test_setup_review_preserves_all_consumers_even_when_another_tap_is_blocked(self):
+        package = self.source / 'skills/implement-rfc'
+        shutil.copytree(GENERATED.with_name('static-package'), package)
+        self.publish('static package')
         self.call('source', 'fetch', TAP)
         shutil.copytree(CONTEXT, self.project / '.mask')
-        self.assertEqual(self.call('install', TAP + '/implement-rfc', '--project', self.project, code=4)['error']['code'], 'workflow.incomplete')
+        self.call('install', TAP + '/implement-rfc', '--project', self.project)
+        shutil.rmtree(package)
+        shutil.copytree(GENERATED, package)
+        self.publish('candidate requires generated roles')
         self.second.rename(self.second.with_name('Second moved away.git'))
+        before = self.consumer_controls()
         result = self.call('upgrade', code=4)
-        error = result['error']
-        self.assertEqual((error['code'], error['details']['blocked'], result['transaction']), ('upgrade.incomplete', [str(self.other)], 'committed'))
-        self.assertIn('implement-rfc codex/rfc-integrator: setup_required', error['details']['workflow'])
-        self.assertEqual(result['data']['workflow'][str(self.project)], 'incomplete')
-        self.assertEqual(self.statuses(result), ['updated', 'updated', 'blocked'])
+        self.assertEqual(result['error']['code'], 'confirmation.required')
+        self.assertFalse(result['changed'])
+        self.assertEqual(before, self.consumer_controls())
+        self.assertEqual(result['data']['fetches'][SECOND]['ok'], False)
+        self.assertEqual(self.rows(result)[str(self.other)]['status'], 'blocked')
         self.assert_store_links()
 
     def test_unavailable_consumer_refuses_before_any_fetch(self):

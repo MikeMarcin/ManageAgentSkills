@@ -129,6 +129,10 @@
             },
             "required": [],
             "type": "object"
+          },
+          "pinned": {
+            "const": true,
+            "description": "Hold the locked version across upgrades; readiness still reconciles."
           }
         },
         "required": [

@@ -77,7 +77,7 @@ class Deploying(ForgeFixture):
     def committed(self, recorded, *, host=None):
         """A project directory holding only what a repository would commit, with ``recorded`` as the spelling an older program wrote."""
         if not (self.project / '.mask.lock.json').exists():
-            self.assertTrue(self.machine('tap', 'add', TAP, HTTPS)['ok'])
+            self.assertTrue(self.machine('tap', TAP, HTTPS)['ok'])
             self.assertEqual(self.human('install', 'alpha').returncode, 0)
         declaration, lock = self.document(self.project / '.mask.json'), self.document(self.project / '.mask.lock.json')
         declaration['sources'][TAP]['repository'] = recorded
@@ -104,12 +104,12 @@ class OneIdentity(Deploying):
                 with self.subTest(recorded=recorded, typed=typed):
                     clone, other = self.committed(recorded), self.machine_home(f'{len(list(self.base.glob("clone-*")))}')
                     before = self.files(clone)
-                    added = self.machine('tap', 'add', TAP, typed, env=other, cwd=clone)
+                    added = self.machine('tap', TAP, typed, env=other, cwd=clone)
                     self.assertEqual((added['ok'], added['data']['config']['sources'][TAP]['repository']), (True, HTTPS))
                     # A fresh machine acquires exactly the locked commit; ensure itself never fetches.
-                    acquired = self.machine('source', 'fetch', '--locked', '--project', clone, env=other, cwd=clone)
+                    acquired = self.machine('tap', 'fetch', '--locked', '--project', clone, env=other, cwd=clone)
                     self.assertTrue(acquired['ok'], acquired)
-                    ensured = self.raw('ensure', '--yes', env=other, cwd=clone)
+                    ensured = self.raw('register', env=other, cwd=clone)
                     self.assertEqual(ensured.returncode, 0, ensured.stderr)
                     self.assertEqual(self.files(clone), before)
                     self.assertTrue((clone / '.claude/skills/alpha/SKILL.md').is_file())
@@ -117,9 +117,9 @@ class OneIdentity(Deploying):
 
     def test_a_write_takes_the_canonical_spelling_and_a_spelling_alone_never_writes(self):
         clone, other = self.committed(LEGACY_SSH), self.machine_home('writer')
-        self.assertTrue(self.machine('tap', 'add', TAP, SCP, env=other, cwd=clone)['ok'])
-        self.assertTrue(self.machine('source', 'fetch', '--locked', '--project', clone, env=other, cwd=clone)['ok'])
-        self.assertEqual(self.raw('ensure', '--yes', env=other, cwd=clone).returncode, 0)
+        self.assertTrue(self.machine('tap', TAP, SCP, env=other, cwd=clone)['ok'])
+        self.assertTrue(self.machine('tap', 'fetch', '--locked', '--project', clone, env=other, cwd=clone)['ok'])
+        self.assertEqual(self.raw('register', env=other, cwd=clone).returncode, 0)
         before, old = self.files(clone), self.document(clone / '.mask.lock.json')['packages'][0]
         quiet = self.machine('upgrade', '--project', clone, env=other, cwd=clone)
         self.assertEqual((quiet['ok'], quiet['changed'], self.files(clone)), (True, False, before))
@@ -143,12 +143,12 @@ class StrictElsewhere(Deploying):
 
     def test_mismatch_refuses_until_the_machine_opts_the_host_in(self):
         clone, other = self.committed('ssh://git@example.test/Fixture/AgentSkills.git'), self.machine_home('strict')
-        self.assertTrue(self.machine('tap', 'add', TAP, 'https://example.test/Fixture/AgentSkills.git', env=other, cwd=clone)['ok'])
-        refused = self.machine('ensure', '--yes', env=other, cwd=clone)
+        self.assertTrue(self.machine('tap', TAP, 'https://example.test/Fixture/AgentSkills.git', env=other, cwd=clone)['ok'])
+        refused = self.machine('register', env=other, cwd=clone)
         self.assertEqual(refused['error']['code'], 'source.identity_mismatch')
         opted = self.machine('config', 'set', '--forge-host', 'example.test', env=other, cwd=clone)
         self.assertEqual((opted['changed'], opted['data']['config']['forge_hosts']), (True, ['example.test']))
-        accepted = self.machine('ensure', '--yes', '--offline', env=other, cwd=clone)
+        accepted = self.machine('register', '--offline', env=other, cwd=clone)
         self.assertNotEqual((accepted.get('error') or {}).get('code'), 'source.identity_mismatch', accepted)
         cleared = self.machine('config', 'set', '--clear-forge-hosts', env=other, cwd=clone)
         self.assertNotIn('forge_hosts', cleared['data']['config'])
@@ -158,7 +158,7 @@ class TransportByConvention(ForgeFixture):
     """AC03: origin, then a proven hint, then gh, then the other scheme; no prompt and never the /~/ URI."""
 
     def add(self, typed=HTTPS, *extra):
-        added = self.machine('tap', 'add', TAP, typed, *extra)
+        added = self.machine('tap', TAP, typed, *extra)
         self.assertTrue(added['ok'], added)
         return added['data']['config']['sources'][TAP]
 
@@ -169,7 +169,7 @@ class TransportByConvention(ForgeFixture):
                 project.mkdir()
                 self.git(project, 'init', '-q', '-b', 'main')
                 self.git(project, 'remote', 'add', 'origin', origin)
-                self.assertTrue(self.machine('tap', 'add', TAP, SCP if first == HTTPS else HTTPS, env=home)['ok'])  # The typed URL says the opposite.
+                self.assertTrue(self.machine('tap', TAP, SCP if first == HTTPS else HTTPS, env=home)['ok'])  # The typed URL says the opposite.
                 self.reached()
                 self.machine('install', 'alpha', '--dry-run', env=home, cwd=project)  # A dry run never contacts the forge, whatever it reports.
                 self.assertEqual(self.reached(), [])
@@ -182,20 +182,20 @@ class TransportByConvention(ForgeFixture):
     def test_personal_scope_uses_gh_then_the_typed_url_then_the_probe_and_remembers_what_worked(self):
         self.add(HTTPS)
         self.gh = 'ssh'
-        first = self.machine('update', '--dry-run')  # Contacts nothing.
+        first = self.machine('tap', 'fetch', '--dry-run')  # Contacts nothing.
         self.assertEqual((first['ok'], self.reached()), (True, []))
-        fetched = self.machine('source', 'fetch', TAP)
+        fetched = self.machine('tap', 'fetch', TAP)
         self.assertEqual((fetched['ok'], self.reached()[0]), (True, SCP))
         self.assertEqual(fetched['data']['transports'][TAP]['chosen_by'], 'gh')
-        shown = self.machine('source', 'show', TAP)['data']
+        shown = self.machine('tap', 'show', TAP)['data']
         self.assertEqual((shown['transport'], shown['transport_policy'], shown['chosen_by']), (SCP, 'derived', 'gh'))
         self.gh = 'https'  # A transport a fetch proved now outranks gh's stated preference.
-        again = self.machine('source', 'fetch', TAP)
+        again = self.machine('tap', 'fetch', TAP)
         self.assertEqual((self.reached()[0], again['data']['transports'][TAP]['chosen_by']), (SCP, 'hint'))
         self.gh = ''
         home = self.machine_home('no-gh')
-        self.assertTrue(self.machine('tap', 'add', TAP, SCP, env=home)['ok'])
-        plain = self.machine('source', 'fetch', TAP, env=home)
+        self.assertTrue(self.machine('tap', TAP, SCP, env=home)['ok'])
+        plain = self.machine('tap', 'fetch', TAP, env=home)
         self.assertEqual((self.reached()[0], plain['data']['transports'][TAP]['chosen_by']), (SCP, 'catalog'))
 
     def test_a_transport_that_cannot_authenticate_falls_back_and_says_so(self):
@@ -210,11 +210,11 @@ class TransportByConvention(ForgeFixture):
         self.assertEqual(upgraded.returncode, 0, upgraded.stderr)
         self.assertEqual(self.reached()[:2], [HTTPS, SCP])
         self.assertIn(f'reached over {SCP} after {HTTPS} (git.auth_required) did not answer', upgraded.stdout)
-        self.assertEqual(self.machine('source', 'show', TAP)['data']['transport'], SCP)  # Remembered: the next fetch starts there.
-        self.machine('update')
+        self.assertEqual(self.machine('tap', 'show', TAP)['data']['transport'], SCP)  # Remembered: the next fetch starts there.
+        self.machine('tap', 'fetch')
         self.assertEqual(self.reached()[0], SCP)
         self.serve(https=False, ssh=False)
-        nothing = self.machine('source', 'fetch', TAP)
+        nothing = self.machine('tap', 'fetch', TAP)
         self.assertEqual((nothing['error']['code'], [item['transport'] for item in nothing['error']['details']['tried']]), ('git.auth_required', [SCP, HTTPS]))
 
     def test_a_catalog_from_before_the_rfc_never_uses_the_tilde_uri(self):
@@ -235,10 +235,10 @@ class Pinning(ForgeFixture):
     """AC04: a pin is explicit, machine-local and exclusive."""
 
     def test_a_pinned_tap_tries_nothing_else_and_derive_unpins(self):
-        added = self.machine('tap', 'add', TAP, HTTPS, '--pin-transport')
+        added = self.machine('tap', TAP, HTTPS, '--pin-transport')
         self.assertEqual((added['data']['config']['sources'][TAP]['transport'], added['data']['config']['sources'][TAP]['transport_policy']), (HTTPS, 'pinned'))
         self.serve(https=False, ssh=True)
-        refused = self.machine('source', 'fetch', TAP)
+        refused = self.machine('tap', 'fetch', TAP)
         self.assertEqual((refused['error']['code'], self.reached()), ('git.auth_required', [HTTPS]))
         before = (self.home / 'config.json').read_bytes()
         other = self.machine('tap', 'transport', TAP, 'git@github.com:Someone/Else.git')
@@ -248,7 +248,7 @@ class Pinning(ForgeFixture):
         self.assertEqual((preview['would_change'], preview['changed'], (self.home / 'config.json').read_bytes()), (True, False, before))
         pinned = self.machine('tap', 'transport', TAP, SSH)
         self.assertEqual((pinned['changed'], pinned['data']['transport'], pinned['data']['transport_policy']), (True, SCP, 'pinned'))
-        fetched = self.machine('source', 'fetch', TAP)
+        fetched = self.machine('tap', 'fetch', TAP)
         self.assertEqual((fetched['ok'], self.reached(), fetched['data']['transports'][TAP]['chosen_by']), (True, [SCP, SCP], 'pinned'))
         self.assertEqual(self.human('install', 'alpha').returncode, 0)
         for committed in ('.mask.json', '.mask.lock.json'):
@@ -258,7 +258,7 @@ class Pinning(ForgeFixture):
         self.assertEqual((derived['changed'], derived['data']['transport_policy']), (True, 'derived'))
         self.serve(https=True, ssh=False)
         self.reached()
-        self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
+        self.assertTrue(self.machine('tap', 'fetch', TAP)['ok'])
         self.assertEqual(self.reached()[:2], [SCP, HTTPS])
 
 
@@ -266,19 +266,19 @@ class Boundaries(ForgeFixture):
     """AC06: the guarantees transport selection must not loosen."""
 
     def test_a_git_rewrite_to_another_repository_refuses_before_any_contact(self):
-        self.assertTrue(self.machine('tap', 'add', TAP, HTTPS)['ok'])
+        self.assertTrue(self.machine('tap', TAP, HTTPS)['ok'])
         (self.personal / '.gitconfig').write_text('[url "https://github.com/Evil/Skills.git"]\n\tinsteadOf = ' + HTTPS + '\n', encoding='utf-8')
-        refused = self.machine('source', 'fetch', TAP)
+        refused = self.machine('tap', 'fetch', TAP)
         self.assertEqual((refused['error']['code'], self.reached()), ('source.identity_mismatch', []))
         (self.personal / '.gitconfig').write_text('[url "' + SCP + '"]\n\tinsteadOf = ' + HTTPS + '\n', encoding='utf-8')
-        allowed = self.machine('source', 'fetch', TAP)  # A rewrite that stays inside the identity is the user's own transport choice.
+        allowed = self.machine('tap', 'fetch', TAP)  # A rewrite that stays inside the identity is the user's own transport choice.
         self.assertTrue(allowed['ok'], allowed)
 
     def test_credentials_and_redirect_policy_still_refuse(self):
-        self.assertEqual(self.machine('tap', 'add', TAP, 'https://user:token@github.com/Fixture/AgentSkills.git')['error']['code'], 'source.identity_invalid')
-        self.assertTrue(self.machine('tap', 'add', TAP, HTTPS)['ok'])
+        self.assertEqual(self.machine('tap', TAP, 'https://user:token@github.com/Fixture/AgentSkills.git')['error']['code'], 'source.identity_invalid')
+        self.assertTrue(self.machine('tap', TAP, HTTPS)['ok'])
         (self.personal / '.gitconfig').write_text('[http "https://github.com/"]\n\tfollowRedirects = true\n', encoding='utf-8')
-        refused = self.machine('source', 'fetch', TAP)
+        refused = self.machine('tap', 'fetch', TAP)
         self.assertEqual((refused['error']['code'], self.reached()), ('source.redirect_policy', []))
 
 
@@ -290,7 +290,7 @@ class OlderMachine(ForgeFixture):
     """AC05: a machine approved before the RFC keeps working, is told so, and converts its catalog in one atomic write."""
 
     def older(self):
-        self.assertTrue(self.machine('tap', 'add', TAP, SCP)['ok'])
+        self.assertTrue(self.machine('tap', TAP, SCP)['ok'])
         config = self.document(self.home / 'config.json')
         entry = config['sources'][TAP]
         # What the previous program wrote for ``tap add git@github.com:...``: a strict identity, its cache key, and no transport policy.
@@ -302,26 +302,26 @@ class OlderMachine(ForgeFixture):
 
     def test_doctor_reports_and_migrate_converts_only_the_catalog(self):
         entry = self.older()
-        report = self.machine('doctor')
+        report = self.machine('status')
         self.assertEqual([(row['source'], row['code'], row['canonical']) for row in report['data']['identity_canonicalization']], [(TAP, 'migration.identity_canonicalization', HTTPS)])
         self.assertIn('migration.identity_canonicalization', [warning['code'] for warning in report['warnings']])
         self.assertEqual(report['data']['forge_hosts']['built_in'], sorted(sources.FORGE_HOSTS))
         everything = {path: path.read_bytes() for path in (self.home / 'config.json', self.home / 'state.json', self.project / '.mask.json', self.project / '.mask.lock.json')}
-        preview = self.machine('doctor', '--migrate', '--dry-run')
+        preview = self.machine('tap', 'migrate', '--dry-run')
         self.assertEqual((preview['would_change'], preview['changed'], [row['after'] for row in preview['data']['identity_canonicalization']]), (True, False, [HTTPS]))
         self.assertEqual({path: path.read_bytes() for path in everything}, everything)
-        self.assertEqual(self.machine('doctor', '--migrate', '--expect-plan-hash', 'sha256:' + '0' * 64)['error']['code'], 'plan.stale')
-        done = self.machine('doctor', '--migrate', '--expect-plan-hash', preview['data']['plan_hash'])
+        self.assertEqual(self.machine('tap', 'migrate', '--approve-plan', 'sha256:' + '0' * 64)['error']['code'], 'plan.stale')
+        done = self.machine('tap', 'migrate', '--approve-plan', preview['data']['plan_hash'])
         self.assertEqual((done['changed'], done['transaction']), (True, 'committed'))
         after = self.document(self.home / 'config.json')['sources'][TAP]
         self.assertEqual((after['repository'], after['transport'], after['transport_policy'], after['cache']), (HTTPS, SCP, 'derived', entry['cache']))
         for path in (self.home / 'state.json', self.project / '.mask.json', self.project / '.mask.lock.json'):
             self.assertEqual(path.read_bytes(), everything[path], path)
-        self.assertEqual(self.machine('doctor')['data']['identity_canonicalization'], [])
+        self.assertEqual(self.machine('status')['data']['identity_canonicalization'], [])
         self.reached()
         self.assertEqual(self.human('upgrade').returncode, 0)  # The reused cache and the unchanged state still serve the consumer.
         self.assertEqual(set(self.reached()), {SCP})
-        self.assertEqual(self.machine('ensure')['data']['readiness'], 'ready_pinned')
-        again = self.machine('doctor', '--migrate')
+        self.assertTrue(self.machine('repair')['ok'])
+        again = self.machine('tap', 'migrate')
         self.assertEqual((again['ok'], again['changed'], again['data']['identity_canonicalization']), (True, False, []))
-        self.assertEqual(self.machine('doctor', '--migrate', '--project', self.project)['error']['code'], 'invocation.invalid')
+        self.assertEqual(self.machine('tap', 'migrate', '--project', self.project)['error']['code'], 'invocation.invalid')

@@ -41,7 +41,7 @@ import mask
 def fail(*args):
     raise FileNotFoundError(2, 'fixture failure', '/fixture/missing-root')
 mask.dispatch = fail
-raise SystemExit(mask.main(['doctor', '--json']))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(['doctor', '--json']))
 '''
         result = subprocess.run([sys.executable, '-c', code, str(ENTRY.parent)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 5)

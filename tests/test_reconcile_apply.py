@@ -116,7 +116,7 @@ def fail(label):
         fired = True
         raise OSError('injected late failure')
 mask_fs.checkpoint = fail
-raise SystemExit(mask.main(['apply', '--project', sys.argv[2], '--home', sys.argv[3], '--json']))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(['apply', '--project', sys.argv[2], '--home', sys.argv[3], '--json']))
 """
         run = subprocess.run([sys.executable, '-B', '-c', code, str(ENTRY.parent), str(self.project), str(self.home)], capture_output=True, encoding='utf-8', env=self.environment())
         data = json.loads(run.stdout)

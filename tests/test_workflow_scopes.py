@@ -25,9 +25,8 @@ class WorkflowScopeTests(SetupFixture):
         shutil.rmtree(self.project / '.mask')
 
     def install_personal(self):
-        result = self.machine('install', 'implement-rfc', '--user')
-        self.assertEqual(result['error']['code'], 'workflow.incomplete', result)
-        return result
+        self.declare_consumer(self.personal, ['implement-rfc'], user=True)
+        return self.machine('ensure', '--user')
 
     def test_personal_setup_without_project_inputs_and_project_stays_incomplete(self):
         self.install_personal()
@@ -79,8 +78,7 @@ class WorkflowScopeTests(SetupFixture):
         value = json.loads(self.descriptor_path.read_text())
         value['scopes']['user']['setup'][0]['parameters']['mode'] = 'changed'
         self.descriptor_path.write_text(json.dumps(value))
-        self.publish('change personal scope')
-        self.machine('upgrade', '--user')
+        self.commit('change personal scope', user=True)
         refused = self.machine('ensure', '--user', '--expect-plan-hash', preview['data']['plan_hash'], '--allow-setup', SUBJECT)
         self.assertEqual(refused['error']['code'], 'plan.stale')
         self.assertEqual(self.launches(), 0)

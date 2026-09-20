@@ -13,7 +13,7 @@ import sys,os
 sys.path.insert(0, sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint = lambda label: os._exit(99) if label == sys.argv[2] else None
-mask.main(sys.argv[3:])
+__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, *(command or ('apply',)), '--project', str(self.project), '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, (run.stdout, run.stderr))
@@ -98,7 +98,7 @@ def checkpoint(label):
         edited = True
         Path(sys.argv[3], '.mask.json').write_text('{"schema_version":2,"sources":{},"skills":[]}')
 mask_fs.checkpoint = checkpoint
-raise SystemExit(mask.main(['install','beta','--home',sys.argv[2],'--project',sys.argv[3],'--json']))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(['install','beta','--home',sys.argv[2],'--project',sys.argv[3],'--json']))
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True, encoding='utf-8', env=self.environment())
         self.assertEqual(run.returncode, 8, run.stdout + run.stderr)

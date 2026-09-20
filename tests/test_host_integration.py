@@ -95,7 +95,7 @@ class HostIntegrationTests(Fixture):
         binary = self.base / 'bin'
         binary.mkdir()
         fake = binary / 'codex'
-        fake.write_text('#!' + sys.executable + '\nimport sys,json\nfrom pathlib import Path\nsys.path.insert(0,' + repr(str(ENTRY.parent)) + ')\nimport mask_core\nwith mask_core.writer_lock(Path(' + repr(str(self.home)) + ')):\n print(json.dumps(sys.argv[1:]))\n')
+        fake.write_text('#!' + sys.executable + '\nimport sys,json\nfrom pathlib import Path\nsys.path.insert(0,' + repr(str(ENTRY.parent)) + ')\nimport mask_core\nwith mask_core.writer_lock(Path(' + repr(str(self.home)) + ')), mask_core.writer_lock(Path(' + repr(str(self.home)) + '), name="lifecycle.lock"):\n print(json.dumps(sys.argv[1:]))\n')
         fake.chmod(0o755)
         environment = dict(os.environ, MASK_HOME=str(self.home), PATH=str(binary) + os.pathsep + os.environ['PATH'])
         command = [sys.executable, str(ENTRY), 'launch', '--agent', 'codex', '--project', str(self.project), '--json', '--', 'literal space', '$(not executed)', '--json']
@@ -127,7 +127,7 @@ class HostIntegrationTests(Fixture):
         self.call('self', 'install', '--bin-dir', binary)
         launcher = binary / 'mask'
         environment = dict(os.environ, MASK_HOME=str(self.home))
-        run = subprocess.run([str(launcher), 'ensure', '--project', str(self.project), '--json'], env=environment, capture_output=True, text=True)
+        run = subprocess.run([str(launcher), 'register', '--project', str(self.project), '--json'], env=environment, capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertTrue((self.project / '.agents/skills/alpha').is_symlink())
         for agent in ('claude', 'codex'):

@@ -33,7 +33,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None, retire_files=None):
     """One observational plan; every owned link text names a store payload or an explicit dev link.
 
     """
@@ -68,13 +68,13 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 c.registered_root(root, record, scope)
             elif not root.is_dir():
                 c.fail('project.unavailable', 'Project is unavailable.', 4, root=key)
-            before_text = c.read_text(manifest_path, 'manifest', missing=key in inactive)
+            before_text = c.read_text(manifest_path, 'manifest', missing=key in inactive or key in proposals)
             if key in inactive:
                 if before_text is not None or record is None:
                     c.fail('readiness.blocked', 'Inactive transition requires an absent declaration and existing registration.', 4)
                 current = desired = record['last_manifest']
             else:
-                current = c.selection_manifest(c.parse_json(before_text, 'manifest'))
+                current = c.selection_manifest(c.parse_json(before_text, 'manifest')) if before_text is not None else None
                 desired = c.selection_manifest(proposals.get(key, current))
             old_links = record['links'] if record else {}
             expected = {}
@@ -87,7 +87,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
             devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
             if devs and operation in ('apply', 'upgrade', 'ensure'):
-                c.fail('dev_link.active', 'Explicit dev-link is unpinned; use source dev-link --to-pinned before ordinary reconciliation.', 4)
+                c.fail('dev_link.active', 'Explicit dev-link is unpinned; use skill dev-link --to-pinned before ordinary reconciliation.', 4)
             if key not in unregister and key not in inactive:
                 expected = pinned.expected_links(home, desired, locked, config, payload_views, root=root, scope=scope, policy_value=policy_value, devs=devs, outcomes=outcomes)
                 for link in expected.values():
@@ -160,7 +160,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     coordinates[link['skill']] = resolve.coordinate(link['resolution'])
             roles = workflow.requirements(root, scope, record, bindings, targets, coordinates=coordinates, staged=(staged_roles or {}).get(key), repair=repair_roles, profiles=workflow_profiles)
             from mask_repair import retired_files as plan_retired
-            retired = plan_retired(root, roles['reports'], repair_roles)
+            retired = plan_retired(root, roles['reports'], repair_roles if retire_files is None else retire_files)
             retired_files.extend(retired)
             actions.extend(dict(kind='retired_file.remove', status='planned', path=str(root / entry['relative']), skill=entry['skill']) for entry in retired)
             if roles['owned']:

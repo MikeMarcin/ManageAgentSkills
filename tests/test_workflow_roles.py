@@ -113,7 +113,7 @@ class StaticRoles(WorkflowFixture):
 
     def test_human_output_names_the_missing_role_and_keeps_json_out(self):
         self.consumer(['implement-rfc'])
-        run = subprocess.run([sys.executable, '-B', str(ENTRY), 'ensure', '--check', '--project', str(self.project)], capture_output=True, encoding='utf-8',
+        run = subprocess.run([sys.executable, '-B', str(ENTRY), 'status', '--check', '--project', str(self.project)], capture_output=True, encoding='utf-8',
                              env=dict(os.environ, MASK_HOME=str(self.home), PYTHONDONTWRITEBYTECODE='1'), stdin=subprocess.DEVNULL)
         self.assertEqual(run.returncode, 7)
         self.assertIn('.codex/agents/rfc-integrator.toml', run.stderr)
@@ -192,7 +192,7 @@ import sys,os
 sys.path.insert(0, sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint = lambda label: os._exit(99) if label == sys.argv[2] else None
-mask.main(sys.argv[3:])
+__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'native_role', 'ensure', '--project', str(self.project), '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, run.stderr)

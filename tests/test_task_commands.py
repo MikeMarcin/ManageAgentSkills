@@ -8,7 +8,7 @@ and other-scope cases named by the card).
 import json
 import shutil
 
-from tests.public_support import PublicFixture, CONSUMER_CONTEXT
+from tests.public_support import EngineFixture, CONSUMER_CONTEXT
 from tests.support import TAP
 
 
@@ -16,7 +16,7 @@ def links(root):
     return sorted(path.relative_to(root).as_posix() for path in root.rglob('*') if path.is_symlink())
 
 
-class FreshScopes(PublicFixture):
+class FreshScopes(EngineFixture):
     """C01/C02/C04: one task command from an unregistered project and personal scope."""
 
     def test_install_from_fresh_project_declares_registers_and_links(self):
@@ -93,7 +93,7 @@ class FreshScopes(PublicFixture):
         self.assertFalse(self.parses_as_result_envelope(run.stderr))
 
 
-class PinnedScopes(PublicFixture):
+class PinnedScopes(EngineFixture):
     """C03/C05: v2 pins and per-binding targets are retained; bare names never pick a first match."""
 
     def pinned_project(self):

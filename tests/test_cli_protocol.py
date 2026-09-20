@@ -22,7 +22,7 @@ class ProtocolTests(unittest.TestCase):
         payload = json.loads(run.stdout)
         self.assertEqual(run.stderr, '')
         self.assertEqual(payload['ok'], run.returncode == 0)
-        self.assertEqual(payload['schema_version'], 1)
+        self.assertEqual(payload['schema_version'], 2)
         return run, payload
 
     def test_capabilities_and_global_placement(self):
@@ -32,7 +32,8 @@ class ProtocolTests(unittest.TestCase):
         commands = {c['name']: c for c in first['data']['commands']}
         self.assertTrue(commands['capabilities']['implemented'])
         self.assertTrue(commands['upgrade']['network'])
-        self.assertFalse(commands['apply']['network'])
+        self.assertFalse(commands['status']['network'])
+        self.assertNotIn('apply', commands)
         self.assertTrue(commands['install']['plan_guard'])
         self.assertTrue(any(a['name'] == 'ids' and a['repeatable'] for a in commands['install']['arguments']))
 

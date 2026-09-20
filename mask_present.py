@@ -146,8 +146,8 @@ def place(data):
 
 def plan_guard(data, output):
     lines = []
-    if output['would_change'] and not output['changed'] and data.get('plan_hash') and not output['dry_run']:
-        lines.append(f"  Apply exactly this with --expect-plan-hash {data['plan_hash']}")
+    if output['would_change'] and not output['changed'] and data.get('plan_hash'):
+        lines.append(f"  Apply exactly this with --approve-plan {data['plan_hash']}")
     return lines
 
 
@@ -221,7 +221,7 @@ def render_inventory(data, output):
     for row in links:
         key = (row['root'], row['scope'], row.get('skill') or row['name'], row.get('content_mode'))
         entry = rows.setdefault(key, dict(skill=row.get('skill') or row['name'], source=(row.get('source') or {}).get('alias') or '-',
-                                          content=row.get('content_mode'), states={}, notes=[]))
+                                          content=row.get('content_mode'), pinned=row.get('pinned', False), states={}, notes=[]))
         agent = row['agent']
         if agent not in agents:
             agents.append(agent)
@@ -231,6 +231,8 @@ def render_inventory(data, output):
         entry['states'][agent] = state
         if not row.get('declared') and row.get('owned'):
             entry['notes'].append('owned but no longer declared')
+        if row.get('pinned') and 'version held' not in entry['notes']:
+            entry['notes'].append('version held')
     lines = [f"Inventory: {plural(len(rows), 'skill')}, {plural(len(links), 'link')}" + ('' if len(links) == total else f' shown of {total}')]
     if not links and not consumers:
         lines.append('  No registered project or personal scope is selected.')
@@ -281,13 +283,19 @@ def render_catalog(data, output):
             for issue in item.get('issues', []) or []:
                 lines.append(f"  {clean(item.get('id'))}: {clean(issue.get('message'))}")
     elif not data.get('resolution_required'):
-        lines.append("  None found. Approve a tap with 'mask tap add NAME URL', then run 'mask update'.")
+        lines.append("  None found. Approve a tap with 'mask tap NAME URL', then run 'mask update'.")
     return lines
 
 
 def render_skill(data, output):
     lines = [f"skill {clean(data.get('id'))}: {'valid' if data.get('valid', True) else 'invalid'}"]
     lines.extend(fields(data, [('description', 'description'), ('path', 'asset_path'), ('digest', 'digest'), ('scope', 'scope')]))
+    if output['command'] == 'info':
+        lines.extend(fields(data, [('source', 'source'), ('commit', 'commit')]))
+        for scope, contract in data.get('workflow', {}).items():
+            lines.append(f"  {scope} workflow: {len(contract['roles'])} native roles; {len(contract['setup'])} setup actions")
+            lines.extend(f"    setup: {clean(name)} ({clean(action.get('entrypoint'))})" for name, action in contract['setup'].items())
+            lines.extend(f"    input: {clean(row['path'])}" for row in contract['inputs'] if row['required'])
     for issue in data.get('issues', []) or []:
         lines.append(f"  issue: {clean(issue.get('message'))}")
     if data.get('content'):
@@ -338,7 +346,11 @@ def render_doctor(data, output):
         for row in rows:
             lines += [f"  {clean(row.get('source'))}  {clean(row.get('after'))}", f"    was {clean(row.get('before'))}; still reached over {clean(row.get('transport'))}"]
         return lines + ['  Only the machine catalog changes: no project file, link or cache is touched.'] + plan_guard(data, output)
-    lines = ['Everything MASK manages looks healthy.' if data.get('healthy') else 'Doctor found problems.']
+    if output['command'] == 'status':
+        lines = ['Status: ready.' if data.get('healthy') else 'Status: problems found.']
+        lines.extend(f"  {clean(row['scope'])}: {clean(row['root'])}" for row in data.get('scopes', []))
+    else:
+        lines = ['Everything MASK manages looks healthy.' if data.get('healthy') else 'Doctor found problems.']
     for issue in data.get('issues', []) or []:
         lines.append(f"  problem: {clean(issue.get('message') if isinstance(issue, dict) else issue)}")
     if data.get('symlink_capability') not in (None, 'available'):
@@ -350,7 +362,7 @@ def render_doctor(data, output):
         lines.append(f"  blocked: {clean(blocker.get('message'))}")
     lines.extend(workflow_lines(data, verb='would be deployed by'))
     if output['would_change']:
-        lines.append("  Links or roles differ from the declaration; 'mask ensure' reconciles them.")
+        lines.append("  Links or roles differ from the declaration; 'mask repair' reconciles them.")
     return lines + note(data)
 
 
@@ -417,7 +429,7 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
             lines.append(f"    {clean(skill.get('skill'))}: {status}" + (' (host loading: not verified)' if status == 'ready' else ''))
             for row in skill.get('retired_files', []):
                 if row['state'] != 'absent':
-                    note = {'present': 'retired; use ensure --repair to back up and remove', 'remove_planned': 'will back up and remove',
+                    note = {'present': 'retired; preview cleanup to remove safely', 'remove_planned': 'will back up and remove',
                             'in_use': 'fallback lock preserved until a canonical lock is published', 'unsafe': 'unsafe retired entry; preserved',
                             'active_input': 'still declared as a consumer input; preserved'}.get(row['state'], row['state'])
                     lines.append(f"      {clean(row['path'])}: {note}")
@@ -446,7 +458,7 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
 
 
 SETUP_NOTES = {
-    'consent_required': "needs your yes in a terminal, or --expect-plan-hash HASH with --allow-setup {subject} from automation",
+    'consent_required': 'needs approval of this task; preview it, then use --approve-plan HASH',
     'not_run': 'check, dry-run and event invocations never run package code',
     'declined': 'nothing ran',
     'granted': 'approved; not run',
@@ -548,10 +560,10 @@ def render_sources(data, output):
     catalog = data.get('sources')
     if command == 'source.list' and isinstance(catalog, dict):
         width = max((len(item) for item in catalog), default=0)
-        return [plural(len(catalog), 'approved tap')] + ([tap_line(item, entry, width) for item, entry in catalog.items()] or ["  None yet. Approve one with 'mask tap add NAME URL'."])
+        return [plural(len(catalog), 'approved tap')] + ([tap_line(item, entry, width) for item, entry in catalog.items()] or ["  None yet. Approve one with 'mask tap NAME URL'."])
     if command == 'source.repair-cache':
         return [headline(output)] + pairs([('retained cache', data.get('cache_retained')),
-                ('next', 'mask source fetch ' + clean(data.get('source')))]) + plan_guard(data, output)
+                ('next', 'mask tap fetch ' + clean(data.get('source')))]) + plan_guard(data, output)
     if command == 'source.show':
         binding = data.get('binding') or {}
         how = clean(data.get('transport')) + {'pinned': ' (pinned)', 'origin': " (follows the project's origin)", 'hint': ' (worked last time)', 'gh': ' (gh git_protocol)',
@@ -590,9 +602,9 @@ def render_upgrade(data, output):
     touched = consumer_count([row for row in rows if row.get('changes')])
     if output['dry_run']:
         head = f"Would upgrade {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
-            'Would repair links; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to upgrade (dry run: cached taps only).'
+            'Would reconcile links and workflow setup; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to upgrade (dry run: cached taps only).'
     elif output['changed']:
-        head = f"Upgraded {plural(moved, 'skill')} in {touched}." if moved else 'Repaired managed links; no skill versions changed.'
+        head = f"Upgraded {plural(moved, 'skill')} in {touched}." if moved else 'Reconciled links and workflow setup; no skill versions changed.'
         if output['transaction'] != 'committed':
             head += f" Transaction: {output['transaction']}."
     elif output['would_change']:
@@ -610,7 +622,7 @@ def render_upgrade(data, output):
             label += f": {clean(row.get('status'))}" + (f" - {clean(error.get('message'))} ({clean(error.get('code'))})" if error else '')
         lines += ['', f'  {label}']
         if row.get('requires_fetch'):
-            lines.append("    not in the cache yet; run 'mask upgrade' without --dry-run, --offline or --expect-plan-hash to fetch it")
+            lines.append("    not in the cache yet; run 'mask upgrade' without --dry-run, --offline or --approve-plan to fetch it")
         lines.extend(f"    {clean(item.get('coordinate')).ljust(width)}  {clean((item.get('before_commit') or 'new')[:7])} -> {clean((item.get('after_commit') or 'removed')[:7])}"
                      for item in row.get('changes') or [])
     notes = fetch_lines(data)
@@ -620,6 +632,8 @@ def render_upgrade(data, output):
     if differing:  # Overlaps that resolve to one target are not news; --json still lists them.
         notes.append(f"  shadowing: {plural(len(differing), 'scope overlap')} resolving to different targets; see warnings")
     notes.extend(workflow_lines(data, quiet_ready=True))
+    notes.extend(setup_lines(data))
+    notes.extend(backup_lines(data))
     if output['changed']:
         notes.append('  Restart running agents to load the new versions.')
     return lines + ([''] + notes if notes else []) + plan_guard(data, output)
@@ -635,9 +649,9 @@ def render_refresh(data, output):
               'held': f"MASK was not updated: {clean(program.get('reason'))}.",
               'failed': f"MASK could not be updated: {clean(program.get('reason'))} ({clean(program.get('code'))})."}.get(program.get('status'), headline(output, 'update'))]
     taps = fetch_lines(data)
-    lines.extend(taps or ["  No taps are approved yet; add one with 'mask tap add NAME URL'."])
+    lines.extend(taps or ["  No taps are approved yet; add one with 'mask tap NAME URL'."])
     if any(row.get('remote_refs_changed') for row in (data.get('fetches') or {}).values()):
-        lines.append("  Run 'mask upgrade' to move your projects and personal skills to the new versions.")
+        lines.append("  Run 'mask upgrade' for this checkout, or 'mask upgrade --all' for every registered checkout and personal skills.")
     return lines
 
 
@@ -654,7 +668,7 @@ def render_fetch(data, output):
         lines = [f"Prepared the locked skills: {plural(got, 'commit')} fetched, {plural(made, 'store copy')} created." if got or made else 'The locked skills are already prepared.']
         return lines + action_lines(output) + plan_guard(data, output)
     taps = fetch_lines(data)
-    return ['Would fetch your taps (dry run: nothing contacted).' if output['dry_run'] else 'Fetched your taps.'] + (taps or ["  No taps are approved yet; add one with 'mask tap add NAME URL'."])
+    return ['Would fetch your taps (dry run: nothing contacted).' if output['dry_run'] else 'Fetched your taps.'] + (taps or ["  No taps are approved yet; add one with 'mask tap NAME URL'."])
 
 
 def fetch_lines(data):
@@ -737,7 +751,7 @@ def render_task(data, output):
     """install/remove: the outcome in one sentence, the skills it touched, then only what needs a human's attention."""
     install = output['command'] == 'install'
     moved = data.get('added' if install else 'removed') or []
-    verb, link = ('install', 'into') if install else ('remove', 'from')
+    verb, link = ('install', 'into') if install else ('uninstall', 'from')
     if not moved:
         head = (f"Already installed in {place(data)}: " if install else f"Not installed in {place(data)}: ") + joined(data.get('already') or [])
         head += '. Nothing to do.' if not output['would_change'] and not output['changed'] else '.'
@@ -771,20 +785,20 @@ def render_list(data, output):
     """One row per selected skill with a column per agent; footer counts and honest limitations."""
     lines = [f"{'Personal' if data.get('scope') == 'user' else 'Project'} skills in {clean(data.get('root'))}"]
     if not data.get('declared'):
-        lines.append("  None yet. Add one with 'mask install ID'; browse with 'mask skill list'.")
+        lines.append("  None yet. Add one with 'mask install ID'; browse with 'mask search'.")
         return lines
     agents = data.get('agents', [])
-    rows = [dict(skill=entry['skill'], version=entry.get('commit', '-')[:7] if entry.get('commit') else '-', **{agent: entry['states'].get(agent, 'unknown') for agent in agents}) for entry in data.get('skills', [])]
+    rows = [dict(skill=entry['skill'], version=entry.get('commit', '-')[:7] if entry.get('commit') else '-', held='yes' if entry.get('pinned') else '-', **{agent: entry['states'].get(agent, 'unknown') for agent in agents}) for entry in data.get('skills', [])]
     lines.append('')
     if rows:
-        lines.extend(table(rows, [('SKILL', 'skill'), ('PIN', 'version')] + [(agent.upper(), agent) for agent in agents]))
+        lines.extend(table(rows, [('SKILL', 'skill'), ('VERSION', 'version'), ('HELD', 'held')] + [(agent.upper(), agent) for agent in agents]))
     else:
         lines.append('  no skills selected')
     links = data.get('links') or {}
     linked, expected = links.get('linked', 0), links.get('expected', 0)
-    lines += ['', f"  {plural(len(rows), 'skill')}, " + ('no links expected here.' if not expected else f'all {clean(expected)} links in place.' if linked == expected else f"{clean(linked)} of {clean(expected)} links in place; run 'mask ensure' to fix.")]
+    lines += ['', f"  {plural(len(rows), 'skill')}, " + ('no links expected here.' if not expected else f'all {clean(expected)} links in place.' if linked == expected else f"{clean(linked)} of {clean(expected)} links in place; run 'mask repair' to fix.")]
     if not data.get('registered'):
-        lines.append("  Not registered, so nothing is deployed; 'mask ensure' deploys the selection.")
+        lines.append("  Not registered, so nothing is deployed; 'mask register' prepares the selection.")
     for limitation in data.get('limitations', []):
         lines.append(f'  note: {clean(limitation)}')
     return lines
@@ -794,12 +808,28 @@ def render_forget(data, output):
     return [headline(output, 'workspace forget')] + fields(data, [('root', 'root'), ('abandoned paths', 'abandoned_paths')]) + actions(output) + plan_guard(data, output)
 
 
+def render_lifecycle(data, output):
+    return [headline(output, output['command'])] + actions(output) + workflow_lines(data, quiet_ready=True) + plan_guard(data, output)
+
+
+def render_all_list(data, output):
+    return render_inventory(data, output) if 'consumers' in data or 'deployments' in data else render_list(data, output)
+
+
 RENDERERS = {
+    'tap': render_sources, 'untap': render_sources, 'search': render_catalog, 'info': render_skill,
+    'uninstall': render_task, 'register': render_lifecycle, 'unregister': render_forget,
+    'repair': render_lifecycle, 'status': render_doctor, 'pin': render_lifecycle, 'unpin': render_lifecycle,
+    'cleanup': render_lifecycle, 'integration.run': render_ensure,
+    'tap.fetch': render_fetch, 'tap.show': render_sources, 'tap.inspect': render_sources,
+    'tap.repair-cache': render_sources, 'tap.publish': render_sources, 'tap.migrate': render_doctor,
+    'skill.dev-link': render_manifest,
+
     'help': render_help, 'version': render_version, 'capabilities': render_capabilities,
     'init': render_config, 'config.show': render_config, 'config.set': render_config,
     'skill.list': render_catalog, 'skill.validate': lambda data, output: render_catalog(data, output) if 'skills' in data else render_skill(data, output),
     'skill.show': render_skill, 'skill.where-used': render_where_used, 'inventory': render_inventory,
-    'install': render_task, 'remove': render_task, 'list': render_list,
+    'install': render_task, 'remove': render_task, 'list': render_all_list,
     'skill.import': render_provenance, 'skill.provenance': render_provenance, 'skill.record-adaptation': render_provenance,
     'project.init': summary('project init', SCOPE_SPEC), 'project.show': render_show, 'project.set-agents': render_manifest, 'project.set-targets': render_manifest,
     'project.register': render_manifest, 'project.unregister': render_forget, 'project.list': render_projects,
@@ -867,7 +897,7 @@ def render_confirmation(proposal, output):
     for root in proposal.get('scope', []):
         lines.append(f"  scope: {clean(root)}")
     lines.extend(actions(dict(actions=proposal.get('actions', []))))
-    lines.append('  grants: this invocation only; no package scripts, new sources, overwrites or persistent approval')
+    lines.append('  grants: only the exact actions shown, including any listed setup, replacements or deletions; no persistent approval' if proposal.get('kind') == 'task' else '  grants: this invocation only; no package scripts, new sources, overwrites or persistent approval')
     return '\n'.join(lines) + '\n'
 
 
@@ -909,11 +939,12 @@ def render_error(output):
             continue
         lines.append(f"  next: {clean(step.get('message'))}")
     if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
-        lines.extend(workflow_next_steps(data))
+        lines.extend(workflow_next_steps(data, command=output['command']))
     return '\n'.join(lines + warnings(output)) + '\n'
 
 
-def workflow_next_steps(data):
+def workflow_next_steps(data, *, command='ensure'):
+    command = 'upgrade' if command == 'upgrade' else 'repair'
     lines = []
     for entry in data.get('workflow_readiness') or []:
         if entry.get('complete'):
@@ -926,13 +957,13 @@ def workflow_next_steps(data):
             lines.append(f"  next for {clean(entry.get('root'))}: Review the preserved files above.")
             lines.append('    Restore the matching native-roles.lock.json and role files from version control if available.')
             lines.append('    Otherwise compare and back up the files before deciding which to keep or replace.')
-            lines.append('    Repeating setup or adding --yes will not overwrite them. See docs/guides/recovery.md.')
+            lines.append('    See docs/guides/recovery.md for the reviewed replacement procedure.')
             selection = '--user' if entry.get('scope') == 'user' else '--project ' + shlex.quote(str(entry.get('root')))
-            lines.append(f'    Or run mask ensure {clean(selection)} --repair to back up and replace them automatically.')
+            lines.append(f'    Preview mask {command} {clean(selection)} --dry-run, then approve the shown backups and replacements.')
         else:
             selection = '--user' if entry.get('scope') == 'user' else '--project ' + shlex.quote(str(entry.get('root')))
-            lines.append(f"  next: Resolve any missing inputs above, then run mask ensure {clean(selection)}")
-            lines.append('    Answer the setup question in a terminal if prompted; upgrade never runs setup.')
+            lines.append(f"  next: Resolve any missing inputs above, then run mask {command} {clean(selection)}")
+            lines.append('    Answer the setup question in a terminal if prompted.')
     return lines
 
 
@@ -988,11 +1019,11 @@ def compact_help(version, groups):
     lines = [f'mask {version} - Manage Agent Skills', 'usage: mask COMMAND [OPTIONS]',
              'Deploy pinned skills from approved Git taps into Claude Code and Codex.', '',
              'Start here:', '  mask tap add agentskills https://github.com/MikeMarcin/AgentSkills.git   # approve a tap; sets up this machine',
-             '  mask source fetch                       # fetch approved taps so you can browse them',
-             '  mask skill list                         # find a skill ID',
+             '  mask tap fetch                       # fetch approved taps so you can browse them',
+             '  mask search                         # find a skill ID',
              '  mask install implement-rfc              # pin it and link it into the current project',
-             '  mask ensure                             # finish any required setup',
-             '  mask ensure --all --repair              # fix all registered scopes; back up replaced roles', '', 'Everyday commands:']
+             '  mask repair                             # finish any required setup',
+             '  mask repair --all --repair              # fix all registered scopes; back up replaced roles', '', 'Everyday commands:']
     pad = max(len(usage) for usage, _ in EVERYDAY)
     lines.extend(f'  {usage.ljust(pad)}  {text}' for usage, text in EVERYDAY)
     lines += ['', 'Choose where:',
@@ -1001,8 +1032,8 @@ def compact_help(version, groups):
               '  Bare upgrade fetches each referenced tap once and upgrades every registered consumer.',
               '  upgrade --project DIR, --user or --skill SOURCE/ID narrows what it upgrades.', '',
               'Preview and diagnose:',
-              '  mask ensure --dry-run            Preview this project without running setup',
-              '  mask doctor --all --check        Check all registered scopes',
+              '  mask repair --dry-run            Preview this project without running setup',
+              '  mask status --all --check        Check all registered scopes',
               '  mask inventory --all             List skills across registered scopes',
               '  mask upgrade --help              Understand upgrade scope before fetching',
               '',
@@ -1023,16 +1054,16 @@ COMMAND_HELP = {
     'install': ('Add skills and link them. Uses the current project unless --project or --user is supplied. Other selections are kept. A bare ID is looked up in every approved tap; name SOURCE/ID when more than one tap offers it. A tap that is not fetched yet is fetched on demand, never with --offline or --dry-run. The declaration, its lock of exact commits, the registration and links to the payloads in the MASK store are written in one recoverable transaction.', 'mask install implement-rfc\nmask install wizard --user\nmask install agentskills/wizard --project /path/to/project --dry-run'),
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
-    'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Only manual ensure can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask ensure --all --repair            # repair all registered scopes, with backups\nmask ensure --all --repair --dry-run  # preview only\nmask ensure\nmask ensure --project /path/to/project --dry-run\nmask ensure --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--expect-plan-hash HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
+    'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Use ensure for a fresh clone/worktree or to restore pinned versions without upgrading. Manual ensure and upgrade can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask repair --all --repair            # repair all registered scopes, with backups\nmask repair --all --repair --dry-run  # preview only\nmask repair\nmask repair --project /path/to/project --dry-run\nmask repair --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--approve-plan HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
     'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update            # update MASK and fetch taps\nmask upgrade --dry-run # see what the fetched taps would change\nmask upgrade           # move every registered project and your personal skills'),
-    'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --expect-plan-hash, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. This command never runs package setup.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --expect-plan-hash HASH.\nIf required setup is missing after an upgrade, run ensure for the named consumer.\nUse mask update to update the MASK program.'),
-    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found. When the tap catalog still records an older spelling of a tap identity, doctor says so, and doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask doctor --project . --check\nmask doctor --all --check\nmask doctor --migrate --dry-run\nmask doctor --migrate'),
+    'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --approve-plan, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. After applying versions and links, reconcile workflow prerequisites even if versions were already current. Necessary generated roles use the same consented staged setup as ensure. A terminal asks before running package code; automation uses the preview hash and --allow-setup SOURCE/ID:ACTION. --repair explicitly authorizes setup and backs up then replaces conflicting native role files. --yes alone never authorizes setup. Missing inputs or declined/failed setup remain nonzero.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --approve-plan HASH.\nFor unattended setup, include --allow-setup SOURCE/ID:ACTION with the preview hash.\nUse mask upgrade --repair for explicit setup and role replacement with backups.\nUse ensure for a fresh clone/worktree or to restore pinned versions without upgrading.\nUse mask update to update the MASK program.'),
+    'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found. When the tap catalog still records an older spelling of a tap identity, doctor says so, and doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask status --project . --check\nmask status --all --check\nmask status --migrate --dry-run\nmask status --migrate'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
     'plan': ('Preview deployment changes for registered scopes without applying them.', 'mask plan --project .\nmask plan --all'),
     'apply': ('Reconcile managed links for the selected registered scopes. Does not run package setup.', 'mask apply --project . --dry-run\nmask apply --project .'),
     'recover': ('Inspect or finish an interrupted MASK deployment transaction.', 'mask recover --inspect\nmask recover --complete\nmask recover --rollback'),
-    'skill.list': ('List the skills in the fetched caches of your approved taps. A tap that is not fetched yet is named instead; run mask source fetch first.', 'mask skill list'),
-    'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask skill show implement-rfc\nmask skill show implement-rfc --content'),
+    'skill.list': ('List the skills in the fetched caches of your approved taps. A tap that is not fetched yet is named instead; run mask tap fetch first.', 'mask search'),
+    'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask info implement-rfc\nmask info implement-rfc --content'),
     'self.install': ('Create a MASK launcher in an existing bin directory.', 'mask self install --bin-dir /path/to/bin'),
     'self.status': ('Show the MASK program, interpreter and installed launchers.', 'mask self status'),
     'self.uninstall': ('Remove the mask launchers this program wrote. A launcher edited since MASK wrote it is kept. MASK never deletes folders, so the command ends by listing what is left (the projects that still link skills, the machine state and the program clone) with the commands that remove them.', 'mask self uninstall --dry-run\nmask self uninstall'),
@@ -1047,8 +1078,8 @@ COMMAND_HELP = {
     'integration.inspect': ('Inspect project readiness authority and installed integrations.', 'mask integration inspect --project .'),
     'source.list': ('List approved taps.', 'mask source list'),
     'source.show': ('Show one approved tap: its identity, the transport this machine uses to reach it and why (pinned, the project origin, a transport that worked before, gh, the typed URL or a probe), its line-ending policy and cached revision.', 'mask source show NAME'),
-    'source.repair-cache': ('Retain a recognized tap cache at a sibling path without trusting its old ownership or objects. Preview and apply with the plan hash; the next source fetch rebuilds it. No consumer or catalog changes, deletion, or network access.', 'mask source repair-cache agentskills --dry-run\nmask source repair-cache agentskills --expect-plan-hash HASH\nmask source fetch agentskills'),
-    'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask source fetch\nmask source fetch agentskills\nmask source fetch --locked --project .'),
+    'source.repair-cache': ('Retain a recognized tap cache at a sibling path without trusting its old ownership or objects. Preview and apply with the plan hash; the next source fetch rebuilds it. No consumer or catalog changes, deletion, or network access.', 'mask source repair-cache agentskills --dry-run\nmask source repair-cache agentskills --approve-plan HASH\nmask tap fetch agentskills'),
+    'source.fetch': ('Fetch approved taps into their MASK-owned caches without changing any consumer. With no NAME, fetch every approved tap; NAME fetches one tap. --locked prepares only the exact commits and store payloads that a project or personal lock names (from the cache only with --offline). Run upgrade to deploy fetched content.', 'mask tap fetch\nmask tap fetch agentskills\nmask tap fetch --locked --project .'),
     'lock': ('Resolve selected requirements to exact versions without deploying them.', 'mask lock --project . --dry-run'),
     'capabilities': ('Describe supported commands, schemas and feature boundaries for automation.', None),
     'config.show': ('Show the machine configuration and its approved taps.', None),
@@ -1088,7 +1119,10 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
-    'workflow-profile': 'Check a declared role subset: SKILL=PROFILE (ensure --check only)',
+    'workflow-profile': 'Check a declared role subset: SKILL=PROFILE (status --check)',
+    'approve-plan': 'Approve the exact reviewed task, including its disclosed setup and replacements',
+    'no-update': 'Skip the preliminary program and catalog update; task-specific fetching remains allowed',
+    'query': 'Text to find in skill names and descriptions',
     'json': 'Emit a structured result for scripts; never prompt',
     'debug': 'Include diagnostic details', 'help': 'Show this help', 'version': 'Show MASK version',
     'home': 'MASK state directory (not the project or personal home)',
@@ -1099,7 +1133,7 @@ OPTION_HELP = {
     'yes': 'Accept ordinary confirmation; does not authorize package setup or overwrites',
     'expect-plan-hash': 'Require the exact plan hash from a reviewed preview (automation)',
     'check': 'Report readiness without making changes', 'offline': 'Use local/cached content; do not fetch',
-    'allow-setup': 'Authorize the named SOURCE/ID:ACTION with --expect-plan-hash; repeatable',
+    'allow-setup': 'Authorize the named SOURCE/ID:ACTION with --approve-plan; repeatable',
     'repair': 'Repair without prompts: authorize declared setup and back up then replace conflicting role files (--yolo is an alias)',
     'event': 'Invocation context: manual (default), startup, post-checkout, post-merge, post-rewrite or post-commit',
     'agent': 'Agent name (claude or codex)', 'skill': 'Skill ID; repeat for multiple skills',

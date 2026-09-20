@@ -50,7 +50,7 @@ import os,sys
 sys.path.insert(0,sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[4] else None
-mask.main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
+__import__('tests.engine_cli', fromlist=['main']).main(['ensure','--home',sys.argv[2],'--project',sys.argv[3],'--json'])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project), label], capture_output=True)
         self.assertEqual(run.returncode, 99, run.stdout)

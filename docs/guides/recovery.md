@@ -1,60 +1,56 @@
-# Recovery and stopping management
+# Recovery, cleanup and retirement
 
-Interrupted operations, unregistering consumers, retiring worktrees and removing the program.
-
-## When ensure preserves existing role files
-
-For automatic repair, run `mask ensure --all --repair` (or `--yolo`). It explicitly
-authorizes declared setup and replacement of regular role files after backing
-them up. For just one scope, use `--project DIR --repair` or `--user --repair`.
-Add `--dry-run` to inspect the repair without running setup or changing files.
-Backups are retained under `MASK_HOME/backups/TRANSACTION/`, including a
-`manifest.json` mapping backups to original paths. Normal `ensure` behaves as
-described below.
-
-`mask ensure` can create missing agent role files and update unchanged files it
-manages. Permission to run setup does not grant permission to replace other
-files. If existing role files have no matching verification record, setup is
-blocked before prompting or running the generator. Repeating `ensure`, using
-`--yes`, or running `upgrade` cannot clear that conflict.
-
-The error groups files under their project or personal root. Paths below that
-root, such as `.codex/agents/rfc-integrator.toml`, identify the files to inspect.
-"Setup needed" with an existing file means MASK cannot verify it; it does not
-mean the file is missing or that its contents are necessarily wrong.
-
-If version control contains a matching set, restore the role files together with
-`.mask/generated/SKILL-ID/native-roles.lock.json` (MASK also reads the retired
-`.mask/skill-config/SKILL-ID/` location when the canonical one is absent) and the
-consumer inputs it verifies. A lock for different package content or different inputs will not
-validate the files. Do not hand-edit hashes or MASK's machine ownership state.
-
-Otherwise, compare the existing files with the intended role definitions. Back
-up files outside the agent discovery directories before deciding which custom
-content to keep and which destinations to clear for generation. MASK does not
-make that replacement decision for you. After resolving the conflicts, run:
+When an operation is interrupted, inspect its pending journal before another mutation:
 
 ```sh
-mask ensure --project /path/to/project
-# Or, for personal skills:
-mask ensure --user
+mask recover --inspect --json
+mask recover --complete --json
 ```
 
-Approve setup in the terminal if it is offered. The final result must say the
-workflow is ready; a saved deployment or successful source fetch alone does not
-mean setup completed. "Deployment changes were saved" refers to local MASK
-changes, never a Git commit. Host loading is a separate check.
+Choose `--rollback` instead when the journal permits restoring the before-state.
+MASK validates current bytes, physical roots, source identity and control snapshots.
+Changed files or Git state can block either direction; preserve them and inspect the
+typed error. Recovery never reruns a setup script. A script that exited before its
+outputs were validated requires rollback of that publication. Earlier committed
+links or setup groups remain reported as committed.
 
-## Recover or stop managing a project
+Old journal versions remain readable even though old public command spellings have
+retired. Program self-update preserves protocol/schema compatibility checks; a
+breaking program transition needs an explicitly reviewed checkout update.
 
-Inspect an interrupted operation with `mask recover --inspect --json`. After checking the recorded intent, choose explicit `--complete` or `--rollback`. Recovery preserves unexpected edits and never resets a Git checkout. Git helpers and checkout filters remain trusted subprocesses; MASK is not a sandbox or an atomic deployment system.
+## Reclaim unused storage
 
-`mask project unregister PATH --json` removes only unchanged owned links and preserves the declaration, context and source. `--keep-links` explicitly abandons ownership, including for an unavailable project. Exact existing declared links can be adopted with `link adopt`; consult the [CLI contract](../architecture/cli-contract.md) for its required preconditions.
+```sh
+mask cleanup --dry-run --json
+mask cleanup --approve-plan RETURNED_HASH --json
+```
 
-If readiness adapters are installed, disable the owned adapters and revoke the
-applicable approval when stopping automatic management. Unregistering alone does
-not revoke approval. `workspace forget PATH --expect-identity ID` can retire a
-removed Git worktree's registration after verifying its recorded identity and
-absence from the original Git worktree list; it does not prune unavailable roots.
+Cleanup lists exact paths and reclaimable bytes. It removes verified unused payloads,
+unused owned tap caches, disposable backups and recognized retired generated files.
+There is no age-only backup retention policy and no automatic cleanup after upgrade.
 
-To remove the program, disable installed integrations and unregister the selected project and personal consumers first. Then `mask self uninstall` (preview it with `--dry-run`) removes the launchers MASK wrote, keeps any launcher edited since, and lists what is left with the commands that delete it: the projects that still link skills, `MASK_HOME`, and the program checkout. MASK never deletes those folders itself; remove them by hand, preserving source history and backups as you see fit. There is no purge command: tap caches under `MASK_HOME/sources` and payloads under `MASK_HOME/store` are retained, and nothing prunes them.
+Current declarations/locks, referenced versions, in-use native-role locks and pending
+recovery protect their data. Unavailable registered roots prevent unsafe assumptions
+about references. Modified backups, unknown files, links and unverifiable staging
+are preserved and reported. A persistent lifecycle lock excludes cleanup throughout
+another operation's preparation and publication. The existence of `operation.lock`
+or `lifecycle.lock` does not mean it is stale; neither file is deleted by cleanup.
+
+## Stop managing a checkout
+
+```sh
+mask unregister
+mask unregister /path/to/checkout
+mask unregister --user
+```
+
+Unregister removes unchanged owned deployment and the registration, preserving the
+declaration and version lock. `--keep-links` explicitly leaves links in place and
+abandons ownership. `workspace forget PATH --expect-identity VALUE` is the narrower
+retirement operation for a removed Git worktree: it verifies the recorded identity
+and absence from the original worktree list, without pruning unavailable roots.
+
+To remove MASK itself, first disable its integrations and unregister consumers you
+intend to retire, then preview `mask self uninstall --dry-run`. Self-uninstall removes
+only unchanged launchers that MASK owns, preserves the program checkout and remaining
+data, and reports what remains. Cleanup never deletes arbitrary consumer directories.

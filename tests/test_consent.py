@@ -15,11 +15,11 @@ import unittest
 import mask_consent as consent
 import mask_core as core
 from tests.fixture_files import write_json
-from tests.public_support import PublicFixture
+from tests.public_support import EngineFixture
 from tests.support import TAP
 
 
-class ConsentFixture(PublicFixture):
+class ConsentFixture(EngineFixture):
     def setUp(self):
         super().setUp()
         self.declare('alpha')

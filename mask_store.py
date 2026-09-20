@@ -1,6 +1,8 @@
 """Immutable raw-byte artifacts and explicit exact-commit hydration."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 import os
 from pathlib import Path
 import shutil
@@ -13,6 +15,17 @@ import mask_sources as s
 from mask_provenance import regular_bytes
 
 MANIFEST_BYTES = 16 * 1024 * 1024
+READ_ONLY = ContextVar('mask_store_read_only', default=False)
+
+
+@contextmanager
+def observational():
+    """Inspection may report extra bytecode, but must never remove it."""
+    token = READ_ONLY.set(True)
+    try:
+        yield
+    finally:
+        READ_ONLY.reset(token)
 
 
 def location(home, digest, identifier):
@@ -113,12 +126,13 @@ def shed_bytecode(root):
                 child.rmdir()
 
 
-def verify_tree(root, row):
+def verify_tree(root, row, *, clean_bytecode=True):
     r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest='sha256:' + '0' * 64, packages=[row]))
     if c.kind(root) != 'directory':
         c.fail('artifact.corrupt', 'Existing artifact root must be a real directory.', 4)
     original = c.identity(root)
-    shed_bytecode(root)
+    if clean_bytecode and not READ_ONLY.get():
+        shed_bytecode(root)
     found = inventory(root)
     if found.get('manifest.json') != 'file':
         c.fail('artifact.corrupt', 'Artifact manifest is missing.', 4)

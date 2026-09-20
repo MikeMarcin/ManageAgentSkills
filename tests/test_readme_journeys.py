@@ -44,25 +44,30 @@ TAP_URL = 'https://github.com/MikeMarcin/AgentSkills.git'
 INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
                 'mkdir -p "$HOME/.local/bin"',
                 'python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"',
-                f'"$HOME/.local/bin/mask" tap add agentskills {TAP_URL}')
+                f'"$HOME/.local/bin/mask" tap agentskills {TAP_URL}')
 # The piped installer is proven against a local program repository in tests.test_installer; this module replays the by-hand recipe.
 INSTALLER = ('curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh',)
 WINDOWS_INSTALLER = ('powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1 | iex"',)
-IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask ensure')
-MAKE_EVERYTHING_WORK = ('mask ensure --all --repair',)
+IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask upgrade')
+MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 EVERYDAY = {
     'Add a skill here': 'mask install ID',
     'Add a personal skill': 'mask install ID --user',
-    "Show this project's skills": 'mask list',
+    "Show this checkout's skills": 'mask list',
     'Show personal skills': 'mask list --user',
-    'Check or reconcile declared setup': 'mask ensure',
-    'Repair every registered project and personal scope': 'mask ensure --all --repair',
-    'Remove a selection here': 'mask remove ID',
+    'Register and prepare this checkout': 'mask register',
+    "Restore this checkout's pinned setup": 'mask repair',
+    'Remove a skill here': 'mask uninstall ID',
+    'Hold a skill at its installed version': 'mask pin ID',
+    'Release a version hold': 'mask unpin ID',
+    "Inspect this checkout's readiness": 'mask status',
     'Update MASK itself and fetch your taps': 'mask update',
-    'Upgrade every registered project and personal scope': 'mask upgrade',
-    'Upgrade only this project': 'mask upgrade --project .',
-    'Upgrade only personal skills': 'mask upgrade --user',
+    'Upgrade every registered checkout and personal skills': 'mask upgrade --all',
+    'Upgrade this checkout': 'mask upgrade',
+    'Upgrade personal skills': 'mask upgrade --user',
+    'Preview unused storage and backups': 'mask cleanup --dry-run',
 }
+
 FENCE = re.compile(r'^```[^\n]*\n(.*?)^```$', re.M | re.S)
 
 
@@ -183,61 +188,29 @@ class ReadmeRecipes(PublicFixture):
         return json.loads(path.read_text(encoding='utf-8'))['packages'][0]['commit']
 
     def test_install_once_then_in_your_project(self):
-        # "Install once" approved the tap without fetching it.
-        self.assertEqual(list(json.loads((self.home / 'config.json').read_text(encoding='utf-8'))['sources']), [TAP])
-        self.assertEqual(list((self.home / 'sources').glob('*.git')), [])
+        from tests.public_support import CONSUMER_CONTEXT
+        shutil.copytree(CONSUMER_CONTEXT, self.project / '.mask')
+        for command in IN_YOUR_PROJECT + MAKE_EVERYTHING_WORK:
+            run = self.shell(command)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])
+        self.assertTrue((self.project / '.codex/agents/rfc-integrator.toml').is_file())
+        self.assertTrue((self.project / '.mask.lock.json').is_file())
 
-        installed, listed, ensured = map(self.shell, IN_YOUR_PROJECT)
-        # install fetched the tap on demand and linked the pinned store copy. The package declares consumer inputs this
-        # fresh project does not have yet: links and static roles are committed, but install cannot report success
-        # (MASK-0090); it names them.
+    def test_missing_input_preserves_fresh_checkout(self):
+        installed = self.shell(IN_YOUR_PROJECT[0])
         self.assertEqual(installed.returncode, 4, installed.stdout + installed.stderr)
         self.assertIn('workflow.incomplete', installed.stderr)
-        self.assertIn('.mask/skill-config/implement-rfc/project.json', installed.stderr)
-        self.assertIn('deployment changes were saved', installed.stderr)
-        self.assertIn('mask ensure', installed.stderr)
-        self.assertEqual(installed.stdout, '')
-        self.assertEqual(len(list((self.home / 'sources').glob('*.git'))), 1)
-        self.assertTrue((self.project / '.mask.lock.json').is_file())
-        self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])
-        self.assertTrue(Path(os.path.realpath(self.project / '.claude/skills/implement-rfc')).is_relative_to(os.path.realpath(self.home / 'store/v1')))
-        self.assertTrue((self.project / '.codex/agents/rfc-integrator.toml').is_file())
-        self.assertTrue((self.project / '.claude/agents/rfc-integrator.md').is_file())
+        self.assertFalse((self.project / '.mask.json').exists())
+        self.assertEqual(self.links(self.project), [])
 
-        self.assertEqual(listed.returncode, 0, listed.stderr)
-        self.assertFalse(self.parses_as_result_envelope(listed.stdout))
-        self.assertIn('implement-rfc', listed.stdout)
-        self.assertIn('linked', listed.stdout)
-
-        # ensure and "Make everything work" share the verdict: they name the input and stop; nothing invents it.
-        [repaired] = map(self.shell, MAKE_EVERYTHING_WORK)
-        for run in (ensured, repaired):
-            self.assertEqual(run.returncode, 4, run.stdout + run.stderr)
-            self.assertIn('.mask/skill-config/implement-rfc/project.json', run.stderr)
-            self.assertEqual(run.stdout, '')
-        self.assertIn('workflow.incomplete', ensured.stderr)
-        self.assertFalse((self.project / '.mask/skill-config/implement-rfc/project.json').exists())
-
-    @unittest.skipUnless(pty, 'POSIX pseudoterminal required; native Windows console is recorded separately')
-    def test_ensure_asks_once_in_the_terminal_and_completes(self):
+    def test_ordinary_repair_needs_no_confirmation(self):
         self.assertEqual(self.shell(EVERYDAY['Add a skill here'], ID='alpha').returncode, 0)
-        ensure = EVERYDAY['Check or reconcile declared setup']
-        self.unlink(self.project / '.claude/skills/alpha')  # Something to reconcile.
-        code, text = self.terminal(ensure, answer=b'y\n')
-        self.assertEqual(code, 0, text)
-        self.assertIn('[y/N]', text)
-        self.assertNotIn('sha256:', text)
-        self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
-        # Declining leaves the explicit incomplete result the README promises.
         self.unlink(self.project / '.claude/skills/alpha')
-        code, text = self.terminal(ensure, answer=b'n\n')
-        self.assertEqual(code, 4, text)
-        self.assertIn('confirmation.declined', text)
-        self.assertEqual(self.links(self.project), ['.agents/skills/alpha'])
-        # The same command through a pipe never asks.
-        piped = self.shell(ensure)
-        self.assertEqual(piped.returncode, 4, piped.stderr)
-        self.assertIn('confirmation.required', piped.stderr)
+        repaired = self.shell(EVERYDAY["Restore this checkout's pinned setup"])
+        self.assertEqual(repaired.returncode, 0, repaired.stderr)
+        self.assertNotIn('[y/N]', repaired.stdout + repaired.stderr)
+        self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
 
     def test_everyday_commands(self):
         replayed = set()
@@ -260,27 +233,27 @@ class ReadmeRecipes(PublicFixture):
         run('Add a skill here', ID='beta')
         self.assertEqual(self.links(self.project), sorted(alpha + ['.agents/skills/beta', '.claude/skills/beta']))
         self.assertEqual(self.links(self.personal), alpha)
-        self.assertIn('beta', run("Show this project's skills").stdout)
+        self.assertIn('beta', run("Show this checkout's skills").stdout)
         self.assertIn('alpha', run('Show personal skills').stdout)
-        self.assertIn(f'- {TAP}/beta', run('Remove a selection here', ID='beta').stdout)
+        self.assertIn(f'- {TAP}/beta', run('Remove a skill here', ID='beta').stdout)
         self.assertEqual(self.links(self.project), alpha)
-        run('Check or reconcile declared setup')
+        run("Restore this checkout's pinned setup")
 
         for root in (self.project, self.personal):
             self.unlink(root / '.claude/skills/alpha')
-        run('Repair every registered project and personal scope')
+        self.assertEqual(self.shell('mask repair --all').returncode, 0)
         self.assertEqual((self.links(self.project), self.links(self.personal)), (alpha, alpha))
 
         # Each update scope moves only its own lock to the fetched upstream commit.
         project_lock, user_lock = self.project / '.mask.lock.json', self.home / 'user.lock.json'
         installed = self.locked(user_lock)
         first = push_upstream('First upstream change.')
-        run('Upgrade only this project')
+        run('Upgrade this checkout')
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (first, installed))
-        run('Upgrade only personal skills')
+        run('Upgrade personal skills')
         self.assertEqual(self.locked(user_lock), first)
         second = push_upstream('Second upstream change.')
-        self.assertIn(f'tap {TAP}: fetched new commits', run('Upgrade every registered project and personal scope').stdout)
+        self.assertIn(f'tap {TAP}: fetched new commits', run('Upgrade every registered checkout and personal skills').stdout)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
         self.assertIn('Second upstream change.', (self.personal / '.claude/skills/alpha/SKILL.md').read_text(encoding='utf-8'))
 
@@ -297,9 +270,14 @@ class ReadmeRecipes(PublicFixture):
         self.assertIn(f'tap {TAP}: fetched new commits', refreshed)
         self.assertIn("Run 'mask upgrade'", refreshed)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))
-        self.assertEqual(self.shell('mask upgrade --offline').returncode, 0)
+        self.assertEqual(self.shell('mask upgrade --all --offline').returncode, 0)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (third, third))
 
+        run('Register and prepare this checkout')
+        run('Hold a skill at its installed version', ID='alpha')
+        run('Release a version hold', ID='alpha')
+        run("Inspect this checkout's readiness")
+        run('Preview unused storage and backups')
         self.assertEqual(replayed, set(EVERYDAY))
 
 

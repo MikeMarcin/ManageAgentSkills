@@ -69,7 +69,7 @@ class Fixture(unittest.TestCase):
         return environment
 
     def call(self, *args, code=0, cwd=None, env=None):
-        run = subprocess.run([sys.executable, str(ENTRY), *map(str, args), '--json'], capture_output=True, encoding="utf-8", cwd=cwd or self.project, env=self.environment(env))
+        run = subprocess.run([sys.executable, str(ENTRY.parent / 'tests/engine_cli.py'), *map(str, args), '--json'], capture_output=True, encoding="utf-8", cwd=cwd or self.project, env=self.environment(env))
         data = json.loads(run.stdout)
         self.assertEqual(run.returncode, code, (run.stdout, run.stderr))
         self.assertEqual(run.stderr, '')

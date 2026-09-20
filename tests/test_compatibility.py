@@ -103,7 +103,7 @@ class CompatibilityTests(Fixture):
 
     def test_policy_journal_exact_bytes_and_typed_coverage(self):
         self.prepare(apply=True)
-        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label=='selection_policy' else None;mask.main(sys.argv[2:])"
+        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label=='selection_policy' else None;__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:])"
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'selection-policy', 'set', '--agent', 'codex', '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
         journal = c.read_json(self.home / 'pending.json')
@@ -143,7 +143,7 @@ class CompatibilityTests(Fixture):
 
     def test_recovery_rederives_links_from_effective_after_policy(self):
         self.prepare(dict(schema_version=1, agents=['codex']), apply=True)
-        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label=='intent' else None;mask.main(sys.argv[2:])"
+        script = "import os,sys;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label: os._exit(99) if label=='intent' else None;__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:])"
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'compatibility', 'override', ALPHA, '--project', str(self.project), '--agent', 'claude', '--reason', 'Reviewed', '--home', str(self.home), '--json'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
         journal = c.read_json(self.home / 'pending.json')
@@ -165,7 +165,7 @@ class CompatibilityTests(Fixture):
         self.prepare(apply=True)
         for boundary in ('selection_policy', 'state'):
             with self.subTest(boundary=boundary):
-                parser, leaves = mask.make_parser()
+                parser, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
                 args = parser.parse_args(['selection-policy', 'set', '--agent', 'codex', '--home', str(self.home)])
                 output = mask.result('selection-policy.set')
                 altered = c.text_json(dict(schema_version=1, enabled_agents=['claude'], overrides=[]))

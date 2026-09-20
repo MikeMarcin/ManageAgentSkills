@@ -16,7 +16,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(set(adapters.BY_ID), {'claude', 'codex'})
         self.assertEqual(mask.ADAPTERS, c.ADAPTERS)
         self.assertEqual(c.ADAPTERS, adapters.paths())
-        _, leaves = mask.make_parser()
+        _, leaves = __import__('tests.engine_cli', fromlist=['make_parser']).make_parser()
         advertised = mask.capabilities(leaves)['adapter_contracts']
         self.assertEqual(advertised, adapters.capabilities())
         for adapter in adapters.BUILTINS:

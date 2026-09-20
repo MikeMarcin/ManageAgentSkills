@@ -12,10 +12,10 @@ fresh states and no role repair for the linked consumer.
 import json
 import unittest
 
-from tests.public_support import PublicFixture, MISSING_ROLE, STATIC_PACKAGE
+from tests.public_support import EngineFixture, MISSING_ROLE, STATIC_PACKAGE
 
 
-class StartingStates(PublicFixture):
+class StartingStates(EngineFixture):
     """The three starting states exist and are not quietly prepared."""
 
     def test_fresh_project_and_personal_scope_are_unregistered(self):
@@ -38,7 +38,7 @@ class StartingStates(PublicFixture):
         self.assertIn('capabilities', {c['name'] for c in machine['data']['commands']})
 
 
-class HumanOutputBaseline(PublicFixture):
+class HumanOutputBaseline(EngineFixture):
     """RFC-MASK-0018-AC02: commands without --json must not print the result envelope (fixed by MASK-0084)."""
 
     def test_inventory_without_json_is_not_an_envelope(self):
@@ -58,7 +58,7 @@ class HumanOutputBaseline(PublicFixture):
         self.assertFalse(self.parses_as_result_envelope(run.stdout), run.stdout[:200])
 
 
-class TaskCommandBaseline(PublicFixture):
+class TaskCommandBaseline(EngineFixture):
     """RFC-MASK-0018-AC01: one task command from an unregistered scope."""
 
     def test_install_from_fresh_project(self):
@@ -73,7 +73,7 @@ class TaskCommandBaseline(PublicFixture):
         self.assertFalse((self.project / '.mask.json').exists())
 
 
-class WorkflowReadinessBaseline(PublicFixture):
+class WorkflowReadinessBaseline(EngineFixture):
     """RFC-MASK-0019-AC01: declared native roles participate in readiness (W01)."""
 
     def test_ensure_check_fails_with_missing_integrator_role(self):

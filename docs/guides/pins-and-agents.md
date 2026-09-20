@@ -1,22 +1,30 @@
 # Pins, development links and per-skill agents
 
-Updating one pinned skill, authoring through a development link, per-skill agent selection, local compatibility policy and adapter facts.
+Updating one selected skill, authoring through a development link, per-skill agent selection, local compatibility policy and adapter facts.
+
+## Version holds
+
+`mask pin SKILL` holds its currently installed version. `mask unpin SKILL` releases
+the hold without upgrading immediately. `--all` replaces SKILL and selects all
+skills in the current checkout; add `--user` to operate on personal skills instead.
+The hold is declarative (`pinned: true`) and preserves the existing version selector.
+Upgrade keeps that locked version while still restoring links and required setup.
 
 ## Pinned updates and development links
 
-`mask upgrade --project PATH --skill SOURCE/ID` fetches that binding's tap and updates only that pin through one recoverable lock/link operation. Preview it with `--dry-run`, which uses cached objects and never fetches. Exact commit requirements stay fixed.
+`mask upgrade SOURCE/ID --project PATH` fetches that binding's tap and updates only that unheld selection through one recoverable lock/link operation. Preview it with `--dry-run`, which uses cached objects and never fetches. Exact commit requirements stay fixed.
 
-For scoped authoring, `mask source dev-link SOURCE/ID --project PATH
+For scoped authoring, `mask skill dev-link SOURCE/ID --project PATH
 --authoring-root PATH --json` makes an explicit dirty/unpinned exception from the
 tap's approved authoring checkout. Return
-with `--to-pinned` in place of `--authoring-root`. Use `ensure --check` to inspect
+with `--to-pinned` in place of `--authoring-root`. Use `status --check` to inspect
 readiness without changing a development scope; complete checks report
-`ready_dev_link`, not pinned readiness. Ordinary apply and mutating ensure
-refuse live overrides, and update skips or refuses them. `mask source publish SOURCE --paths PACKAGE_PATH --json`
+`ready_dev_link`, not pinned readiness. Ordinary repair and upgrade
+refuse live overrides, and upgrade skips or refuses them. `mask tap publish SOURCE --paths PACKAGE_PATH --json`
 previews exact package publication. Add `--commit` and separately `--push` only
 when those effects are intended. Publication preserves the authoring HEAD/index
 and reports its separate commit/ref. See the
-[CLI contract](../architecture/cli-contract.md#selected-updates-and-authoring-exceptions)
+[CLI contract](../architecture/cli-contract.md#integrations-and-advanced-controls)
 for recovery, authority and platform limits.
 
 
@@ -25,18 +33,17 @@ for recovery, authority and platform limits.
 Registered v2 consumers can choose agents independently:
 
 ```sh
-mask project set-agents vendor/alpha codex --apply --json
-mask user set-agents vendor/alpha claude --apply --json
-mask project set-agents vendor/alpha --inherit --apply --json
-mask project set-targets --inherit --apply --json
+mask project set-agents vendor/alpha codex --json
+mask user set-agents vendor/alpha claude --json
+mask project set-agents vendor/alpha --inherit --json
+mask project set-targets --inherit --json
 ```
 
 `--all` on `set-agents` selects supported, locally enabled agents. `--inherit`
 removes the binding choice; `set-targets --inherit` restores the v2 `all` default.
-Run `project register` or `user register` first; registration without `--apply`
-is supported. Without `--apply`, setters update declaration, coherent lock and
-cached desired selection while retaining current owned links. Preview with
-`--dry-run` and apply its `--expect-plan-hash` to guard the exact intent.
+Run `register` or `register --user` to enroll and prepare a selection. Agent setters
+reconcile immediately. Preview with `--dry-run` and approve the exact task using
+`--approve-plan HASH`.
 
 Bindings whose `when.platforms` or `when.architectures` do not match are reported
 `not_applicable`, retain their lock rows, and need no artifact preparation.
@@ -89,7 +96,7 @@ positive agent selections, retaining all exact commits/selectors and origins.
 Inapplicable contributions retain their lock attribution without participating
 in conflicts or requiring their content. Public profile storage is still RFC10.
 
-`plan`, `apply`, and project/user `show` expose `shadowing` and
+Task previews and `status` expose `shadowing` and
 `target.scope_shadowing` warnings for user/project discovery names. Observed owned
 links and prospective overlaps are distinguished, and an overlap whose scopes
 resolve to one directory is reported as `same_target` without a warning. Both

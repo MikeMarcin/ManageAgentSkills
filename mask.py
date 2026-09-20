@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import copy
 import json
 import os
@@ -12,8 +13,8 @@ import shutil
 import subprocess
 import textwrap
 
-VERSION = '0.2.0'
-PROTOCOL_VERSION = 1
+VERSION = '0.3.0'
+PROTOCOL_VERSION = 2
 import mask_adapters as adapters
 
 ADAPTERS = adapters.paths()
@@ -38,7 +39,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def result(command='', dry_run=False):
-    return dict(schema_version=1, tool='mask', tool_version=VERSION, command=command,
+    return dict(schema_version=2, tool='mask', tool_version=VERSION, command=command,
                 ok=True, dry_run=dry_run, changed=False, would_change=False,
                 transaction='not_needed', data={}, actions=[], warnings=[], error=None)
 
@@ -98,7 +99,7 @@ COMMANDS = {
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     # brew/apt vocabulary: update refreshes what is available (this program and the taps); upgrade moves consumers to it.
     'update': (True, True, []),
-    'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag')]),
+    'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.uninstall': (True, False, []),
@@ -148,41 +149,8 @@ def argument(parser, name, shape):
 
 
 def make_parser():
-    root = Parser(prog='mask', add_help=False, description=__doc__, allow_abbrev=False)
-    for name, shape in COMMON:
-        argument(root, name, shape)
-    sub = root.add_subparsers(dest='group', parser_class=Parser)
-    groups, leaves = {}, {}
-    for command, (mutates, network, arguments) in COMMANDS.items():
-        parts = command.split('.')
-        if len(parts) == 2:
-            if parts[0] not in groups:
-                group = sub.add_parser(parts[0], add_help=False, allow_abbrev=False)
-                for name, shape in COMMON:
-                    argument(group, name, shape)
-                groups[parts[0]] = group.add_subparsers(dest='subcommand', parser_class=Parser)
-            parent = groups[parts[0]]
-        else:
-            parent = sub
-        description, examples = present.COMMAND_HELP.get(command, (None, None))
-        parser = parent.add_parser(parts[-1], add_help=False, allow_abbrev=False,
-                                   description=textwrap.fill(description, width=78, break_on_hyphens=False) if description else None,
-                                   epilog='Examples:\n  ' + examples.replace('\n', '\n  ') if examples else None,
-                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-        for name, shape in COMMON + arguments:
-            argument(parser, name, shape)
-        if command == 'skill.validate':
-            parser._option_string_actions['--all'].help = 'Validate every available skill'
-        if command in ('project.set-agents', 'user.set-agents'):
-            parser._option_string_actions['--all'].help = 'Select all supported agents for this skill'
-        if mutates:
-            argument(parser, 'dry-run', 'flag')
-            argument(parser, 'yes', 'flag')
-        if command in GUARDED:
-            argument(parser, 'expect-plan-hash', 'value')
-        parser.set_defaults(command=command)
-        leaves[command] = parser
-    return root, leaves
+    import mask_cli
+    return mask_cli.parser(COMMANDS, COMMON, Parser, argument, present.COMMAND_HELP)
 
 
 def capabilities(leaves):
@@ -200,7 +168,7 @@ def capabilities(leaves):
     return dict(commands=descriptors, schemas=dict(result=1, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                 readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1, 2, 3], pending=[1, 2, 3]), scopes=['project', 'user'],
                 deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap add --autocrlf'), pinned_deployment=True, per_binding_targeting=True, adapter_contracts=adapters.capabilities(), targets=ADAPTERS, python_minimum='3.11', program_root=str(PROGRAM_ROOT),
-                workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1', profile_selection='ensure --check --workflow-profile SKILL=PROFILE', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
+                workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1', profile_selection='ensure --check --workflow-profile SKILL=PROFILE', scope_contracts=['project', 'user'], setup_request_scope=True, native_roles=True, staged_setup=True, setup_entrypoints=['ensure', 'upgrade'], repair_with_backups=True, paths=workflow.paths(), retired_paths=True, compatible_locks=True, entrypoints=['ensure', 'install', 'remove', 'upgrade', 'doctor', 'launch'], host_load='not_verified'))
 
 
 CONFLICTS = {
@@ -267,7 +235,12 @@ def selected_roots(args, state, *, all_default=False):
         return [Path(state['user']['root'])]
     if getattr(args, 'all', False) or all_default and not getattr(args, 'project', None):
         return [Path(key) for key in sorted(core.consumer_records(state))]
-    root = core.project_root(getattr(args, 'project', None))
+    try:
+        root = core.project_root(getattr(args, 'project', None))
+    except MaskError as error:
+        if error.code in ('manifest.missing', 'project.not_found') and not getattr(args, 'project', None):
+            core.fail('scope.required', 'Run inside a registered checkout, or select --user or --all.', 4)
+        raise
     for known in state['projects']:
         if Path(known).is_dir() and os.path.samefile(root, known):
             root = Path(known)
@@ -281,8 +254,16 @@ def diagnostics(args, output, home):
     config = machine_config(home)
     state = core.state(core.read_json(home / 'state.json', 'state', default=core.empty_state()))
     pending = [MaskError('recovery.required', 'A pending operation requires inspection.', 8).as_dict()] if core.kind(home / 'pending.json') != 'missing' else []
-    roots = selected_roots(args, state, all_default=True)
-    planned = fs.plan(config, state, roots, home=home)
+    roots = selected_roots(args, state)
+    profiles = {}
+    for item in getattr(args, 'workflow_profile', []):
+        skill, separator, profile = item.partition('=')
+        if not separator or skill in profiles or not getattr(args, 'check', False):
+            core.fail('invocation.invalid', 'Use --check with unique --workflow-profile SKILL=PROFILE selections.', 2)
+        workflow.identifier(skill, 'skill')
+        workflow.identifier(profile, 'profile')
+        profiles[skill] = profile
+    planned = fs.plan(config, state, roots, home=home, operation='ensure.check', workflow_profiles=profiles)
     fs.public_plan(planned, output)
     issues = list(planned['blockers']) + pending
     try:
@@ -310,11 +291,16 @@ def diagnostics(args, output, home):
     output['data'].update(forge_hosts=forges, identity_canonicalization=stale)
     if stale:
         output['warnings'].append(dict(code='migration.identity_canonicalization', sources=', '.join(row['source'] for row in stale),
-                                       message="The tap catalog records an older identity spelling; it still works. Convert it with 'mask doctor --migrate --dry-run', then without --dry-run."))
+                                       message="The tap catalog records an older identity spelling; it still works. Preview its conversion with 'mask tap migrate --dry-run'."))
     output['data'].update(healthy=not issues and not drift, issues=issues, filesystem_present=not issues and not drift,
                           host_load='not_verified', symlink_capability='unknown' if os.name == 'nt' else 'available')
+    workflows = ensure_ops.scope_workflows(planned)
+    records = core.consumer_records(state)
+    output['data']['scope_readiness'] = [dict(root=str(root), scope=core.consumer_scope(state, root), workflow=workflows.get(str(root), 'not_declared'),
+        readiness='drifted' if issues or drift else 'ready_dev_link' if records[str(root)].get('mode') == 'dev-link' else 'ready_pinned') for root in roots]
+    output['data']['readiness'] = 'drifted' if issues or drift else 'ready_dev_link' if any(row['readiness'] == 'ready_dev_link' for row in output['data']['scope_readiness']) else 'ready_pinned'
     if getattr(args, 'check', False) and (issues or drift):
-        core.fail('state.drift', 'Doctor found actionable drift or health failures.', 7, **(dict(workflow=unmet) if unmet else {}))
+        core.fail('state.drift', 'Readiness check found actionable drift or health failures.', 7, **(dict(workflow=unmet) if unmet else {}))
 
 
 def reconciliation(args, output, home):
@@ -574,7 +560,8 @@ def dispatch_impl(args, output, leaves):
             core.fail('host.unavailable', 'Configure a directly executable host on PATH before launch.', 4)
         ensure_args = argparse.Namespace(**vars(args))
         ensure_args.command, ensure_args.event = 'ensure', 'startup'
-        dispatch(ensure_args, output, leaves)
+        with core.writer_lock(home, name='lifecycle.lock') if not output['dry_run'] else nullcontext():
+            dispatch(ensure_args, output, leaves)
         if output['dry_run']:
             return
         operands = getattr(args, 'host_args', [])
@@ -659,21 +646,8 @@ def dispatch(args, output, leaves):
 
 def help_text(parser, leaves, words):
     """Compact everyday help for the root, the subcommand list for a group, argparse detail for a leaf."""
-    groups = sorted({name.split('.')[0] for name in COMMANDS if '.' in name})
-    selected = '.'.join(words[:2])
-    if selected in leaves:
-        return leaves[selected].format_help()
-    if words and words[0] in groups:
-        members = [name.split('.')[1] for name in COMMANDS if name.startswith(words[0] + '.')]
-        lines = [f"usage: mask {words[0]} SUBCOMMAND [OPTIONS]", 'subcommands:']
-        for member in members:
-            description = present.COMMAND_HELP.get(f'{words[0]}.{member}', ('', ''))[0]
-            lines.append(f'  {member:16} {description}'.rstrip())
-        lines.append(f"Run 'mask {words[0]} SUBCOMMAND --help' for arguments and examples.")
-        return '\n'.join(lines) + '\n'
-    if words and words[0] in leaves:
-        return leaves[words[0]].format_help()
-    return present.compact_help(VERSION, groups)
+    import mask_cli
+    return mask_cli.help_text(parser, leaves, words, sys.modules[__name__])
 
 
 def main(argv=None):
@@ -689,21 +663,24 @@ def main(argv=None):
     output = result()
     exit_code = 0
     try:
+        import mask_cli
         parser, leaves = make_parser()
-        if '--help' in before_separator or '--version' in before_separator or not [item for item in before_separator if item not in ('--json', '--debug')]:
+        if '--help' in before_separator or '--version' in before_separator:
             output['command'] = 'version' if '--version' in before_separator else 'help'
             output['data'] = {'version': VERSION}
             if output['command'] == 'help':
                 words = [item for item in before_separator if not item.startswith('-')]
                 output['data']['help'] = help_text(parser, leaves, words)
         else:
-            args = parser.parse_args(argv)
+            if not [item for item in argv if item not in ('--json', '--debug')]:
+                argv = ['status', *argv]
+            args = parser.parse_args(mask_cli.normalize(argv))
+            args.invocation_argv = argv
             if not hasattr(args, 'command'):
-                members = [name.split('.')[1] for name in COMMANDS if name.startswith(f"{getattr(args, 'group', '')}.")]
+                members = [name.split('.')[1] for name in mask_cli.definitions(COMMANDS) if name.startswith(f"{getattr(args, 'group', '')}.")]
                 raise MaskError('invocation.invalid', f"'mask {args.group}' needs one of these subcommands: {', '.join(members)}." if members else 'A complete command is required.', 2)
             output = result(args.command, getattr(args, 'dry_run', False))
-            validate_arguments(args)
-            dispatch(args, output, leaves)
+            mask_cli.dispatch(args, output, leaves)
     except MaskError as error:
         output.update(ok=False, error=error.as_dict())
         if output['transaction'] == 'not_needed':

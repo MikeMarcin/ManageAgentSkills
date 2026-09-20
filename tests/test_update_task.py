@@ -10,11 +10,11 @@ import os
 from pathlib import Path
 import unittest
 
-from tests.public_support import PublicFixture
+from tests.public_support import EngineFixture
 from tests.support import TAP
 
 
-class TapUpdateFixture(PublicFixture):
+class TapUpdateFixture(EngineFixture):
     """The fixture tap, one consumer installed through the public task, and upstream changes pushed with ``publish``."""
 
     def setUp(self):

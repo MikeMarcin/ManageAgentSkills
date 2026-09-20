@@ -2,6 +2,7 @@
 import copy
 import json
 from tests.test_setup import SetupFixture, SUBJECT
+from tests.public_support import ENTRY
 from tests.support import TAP
 import mask_core as core
 import mask_workflow as workflow
@@ -24,14 +25,20 @@ class WorkflowProfileTests(SetupFixture):
         personal['setup'][0]['inputs'] = []
         value['scopes'] = {'user': personal}
         self.descriptor_path.write_text(json.dumps(value))
-        self.publish('requirement profiles')
-        # Materialize links through the normal entrypoint; role setup remains pending.
-        self.machine('upgrade', '--project', self.project)
+        self.commit('requirement profiles')
+        # The retained engine fixture selects these requirements without setup.
         self.machine('ensure', '--project', self.project)
 
     def selected(self, profile='direct', *extra):
-        return self.machine('ensure', '--project', self.project, '--check',
-                            '--workflow-profile', 'implement-rfc=' + profile, *extra)
+        return self.public_status('--project', self.project, *extra, profile=profile)
+
+    def public_status(self, *scope, profile='direct'):
+        old = self.entrypoint
+        self.entrypoint = ENTRY
+        try:
+            return self.machine('status', *scope, '--check', '--workflow-profile', 'implement-rfc=' + profile)
+        finally:
+            self.entrypoint = old
 
     def test_missing_roles_pass_only_selected_core_and_checks_never_write(self):
         before = (self.home / 'state.json').read_bytes()
@@ -63,8 +70,9 @@ class WorkflowProfileTests(SetupFixture):
         self.assertEqual(self.launches(), 1)
 
     def test_personal_and_invalid_selection(self):
-        self.machine('install', 'implement-rfc', '--user')
-        selected = self.machine('ensure', '--user', '--check', '--workflow-profile', 'implement-rfc=direct')
+        self.declare_consumer(self.personal, ['implement-rfc'], user=True)
+        self.machine('ensure', '--user')
+        selected = self.public_status('--user')
         self.assertTrue(selected['ok'], selected)
         self.assertFalse((self.personal / '.mask/skill-config').exists())
         for profile in ('unknown', 'worker'):
@@ -99,7 +107,8 @@ class WorkflowProfileTests(SetupFixture):
         self.assertEqual(self.launches(), 0)
 
     def test_development_checks_are_observational_in_both_scopes(self):
-        self.machine('install', 'implement-rfc', '--user')
+        self.declare_consumer(self.personal, ['implement-rfc'], user=True)
+        self.machine('ensure', '--user')
         for scope in (('--project', self.project), ('--user',)):
             command = ('source', 'dev-link', TAP + '/implement-rfc', *scope, '--authoring-root', self.source)
             preview = self.machine(*command, '--dry-run')
@@ -107,7 +116,7 @@ class WorkflowProfileTests(SetupFixture):
             applied = self.machine(*command, '--expect-plan-hash', preview['data']['plan_hash'])
             self.assertTrue(applied['ok'], applied)
             state = (self.home / 'state.json').read_bytes()
-            selected = self.machine('ensure', *scope, '--check', '--workflow-profile', 'implement-rfc=direct')
+            selected = self.public_status(*scope)
             self.assertTrue(selected['ok'], selected)
             self.assertEqual(selected['data']['readiness'], 'ready_dev_link')
             self.assertFalse(selected['changed'])

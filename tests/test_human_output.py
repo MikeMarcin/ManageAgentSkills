@@ -1,6 +1,6 @@
 """Human presentation for every registered command (MASK-0084, RFC-MASK-0018-AC02/AC03).
 
-The subprocess cases use ``PublicFixture.human``, which never injects ``--json``;
+The subprocess cases use ``EngineFixture.human``, which never injects ``--json``;
 the registry cases reject a command without an intentional renderer.
 """
 import json
@@ -9,8 +9,9 @@ import subprocess
 import unittest
 
 import mask
+import mask_cli
 import mask_present as present
-from tests.public_support import PublicFixture, PACK
+from tests.public_support import PublicFixture, EngineFixture, PACK
 from tests.support import TAP
 
 
@@ -34,7 +35,7 @@ class RendererRegistry(unittest.TestCase):
         self.assertIn('no deployment changes were', text)
 
     def test_every_registered_command_has_an_intentional_renderer(self):
-        missing = sorted(set(mask.COMMANDS) - set(present.RENDERERS))
+        missing = sorted(set(mask_cli.definitions(mask.COMMANDS)) - set(present.RENDERERS))
         self.assertEqual(missing, [])
         self.assertLessEqual({'help', 'version'}, set(present.RENDERERS))
 
@@ -46,11 +47,11 @@ class RendererRegistry(unittest.TestCase):
                 self.assertEqual([action.dest for action in parser._actions if not action.help], [])
 
     def test_renderers_tolerate_minimal_results_and_never_emit_json(self):
-        for command in mask.COMMANDS:
+        for command in mask_cli.definitions(mask.COMMANDS):
             with self.subTest(command=command):
                 text = present.render(mask.result(command))
                 self.assertTrue(text.endswith('\n'))
-                self.assertFalse(PublicFixture.parses_as_result_envelope(text))
+                self.assertFalse(EngineFixture.parses_as_result_envelope(text))
                 self.assertRaises(ValueError, json.loads, text)
 
     def test_control_characters_are_sanitized(self):
@@ -59,30 +60,30 @@ class RendererRegistry(unittest.TestCase):
         self.assertNotIn('\x1b', text)
 
 
-class HumanTerminal(PublicFixture):
-    def test_task_help_explains_scope_options_and_examples(self):
+class PublicHelp(PublicFixture):
+    def test_task_help_explains_scopes_and_examples(self):
         for command, expected in (
-            ('ensure', ('Examples:', '--allow-setup', 'SOURCE/ID:ACTION', 'Normal ensure', 'mask ensure --user', 'mask ensure --all --repair')),
-            ('upgrade', ('Examples:', 'ALL registered consumers', 'fetched once', 'upgrade.incomplete', '--allow-ref-rebind', 'mask update')),
-            ('install', ('Examples:', 'Other selections are kept', 'every approved tap', 'never with --offline', 'mask install wizard --user')),
-            ('doctor', ('Examples:', 'doctor --migrate', 'one atomic write', 'mask doctor --migrate --dry-run')),
+            ('repair', ('Examples:', '--approve-plan', 'pinned state', 'mask repair --all')),
+            ('upgrade', ('Examples:', 'this checkout', 'every registered checkout', '--no-update', 'mask upgrade --user')),
+            ('install', ('Examples:', 'complete their setup', '--user', 'mask install implement-rfc')),
+            ('status', ('Examples:', 'without changing files', '--check', 'mask status --all')),
         ):
             with self.subTest(command=command):
                 run = self.human(command, '--help')
                 self.assertEqual(run.returncode, 0, run.stderr)
                 for phrase in expected:
                     self.assertIn(phrase, ' '.join(run.stdout.split()))
-                machine = self.machine(command, '--help')
-                self.assertEqual(machine['data']['help'], run.stdout)
+                self.assertEqual(self.machine(command, '--help')['data']['help'], run.stdout)
         root = self.human('--help').stdout
-        self.assertIn('Start here:', root)
-        self.assertIn('Bare upgrade fetches each referenced tap once', root)
-        self.assertIn('mask upgrade --help', root)
+        self.assertIn('This checkout:', root)
+        self.assertIn('Shared resources', root)
+        self.assertIn('mask COMMAND --help', root)
 
-    def test_no_operand_shows_everyday_help_and_exits_zero(self):
+    def test_no_operand_reports_status(self):
+        self.assertTrue(self.machine('register')['ok'])
         run = self.human()
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertIn('Everyday commands:', run.stdout)
+        self.assertIn('Status: ready.', run.stdout)
         self.assertNotIn('"schema_version"', run.stdout)
         self.assertEqual(run.stderr, '')
 
@@ -91,13 +92,15 @@ class HumanTerminal(PublicFixture):
         self.assertEqual((run.returncode, run.stdout), (0, f'mask {mask.VERSION}\n'))
 
     def test_group_and_leaf_help_are_text(self):
-        for args, expected, code in ((('project',), 'subcommands: init', 2), (('project', '--help'), 'subcommands:', 0), (('inventory', '--help'), 'usage: mask inventory', 0)):
+        for args, expected, code in ((('project',), 'subcommand', 2), (('project', '--help'), 'mask project set-agents', 0), (('list', '--help'), 'usage: mask list', 0)):
             with self.subTest(args=args):
                 run = self.human(*args)
                 self.assertEqual(run.returncode, code)
                 self.assertIn(expected, run.stdout + run.stderr)
                 self.assertFalse(self.parses_as_result_envelope(run.stdout))
 
+
+class HumanTerminal(EngineFixture):
     def test_inventory_shows_three_pinned_skill_rows_with_separate_agent_states(self):
         # Tap-first pinned rows (MASK-0102): one line per SOURCE/ID with a per-agent state column.
         self.assertTrue(self.machine('install', 'beta', '--project', self.project)['ok'])

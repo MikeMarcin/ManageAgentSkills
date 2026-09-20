@@ -63,6 +63,11 @@ sys.exit(1)
 class ForgeFixture(PublicFixture):
     """The public fixture with its upstream served as ``github.com/Fixture/AgentSkills`` over HTTPS, SSH or both."""
 
+    def raw(self, *args, **kwargs):
+        if args and args[0] in ('install', 'upgrade'):
+            args = (*args, '--no-update')
+        return super().raw(*args, **kwargs)
+
     def bootstrap(self):
         self.shim = self.base / 'shim'
         self.shim.mkdir()

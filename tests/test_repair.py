@@ -112,7 +112,7 @@ import mask, mask_fs
 def checkpoint(label):
     if label == 'native_role': os._exit(97)
 mask_fs.checkpoint = checkpoint
-raise SystemExit(mask.main(sys.argv[2:]))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:]))
 '''
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'ensure', '--project', str(self.project), '--repair', '--json'],
                              capture_output=True, text=True, env=self.environment(), timeout=60)

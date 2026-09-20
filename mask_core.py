@@ -33,33 +33,33 @@ class MaskError(Exception):
 
 
 REMEDIATION = {
-    'repair.incomplete': 'The other scopes were still attempted. Resolve the specific remaining errors above and rerun mask ensure --all --repair. Backups are retained at the reported paths.',
+    'repair.incomplete': 'The other scopes were still attempted. Resolve the specific remaining errors above and rerun mask repair --all. Backups are retained at the reported paths.',
     None: 'Inspect the reported inputs and retry only after resolving the condition.',
     'invocation.invalid': "Run 'mask --help' or 'mask COMMAND --help' for the accepted arguments.",
     'invocation.interrupted': "Nothing further was started; run 'mask recover --inspect' if a change was in progress.",
-    'plan.stale': 'Preview again and pass the newly reported --expect-plan-hash.',
-    'workflow.incomplete': "Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock or approved setup. Run 'mask ensure --project ROOT' (or --user, or --all) to deploy or set them up: install, update, doctor and launch never run setup (answer yes in a terminal, or pass the reported --expect-plan-hash with --allow-setup SOURCE/ID:ACTION).",
+    'plan.stale': 'Preview again and pass the newly reported --approve-plan.',
+    'workflow.incomplete': "Review the listed native roles and inputs: modified, unknown or colliding files are preserved for a manual decision; generated roles need a checked-in lock or approved setup. Run 'mask repair --project ROOT' (or --user, or --all), review the task in a terminal or preview it and use --approve-plan HASH.",
     'setup.failed': 'The package setup process failed or was stopped; nothing was published and its stage was discarded. Fix or report the package before approving setup again; MASK never reruns it on its own.',
     'setup.outputs_invalid': 'The setup stage produced outputs MASK cannot publish; nothing reached the consumer. Fix the package generator, then approve setup again.',
-    'setup.unverified': "Setup execution never reached validation, so its completion is unknown; run 'mask recover --rollback' to discard the stage, then rerun 'mask ensure' and approve setup again. MASK does not rerun package code from a journal.",
+    'setup.unverified': "Setup execution never reached validation, so its completion is unknown; run 'mask recover --rollback' to discard the stage, then rerun 'mask repair' and approve setup again. MASK does not rerun package code from a journal.",
     'workflow.invalid': 'The package workflow descriptor or a role asset is invalid; fix the package (MASK never runs package code to repair it).',
     'workflow.role_invalid': 'The native role content uses unsupported or mismatched fields; correct the package asset or role file.',
-    'project.not_registered': "Register the project first: 'mask project register PATH'.",
-    'project.unavailable': "Restore the reported project, or preview 'mask project unregister PATH --keep-links --dry-run' if it was intentionally removed.",
-    'user.unavailable': "Restore the reported personal home, or preview 'mask user unregister --keep-links --dry-run' if it was intentionally removed.",
-    'source.cache_invalid': "Inspect the reported cache. For a recognized tap cache, preview 'mask source repair-cache NAME --dry-run' to retain it before a fresh fetch; never edit its ownership marker.",
-    'manifest.missing': "Create the declaration first: 'mask project init' or 'mask user init'.",
-    'config.missing': "Add a skill source first: 'mask tap add NAME URL'.",
-    'state.drift': "Review the reported drift, then reconcile with 'mask apply' or 'mask ensure'.",
+    'project.not_registered': "Register the project first: 'mask register PATH'.",
+    'project.unavailable': "Restore the reported project, or preview 'mask unregister PATH --keep-links --dry-run' if it was intentionally removed.",
+    'user.unavailable': "Restore the reported personal home, or preview 'mask unregister --user --keep-links --dry-run' if it was intentionally removed.",
+    'source.cache_invalid': "Inspect the reported cache. For a recognized tap cache, preview 'mask tap repair-cache NAME --dry-run' to retain it before a fresh fetch; never edit its ownership marker.",
+    'manifest.missing': "Create the declaration first: 'mask register' or 'mask register --user'.",
+    'config.missing': "Add a skill source first: 'mask tap NAME URL'.",
+    'state.drift': "Review the reported drift, then reconcile with 'mask repair'.",
     'integration.approval_required': "Approve the project once with 'mask integration approve --project ROOT', then rerun.",
-    'confirmation.required': "Answer the question in a terminal, add --yes for this ordinary one-time effect, or pass the reported --expect-plan-hash from automation.",
+    'confirmation.required': "Answer the question in a terminal, review with --dry-run, then pass the reported --approve-plan hash from automation.",
     'confirmation.declined': 'Nothing was applied; rerun and answer yes when you want this proposal.',
     'state.busy': 'Another MASK operation holds the lock; retry when it finishes.',
     'state.pending': "Finish the interrupted operation with 'mask recover --inspect' before continuing.",
     'skill.ambiguous': 'Name the source explicitly as SOURCE/ID; MASK never picks the first match.',
-    'skill.unknown': "Check the exact skill name with 'mask skill list' or 'mask source show NAME'.",
-    'source.unresolved': "Fetch the approved source with 'mask source fetch NAME', or name SOURCE/ID for a resolved source.",
-    'lock.resolution_required': "Fetch the approved source with 'mask source fetch NAME' before an offline or dry-run resolution.",
+    'skill.unknown': "Check the exact skill name with 'mask search' or 'mask tap show NAME'.",
+    'source.unresolved': "Fetch the approved source with 'mask tap fetch NAME', or name SOURCE/ID for a resolved source.",
+    'lock.resolution_required': "Fetch the approved source with 'mask tap fetch NAME' before an offline or dry-run resolution.",
     'target.collision': 'Move or delete the conflicting entry yourself, then rerun; MASK never overwrites it.',
     'recovery.required': "Run 'mask recover --inspect' and complete or roll back the pending operation.",
     'lock.busy': 'Another MASK operation holds the lock; retry when it finishes.',
@@ -241,10 +241,10 @@ def atomic_text(path, content, before):
 
 
 @contextmanager
-def writer_lock(home):
-    parents_safe(Path(home.anchor), home / 'operation.lock')
+def writer_lock(home, *, name='operation.lock'):
+    parents_safe(Path(home.anchor), home / name)
     home.mkdir(parents=True, exist_ok=True)
-    path = home / 'operation.lock'
+    path = home / name
     if kind(path) not in ('missing', 'file'):
         fail('config.invalid', 'The writer lock must be a regular file.')
     handle = path.open('a+b')

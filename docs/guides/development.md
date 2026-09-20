@@ -30,13 +30,13 @@ while keeping links, caches, virtual environments, and local state excluded.
 The selected output file is always excluded from its own dump.
 
 `mask lock --project PATH --dry-run --json` previews an exact lock for a v2
-selection. Add the tap and fetch it with `mask source fetch NAME` first, then run `mask lock`
-with the returned `--expect-plan-hash`. `--user` selects the personal declaration.
+selection. Add the tap and fetch it with `mask tap fetch NAME` first, then run `mask lock`
+with the returned `--approve-plan`. `--user` selects the personal declaration.
 Locking uses cached objects only and never changes deployed skills. Existing locks
 retain their resolution; `--refresh --skill SOURCE/ID` updates selected bindings.
-Ref rewrites require explicit `--allow-ref-rebind`. New consumers can register/apply those artifacts; a registered
+Ref rewrites require explicit `--allow-ref-rebind`. New consumers can register those artifacts; a registered
 consumer changes its lock through `mask upgrade` (`mask lock` refuses `lock.active`). Missing or stale locks block readiness. See the
-[selection/lock contract](../architecture/cli-contract.md#cached-selection-locks)
+[selection/lock contract](../architecture/cli-contract.md#integrations-and-advanced-controls)
 for canonical defaults, exact digests and the machine-local file-source limitation.
 
 - [CLI contract and exit codes](../architecture/cli-contract.md)
@@ -50,7 +50,7 @@ recovery and inventory slices implemented. Native Windows
 readiness acceptance passed on ExampleWinHost after the recorded Windows fixes. The tap
 catalog supports fetch, package validation, curated
 copy imports and provenance. Cached v2 selection locks now record exact commits,
-paths and payload digests. Exact artifact preparation is available through `source fetch --locked`;
+paths and payload digests. Exact artifact preparation is available through `tap fetch --locked`;
 consumers deploy isolated store artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
 remains pending. [RFC-MASK-0021](../rfcs/RFC-MASK-0021-tap-only-deployment.md) makes deployment tap-only:

@@ -393,6 +393,32 @@ def dispatch(args, output, home):
     parse_policy_text(policy_after)
     consumers = [(root, c.consumer_scope(state, root)) for root in roots]
     before = pinned.snapshot(home, consumers)
+    if getattr(args, 'public_command', None) and apply:
+        import mask_lifecycle
+        change = dict(policy_before=policy_before, policy_after=policy_after, apply=True)
+        if coordinate is not None:
+            change['coordinate'] = coordinate
+        def candidate():
+            planned = fs.plan(config, state, roots, home=home, proposals=proposals, lock_proposals=locks,
+                              operation=command, selection_policy=proposal_policy, repair_roles=True, retire_files=False)
+            planned['intent']['selection_change'] = change
+            if policy_after != policy_before:
+                planned['intent']['files'].append(dict(root=str(home), role='selection_policy', before=policy_before, after=policy_after))
+                planned['actions'].append(dict(kind='selection_policy.write', status='planned', path=str(home / 'selection-policy.json')))
+                planned['would_change'] = True
+            planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], change=change))
+            return planned
+        def prepare():
+            effects = output['data']['preparation'] = []
+            for root, scope in consumers:
+                declaration = proposals.get(str(root), c.consumer_records(state)[str(root)]['last_manifest'])
+                locked = locks.get(str(root), c.consumer_records(state)[str(root)]['last_lock'])
+                observation = dict(root=str(root), effects={})
+                effects.append(observation)
+                store.ensure(home, declaration, locked, config, offline=True, coordinates=applicable_coordinates(declaration), effects=observation['effects'])
+        mask_lifecycle.execute(args, output, home, config, roots, before, candidate, prepare,
+                               details=dict(selection_policy=proposal_policy, affected_scopes=[str(root) for root in roots]))
+        return True
     planned = fs.plan(config, state, roots, home=home, proposals=proposals, lock_proposals=locks,
                       operation=command, register_only=not apply, selection_policy=proposal_policy)
     change = dict(policy_before=policy_before, policy_after=policy_after, apply=apply)

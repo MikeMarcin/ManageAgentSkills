@@ -37,7 +37,7 @@ import os,sys
 sys.path.insert(0,sys.argv[1])
 import mask,mask_fs
 mask_fs.checkpoint=lambda label: os._exit(99) if label==sys.argv[2] else None
-mask.main(sys.argv[3:])
+__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])
 """
         run=subprocess.run([sys.executable,'-B','-c',script,str(ENTRY.parent),label,*(command or ['apply']),'--project',str(self.project),'--home',str(self.home),'--json'],capture_output=True,text=True)
         self.assertEqual(run.returncode,99,run.stdout+run.stderr)
@@ -109,7 +109,7 @@ mask.main(sys.argv[3:])
                 after['generation']+=1
                 c.atomic_text(self.home/'state.json',c.text_json(after),c.read_text(self.home/'state.json'))
             return original(*args,**kwargs)
-        parser,leaves=mask.make_parser();args=parser.parse_args(['apply','--project',str(self.project),'--home',str(self.home)])
+        parser,leaves=__import__('tests.engine_cli', fromlist=['make_parser']).make_parser();args=parser.parse_args(['apply','--project',str(self.project),'--home',str(self.home)])
         output=mask.result('apply')
         with patch.object(store,'ensure',side_effect=changed),self.assertRaises(c.MaskError) as error:
             mask.dispatch(args,output,leaves)
@@ -276,7 +276,7 @@ mask.main(sys.argv[3:])
         self.assertTrue(ready['changed'])
         self.assertTrue(ready['data']['preparation'][0]['effects']['artifacts'][0]['created'])
         root.rename(self.base/'retained-artifact-two')
-        parser,leaves=mask.make_parser();args=parser.parse_args(['apply','--project',str(self.project),'--home',str(self.home)])
+        parser,leaves=__import__('tests.engine_cli', fromlist=['make_parser']).make_parser();args=parser.parse_args(['apply','--project',str(self.project),'--home',str(self.home)])
         output=mask.result('apply')
         def fail(*args):
             output['data']={}

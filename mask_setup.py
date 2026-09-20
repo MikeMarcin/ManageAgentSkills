@@ -335,7 +335,23 @@ def execute(output, home, replan, rows):
     for row in rows:
         groups.setdefault((row['root'], row['skill']), []).append(row)
     for _, group in sorted(groups.items()):
-        publish(output, home, replan, group)
+        # A later publication can roll back without undoing committed links or earlier
+        # setup groups. Keep its actions and transaction separate, then merge the effects.
+        publication = dict(output, actions=[], changed=False, transaction='not_needed')
+        try:
+            publish(publication, home, replan, group)
+        finally:
+            output['actions'].extend(publication['actions'])
+            output['changed'] |= publication['changed']
+            previous, current = output['transaction'], publication['transaction']
+            if current == 'partial' or previous == 'partial':
+                output['transaction'] = 'partial'
+            elif current == 'committed' or previous == 'committed':
+                output['transaction'] = 'committed'
+            elif current != 'not_needed':
+                output['transaction'] = current
+            output['data']['setup'].setdefault('transactions', []).append(
+                dict(root=group[0]['root'], skill=group[0]['skill'], transaction=current, changed=publication['changed']))
 
 
 def publish(output, home, replan, rows):
@@ -374,7 +390,7 @@ def publish(output, home, replan, rows):
         report = recheck(after, rows, ran=True)
         from mask_repair import check_retired_snapshot
         check_retired_snapshot(base, after)
-        if rows[0].get('granted_by') == 'repair':
+        if rows[0].get('granted_by') in ('repair', 'approve-plan', 'prompt'):
             for role in report['roles']:
                 key = (role['agent'], role['name'])
                 if key in outputs and role.get('observed_sha256') != observed_roles.get(key):
@@ -423,11 +439,11 @@ def validate_journal(pending):
         c.fail('recovery.conflict', 'Unsafe pending setup transaction id.', 8)
     c.fields(facts, ('phase', 'root', 'scope', 'skill', 'coordinate', 'package_sha256', 'descriptor_sha256', 'role_inputs_sha256', 'interpreter', 'granted_by', 'actions'), ('lock',), family='recovery')
     c.skill_id(facts['skill'])
-    if (facts['phase'] not in PHASES or pending['operation'] != 'ensure' or facts['root'] not in pending['selected'] or facts['scope'] not in ('project', 'user')
+    if (facts['phase'] not in PHASES or pending['operation'] not in ('ensure', 'upgrade', 'install', 'remove') or facts['root'] not in pending['selected'] or facts['scope'] not in ('project', 'user')
             or not isinstance(facts['coordinate'], str) or not consent.GRANT_RE.fullmatch(facts['coordinate'] + ':x') or not facts['coordinate'].endswith('/' + facts['skill'])
             or any(not isinstance(facts[key], str) for key in ('package_sha256', 'descriptor_sha256', 'role_inputs_sha256'))
             or not isinstance(facts['interpreter'], dict) or set(facts['interpreter']) != {'executable', 'version'} or any(not isinstance(item, str) for item in facts['interpreter'].values())
-            or facts['granted_by'] not in ('prompt', 'allow-setup', 'repair')
+            or facts['granted_by'] not in ('prompt', 'allow-setup', 'repair', 'approve-plan')
             or not isinstance(facts['actions'], list) or not 1 <= len(facts['actions']) <= workflow.LIMITS['setup']):
         c.fail('recovery.conflict', 'Unsafe pending setup facts.', 8)
     for action in facts['actions']:

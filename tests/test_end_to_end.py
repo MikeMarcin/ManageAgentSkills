@@ -25,6 +25,8 @@ def verify(program):
         git(project, 'init', '-b', 'main')
         env = dict(os.environ, MASK_HOME=str(home), PYTHONDONTWRITEBYTECODE='1')
         def call(*args, code=0):
+            if args and args[0] in ('install', 'upgrade'):
+                args = (*args, '--no-update')
             run = subprocess.run([sys.executable, '-B', str(program / 'mask.py'), *map(str, args), '--json'], cwd=project, env=env, capture_output=True, encoding='utf-8')
             assert run.returncode == code, (args, run.stdout, run.stderr)
             assert not run.stderr
@@ -35,35 +37,35 @@ def verify(program):
         capabilities = call('capabilities')['data']
         assert capabilities['deployment_model'] == 'taps' and capabilities['schemas']['machine'] == 3
         # Tap-first bootstrap (RFC-MASK-0021): approving the local bare upstream creates machine config v3 and state.
-        call('tap', 'add', 'agentskills', remote)
-        call('config', 'show'); call('source', 'fetch')
-        call('project', 'init', '--project', project); call('project', 'register', project)
+        call('tap', 'agentskills', remote)
+        call('config', 'show'); call('tap', 'fetch')
+        call('register', project)
         preview = call('install', 'alpha', '--project', project, '--dry-run')
-        call('install', 'alpha', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'])
+        call('install', 'alpha', '--project', project, '--approve-plan', preview['data']['plan_hash'])
         assert not call('install', 'alpha', '--project', project)['would_change']
         assert links() == ['.agents/skills/alpha', '.claude/skills/alpha']
         # A reviewed install preview goes stale once the tap cache moves under it.
         preview = call('install', 'beta', '--project', project, '--dry-run')
         support = source / 'skills/beta/support.txt'; support.write_text('changed')
         git(source, 'add', 'skills'); git(source, 'commit', '-m', 'support'); git(source, 'push', 'origin', 'main')
-        call('source', 'fetch')
-        assert call('install', 'beta', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'], code=4)['error']['code'] == 'plan.stale'
+        call('tap', 'fetch')
+        assert call('install', 'beta', '--project', project, '--approve-plan', preview['data']['plan_hash'], code=4)['error']['code'] == 'plan.stale'
         leaf = project / '.agents/skills/beta'; leaf.mkdir(); (leaf / 'preserve').write_text('user content')
         assert call('install', 'beta', '--project', project, code=4)['error']['code'] == 'target.collision'
         assert (leaf / 'preserve').read_text() == 'user content'
         assert 'beta' not in [row['id'] for row in json.loads((project / '.mask.json').read_text(encoding='utf-8'))['skills']]
         (leaf / 'preserve').unlink(); leaf.rmdir()  # Only our explicit test fixture.
         preview = call('install', 'beta', '--project', project, '--dry-run')
-        call('install', 'beta', '--project', project, '--expect-plan-hash', preview['data']['plan_hash'])
-        call('doctor', '--project', project, '--check')
+        call('install', 'beta', '--project', project, '--approve-plan', preview['data']['plan_hash'])
+        call('status', '--project', project, '--check')
         # A separate crashed process proves that public recovery resumes journal intent.
         injection = "import sys,os;sys.path.insert(0,sys.argv[1]);import mask,mask_fs;mask_fs.checkpoint=lambda label:os._exit(99) if label=='intent' else None;mask.main(sys.argv[2:])"
-        run = subprocess.run([sys.executable, '-B', '-c', injection, str(program), 'remove', 'beta', '--project', str(project), '--json'], cwd=project, env=env, capture_output=True)
+        run = subprocess.run([sys.executable, '-B', '-c', injection, str(program), 'uninstall', 'beta', '--project', str(project), '--json'], cwd=project, env=env, capture_output=True)
         assert run.returncode == 99
         assert call('recover', '--inspect')['data']['pending']['operation'] == 'remove'
-        call('recover', '--complete'); assert not call('apply', '--project', project)['changed']
+        call('recover', '--complete'); assert not call('repair', '--project', project)['changed']
         assert links() == ['.agents/skills/alpha', '.claude/skills/alpha']
-        removed = call('remove', 'beta', '--project', project)
+        removed = call('uninstall', 'beta', '--project', project)
         assert not removed['changed'] and [warning['code'] for warning in removed['warnings']] == ['selection.not_selected']
         author = base / 'author'; git(base, 'clone', '--branch', 'main', remote, author)
         git(author, 'config', 'user.name', 'Fixture'); git(author, 'config', 'user.email', 'fixture@example.invalid')
@@ -78,8 +80,8 @@ def verify(program):
         assert updated['data']['network'] == 'fetch' and updated['changed']
         assert [row['commit'] for row in json.loads((project / '.mask.lock.json').read_text(encoding='utf-8'))['packages']] == [head]
         assert not call('upgrade')['changed']
-        call('project', 'show', '--project', project); call('project', 'set-targets', '--project', project, '--inherit')
-        call('project', 'unregister', project)
+        call('list', '--project', project); call('project', 'set-targets', '--project', project, '--inherit')
+        call('unregister', project)
         assert (project / '.mask.json').is_file() and not (project / '.agents/skills/alpha').is_symlink()
         print('PASS: capabilities, add/remove/no-op, guarded stale refusal, collision preservation, crash recovery, frozen update, unregister; all fixtures removed on exit.')
 
@@ -107,10 +109,12 @@ class EndToEndTests(unittest.TestCase):
             program = Path(__file__).resolve().parents[1] / 'mask.py'
             home = base / 'machine'
             def call(*args):
+                if args and args[0] in ('install', 'upgrade'):
+                    args = (*args, '--no-update')
                 run = subprocess.run([sys.executable, '-B', str(program), '--home', str(home), '--json', *map(str,args)], capture_output=True, encoding='utf-8')
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
                 return json.loads(run.stdout)
-            call('tap', 'add', 'agentskills', upstream)
+            call('tap', 'agentskills', upstream)
             store = (home / 'store' / 'v1').resolve()
             facts = []
             for name in ('ManageAgentSkills', 'AgentSkills'):

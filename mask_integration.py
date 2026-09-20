@@ -241,7 +241,7 @@ def dispatch(args, output, home):
                                        for entry in changes} | ({str(home / 'integrations.json')} if before != after else set()))
     if agent == 'codex':
         output['data']['worktree_setup_command'] = shlex.join([record['interpreter'], str(Path(record['program']) / 'mask.py'),
-                                                             'ensure', '--home', str(home), '--event', 'startup'])
+                                                             'integration', 'run', '--home', str(home), '--event', 'startup'])
         output['data']['worktree_setup'] = 'Available for an existing Codex local-environment setup script; the script is preserved and not replaced.'
     output['would_change'] = bool(changes) or before != after
     output['actions'] = [dict(kind=args.command, status='planned', role=entry['role'], entry=entry['name']) for entry in changes]
@@ -367,28 +367,28 @@ def git_hook(home, event):
         return 0
     if event not in EVENTS:
         return 2
-    command = [sys.executable, str(Path(__file__).resolve().parent / 'mask.py'), 'ensure', '--home', home, '--event', event, '--json']
+    command = [sys.executable, str(Path(__file__).resolve().parent / 'mask.py'), 'integration', 'run', '--home', home, '--event', event, '--json']
     try:
         run = run_readiness(command)
         if run.returncode:
             data = c.parse_json(run.stdout)
             code = data.get('error', {}).get('code', 'readiness.blocked')
-            print(f'MASK: Git {event} already completed; readiness is blocked ({code}). Inspect mask ensure --check.', file=sys.stderr)
+            print(f'MASK: Git {event} already completed; readiness is blocked ({code}). Inspect mask status --check.', file=sys.stderr)
     except (OSError, subprocess.TimeoutExpired, c.MaskError):
-        print(f'MASK: Git {event} already completed; readiness could not finish. Inspect mask ensure --check.', file=sys.stderr)
+        print(f'MASK: Git {event} already completed; readiness could not finish. Inspect mask status --check.', file=sys.stderr)
     return 0
 
 
 def host_hook(home, agent):
     if agent not in adapters.BY_ID:
         return 2
-    command = [sys.executable, str(Path(__file__).resolve().parent / 'mask.py'), 'ensure', '--home', home, '--event', 'startup', '--json']
+    command = [sys.executable, str(Path(__file__).resolve().parent / 'mask.py'), 'integration', 'run', '--home', home, '--event', 'startup', '--json']
     try:
         run = run_readiness(command)
         data = c.parse_json(run.stdout)
         ready = run.returncode == 0
         code = data.get('error', {}).get('code', 'readiness.blocked') if not ready else None
-        message = 'MASK filesystem readiness is complete; host loading is not verified.' if ready else f'MASK readiness is blocked ({code}). Inspect mask ensure --check before continuing.'
+        message = 'MASK filesystem readiness is complete; host loading is not verified.' if ready else f'MASK readiness is blocked ({code}). Inspect mask status --check before continuing.'
     except (OSError, c.MaskError, subprocess.TimeoutExpired):
         ready = False
         message = 'MASK readiness could not finish. Inspect pending recovery before continuing.'

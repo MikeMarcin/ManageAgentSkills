@@ -595,7 +595,8 @@
           "enum": [
             "prompt",
             "allow-setup",
-            "repair"
+            "repair",
+            "approve-plan"
           ]
         }
       }

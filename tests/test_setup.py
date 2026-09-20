@@ -1,6 +1,6 @@
-"""Approved staged setup through the public CLI (MASK-0089; RFC-MASK-0019 AC04/AC05, cases W06-W12).
+"""Retained staged-setup service contracts through the private engine harness (MASK-0089; RFC-MASK-0019 AC04/AC05, cases W06-W12).
 
-Every case runs ``mask ensure`` as a subprocess against a disposable source and
+Every case runs the private ``ensure`` operation as a subprocess against a disposable source and
 consumer built from the retained generated-package fixture (model
 ``fixture-model-do-not-run``; never a real host). The fixture entrypoint is
 replaced per scenario by a variant that records every launch in a sentinel file,
@@ -18,7 +18,7 @@ import time
 import unittest
 
 from tests.fixture_files import write_json
-from tests.public_support import CONSUMER_CONTEXT, ENTRY, PACK, PublicFixture
+from tests.public_support import CONSUMER_CONTEXT, ENTRY, PACK, EngineFixture
 from tests.support import TAP
 
 GENERATED = PACK / 'fixtures/generated-package'
@@ -68,7 +68,7 @@ def render(role):
 '''
 
 
-class SetupFixture(PublicFixture):
+class SetupFixture(EngineFixture):
     """Tap whose implement-rfc is the generated package (setup action), plus an approved, declared, pinned consumer without links."""
 
     def setUp(self):
@@ -125,11 +125,36 @@ class SetupFixture(PublicFixture):
             value['setup'][0]['timeout_seconds'] = timeout
         descriptor.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
 
-    def commit(self, message):
-        """Publish the package edit and adopt it: fetch the tap, then the pinned update of the consumer (it never runs setup)."""
+    def commit(self, message, *, user=False):
+        """Prepare a newer locked engine fixture without exercising public task consent.
+
+        Setup-failure tests need the failing package already selected. Public
+        upgrade now requires consent before changing that lock; its consent
+        behavior is covered by test_upgrade_readiness instead.
+        """
         self.publish(message)
         self.assertTrue(self.machine('source', 'fetch', TAP)['ok'])
-        return self.machine('upgrade', '--project', self.project)
+        import mask, mask_core as c, mask_fs as fs, mask_resolve as r, mask_store as store
+        c.FROZEN.clear()
+        config = c.config(c.read_json(self.home / 'config.json'))
+        state = c.state(c.read_json(self.home / 'state.json', 'state'))
+        root, scope = (self.personal, 'user') if user else (self.project, 'project')
+        declaration = r.selection(c.read_json(c.declaration_path(root, scope, self.home), 'manifest'))
+        previous = r.lock(c.read_json(r.lock_path(root, scope, self.home), 'lock'))
+        resolved = r.resolve_candidate(declaration, config, self.home, previous, refresh=True)
+        with c.writer_lock(self.home):
+            store.ensure(self.home, declaration, resolved, config, offline=True)
+            planned = fs.plan(config, state, [root], home=self.home, operation='upgrade',
+                              lock_proposals={str(root): resolved})
+            output = mask.result('upgrade')
+            fs.public_plan(planned, output)
+            try:
+                fs.ensure_applicable(planned)
+            except c.MaskError as error:
+                output.update(ok=False, error=error.as_dict())
+                return output
+            fs.execute(planned, self.home, output)
+        return output
 
     def launches(self):
         return len(self.sentinel.read_text(encoding='utf-8').splitlines()) if self.sentinel.exists() else 0
@@ -190,7 +215,7 @@ class NoninteractiveSetupTests(SetupFixture):
         self.assertEqual(human.returncode, 4)
         self.assertIn(str(self.project), human.stderr)
         self.assertIn('2 role file(s)', human.stderr)
-        self.assertIn('Repeating setup or adding --yes will not overwrite', human.stderr)
+        self.assertIn('reviewed replacement procedure', human.stderr)
         self.assertNotIn('Run this setup?', human.stderr)
         for relative, content in originals.items():
             self.assertEqual((self.project / relative).read_text(encoding='utf-8'), content)
@@ -206,7 +231,7 @@ class NoninteractiveSetupTests(SetupFixture):
         proposal = result['data']['setup']['confirmation']
         self.assertEqual((proposal['kind'], proposal['reason'], proposal['subjects'], proposal['plan_hash']), ('package.setup', 'setup.required', [SUBJECT], result['data']['plan_hash']))
         self.assertEqual(proposal['actions'][0]['path'], str(self.deployed() / 'scripts/prepare_fixture_roles.py'))
-        self.assertIn('--allow-setup', result['error']['remediation'][0]['message'])
+        self.assertIn('--approve-plan', result['error']['remediation'][0]['message'])
         self.assertEqual(self.launches(), 0)
         self.assert_nothing_published()
 
@@ -221,8 +246,10 @@ class NoninteractiveSetupTests(SetupFixture):
     def test_check_dry_run_yes_and_events_never_run_package_code(self):
         self.machine('ensure', '--project', self.project)  # Commits the links so every preview below shares one frozen plan.
         plan_hash = self.machine('ensure', '--project', self.project, '--dry-run')['data']['plan_hash']
+        # Check mode has its own observational plan identity; bind that operation's preview.
+        check_hash = self.machine('ensure', '--project', self.project, '--check', '--dry-run')['data']['plan_hash']
         for options in (['--check'], ['--dry-run'], ['--yes'], ['--event', 'startup'], ['--event', 'post-checkout'],
-                        ['--check', '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT],
+                        ['--check', '--expect-plan-hash', check_hash, '--allow-setup', SUBJECT],
                         ['--dry-run', '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT],
                         ['--event', 'startup', '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT]):
             with self.subTest(options=options):
@@ -262,7 +289,7 @@ import mask, mask_core, mask_fs
 def refuse(pending, home):
     raise mask_core.MaskError('internal.invariant', 'injected journal refusal', 10)
 mask_fs.validate_pending = refuse
-raise SystemExit(mask.main(sys.argv[2:]))
+raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[2:]))
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), 'ensure', '--project', str(self.project), '--json',
                               '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT], capture_output=True, text=True, env=self.environment())
@@ -444,19 +471,19 @@ class SetupFailureTests(SetupFixture):
         self.assertFalse((self.home / 'pending.json').exists())
         self.assertFalse((self.home / 'staging').exists())
 
-    def test_shipped_bytecode_never_replaces_the_reviewed_source(self):
+    def test_shipped_bytecode_is_refused_before_setup(self):
         import py_compile
+        import mask_core
         cache = self.package / 'scripts/__pycache__'
         cache.mkdir()
         rogue = self.base / 'helper.py'
         rogue.write_text(HELPER.replace('fixture-model-do-not-run', 'bytecode-model-do-not-run'), encoding='utf-8')
         py_compile.compile(str(rogue), cfile=str(cache / f'helper.cpython-{sys.version_info[0]}{sys.version_info[1]}.pyc'), invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
-        self.commit('rogue bytecode')
-        result = self.approve()
-        self.assertTrue(result['ok'], result)
-        shutil.rmtree(cache)  # The planted cache is the package's own; MASK wrote none of its own.
-        self.assert_published(result)
-        self.assertNotIn('bytecode-model', (self.project / '.claude/agents/rfc-integrator.md').read_text(encoding='utf-8'))
+        with self.assertRaises(mask_core.MaskError) as error:
+            self.commit('rogue bytecode')
+        self.assertEqual(error.exception.code, 'artifact.corrupt')
+        self.assertEqual(self.launches(), 0)
+        self.assert_nothing_published()
 
 
 class SetupRecoveryTests(SetupFixture):
@@ -477,7 +504,7 @@ import sys, os
 sys.path.insert(0, sys.argv[1])
 import mask, mask_fs
 mask_fs.checkpoint = lambda label: os._exit(99) if label == sys.argv[2] else None
-mask.main(sys.argv[3:])
+__import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), label, 'ensure', '--project', str(self.project), '--json',
                               '--expect-plan-hash', plan_hash, '--allow-setup', SUBJECT], capture_output=True, text=True, env=self.environment())

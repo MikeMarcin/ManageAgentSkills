@@ -119,7 +119,7 @@ def resolve_row(home, declaration, binding, entry, config, args, output, payload
     try:
         return r.resolve_binding(home, declaration, binding, entry, payload_views)
     except c.MaskError as error:
-        if error.code != 'lock.resolution_required' or getattr(args, 'offline', False) or output['dry_run']:
+        if error.code != 'lock.resolution_required' or getattr(args, 'offline', False) or output['dry_run'] or getattr(args, 'expect_plan_hash', None):
             raise
     scratch = dict(data={})
     sources.fetch(home, binding['source'], entry, config['git_timeout_seconds'], scratch, consumer=consumer)
@@ -199,14 +199,11 @@ def mutate(args, output, home):
         c.fail(scope + '.not_registered', 'Nothing is deployed for this scope, so there is nothing to remove.', 4, root=key)
     path = c.declaration_path(root, scope, home)
     text = c.read_text(path, 'manifest', missing=True)
-    created = {}
+    created = text is None
     if text is None:
         if not installing:
             c.fail('manifest.missing', 'No declaration exists for this scope.', 4, path=str(path))
-        fresh = fresh_declaration(config)
-        created[path] = c.text_json(fresh)
-        created[r.lock_path(root, scope, home)] = c.text_json(dict(schema_version=1, resolver='mask-lock-v1', selection_digest=r.selection_digest(fresh), packages=[]))
-    declaration = c.selection_manifest(c.parse_json(text if text is not None else created[path], 'manifest'))
+    declaration = c.selection_manifest(c.parse_json(text, 'manifest') if text is not None else fresh_declaration(config))
     proposal, lock, changed, unchanged, payload_views, previous = v2_proposal(args, declaration, config, requested, output, root, scope, home, record)
     acquisitions = output['data'].get('acquisitions', [])
     task = dict(root=key, scope=scope, declaration_path=str(path), registered=record is not None, declaration_created=bool(created),
@@ -217,54 +214,24 @@ def mutate(args, output, home):
                 acquisitions=acquisitions, network='fetch' if acquisitions else 'none')
     if getattr(args, 'agent', None):
         task['agents'] = sorted(set(args.agent))
-    if created and output['dry_run']:
-        # A dry run writes nothing, so the shared planner cannot see the declaration it would create.
-        output['data'] = dict(task, plan='not_computed')
-        output['would_change'] = True
-        output['actions'] = [dict(kind='declaration.create', status='planned', path=str(path))]
-        output['actions'] += [dict(kind='link.create', status='planned', skill=skill) for skill in task['added']]
-        return
-    consumers = [(root, scope)]
-    committed = False
-    try:
-        for control, content in created.items():
-            # The shared planner and journal replace existing controls; new files are removed again unless the task commits.
-            c.atomic_text(control, content, None)
-        before = pinned.snapshot(home, consumers)
-        planned = fs.plan(config, state, [root], proposals={key: proposal}, lock_proposals={key: lock},
-                          register=[key] if record is None else (), operation=args.command, home=home,
-                          user_root=root if scope == 'user' else None, payload_views=payload_views)
-        fs.public_plan(planned, output)
-        output['data'].update(task)
-        if created:
-            output['would_change'] = True
-        fs.ensure_applicable(planned, getattr(args, 'expect_plan_hash', None))
-        if output['dry_run']:
-            return
+    before = pinned.snapshot(home, [(root, scope)])
+    def candidate():
+        return fs.plan(config, state, [root], proposals={key: proposal}, lock_proposals={key: lock},
+                       register=[key] if record is None else (), operation=args.command, home=home,
+                       user_root=root if scope == 'user' else None, payload_views=payload_views,
+                       repair_roles=True, retire_files=False)
+    def prepare():
         observation = dict(root=key, effects={})
         output['data']['preparation'] = [observation]
         store.ensure(home, proposal, lock, config, offline=True, coordinates=selection.applicable_coordinates(proposal), effects=observation['effects'])
         kept = {r.coordinate(row) for row in lock['packages']}
         retired = [coordinate for coordinate in selection.applicable_coordinates(declaration) if coordinate not in kept] if previous is not None else []
         if retired:
-            # The journal verifies the removed links' old artifacts as well; prepare them offline from the approved cache too.
             removal = dict(root=key, effects={})
             output['data']['preparation'].append(removal)
             store.ensure(home, declaration, previous, config, offline=True, coordinates=retired, effects=removal['effects'])
-        with c.writer_lock(home):
-            if c.kind(home / 'pending.json') != 'missing':
-                c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
-            if pinned.snapshot(home, consumers) != before:
-                c.fail('plan.stale', 'The declaration, lock, registry or workspace changed during preparation; nothing was applied.', 4)
-            fs.execute(planned, home, output)
-            committed = output['transaction'] == 'committed'
-        # Links are committed above; declared roles or inputs still unmet make the task nonzero (setup consent lives on ensure).
-        import mask_ensure as readiness
-        readiness.final_status(output)
-    finally:
-        for control, content in created.items():
-            if not committed and c.read_text(control, 'manifest', missing=True) == content:
-                control.unlink()
+    import mask_lifecycle
+    mask_lifecycle.execute(args, output, home, config, [root], before, candidate, prepare, details=task)
 
 
 def link_state(relative, expected, leaves, registered):
@@ -312,7 +279,7 @@ def listing(args, output, home):
         for agent in data['agents']:
             states[agent] = link_state(adapters.relative(agent, scope, identifier), expected, leaves, record is not None)
             linked += states[agent] == 'linked'
-        entry = dict(skill=coordinate, id=identifier, source=alias, states=states)
+        entry = dict(skill=coordinate, id=identifier, source=alias, states=states, pinned=next(binding.get('pinned', False) for binding in declaration['skills'] if r.coordinate(binding) == coordinate))
         if row is not None:
             entry.update(commit=row.get('commit'), version=row.get('selector'))
         data['skills'].append(entry)

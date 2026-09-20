@@ -446,7 +446,7 @@ def requirements(root, scope, record, bindings, targets, *, coordinates=None, st
             elif holder and holder['sha256'] == actual:
                 row.update(state='stale', action='update', ownership='package-managed')
             elif repair:
-                row.update(state='stale', action='update', detail='will back up and replace this role file (--repair)')
+                row.update(state='stale', action='update', detail='will back up and replace this role file after task review')
             else:
                 row.update(state='modified', ownership='package-managed' if holder else None, detail='content differs from the package asset and is not an unchanged managed output; it is preserved')
         first = rows[0][2]
@@ -499,7 +499,7 @@ def validate_pending_roles(pending, before, after):
     seen = set()
     for entry in pending['native_roles']:
         c.fields(entry, ('root', 'relative', 'skill', 'agent', 'name', 'before', 'after'), ('repair',), family='recovery')
-        if 'repair' in entry and (entry['repair'] is not True or pending['operation'] != 'ensure' or entry['before'] is None or entry['after'] is None):
+        if 'repair' in entry and (entry['repair'] is not True or pending['operation'] not in ('ensure', 'upgrade', 'install', 'remove') or entry['before'] is None or entry['after'] is None):
             c.fail('recovery.conflict', 'Unsafe repair transition.', 8)
         if entry['root'] not in pending['selected'] or entry['agent'] not in adapters.BY_ID or not isinstance(entry['name'], str) or not c.ID_RE.fullmatch(entry['name']):
             c.fail('recovery.conflict', 'Unsafe pending native role entry.', 8)
