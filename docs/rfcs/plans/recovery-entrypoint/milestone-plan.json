@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "recovery-entrypoint",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0122"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "recover",
+      "outcome": "A blocked MASK operation is explained and safely recoverable through the maintenance flow.",
+      "work": [
+        {
+          "issue": "MASK-0122"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "AC1 through AC4 are verified; live effects and unresolved limits are recorded."
+      ],
+      "boundary": "Direct source fixes, fixture verification and bounded live recovery of the reported operation; no broader upgrade or publication."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}
