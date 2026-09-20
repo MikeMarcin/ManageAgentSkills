@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0122"
+  ],
+  "reserve_for": "recovery-entrypoint",
+  "purpose": "",
+  "created": "2026-09-20T21:40:07.194650+00:00",
+  "base": "d95b2030d3cd854d5912cbdddacd316d9a495df4"
+}
