@@ -34,8 +34,16 @@ import mask_workflow as workflow
 from mask_core import MaskError
 
 class Parser(argparse.ArgumentParser):
+    def _check_value(self, action, value):
+        if isinstance(action, argparse._SubParsersAction) and value not in action.choices:
+            raise MaskError('invocation.invalid', f'Unknown command: {self.prog} {value}', 2,
+                            details=dict(unknown_command=value, command_path=self.prog,
+                                         subcommands=list(action.choices) if self.prog != 'mask' else []))
+        return super()._check_value(action, value)
+
     def error(self, message):
-        raise MaskError('invocation.invalid', message, 2)
+        raise MaskError('invocation.invalid', message, 2,
+                        details=dict(command_path=self.prog.replace('mask tap.', 'mask tap ')))
 
 
 def result(command='', dry_run=False):
@@ -678,7 +686,9 @@ def main(argv=None):
             args.invocation_argv = argv
             if not hasattr(args, 'command'):
                 members = [name.split('.')[1] for name in mask_cli.definitions(COMMANDS) if name.startswith(f"{getattr(args, 'group', '')}.")]
-                raise MaskError('invocation.invalid', f"'mask {args.group}' needs one of these subcommands: {', '.join(members)}." if members else 'A complete command is required.', 2)
+                command_path = f'mask {args.group}' if members else 'mask'
+                raise MaskError('invocation.invalid', f"A subcommand is required for '{command_path}'." if members else 'A command is required.', 2,
+                                details=dict(command_path=command_path, subcommands=members))
             output = result(args.command, getattr(args, 'dry_run', False))
             import mask_progress
             visible = not machine and sys.stdout.isatty() and args.command in ('install', 'uninstall', 'upgrade', 'repair', 'register', 'update', 'cleanup', 'tap', 'tap.fetch', 'recover')

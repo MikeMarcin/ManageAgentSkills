@@ -61,6 +61,50 @@ class RendererRegistry(unittest.TestCase):
 
 
 class PublicHelp(PublicFixture):
+    def test_unknown_command_shows_examples_without_parser_or_transaction_dump(self):
+        for word in ('blah', 'ugrade', 'bad\x1b[31m\ncommand'):
+            with self.subTest(word=word):
+                run = self.human(word, '--all')
+                self.assertEqual((run.returncode, run.stdout), (2, ''))
+                self.assertIn('Example usage:\n  mask search TEXT', run.stderr)
+                self.assertIn('mask upgrade --all', run.stderr)
+                self.assertIn('Troubleshooting:\n  mask status\n  mask repair', run.stderr)
+                self.assertIn('Further help:', run.stderr)
+                self.assertIn('mask COMMAND --help', run.stderr)
+                self.assertTrue(run.stderr.endswith('Error: Unknown command: mask ' + present.clean(word) + '\n'))
+                for noise in ('choose from', 'argument group:', 'code:', 'state:', 'next:', 'tap.fetch', '\x1b'):
+                    self.assertNotIn(noise, run.stderr)
+
+    def test_unknown_subcommand_and_other_usage_errors_offer_relevant_help(self):
+        nested = self.human('project', 'blah')
+        self.assertEqual((nested.returncode, nested.stdout), (2, ''))
+        self.assertIn('Commands:\n  mask project ', nested.stderr)
+        self.assertIn('mask project --help', nested.stderr)
+        self.assertTrue(nested.stderr.endswith('Error: Unknown command: mask project blah\n'))
+        self.assertNotIn('mask upgrade', nested.stderr)
+        for args in (('install',), ('upgrade', '--bogus'), ('pin', 'alpha', '--all')):
+            with self.subTest(args=args):
+                run = self.human(*args)
+                self.assertEqual((run.returncode, run.stdout), (2, ''))
+                self.assertIn('Error:', run.stderr)
+                self.assertIn('--help for usage.', run.stderr)
+                self.assertNotIn('code:', run.stderr)
+                self.assertNotIn('state:', run.stderr)
+
+    def test_unknown_command_json_and_operand_separator_remain_explicit(self):
+        for args in (('--json', 'blah'), ('blah', '--json'), ('project', 'blah', '--json')):
+            with self.subTest(args=args):
+                run = self.raw(*args)
+                self.assertEqual((run.returncode, run.stderr), (2, ''))
+                result = json.loads(run.stdout)
+                self.assertFalse(result['ok'])
+                self.assertEqual(result['error']['code'], 'invocation.invalid')
+                self.assertEqual(result['transaction'], 'not_started')
+                self.assertFalse(result['changed'])
+        run = self.raw('blah', '--', '--json')
+        self.assertEqual((run.returncode, run.stdout), (2, ''))
+        self.assertIn('Error: Unknown command: mask blah', run.stderr)
+
     def test_task_help_explains_scopes_and_examples(self):
         for command, expected in (
             ('repair', ('Examples:', '--approve-plan', 'pinned state', 'mask repair --all')),

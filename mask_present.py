@@ -44,7 +44,10 @@ def paint(text, stream, *, tone='success'):
     if not lines:
         return text
     color = {'success': '1;32', 'error': '1;31', 'review': '1;36', 'progress': '2'}.get(tone, '1')
-    lines[0] = f'\x1b[{color}m' + lines[0].rstrip('\n') + '\x1b[0m' + ('\n' if lines[0].endswith('\n') else '')
+    index = 0
+    if tone == 'error':
+        index = next((i for i, line in enumerate(lines) if line.lower().startswith('error:')), 0)
+    lines[index] = f'\x1b[{color}m' + lines[index].rstrip('\n') + '\x1b[0m' + ('\n' if lines[index].endswith('\n') else '')
     return ''.join(lines)
 
 
@@ -1019,10 +1022,46 @@ def task_review(proposal, output):
     return '\n'.join(lines) + '\n'
 
 
+def render_invocation(error, command):
+    """Usage mistakes need commands and help, not transaction diagnostics."""
+    details = error.get('details') or {}
+    command_path = clean(details.get('command_path') or ('mask ' + command.replace('.', ' ')).rstrip())
+    lines = []
+    if details.get('subcommands'):
+        lines = ['Commands:'] + [f'  {command_path} {clean(name)}' for name in details['subcommands']]
+    elif 'unknown_command' in details:
+        lines = [
+            'Example usage:',
+            '  mask search TEXT',
+            '  mask info SKILL',
+            '  mask install SKILL',
+            '  mask uninstall SKILL',
+            '  mask list',
+            '  mask update',
+            '  mask upgrade',
+            '  mask upgrade --all',
+            '',
+            'Troubleshooting:',
+            '  mask status',
+            '  mask repair',
+        ]
+    if lines:
+        lines += ['', 'Further help:', f'  {command_path} --help']
+        if command_path == 'mask':
+            lines.append('  mask COMMAND --help')
+        lines.append('')
+    lines.append(f"Error: {clean(error['message'])}")
+    if len(lines) == 1:
+        lines.append(f'Run {command_path} --help for usage.')
+    return '\n'.join(lines) + '\n'
+
+
 def render_error(output):
     """Text for stderr on a handled failure: what failed, what is preserved, what to do."""
     error = output['error']
     data = output.get('data', {})
+    if error['code'] == 'invocation.invalid' and not (data or output.get('changed') or output.get('actions') or output.get('warnings')):
+        return render_invocation(error, output['command'])
     message = error['message']
     if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
         count = sum(not entry.get('complete') for entry in data['workflow_readiness'])

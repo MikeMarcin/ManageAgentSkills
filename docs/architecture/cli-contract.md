@@ -80,6 +80,12 @@ or replace. Internal store destinations stay in JSON. Terminal output uses
 restrained color; `NO_COLOR` or `TERM=dumb` disables it. Redirected output remains
 plain text. JSON always emits one result document without progress messages.
 
+Unknown commands show a short usage guide and a plain error, with relevant group
+commands for an unknown subcommand. Invocation mistakes omit transaction fields
+from human output and retain exit class 2. Explicit `--json` retains the structured
+error, including its code and transaction state; operational failures still report
+their effects and recovery information.
+
 Long terminal tasks report phases as they begin and elapsed activity every ten
 seconds while a phase is running. Progress pauses during the confirmation question
 and resumes immediately after approval. It describes activity, not estimated

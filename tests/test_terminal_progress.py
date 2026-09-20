@@ -26,8 +26,13 @@ class TerminalPresentation(unittest.TestCase):
         stream.isatty = lambda: True
         with patch.dict(os.environ, {'TERM': 'xterm'}, clear=True):
             self.assertIn('\x1b[1;32m', present.paint('Ready.\n', stream))
+            diagnostic = 'Example usage:\n  mask list\n\nError: Unknown command: mask blah\n'
+            painted = present.paint(diagnostic, stream, tone='error')
+            self.assertTrue(painted.startswith('Example usage:\n'))
+            self.assertIn('\x1b[1;31mError: Unknown command: mask blah\x1b[0m\n', painted)
             with patch.dict(os.environ, {'NO_COLOR': ''}):
                 self.assertEqual(present.paint('Ready.\n', stream), 'Ready.\n')
+                self.assertEqual(present.paint(diagnostic, stream, tone='error'), diagnostic)
             stream.isatty = lambda: False
             self.assertEqual(present.paint('Ready.\n', stream), 'Ready.\n')
 
