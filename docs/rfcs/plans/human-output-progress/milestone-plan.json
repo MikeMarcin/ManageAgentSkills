@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "human-output-progress",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0121"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "polish",
+      "outcome": "Human MASK tasks are concise and visibly active, with current workflow instructions and truthful failure details.",
+      "work": [
+        {
+          "issue": "MASK-0121"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "AC1 through AC5 accepted against canonical source and disposable public CLI checks."
+      ],
+      "boundary": "Direct source implementation; no live recovery or publication."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}
