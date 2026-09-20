@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0120"
 title: "Make upgrade reconcile registered consumers through workflow setup"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
