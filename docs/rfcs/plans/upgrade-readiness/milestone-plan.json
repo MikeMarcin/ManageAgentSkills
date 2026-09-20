@@ -1,0 +1,29 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "upgrade-readiness",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0120"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "ready",
+      "outcome": "Upgrade makes existing registered consumers ready, including consented setup.",
+      "work": [
+        {
+          "issue": "MASK-0120"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "MASK-0120 AC1 through AC4 pass through public CLI tests.",
+        "Current docs describe upgrade setup and the retained ensure worktree/pinned use."
+      ],
+      "boundary": "Registered consumers only; no live migration or publication."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}
