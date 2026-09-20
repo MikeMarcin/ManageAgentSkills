@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0123"
 title: "Show useful human diagnostics for unknown commands"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P2"
