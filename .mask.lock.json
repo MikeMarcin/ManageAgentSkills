@@ -1,7 +1,7 @@
 {
   "packages": [
     {
-      "commit": "96c43b31e9f99a19c4ae1153f7c31561e24c0080",
+      "commit": "6a59176a68ef4bd60b5b63321927c4c663cc4d81",
       "git_object_format": "sha1",
       "id": "attended-review",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
@@ -14,12 +14,12 @@
       "source": "agentskills"
     },
     {
-      "commit": "96c43b31e9f99a19c4ae1153f7c31561e24c0080",
+      "commit": "6a59176a68ef4bd60b5b63321927c4c663cc4d81",
       "git_object_format": "sha1",
       "id": "implement-rfc",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
       "path": "skills/implement-rfc",
-      "payload_digest": "sha256:1c3b5e0c1b2388e4328d04c341333a8882de2549724070978eb0e287d790a81f",
+      "payload_digest": "sha256:b901f132bf48aefacdb6d43d0e0629789592a3d00cb028a52f63dc3c6aa276b3",
       "repository": "https://github.com/MikeMarcin/AgentSkills.git",
       "selector": {
         "ref": "refs/heads/main"
@@ -27,7 +27,7 @@
       "source": "agentskills"
     },
     {
-      "commit": "96c43b31e9f99a19c4ae1153f7c31561e24c0080",
+      "commit": "6a59176a68ef4bd60b5b63321927c4c663cc4d81",
       "git_object_format": "sha1",
       "id": "wizard",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
@@ -40,7 +40,7 @@
       "source": "agentskills"
     },
     {
-      "commit": "96c43b31e9f99a19c4ae1153f7c31561e24c0080",
+      "commit": "6a59176a68ef4bd60b5b63321927c4c663cc4d81",
       "git_object_format": "sha1",
       "id": "writing-for-agents",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
