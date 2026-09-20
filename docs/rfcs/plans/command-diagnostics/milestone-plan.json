@@ -1,0 +1,15 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "command-diagnostics",
+  "scope": {"rfcs": [], "issues": ["MASK-0123"]},
+  "milestones": [{
+    "id": "diagnostics",
+    "outcome": "Unknown commands provide concise human usage guidance while retaining structured automation errors.",
+    "work": [{"issue": "MASK-0123"}],
+    "depends_on": [],
+    "exit_criteria": ["AC1 through AC3 verified through public CLI output and documented evidence."],
+    "boundary": "Direct CLI presentation correction and focused fixtures; preserve unrelated work and live installations."
+  }],
+  "coverage": "complete",
+  "unplanned_work": []
+}
