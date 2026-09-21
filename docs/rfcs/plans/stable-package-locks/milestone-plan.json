@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "stable-package-locks",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0125"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "retain",
+      "outcome": "Upgrades retain unchanged exact package resolutions across branch advances without suppressing real changes or weakening validation.",
+      "work": [
+        {
+          "issue": "MASK-0125"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "AC1, AC2, AC3 and AC4 pass; task-owned commands are stopped and unrelated user changes are preserved."
+      ],
+      "boundary": "Local implementation and fixture verification only; no push or live consumer mutation."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}
