@@ -39,15 +39,18 @@ from tests.public_support import ENTRY, PublicFixture
 from tests.support import TAP
 
 README = ENTRY.parent / 'README.md'
-PROGRAM_URL = 'https://github.com/MikeMarcin/ManageAgentSkills.git'
+PROGRAM_URL = 'git@github.com:MikeMarcin/ManageAgentSkills.git'
 TAP_URL = 'https://github.com/MikeMarcin/AgentSkills.git'
 INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
                 'mkdir -p "$HOME/.local/bin"',
                 'python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"',
                 f'"$HOME/.local/bin/mask" tap agentskills {TAP_URL}')
 # The piped installer is proven against a local program repository in tests.test_installer; this module replays the by-hand recipe.
-INSTALLER = ('curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh',)
-WINDOWS_INSTALLER = ('powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1 | iex"',)
+INSTALLER = ('gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh \\',
+             "  -H 'Accept: application/vnd.github.raw+json' | sh")
+WINDOWS_INSTALLER = ('$install = gh api repos/MikeMarcin/ManageAgentSkills/contents/install.ps1 -H \'Accept: application/vnd.github.raw+json\'',
+                     "if ($LASTEXITCODE -ne 0) { throw 'Could not download the MASK installer.' }",
+                     'Invoke-Expression ($install -join "`n")')
 IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask upgrade')
 MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 EVERYDAY = {
@@ -56,7 +59,7 @@ EVERYDAY = {
     "Show this checkout's skills": 'mask list',
     'Show personal skills': 'mask list --user',
     'Register and prepare this checkout': 'mask register',
-    "Restore this checkout's pinned setup": 'mask repair',
+    'Restore pinned setup, or review an interrupted setup': 'mask repair',
     'Remove a skill here': 'mask uninstall ID',
     'Hold a skill at its installed version': 'mask pin ID',
     'Release a version hold': 'mask unpin ID',
@@ -207,7 +210,7 @@ class ReadmeRecipes(PublicFixture):
     def test_ordinary_repair_needs_no_confirmation(self):
         self.assertEqual(self.shell(EVERYDAY['Add a skill here'], ID='alpha').returncode, 0)
         self.unlink(self.project / '.claude/skills/alpha')
-        repaired = self.shell(EVERYDAY["Restore this checkout's pinned setup"])
+        repaired = self.shell(EVERYDAY['Restore pinned setup, or review an interrupted setup'])
         self.assertEqual(repaired.returncode, 0, repaired.stderr)
         self.assertNotIn('[y/N]', repaired.stdout + repaired.stderr)
         self.assertEqual(self.links(self.project), ['.agents/skills/alpha', '.claude/skills/alpha'])
@@ -237,7 +240,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertIn('alpha', run('Show personal skills').stdout)
         self.assertIn(f'- {TAP}/beta', run('Remove a skill here', ID='beta').stdout)
         self.assertEqual(self.links(self.project), alpha)
-        run("Restore this checkout's pinned setup")
+        run('Restore pinned setup, or review an interrupted setup')
 
         for root in (self.project, self.personal):
             self.unlink(root / '.claude/skills/alpha')
