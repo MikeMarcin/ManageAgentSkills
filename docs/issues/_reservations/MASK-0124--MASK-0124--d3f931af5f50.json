@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0124"
+  ],
+  "reserve_for": "upgrade-fetch-output-order",
+  "purpose": "",
+  "created": "2026-09-21T00:14:18.185355+00:00",
+  "base": "3e78da1a945cbc91c51c176a0c2d5de671d1e530"
+}
