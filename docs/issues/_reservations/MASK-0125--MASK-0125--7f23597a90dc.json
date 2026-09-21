@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0125"
+  ],
+  "reserve_for": "mask-stable-content-locks",
+  "purpose": "",
+  "created": "2026-09-21T00:44:24.844797+00:00",
+  "base": "18b82ec5248e3712e9d2e9cc0e0ac822ca471a73"
+}
