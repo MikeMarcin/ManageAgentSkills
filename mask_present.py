@@ -650,7 +650,7 @@ def consumer_count(rows):
 
 
 def render_upgrade(data, output):
-    """upgrade: one sentence for the outcome, then only the consumers, taps and follow-ups that carry news."""
+    """upgrade: fetch results, then the outcome, consumers and follow-ups that carry news."""
     rows = data.get('consumers') or []
     moved = sum(len(row.get('changes') or []) for row in rows)
     touched = consumer_count([row for row in rows if row.get('changes')])
@@ -665,7 +665,8 @@ def render_upgrade(data, output):
         head = 'Upgrade proposed; nothing applied.'
     else:
         head = f'Already up to date ({consumer_count(rows)}).' if rows else 'Nothing to upgrade.'
-    lines = [head]
+    taps = fetch_lines(data)
+    lines = (taps + [''] if taps else []) + [head]
     width = max((len(clean(item.get('coordinate'))) for row in rows for item in row.get('changes') or []), default=0)
     for row in rows:
         if not row.get('changes') and row.get('status') in ('unchanged', 'updated'):
@@ -679,7 +680,7 @@ def render_upgrade(data, output):
             lines.append("    not in the cache yet; run 'mask upgrade' without --dry-run, --offline or --approve-plan to fetch it")
         lines.extend(f"    {clean(item.get('coordinate')).ljust(width)}  {clean((item.get('before_commit') or 'new')[:7])} -> {clean((item.get('after_commit') or 'removed')[:7])}"
                      for item in row.get('changes') or [])
-    notes = fetch_lines(data)
+    notes = []
     for blocker in data.get('blockers', []) or []:
         notes.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
     differing = [row for row in data.get('shadowing') or [] if not row.get('same_target')]
