@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0126"
 title: "Repair private-repository installer bootstrap"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P0"
