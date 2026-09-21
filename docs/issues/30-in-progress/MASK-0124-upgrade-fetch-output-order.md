@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0124"
 title: "Show tap fetch results before the upgrade summary"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 metadata: {"milestone_plan":{"id":"upgrade-fetch-output-order","path":"docs/rfcs/plans/upgrade-fetch-output-order/milestone-plan.json"}}
