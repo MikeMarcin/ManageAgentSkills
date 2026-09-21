@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0126"
 title: "Repair private-repository installer bootstrap"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P0"
 metadata: {"field_report":"Unauthenticated raw GitHub installer URLs return 404 for the private repository; the Windows recipe also launches a separately blocked powershell.exe."}
+acceptance: [{"criterion":"AC1: authenticated private downloads and current-shell PowerShell recipe","outcome":"pass","revision":"0284075fcba134b18d2591b23a6e8697a54a8535","evidence":{"kind":"observation","detail":"GitHub reported the repository PRIVATE; unauthenticated raw installer URLs returned 404, authenticated gh api downloads succeeded on Windows and WSL, and README/install.ps1 no longer invoke powershell.exe or ExecutionPolicy Bypass."}},{"criterion":"AC2: authenticated default clone and explicit repository override","outcome":"pass","revision":"0284075fcba134b18d2591b23a6e8697a54a8535","evidence":{"kind":"command","detail":"tests.test_installer passed the default gh repo clone shim and MASK_REPO override on native Windows and WSL; both installers now print the current mask tap agentskills URL command."}},{"criterion":"AC3: native disposable installer and README verification","outcome":"pass","revision":"0284075fcba134b18d2591b23a6e8697a54a8535","evidence":{"kind":"command","detail":"Windows tests.test_installer: 2 passed, 4 platform skips; WSL tests.test_installer: 4 passed, 2 platform skips; tests.test_readme_journeys: 5 passed in 222.512s; documentation gate: 23 RFCs, 126 cards, 0 violations; PowerShell and normalized sh syntax checks passed."}},{"criterion":"AC4: explicit WSL protocol/schema update recovery","outcome":"pass","revision":"0284075fcba134b18d2591b23a6e8697a54a8535","evidence":{"kind":"observation","detail":"The clean WSL program checkout advanced from 0b2e41f to cff275d through a one-off existing gh credential helper. The owned launcher needed no rewrite; mask --version is 0.3.0 and mask update --dry-run --json reports program status current with no consumer or MASK-state change."}}]
 ---
 
 # MASK-0126: Repair private-repository installer bootstrap
