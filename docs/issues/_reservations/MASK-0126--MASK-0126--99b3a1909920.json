@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0126"
+  ],
+  "reserve_for": "private-installer-bootstrap",
+  "purpose": "",
+  "created": "2026-09-21T05:25:02.430543+00:00",
+  "base": "cff275db49d05142651ac4ca6464cb495ff94ef8"
+}
