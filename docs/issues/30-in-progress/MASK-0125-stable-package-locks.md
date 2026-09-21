@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0125"
 title: "Retain exact package locks across content-equivalent branch advances"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 metadata: {"milestone_plan":{"id":"stable-package-locks","path":"docs/rfcs/plans/stable-package-locks/milestone-plan.json"}}
