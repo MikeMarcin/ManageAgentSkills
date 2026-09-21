@@ -1,0 +1,15 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "upgrade-fetch-output-order",
+  "scope": {"rfcs": [], "issues": ["MASK-0124"]},
+  "milestones": [{
+    "id": "order",
+    "outcome": "Human upgrade output presents tap fetch results before the upgrade result.",
+    "work": [{"issue": "MASK-0124"}],
+    "depends_on": [],
+    "exit_criteria": ["AC1 and AC2 pass on the exact candidate; unrelated work is preserved."],
+    "boundary": "Presentation only; local commit, no push or live consumer mutation."
+  }],
+  "coverage": "complete",
+  "unplanned_work": []
+}
