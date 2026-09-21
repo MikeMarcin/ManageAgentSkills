@@ -117,7 +117,7 @@ def effective_selection(home, declaration, resolved, config, *, root, scope, pay
             metadata[key] = r.metadata(raw)
             verified[key] = True
         else:
-            metadata[key] = metadata_supported(home, row, (payload_views or {}).get(row['payload_digest']), config=config, verified=verified)
+            metadata[key] = metadata_supported(home, row, (payload_views or {}).get(r.payload_key(row)), config=config, verified=verified)
     evaluated = selection.evaluate([dict(origin='local', declaration=declaration, lock=resolved)], metadata,
                               facts=facts, enabled_agents=policy_value['enabled_agents'], scope=scope,
                               root=str(root), identity=c.identity(root), overrides=policy_value['overrides'])

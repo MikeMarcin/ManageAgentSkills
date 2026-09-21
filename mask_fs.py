@@ -153,7 +153,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                         # An absent store artifact is examined from its exact locked bytes, supplied or read from the approved
                         # cache without fetching, so a preview plans the roles and setup the materializing run binds (MASK-0111).
                         row = link['resolution']
-                        payload = None if 'dev' in link else (payload_views or {}).get(row['payload_digest']) or store.cached_payload(home, row, config)
+                        payload = None if 'dev' in link else (payload_views or {}).get(resolve.payload_key(row)) or store.cached_payload(home, row, config)
                         targets[link['skill']] = None if payload is None else workflow.PackageView(root=location, payload=payload)
                         if payload is not None:
                             package_views[str(location)] = targets[link['skill']]

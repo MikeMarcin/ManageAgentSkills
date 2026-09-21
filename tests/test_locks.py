@@ -149,6 +149,7 @@ class LockTests(Fixture):
         self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
         self.locked()
         (self.source / 'skills/alpha/data').write_text('next')
+        (self.source / 'skills/beta/data').write_text('next beta')  # Beta must actually advance before testing its rollback.
         next_commit = self.commit()
         self.git(self.source, 'tag', '-f', '-a', 'release', '-m', 'moved')
         self.push('refs/tags/release', force=True)
@@ -163,6 +164,117 @@ class LockTests(Fixture):
         self.fetch()
         self.assertEqual(self.locked('--refresh', '--skill', BETA, code=4)['error']['code'], 'lock.ref_rebound')
         self.locked('--refresh', '--skill', BETA, '--allow-ref-rebind')
+
+    def test_unchanged_bytes_preserve_explicit_selectors_and_rebind_checks(self):
+        self.fetch()
+        original = self.locked()['data']['lock']['packages'][0]
+        (self.source / 'notes').write_text('outside the package')
+        newer = self.commit()
+        self.fetch()
+        self.assertFalse(self.locked('--refresh')['changed'])
+        self.git(self.source, 'branch', 'other')
+        self.push('refs/heads/other')
+        self.fetch()
+        for chosen in ({'ref': 'refs/heads/other'}, {'commit': original['commit']}, {'commit': newer}, {'ref': 'refs/heads/main'}):
+            self.declaration['skills'][0]['version'] = chosen
+            self.write_selection()
+            row = self.locked('--refresh')['data']['lock']['packages'][0]
+            self.assertEqual((row['selector'], row['commit'], row['payload_digest']), (chosen, chosen.get('commit', newer), original['payload_digest']))
+
+        self.git(self.source, 'tag', '-a', 'release', '-m', 'release')
+        self.push('refs/tags/release')
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
+        self.declaration['skills'][0]['version'] = {'ref': 'refs/tags/release'}
+        self.write_selection()
+        self.locked('--refresh')
+        (self.source / 'notes').write_text('still outside the package')
+        latest = self.commit()
+        self.git(self.source, 'tag', '-f', '-a', 'release', '-m', 'moved')
+        self.push('refs/tags/release', force=True)
+        self.call('source', 'inspect', TAP, '--ref', 'refs/tags/release')
+        self.assertEqual(self.locked('--refresh', code=4)['error']['code'], 'lock.ref_rebound')
+        row = self.locked('--refresh', '--allow-ref-rebind')['data']['lock']['packages'][0]
+        self.assertEqual(row['commit'], latest)
+        self.assertFalse(self.locked('--refresh')['changed'])
+
+        self.declaration['skills'][0]['version'] = {'ref': 'refs/heads/main'}
+        self.write_selection()
+        self.fetch()
+        self.locked('--refresh')
+        self.git(self.source, 'reset', '--hard', original['commit'])
+        (self.source / 'notes').write_text('a different descendant of the original commit')
+        self.git(self.source, 'add', 'notes')
+        self.git(self.source, 'commit', '-m', 'rewritten branch')
+        rebound = self.git(self.source, 'rev-parse', 'HEAD')
+        self.push(force=True)
+        self.fetch()
+        self.assertEqual(self.locked('--refresh', code=4)['error']['code'], 'lock.ref_rebound')
+        row = self.locked('--refresh', '--allow-ref-rebind')['data']['lock']['packages'][0]
+        self.assertEqual((row['commit'], row['payload_digest']), (rebound, original['payload_digest']))
+        self.assertFalse(self.locked('--refresh')['changed'])
+
+    def test_full_package_changes_advance_only_the_changed_row(self):
+        self.fetch()
+        previous = self.locked()['data']['lock']['packages']
+        skill = self.source / 'skills/alpha'
+        edits = [('support.txt', b'support'), ('setup.py', b'# setup helper'),
+                 ('mask-skill.json', b'{"schema_version":1,"requirements":["python"]}'),
+                 ('.mask-provenance.json', b'{"origin":"one"}'),
+                 ('.mask-provenance.json', b'{"origin":"two"}'),
+                 ('.mask-provenance.json', None)]
+        for name, content in edits:
+            with self.subTest(name=name, content=content):
+                path = skill / name
+                if content is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(content)
+                commit = self.commit()
+                self.fetch()
+                rows = self.locked('--refresh')['data']['lock']['packages']
+                self.assertEqual(rows[0]['commit'], commit)
+                self.assertNotEqual(rows[0]['payload_digest'], previous[0]['payload_digest'])
+                self.assertEqual(rows[1], previous[1])
+                previous = rows
+        self.git(self.source, 'update-index', '--chmod=+x', 'skills/alpha/setup.py')
+        self.git(self.source, 'commit', '-m', 'logical mode only')
+        self.push()
+        self.fetch()
+        row = self.locked('--refresh')['data']['lock']['packages'][0]
+        self.assertNotEqual(row['payload_digest'], previous[0]['payload_digest'])
+        self.assertEqual(row['commit'], self.git(self.source, 'rev-parse', 'HEAD'))
+
+    def test_retention_verifies_old_resolution_and_missing_ancestry_refuses(self):
+        self.fetch()
+        first = self.locked()['data']['lock']
+        (self.source / 'skills/alpha/new').write_text('new bytes')
+        self.commit()
+        self.fetch()
+        candidate = self.locked('--refresh', '--dry-run')['data']['lock']
+        bad = copy.deepcopy(candidate)
+        bad['packages'][0]['commit'] = first['packages'][0]['commit']
+        self.target.write_text(json.dumps(bad))
+        self.assertEqual(self.locked('--refresh', code=4)['error']['code'], 'lock.digest_mismatch')
+        bad['packages'][0]['commit'] = '0' * 40
+        self.target.write_text(json.dumps(bad))
+        self.assertEqual(self.locked('--refresh', code=4)['error']['code'], 'lock.ref_rebound')
+        accepted = self.locked('--refresh', '--allow-ref-rebind')['data']['lock']
+        self.assertEqual(accepted, candidate)
+
+    def test_changed_approved_repository_is_not_coalesced(self):
+        self.fetch()
+        first = self.locked()['data']['lock']['packages']
+        alternate = self.base / 'alternate.git'
+        self.git(self.base, 'clone', '--bare', str(self.upstream), str(alternate))
+        self.call('tap', 'remove', TAP)  # This lock-only fixture has no registered consumer.
+        self.call('tap', 'add', TAP, alternate)
+        self.declaration['sources'][TAP]['repository'] = alternate.as_uri()
+        self.write_selection()
+        self.fetch()
+        rows = self.locked('--refresh')['data']['lock']['packages']
+        self.assertEqual(rows[0]['payload_digest'], first[0]['payload_digest'])
+        self.assertEqual(rows[0]['repository'], alternate.as_uri())
+        self.assertNotEqual(rows[0], first[0])
 
     def test_exact_pin_never_moves_and_stale_preview_refuses(self):
         self.fetch()
@@ -301,4 +413,3 @@ class LockTests(Fixture):
         self.target.write_text(json.dumps(bad))
         self.assertEqual(self.locked(code=4)['error']['code'], 'lock.resolution_required')
         self.target.write_text(json.dumps(refreshed))
-

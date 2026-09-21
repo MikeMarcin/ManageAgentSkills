@@ -29,10 +29,22 @@ collects one review if needed, then applies and verifies. `--dry-run` and
 `--approve-plan HASH` use cached content without fetching. JSON and redirected
 commands never prompt. Declining significant actions leaves consumers untouched.
 
+For a branch selector, an upgrade keeps the existing exact lock when that package's
+path, bytes, executable modes, metadata and provenance are unchanged. Commits to
+other skills or repository bookkeeping do not advance its lock. This lets a skill
+repository commit its own consumer lock without triggering another lock update.
+Real package changes and explicit selector changes still advance the resolution;
+unchanged packages still receive readiness repair. A lock inside the selected
+package itself is payload content, so changing it remains a package change.
+
 For `--all`, a failed tap blocks its dependent consumers and reports
 `upgrade.incomplete` while independent consumers may complete. A single-checkout
 failure applies no consumer changes. Moved tag/non-fast-forward ref resolutions
-require explicit `--allow-ref-rebind`. Dev-link consumers are skipped only with
+require explicit `--allow-ref-rebind`; an approved rebind records the new resolution
+even if its package bytes match. Branch ancestry is checked against the locked
+commit, not every head previously inspected: a rewrite confined to later commits
+can still descend from that locked commit. Unavailable ancestry is not assumed safe.
+Dev-link consumers are skipped only with
 `--all`; a single selected development checkout refuses ordinary upgrade.
 
 `mask tap fetch [NAME]` refreshes approved caches without deployment. The advanced

@@ -257,6 +257,11 @@ def payload_digests(payload):
     return result
 
 
+def payload_key(row):
+    """A validated view belongs to an exact resolution, even when bytes are shared."""
+    return c.digest(dict(row, repository=s.repository(row['repository'])))
+
+
 def approved(declaration, config):
     entries = {}
     for name, expected in declaration['sources'].items():
@@ -333,7 +338,7 @@ def resolve_binding(home, declaration, binding, entry, payload_views=None):
     payload = frozen_payload(root, row)
     row.update(payload_digests(payload))
     if payload_views is not None:
-        payload_views[row['payload_digest']] = payload
+        payload_views[payload_key(row)] = payload
     return row
 
 
@@ -361,11 +366,11 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
             else:
                 payload = verify_resolution(home, binding['source'], entry, prior)
                 if payload_views is not None:
-                    payload_views[prior['payload_digest']] = payload
+                    payload_views[payload_key(prior)] = payload
             rows.append(prior)
             continue
         row = resolve_binding(home, declaration, binding, entry, payload_views)
-        if prior is not None and dict(prior, repository=row['repository']) == row:
+        if prior is not None and s.same(prior['repository'], row['repository']) and dict(prior, repository=row['repository']) == row:
             row = prior  # The same resolution under an older spelling: a spelling alone never rewrites a committed lock.
         if prior is not None and s.same(prior['repository'], row['repository']) and prior['selector'] == row['selector'] and prior['commit'] != row['commit']:
             chosen = row['selector']
@@ -373,6 +378,13 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
             rewritten = 'ref' in chosen and (chosen['ref'].startswith('refs/tags/') or c.git(root, 'merge-base', '--is-ancestor', prior['commit'], row['commit'], optional=True) is None)
             if rewritten and not allow_ref_rebind:
                 c.fail('lock.ref_rebound', 'Cached tag moved or branch is not proven fast-forward; review and pass --allow-ref-rebind explicitly.', 4, skill=key, before=prior['commit'], after=row['commit'])
+            if not rewritten and chosen.get('ref', '').startswith('refs/heads/') and dict(prior, repository=row['repository'], commit=row['commit']) == row:
+                # A branch is an update selector, not a requirement to rewrite identical packages at each repository commit.
+                # Verify the retained commit's own mapping and bytes; a matching new payload cannot attest the old resolution.
+                payload = verify_resolution(home, binding['source'], entry, prior)
+                row = prior
+                if payload_views is not None:
+                    payload_views[payload_key(row)] = payload
         rows.append(row)
     if {coordinate(row): row for row in rows} != previous_rows:
         # The lock is being written anyway, so every row takes the canonical spelling (RFC-MASK-0022).

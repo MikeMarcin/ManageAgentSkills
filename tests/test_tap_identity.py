@@ -121,6 +121,7 @@ class OneIdentity(Deploying):
         self.assertTrue(self.machine('tap', 'fetch', '--locked', '--project', clone, env=other, cwd=clone)['ok'])
         self.assertEqual(self.raw('register', env=other, cwd=clone).returncode, 0)
         before, old = self.files(clone), self.document(clone / '.mask.lock.json')['packages'][0]
+        self.publish('unrelated bookkeeping commit')
         quiet = self.machine('upgrade', '--project', clone, env=other, cwd=clone)
         self.assertEqual((quiet['ok'], quiet['changed'], self.files(clone)), (True, False, before))
         path = self.source / 'skills/alpha/SKILL.md'
