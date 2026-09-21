@@ -1,7 +1,7 @@
 {
   "packages": [
     {
-      "commit": "f42779a38b8620a345549588dc156a8a4708493a",
+      "commit": "5139a09a07bfaa0fb5414f1137343349463e66c2",
       "git_object_format": "sha1",
       "id": "attended-review",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
@@ -14,7 +14,7 @@
       "source": "agentskills"
     },
     {
-      "commit": "f42779a38b8620a345549588dc156a8a4708493a",
+      "commit": "5139a09a07bfaa0fb5414f1137343349463e66c2",
       "git_object_format": "sha1",
       "id": "implement-rfc",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
@@ -27,7 +27,7 @@
       "source": "agentskills"
     },
     {
-      "commit": "f42779a38b8620a345549588dc156a8a4708493a",
+      "commit": "5139a09a07bfaa0fb5414f1137343349463e66c2",
       "git_object_format": "sha1",
       "id": "wizard",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
@@ -40,7 +40,7 @@
       "source": "agentskills"
     },
     {
-      "commit": "f42779a38b8620a345549588dc156a8a4708493a",
+      "commit": "5139a09a07bfaa0fb5414f1137343349463e66c2",
       "git_object_format": "sha1",
       "id": "writing-for-agents",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
