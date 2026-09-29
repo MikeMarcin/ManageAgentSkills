@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0127"
+  ],
+  "reserve_for": "incidental-python-bytecode-20260929",
+  "purpose": "",
+  "created": "2026-09-29T21:12:09.440309+00:00",
+  "base": "aa72588162fb9e9a0b92a32059e6dd3c674c4665"
+}
