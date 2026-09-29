@@ -104,15 +104,62 @@ class ArtifactTests(Fixture):
         subprocess.run([sys.executable, '-c', module, str(target)], env=environment, check=True)
         self.assertTrue(list((target / '__pycache__').glob('run.*.pyc')))
         self.assertTrue(store.materialize(self.home, self.row, self.payload)['reused'])
-        self.assertFalse((target / '__pycache__').exists())
+        self.assertTrue(list((target / '__pycache__').glob('run.*.pyc')))
         # Anything that is not plainly bytecode is never deleted; it is refused and kept for inspection.
-        (target / '__pycache__').mkdir()
         (target / '__pycache__/run.cpython-313.pyc').write_bytes(b'bytecode')
         (target / '__pycache__/notes.txt').write_text('not bytecode')
         with self.assertRaises(c.MaskError) as error:
             store.materialize(self.home, self.row, self.payload)
         self.assertEqual(error.exception.code, 'artifact.corrupt')
-        self.assertEqual(sorted(item.name for item in (target / '__pycache__').iterdir()), ['notes.txt', 'run.cpython-313.pyc'])
+        self.assertTrue((target / '__pycache__/notes.txt').exists())
+
+    def test_cache_types_unknown_contents_and_concurrent_atomic_churn(self):
+        store.materialize(self.home, self.row, self.payload)
+        root, target = store.location(self.home, self.row['payload_digest'], 'alpha')
+        cache = target / '__pycache__'
+        cache.mkdir()
+        leaf = cache / 'run.cpython-313.pyc'
+        for kind in ('symlink', 'hardlink', 'nested', 'unknown'):
+            with self.subTest(kind=kind):
+                if kind == 'symlink': leaf.symlink_to(target / 'run.py')
+                elif kind == 'hardlink': os.link(target / 'run.py', leaf)
+                elif kind == 'nested': leaf.mkdir()
+                else: (cache / 'notes.txt').write_text('unknown')
+                with self.assertRaises(c.MaskError): store.verify_tree(root, self.row)
+                if leaf.is_dir(): leaf.rmdir()
+                elif leaf.exists(): leaf.unlink()
+                if (cache / 'notes.txt').exists(): (cache / 'notes.txt').unlink()
+        original = store.inventory
+        calls = 0
+        def changing(path):
+            nonlocal calls
+            calls += 1
+            # CPython writes the temporary file then atomically replaces its cache.
+            temp = cache / 'run.cpython-313.pyc.1234'
+            if calls == 1: temp.write_bytes(b'new cache')
+            else: temp.replace(leaf)
+            return original(path)
+        with patch.object(store, 'inventory', side_effect=changing):
+            self.assertEqual(store.verify_tree(root, self.row), target)
+        self.assertEqual(leaf.read_bytes(), b'new cache')
+        (target / 'run.py').chmod(0o755)
+        (target / 'run.py').write_bytes(b'changed source')
+        with self.assertRaises(c.MaskError): store.verify_tree(root, self.row)
+
+    def test_caches_have_separate_entry_capacity_and_portable_inventory_keys(self):
+        store.materialize(self.home, self.row, self.payload)
+        root, target = store.location(self.home, self.row['payload_digest'], 'alpha')
+        original = store.inventory(root)
+        for directory in (target,):
+            cache = directory / '__pycache__'
+            cache.mkdir()
+            for index in range(3): (cache / f'module{index}.pyc').write_bytes(b'cache')
+        with patch.object(p, 'FILE_COUNT', len(original) - 3):
+            self.assertEqual(store.verify_tree(root, self.row), target)
+        expected = {'payload/alpha/scripts': 'directory'}
+        found = dict(expected, **{'payload/alpha/scripts/__pycache__': 'directory',
+                                  'payload/alpha/scripts/__pycache__/module.cpython-313.pyc': 'file'})
+        self.assertEqual(store.source_inventory(found, expected, 'payload/alpha'), expected)
 
     def test_forwarded_dataclass_cannot_bypass_raw_validation(self):
         mutations = [replace(self.payload, digest='sha256:'+'0'*64), replace(self.payload, files=self.payload.files+(self.payload.files[0],)), replace(self.payload, files=(p.PayloadFile('../escape','100644',b'bad'),)), replace(self.payload, files=(p.PayloadFile('SKILL.md','120000',b'target'),)), replace(self.payload, files=(p.PayloadFile('SKILL.md','100644',b'---\nname: alpha\ndescription: a\nhooks: live\n---\n'),))]

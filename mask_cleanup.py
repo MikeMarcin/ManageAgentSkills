@@ -49,7 +49,7 @@ def artifact(path):
     row = dict(source='cleanup', id=value['id'], repository='file:///mask-cleanup', path='.',
                commit='0' * 40, git_object_format='sha1', selector=dict(commit='0' * 40),
                **{key: value[key] for key in ('payload_digest','metadata_digest','provenance_digest') if key in value})
-    store.verify_tree(path, row, clean_bytecode=False)
+    store.verify_tree(path, row)
     return value['payload_digest']
 
 

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from contextvars import ContextVar
 import os
-from pathlib import Path
+import re
+import stat
+from pathlib import Path, PurePosixPath
 import shutil
 import tempfile
 
@@ -15,17 +16,12 @@ import mask_sources as s
 from mask_provenance import regular_bytes
 
 MANIFEST_BYTES = 16 * 1024 * 1024
-READ_ONLY = ContextVar('mask_store_read_only', default=False)
 
 
 @contextmanager
 def observational():
-    """Inspection may report extra bytecode, but must never remove it."""
-    token = READ_ONLY.set(True)
-    try:
-        yield
-    finally:
-        READ_ONLY.reset(token)
+    """Retained caller boundary; artifact verification itself is always observational."""
+    yield
 
 
 def location(home, digest, identifier):
@@ -58,6 +54,8 @@ def manifest(value):
     if total > p.PACKAGE_BYTES or len(names) + len(directories) > p.FILE_COUNT or names != sorted(set(names)):
         c.fail('artifact.invalid', 'Artifact manifest is unsorted, duplicated or exceeds package bounds.', 4)
     p.check_paths(names)
+    if any('__pycache__' in Path(name).parts or Path(name).suffix in ('.pyc', '.pyo') for name in names):
+        c.fail('artifact.corrupt', 'Interpreter bytecode cannot be shipped as locked package content.', 4)
     if c.digest(value['files']) != value['payload_digest']:
         c.fail('artifact.corrupt', 'Manifest entries differ from artifact identity.', 4)
     return value
@@ -75,64 +73,74 @@ def checked_payload(payload, row):
     return checked
 
 
+def _cache_entry(relative):
+    """Recognize interpreter output, including CPython's atomic-write temporary file."""
+    parts = Path(relative).parts
+    return (len(parts) >= 2 and parts[-2] == '__pycache__'
+            and re.fullmatch(r'.+\.(?:pyc|pyo)(?:\.[0-9]+)?', parts[-1]) is not None)
+
+
 def inventory(root):
-    """Bounded no-follow enumeration includes otherwise invisible empty directories."""
-    found, pending = {}, [root]
+    """Bounded no-follow enumeration; cache files may disappear during atomic writes."""
+    found, pending, cache_bytes = {}, [root], 0
     while pending:
         directory = pending.pop()
         if c.kind(directory) != 'directory':
+            if directory.name == '__pycache__' and c.kind(directory) == 'missing':
+                continue
             c.fail('artifact.corrupt', 'Artifact contains a linked or special directory.', 4)
-        with os.scandir(directory) as entries:
-            for entry in entries:
-                pathname = directory / entry.name
-                relative = pathname.relative_to(root).as_posix()
-                kind = c.kind(pathname)
-                if kind not in ('directory', 'file') or kind == 'file' and pathname.lstat().st_nlink != 1:
-                    c.fail('artifact.corrupt', 'Artifacts require unlinked regular files and real directories.', 4, path=relative)
-                found[relative] = kind
-                if len(found) > p.FILE_COUNT + 3 or len(pathname.relative_to(root).parts) > p.DEPTH + 2:
-                    c.fail('artifact.corrupt', 'Artifact tree exceeds entry/depth bounds.', 4)
-                if kind == 'directory':
-                    pending.append(pathname)
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    pathname = directory / entry.name
+                    relative = pathname.relative_to(root).as_posix()
+                    kind = c.kind(pathname)
+                    if kind == 'missing' and _cache_entry(relative):
+                        continue
+                    if kind not in ('directory', 'file'):
+                        c.fail('artifact.corrupt', 'Artifacts require unlinked regular files and real directories.', 4, path=relative)
+                    if kind == 'file':
+                        try:
+                            observed = pathname.lstat()
+                        except FileNotFoundError:
+                            if _cache_entry(relative):
+                                continue
+                            raise
+                        if observed.st_nlink != 1 or not stat.S_ISREG(observed.st_mode) or c.reparse(observed):
+                            c.fail('artifact.corrupt', 'Artifacts require unlinked regular files and real directories.', 4, path=relative)
+                        if _cache_entry(relative):
+                            cache_bytes += observed.st_size
+                            if observed.st_size > p.FILE_BYTES or cache_bytes > p.PACKAGE_BYTES:
+                                c.fail('artifact.corrupt', 'Interpreter caches exceed byte bounds.', 4)
+                    found[relative] = kind
+                    if len(found) > 2 * p.FILE_COUNT + 3 or len(pathname.relative_to(root).parts) > p.DEPTH + (3 if _cache_entry(relative) else 2):
+                        c.fail('artifact.corrupt', 'Artifact tree exceeds entry/depth bounds.', 4)
+                    if kind == 'directory':
+                        pending.append(pathname)
+        except FileNotFoundError:
+            if directory.name != '__pycache__':
+                raise
     return found
 
 
-BYTECODE = ('.pyc', '.pyo')
+def source_inventory(found, expected, prefix):
+    """Exclude only flat interpreter caches under manifested payload directories."""
+    incidental = set()
+    for name, kind in found.items():
+        if (kind != 'directory' or name in expected or not name.startswith(prefix + '/')
+                or not name.endswith('/__pycache__') or expected.get(PurePosixPath(name).parent.as_posix()) != 'directory'):
+            continue
+        children = [path for path in found if path.startswith(name + '/')]
+        if all(found[path] == 'file' and _cache_entry(path) and PurePosixPath(path).parent.as_posix() == name for path in children):
+            incidental.update([name, *children])
+    return {key: value for key, value in found.items() if key not in incidental}
 
 
-def shed_bytecode(root):
-    """Remove interpreter bytecode from an owned artifact before its exact inventory is taken.
-
-    A host that imports a skill's script through the managed link writes ``__pycache__`` beside it, which the
-    inventory normally refuses as an extra entry. Before package reuse, bytecode is removed because Python
-    prefers a matching ``.pyc`` to the reviewed source, and only when the directory holds nothing but
-    regular bytecode files. Anything else stays for verification to refuse and a human to inspect.
-    """
-    directories = [root / 'payload'] if c.kind(root / 'payload') == 'directory' else []
-    for directory in directories:
-        with os.scandir(directory) as entries:
-            children = [directory / entry.name for entry in entries]
-        for child in children:
-            if c.kind(child) != 'directory':
-                continue
-            if child.name != '__pycache__':
-                directories.append(child)
-                continue
-            with os.scandir(child) as entries:
-                droppings = [child / entry.name for entry in entries]
-            if all(c.kind(item) == 'file' and item.suffix in BYTECODE for item in droppings):
-                for item in droppings:
-                    item.unlink()
-                child.rmdir()
-
-
-def verify_tree(root, row, *, clean_bytecode=True, allow_bytecode=False):
+def verify_tree(root, row):
     r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest='sha256:' + '0' * 64, packages=[row]))
     if c.kind(root) != 'directory':
         c.fail('artifact.corrupt', 'Existing artifact root must be a real directory.', 4)
     original = c.identity(root)
-    if clean_bytecode and not READ_ONLY.get():
-        shed_bytecode(root)
     found = inventory(root)
     if found.get('manifest.json') != 'file':
         c.fail('artifact.corrupt', 'Artifact manifest is missing.', 4)
@@ -162,18 +170,11 @@ def verify_tree(root, row, *, clean_bytecode=True, allow_bytecode=False):
         if total > p.PACKAGE_BYTES or c.digest(data) != 'sha256:' + entry['sha256']:
             c.fail('artifact.corrupt', 'Artifact bytes differ from its manifest.', 4, path=relative)
         files.append(p.PayloadFile(entry['path'], entry['mode'], data))
-    incidental = set()
-    if allow_bytecode:
-        # Recovery publishes journaled text without executing/importing the package.
-        # Preserve interpreter caches while checking every locked source byte. Linked,
-        # nested or mixed-content caches are still rejected by the exact inventory.
-        for name, kind in found.items():
-            if kind != 'directory' or name in expected or not name.startswith(prefix + '/') or not name.endswith('/__pycache__'):
-                continue
-            children = [path for path in found if path.startswith(name + '/')]
-            if all(found[path] == 'file' and Path(path).parent.as_posix() == name and Path(path).suffix in BYTECODE for path in children):
-                incidental.update([name, *children])
-    if {key: value for key, value in found.items() if key not in incidental} != expected or inventory(root) != found or c.identity(root) != original:
+    # Both inventories enforce types and bounds. Cache-only churn is incidental;
+    # each independently filtered source inventory must still match the manifest.
+    if (source_inventory(found, expected, prefix) != expected
+            or source_inventory(inventory(root), expected, prefix) != expected
+            or c.identity(root) != original):
         c.fail('artifact.corrupt', 'Artifact contains extra entries or changed during verification.', 4)
     payload = p.validate_files(files, row['id'], commit=row['commit'], path=row['path'])
     checked_payload(payload, row)
@@ -186,7 +187,7 @@ def verify(home, row, *, frozen_recovery=False):
     root, target = location(home, row['payload_digest'], row['id'])
     if c.kind(root) == 'missing':
         c.fail('artifact.unavailable', 'Exact artifact is absent from the local store.', 4, payload_digest=row['payload_digest'])
-    return verify_tree(root, row, clean_bytecode=not frozen_recovery, allow_bytecode=frozen_recovery)
+    return verify_tree(root, row)
 
 
 def cleanup(stage, identity):

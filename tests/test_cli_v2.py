@@ -115,17 +115,46 @@ class CliV2(PublicFixture):
         self.assertEqual(self.human('tap').returncode, 0)
         self.assertTrue(self.machine('register')['ok'])
 
-    def test_previews_and_status_preserve_unexpected_cached_bytecode(self):
+    def test_previews_status_and_repair_accept_and_preserve_cached_bytecode(self):
         self.assertTrue(self.machine('install', 'alpha')['ok'])
         payload = (self.project / '.agents/skills/alpha').resolve()
         bytecode = payload / '__pycache__/untracked.pyc'
         bytecode.parent.mkdir()
         bytecode.write_bytes(b'host-generated cache')
         for command in (('upgrade', '--dry-run'), ('repair', '--dry-run'), ('status',), ('cleanup', '--dry-run')):
-            self.machine(*command)
+            result = self.machine(*command)
+            self.assertTrue(result['ok'], result)
             self.assertEqual(bytecode.read_bytes(), b'host-generated cache')
         self.assertTrue(self.machine('repair')['ok'])
-        self.assertFalse(bytecode.exists())
+        self.assertEqual(bytecode.read_bytes(), b'host-generated cache')
+
+    def test_normal_linked_import_preserves_preview_consent_and_readiness(self):
+        import os
+        import subprocess
+        import sys
+        (self.source / 'skills/alpha/helper.py').write_text('VALUE = 42\n')
+        self.publish('importable helper')
+        self.assertTrue(self.machine('tap', 'fetch')['ok'])
+        self.assertTrue(self.machine('install', 'alpha')['ok'])
+        linked = self.project / '.agents/skills/alpha'
+        preview = self.machine('repair', '--dry-run')
+        self.assertTrue(preview['ok'], preview)
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in ('PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX')}
+        subprocess.run([sys.executable, '-c',
+                        'import sys; sys.path.insert(0, sys.argv[1]); import helper; assert helper.VALUE == 42',
+                        str(linked)], env=environment, check=True)
+        caches = list((linked / '__pycache__').glob('helper.*.pyc'))
+        self.assertTrue(caches)
+        before = {path.name: path.read_bytes() for path in caches}
+        second = self.machine('repair', '--dry-run')
+        self.assertEqual(second['data']['plan_hash'], preview['data']['plan_hash'])
+        applied = self.machine('repair', '--approve-plan', preview['data']['plan_hash'])
+        self.assertTrue(applied['ok'], applied)
+        for command in (('status', '--check'), ('upgrade', '--dry-run'), ('upgrade',), ('repair',), ('cleanup', '--dry-run')):
+            result = self.machine(*command)
+            self.assertTrue(result['ok'], result)
+        self.assertEqual({path.name: path.read_bytes() for path in caches}, before)
 
 
 from tests.test_setup import SetupFixture, GENERATED

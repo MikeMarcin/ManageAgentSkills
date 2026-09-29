@@ -161,12 +161,15 @@ repositories share one identity. Transport preferences remain machine-local.
 `tap fetch --locked` prepares the exact selected objects without upgrading them.
 Ordinary consumers link to verified immutable store payloads; authoring checkouts
 are used only by explicit development and publication commands. Unknown or corrupt
-cache content is preserved for diagnosis. Read-only checks and previews never
-remove interpreter bytecode; a mutating readiness task may clear recognized cache
-files before verification. A frozen, role-only recovery may verify source bytes
-while preserving extra `__pycache__` directories containing only unlinked regular
-bytecode files: it never imports or executes the package. Other extra files and
-changed source still refuse recovery.
+cache content is preserved for diagnosis. Every artifact check verifies the locked
+source bytes and executable modes while preserving incidental `__pycache__` output.
+Only flat, unlinked regular `.pyc`/`.pyo` files (and their numeric atomic-write
+suffixes) inside payload directories are incidental. Entry, depth and byte bounds
+still apply. Cache-only churn changes neither package identity nor preview consent;
+linked, hardlinked, special, nested or mixed unknown cache contents and changed
+source refuse status, readiness, recovery and cleanup verification alike. Git-shipped
+bytecode remains invalid package content. Checks never delete caches to repair them.
+
 
 ## Cached selection locks
 
