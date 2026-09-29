@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0127"
 title: "Preserve interpreter caches during artifact verification"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P1"
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"2fcd627c6ef89b0bd0d722a8802adc0ec30485fa","evidence":{"kind":"observation","detail":"Normal managed-link import plus public status/repair/upgrade and recovery preserve interpreter caches; real AgentSkills/BPR readiness restored with 101 source and 5 cache hashes unchanged."}},{"criterion":"AC2","outcome":"pass","revision":"2fcd627c6ef89b0bd0d722a8802adc0ec30485fa","evidence":{"kind":"observation","detail":"Public normal import leaves original repair preview hash unchanged and original approval applies."}},{"criterion":"AC3","outcome":"pass","revision":"2fcd627c6ef89b0bd0d722a8802adc0ec30485fa","evidence":{"kind":"observation","detail":"Artifact negative controls reject linked, hardlinked, nested and unknown cache contents and edited source; explicit shipped-bytecode regression passes; atomic churn, portable paths and derived entry budget pass."}},{"criterion":"AC4","outcome":"pass","revision":"2fcd627c6ef89b0bd0d722a8802adc0ec30485fa","evidence":{"kind":"observation","detail":"23 focused passing observations, exact source structure gate zero violations; setup failures recorded and corrected; docs contract unified."}}]
 ---
 
 # Preserve interpreter caches during artifact verification
