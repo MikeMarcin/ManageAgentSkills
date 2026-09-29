@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0127"
 title: "Preserve interpreter caches during artifact verification"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
