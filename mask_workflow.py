@@ -28,7 +28,7 @@ HEX_RE = re.compile(r'[a-f0-9]{64}')
 # Supported passive native fields per adapter; anything else is refused rather than deployed blind.
 CODEX_FIELDS = {'name', 'description', 'model', 'model_reasoning_effort', 'sandbox_mode', 'developer_instructions'}
 CODEX_TABLES = {'agents': {'enabled'}}
-CLAUDE_FIELDS = {'name', 'description', 'model', 'effort', 'maxTurns', 'permissionMode', 'tools', 'disallowedTools', 'color'}
+CLAUDE_FIELDS = {'name', 'description', 'model', 'effort', 'maxTurns', 'permissionMode', 'tools', 'disallowedTools', 'color', 'background'}
 ROUTE_FIELDS = {'codex': ('model', 'model_reasoning_effort'), 'claude': ('model', 'effort')}
 
 

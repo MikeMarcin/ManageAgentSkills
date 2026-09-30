@@ -11,7 +11,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import unittest
 
+from mask_core import MaskError
+from mask_workflow import native
 from tests.support import Fixture, ENTRY, TAP
 
 PACK = ENTRY.parent / 'docs/rfcs/assets/mask-corrective-ux-readiness'
@@ -348,3 +351,15 @@ class CheckedInGeneratedRoles(WorkflowFixture):
         (self.project / '.mask/skill-config/implement-rfc/project.md').unlink()
         result = self.call('ensure', code=4)
         self.assertEqual(result['error']['details']['workflow'][0], 'implement-rfc input project-rules (.mask/skill-config/implement-rfc/project.md): missing')
+
+
+class NativeClaudeFields(unittest.TestCase):
+    def test_background_is_a_supported_frontmatter_field_and_is_not_a_route_fact(self):
+        role = b'---\nname: rfc-implementer\nmodel: fixture-model-do-not-run\nbackground: true\neffort: high\n---\n\nFixture.\n'
+        self.assertEqual(native('claude', 'rfc-implementer', role), {'model': 'fixture-model-do-not-run', 'effort': 'high'})
+
+    def test_a_duplicate_background_field_is_still_refused(self):
+        role = b'---\nname: rfc-implementer\nbackground: true\nbackground: true\n---\n\nFixture.\n'
+        with self.assertRaises(MaskError) as raised:
+            native('claude', 'rfc-implementer', role)
+        self.assertEqual(raised.exception.code, 'workflow.role_invalid')
