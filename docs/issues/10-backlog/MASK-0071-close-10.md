@@ -40,15 +40,18 @@ RFC_BASE_SHA: 9dc90df45febf2a6e048ace60a4ac959807aaaf6
 
 Planned cards: MASK-0041, MASK-0042, MASK-0043.
 
-Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision when required.
+Cross-repository named-bundle handoff: actual AgentSkills ASK-0095, source candidate
+`fb67261a5fd8a69231e963226189fd98458e4d82`, acceptance commit
+`b9e413673b7dc7b618487def3831049451010632`; canonical public install verified with
+MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Broader profile handoffs remain open.
 
 ## Closeout checklist
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
 | RFC-MASK-0010-AC01 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0010-AC02 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0010-AC03 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0010-AC02 | Bundle union/manual/overlap/replace ownership passes in [public evidence](../../development/named-bundles-evidence.json); export/all-agent freezing still belongs to open MASK-0041 | Partial; remains open | bc4f9f9 |
+| RFC-MASK-0010-AC03 | 18 public bundle journeys plus 5 renderer checks; revision/digest stale guards, held/manual/overlap preservation, exact locks, conflicts, setup and recovery; canonical upstream bundle ready | Pass | bc4f9f9 |
 | RFC-MASK-0010-AC04 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0010-AC05 | Not recorded | Not run | Unrecorded |
 
@@ -57,25 +60,36 @@ Closeout review runtime: not run. A skipped required native/host/device check le
 ## Current named-bundle checkpoint
 
 Assignment MASK-0042 / `named-bundles`, mandate `named-bundles-v1`, run
-`mask-named-bundles-20261002`, segment `coordinator-implementer`; engineering writer
+`mask-named-bundles-20261002`, segment `coordinator-implementer`; engineering owner
 `/root/bundles`, rfc-implementer gpt-6.1-sol/xhigh. The owner's "dont use direct"
-amendment selects the preserved [strategy](../../rfcs/plans/named-bundles/strategy-selection.json).
-The adopted [plan/checkpoint](../../rfcs/plans/named-bundles/checkpoint.json) retains
-all bundle, canonical-handoff and upkeep exits. RFC_BASE_SHA above is unchanged;
-this slice's live intake baseline is `4b983e3516cf0928e2eeff2ce35e9c84ff10e1ee`.
-MASK-0041 remains open; no profile/fleet/native-host acceptance is supplied.
+amendment selects the preserved [strategy](../../rfcs/plans/named-bundles/strategy-selection.json)
+and [plan/checkpoint](../../rfcs/plans/named-bundles/checkpoint.json). All named-bundle,
+canonical-handoff and upkeep exits pass. RFC_BASE_SHA above stays unchanged; this
+slice's live intake baseline is `4b983e3516cf0928e2eeff2ce35e9c84ff10e1ee`.
 
-Candidate work adds mask_bundles.py, public CLI/rendering, strict declaration
-bundle_state, source-index binding validation, manual install/uninstall membership,
-runtime module inventory, schemas, public bundle tests and affected docs.
-The shortest public composition passed; 12/13 expanded checks passed, with the sole
-test exit-class expectation corrected. Setup failure, interrupted setup without
-rerun and frozen activation recovery passed. The first broader focused regression passed 70 tests in 211 seconds. A second
-81-test pass (two skips) isolated a human-preview omission, four missing argument-help
-subtests and an expected source error code; all affected tests now pass in the
-eight-test public/renderer recheck. Other selected recovery/manifest/user/target checks passed. Canonical AgentSkills `a32377166fd02d3b4b35feb2dfb3c178e7b80f7e`
-passed public discovery of all 16 packages, four-skill installation, reviewed setup,
-healthy status and repeat no-op; the exact committed MASK candidate rerun remains.
-All task commands ended before the candidate commit; no review server, protected candidate or extra agent
-exists. Next: collect regression results, commit explicit owned paths, rerun exact
-canonical candidate, finish ASK-0095/MASK-0042 and record final evidence/quiescence.
+Runtime implementation: `ab625a6e1735a3d79fda24ae5b6c52355d465014`; exact verified
+MASK candidate: `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Canonical AgentSkills
+candidate: `fb67261a5fd8a69231e963226189fd98458e4d82`; upstream ASK-0095 acceptance:
+`b9e413673b7dc7b618487def3831049451010632`. [Evidence](../../development/named-bundles-evidence.json)
+records the actual commands, outcomes and corrections: first 70-test regression
+pass; final 23-test public/renderer pass; canonical four-skill installation with
+reviewed setup, healthy status and all 16 package discoveries. Two preexisting
+native/POSIX skips in the selected 81-test run remain declared. Initial human
+preview/help issues and clean-checkout fixture auto-refresh failures were corrected
+and directly rechecked; the failed exact-candidate receipt is retained.
+
+Changed paths: named-bundle module, public CLI/rendering and runtime inventory,
+selection/source validators, task manual membership, source/declaration schemas,
+focused bundle/launcher tests, affected user/CLI/RFC docs, adopted plan/strategy,
+MASK-0042 and bounded MASK-0064/closeout handoff. No unrelated work was modified.
+Both canonical repositories remain on main; no push/publication, real consumer
+migration, permission/credential/persistent approval change occurred.
+
+All task-owned Git/test/setup/verification commands ended; no descendants,
+background commands, protected candidate, review session/server or owned worktree
+exists. Disposable consumers, local bare remotes and machine roots were consumed
+and cleaned. Ownership releases when this milestone returns. No required human
+review is imposed or substituted. MASK-0041/profile subscription/export/frozen-agent
+and broader MASK-0064/fleet/native host-loading work remain outside this mandate.
+Next eligible continuation is coordinator selection of newly authorized scope;
+RFC-MASK-0010 remains Implementing with its other acceptance rows open.

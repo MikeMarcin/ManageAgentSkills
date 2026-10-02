@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0042"
 title: "Implement flat named bundle expansion and guarded refresh"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0010"]
 depends_on: []
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"bundles","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"named-bundles","path":"docs/rfcs/plans/named-bundles/milestone-plan.json"}}
+acceptance: [{"criterion":"bundle-local-contributions","outcome":"pass","revision":"bc4f9f9015ee2bd3495101e91d0077f35ebc1733","evidence":{"kind":"artifact","path":"docs/development/named-bundles-evidence.json","detail":"Additive/no-op, manual targets and explicit install promotion, overlap, bounded replace/removals, explicit uninstall and held/locally modified bindings pass. This is the bundle portion of AC02, not profile export acceptance."}},{"criterion":"RFC-MASK-0010-AC03","outcome":"pass","revision":"bc4f9f9015ee2bd3495101e91d0077f35ebc1733","evidence":{"kind":"artifact","path":"docs/development/named-bundles-evidence.json","detail":"Public flat list/show/apply/refresh uses exact revision/digest guarded plans, exact package locks, conflict/source prerequisite refusal, reviewed setup and frozen-journal recovery; final 23 tests pass."}},{"criterion":"canonical-rfc-handoff","outcome":"pass","revision":"bc4f9f9015ee2bd3495101e91d0077f35ebc1733","evidence":{"kind":"artifact","path":"docs/development/named-bundles-evidence.json","detail":"Actual upstream ASK-0095 accepted at b9e413673b7dc7b618487def3831049451010632; exact canonical bundle installs four skills with healthy required setup and preserves all 16 packages."}},{"criterion":"upkeep","outcome":"pass","revision":"bc4f9f9015ee2bd3495101e91d0077f35ebc1733","evidence":{"kind":"artifact","path":"docs/development/named-bundles-evidence.json","detail":"Public docs, source/declaration schemas, capability advertisement and runtime inventory match shipped scope; focused regression and structure/portable-source checks pass after reported corrections; all commands end."}}]
 ---
 
 # MASK-0042: Implement flat named bundle expansion and guarded refresh

@@ -1,0 +1,13 @@
+{
+  "criterion": "named-bundles-final",
+  "outcome": "pass",
+  "revision": "bc4f9f9015ee2bd3495101e91d0077f35ebc1733",
+  "evidence": {
+    "kind": "command",
+    "detail": "[\"python3\", \"-B\", \"-m\", \"unittest\", \"tests.test_bundles\", \"tests.test_human_output.RendererRegistry\"]",
+    "exit_code": 0,
+    "elapsed_seconds": 63.725,
+    "stdout_tail": "",
+    "stderr_tail": ".......................\n----------------------------------------------------------------------\nRan 23 tests in 63.654s\n\nOK\n"
+  }
+}

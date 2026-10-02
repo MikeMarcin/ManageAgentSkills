@@ -40,6 +40,8 @@ Actual upstream ASK-0095 owns `mask-source.json`, companion/install guidance and
 the disposable public verification. Candidate `a32377166fd02d3b4b35feb2dfb3c178e7b80f7e`
 preserves all 16 package discoveries and supplies author-rfc, grill-rfc, grill-me
 and implement-rfc. See [handoff](../../development/agent-skills-handoff.md).
-Completion revision and exact MASK runtime evidence will be recorded there.
+Upstream completion revision is `b9e413673b7dc7b618487def3831049451010632`;
+MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733` verifies the canonical public
+installation with healthy required setup, all four skills and all 16 packages.
 This card remains Backlog for its broader management/provenance/fleet handoff;
 its unrelated prerequisites and RFC-MASK-0017 acceptance remain open.
