@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0042"
 title: "Implement flat named bundle expansion and guarded refresh"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0010"]
 depends_on: []
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "bundles", "stage": "C — portable composition", "provisional_id": false}
