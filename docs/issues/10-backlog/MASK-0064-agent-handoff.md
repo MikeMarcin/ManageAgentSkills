@@ -5,6 +5,7 @@ title: "Coordinate canonical AgentSkills guidance and metadata handoff"
 status: "Backlog"
 rfcs: ["RFC-MASK-0017"]
 depends_on: ["MASK-0071", "MASK-0072", "MASK-0053"]
+external_depends_on: ["AgentSkills:ASK-0095"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "agent-handoff", "stage": "A–D — integration and owner workflow", "provisional_id": false}
 ---
 
@@ -31,3 +32,14 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Run record
 
 Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+
+## Bounded named-bundle handoff — 2026-10-02
+
+The owner authorized the canonical `agentskills/rfc` slice with MASK-0042.
+Actual upstream ASK-0095 owns `mask-source.json`, companion/install guidance and
+the disposable public verification. Candidate `a32377166fd02d3b4b35feb2dfb3c178e7b80f7e`
+preserves all 16 package discoveries and supplies author-rfc, grill-rfc, grill-me
+and implement-rfc. See [handoff](../../development/agent-skills-handoff.md).
+Completion revision and exact MASK runtime evidence will be recorded there.
+This card remains Backlog for its broader management/provenance/fleet handoff;
+its unrelated prerequisites and RFC-MASK-0017 acceptance remain open.

@@ -5,7 +5,7 @@ title: "Implement flat named bundle expansion and guarded refresh"
 status: "In Progress"
 rfcs: ["RFC-MASK-0010"]
 depends_on: []
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "bundles", "stage": "C — portable composition", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"bundles","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"named-bundles","path":"docs/rfcs/plans/named-bundles/milestone-plan.json"}}
 ---
 
 # MASK-0042: Implement flat named bundle expansion and guarded refresh

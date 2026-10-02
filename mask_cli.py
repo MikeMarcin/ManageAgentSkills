@@ -22,6 +22,10 @@ COMMANDS = {
     'cleanup': (True, False, []),
     'search': (False, False, [('query', 'optional')]),
     'info': (False, False, [('id', 'pos'), ('content', 'flag')]),
+    'bundle.list': (False, False, [('source', 'value')]),
+    'bundle.show': (False, False, [('bundle', 'pos')]),
+    'bundle.apply': (True, True, [('bundle', 'pos')] + SINGLE + [('replace', 'flag')] + OFFLINE),
+    'bundle.refresh': (True, True, [('bundle', 'pos')] + SINGLE + OFFLINE),
     'register': (True, True, [('path', 'optional')] + SINGLE + OFFLINE),
     'unregister': (True, False, [('path', 'optional')] + SINGLE + [('keep-links', 'flag')]),
     'install': (True, True, [('ids', 'many')] + SINGLE + [('agent', 'repeat')] + REFRESH),
@@ -62,6 +66,10 @@ HELP = {
     'status': ('Inspect readiness in this checkout without changing files. --user selects personal skills; --all checks every registered installation. --check exits nonzero for problems.', 'mask status\nmask status --all --check'),
     'search': ('Search the fetched catalogs of your shared taps by skill name or description. No query lists all available skills.', 'mask search review'),
     'info': ('Inspect one available skill, its source and declared workflow. This reads the shared tap catalog.', 'mask info implement-rfc\nmask info implement-rfc --content'),
+    'bundle.list': ('List flat bundles in fetched approved taps. Unfetched catalogs are reported; browsing never fetches.', 'mask bundle list\nmask bundle list --source agentskills'),
+    'bundle.show': ('Show one fetched bundle definition, its exact source revision and digest.', 'mask bundle show agentskills/rfc'),
+    'bundle.apply': ('Expand a bundle and complete required setup. Existing manual targets, exact locks and other contributions remain. --replace explicitly refreshes only this named local bundle contribution, with exclusive removals shown.', 'mask bundle apply agentskills/rfc --dry-run\nmask bundle apply agentskills/rfc --approve-plan HASH'),
+    'bundle.refresh': ('Preview and apply an explicit update of an already-expanded named local contribution. Preserve manual, overlapping, held and locally modified selections; never refresh other bundles or package versions implicitly.', 'mask bundle refresh agentskills/rfc --dry-run\nmask bundle refresh agentskills/rfc --approve-plan HASH'),
     'cleanup': ('Preview and delete verified unused MASK storage and disposable backups. Referenced content, active locks, recovery data and unknown files are preserved.', 'mask cleanup --dry-run\nmask cleanup --approve-plan HASH'),
     'integration.run': ('Run an approved startup readiness event. This entrypoint never grants consent or runs package setup.', None),
 }
@@ -79,7 +87,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'bundle.apply', 'bundle.refresh') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -233,6 +241,9 @@ def dispatch(args, output, leaves):
                 return mask_cleanup.dispatch(args, output, home)
             if public == 'capabilities':
                 return capabilities(output, leaves, mask)
+            if public.startswith('bundle.'):
+                import mask_bundles
+                return mask_bundles.dispatch(args, output, home)
             if public == 'list' and getattr(args, 'all', False):
                 args.command = 'inventory'
             elif public == 'tap':
@@ -307,6 +318,7 @@ def capabilities(output, leaves, mask):
                          readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1,2,3], pending=[1,2,3]),
                          scopes=['project', 'user'], default_scope='current_checkout', aggregate_scope='all_registered',
                          deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap --autocrlf'), pinned_deployment=True, per_binding_targeting=True, targets=mask.ADAPTERS,
+                         bundles=dict(flat=True, source_index=1, contributions='explicit_local', refresh='explicit', recursive=False),
                          adapter_contracts=mask.adapters.capabilities(), python_minimum='3.11', program_root=str(mask.PROGRAM_ROOT),
                          workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1',
                                        profile_selection='status --check --workflow-profile SKILL=PROFILE', scope_contracts=['project','user'],
@@ -337,6 +349,8 @@ Shared resources (independent of your checkout):
 Catalog browsing (your shared taps):
   search [QUERY]          Find available skills
   info SKILL              Inspect an available skill and its workflow
+  bundle list / show      Inspect flat named bundles in fetched taps
+  bundle apply / refresh  Expand or explicitly refresh one local contribution
 
 This checkout:
   register [PATH]         Start managing a checkout and make it ready

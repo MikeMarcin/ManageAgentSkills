@@ -10,6 +10,7 @@ Skills are passive data unless the user approves a declared setup action.
 |---|---|---|
 | Shared resources | `tap`, `untap`, `update`, `cleanup` | Program, approved catalog and storage |
 | Catalog browsing | `search [QUERY]`, `info SKILL` | Fetched shared tap catalogs |
+| Named bundles | `bundle list [--source SOURCE]`, `bundle show SOURCE/NAME`, `bundle apply SOURCE/NAME [--replace]`, `bundle refresh SOURCE/NAME` | Browsing: shared catalogs; mutation: current checkout |
 | Enrollment | `register [PATH]`, `unregister [PATH]` | Current checkout |
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
@@ -111,6 +112,18 @@ Development links use `skill dev-link`.
 
 `search` matches names and descriptions in fetched catalogs. `info` reports skill
 metadata and the declared project/personal workflow; neither command runs scripts.
+
+Bundle browsing reads validated `mask-source.json` definitions at the approved cached
+ref. Definitions contain source-qualified skills and optional target, version and
+condition suggestions. Bundle apply/refresh are guarded project/personal tasks using
+the same planner, setup review, exact locks and journal as install. The plan hash
+includes the exact definition source commit and digest, including a definition source
+that contributes no package. Repeat apply retains the previous expansion; changed
+definitions require explicit refresh. `--replace` replaces the named local bundle
+contribution, with only exclusive unchanged unheld removals; it preserves manual and
+overlapping contributions. `data.before`, `after`, `bundle`, `locked`, `added`,
+`removed` and `preserved` make the candidate diffable. No recursive dependency,
+profile subscription, fleet behavior or naive bundle removal is advertised.
 
 `update` fast-forwards the program when safe and refreshes all tap catalogs; dirty,
 ahead or diverged program checkouts are preserved and reported. Install/upgrade

@@ -95,6 +95,15 @@ mask tap show community --json
 mask tap fetch community --json
 ```
 
+A source may commit `mask-source.json` with `schema_version: 1`, a complete
+`packages` map from package ID to relative package directory, and an optional
+`bundles` map. An index replaces automatic package discovery, so list every package
+that should remain discoverable. Each bundle has `skills` (a flat array of
+source-qualified bindings) and an optional `description`; only the supported binding
+fields `source`, `id`, `agents`, `version`, `when` and `introduced_by` are accepted.
+Duplicate, recursive, malformed and unsupported entries refuse. The source index
+grants no machine approval or setup authority. See [named bundles](declarations.md#named-bundles).
+
 Adding a tap only registers its repository, ref and package layout; `tap` never fetches. `install` fetches a tap on demand, and `upgrade` and `tap fetch` fetch it explicitly, into a separate owned bare cache. HTTPS and SSH are distinct approved identities. Git credentials remain in the existing Git
 configuration; URLs containing credentials and redirects are refused. Tap removal
 retains the cache and refuses while a registered declaration or lock references the tap.

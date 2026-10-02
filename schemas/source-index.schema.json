@@ -1,5 +1,5 @@
 {
-  "$comment": "Source-owned catalog metadata. Runtime validates exact paths and package IDs; bundles remain passive until explicit expansion. No machine authority is granted.",
+  "$comment": "Source-owned flat catalog and explicit bundle definitions. Runtime validates bounded sets, exact paths, package IDs and bindings. No machine approval or setup authority is granted.",
   "$id": "urn:mask:source-index:v1",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,

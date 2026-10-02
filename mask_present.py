@@ -869,11 +869,36 @@ def render_lifecycle(data, output):
     return [headline(output, output['command'])] + actions(output) + workflow_lines(data, quiet_ready=True) + plan_guard(data, output)
 
 
+def render_bundles(data, output):
+    if 'bundles' in data:
+        lines = ['Available bundles']
+        for row in data['bundles']:
+            lines.append(f"  {clean(row['coordinate'])}: {clean(row['description'])} ({len(row['bindings'])} skills)")
+        for row in data.get('unavailable', []):
+            lines.append(f"  {clean(row['source'])}: fetch this approved tap to inspect its bundles")
+        return lines
+    row = data.get('bundle', {})
+    lines = [f"Bundle {clean(row.get('coordinate'))}", f"  revision: {clean(row.get('commit'))}", f"  definition: {clean(row.get('definition_digest'))}"]
+    if 'after' in data:
+        verb = 'Would apply' if output['dry_run'] else 'Applied' if output['changed'] else 'Unchanged'
+        lines[0] = f"{verb} bundle {clean(row.get('coordinate'))} in {place(data)}"
+        lines.extend('  + ' + clean(key) for key in data.get('added', []))
+        lines.extend('  - ' + clean(key) for key in data.get('removed', []))
+        lines.extend('  preserved ' + clean(item['skill']) + ': ' + clean(item['reason']) for item in data.get('preserved', []))
+        lines.extend(action_summary(output))
+        lines.extend(workflow_lines(data, quiet_ready=True))
+        lines.extend(plan_guard(data, output))
+    else:
+        lines.extend('  ' + clean(binding['source'] + '/' + binding['id']) for binding in row.get('bindings', []))
+    return lines
+
+
 def render_all_list(data, output):
     return render_inventory(data, output) if 'consumers' in data or 'deployments' in data else render_list(data, output)
 
 
 RENDERERS = {
+    'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.apply': render_bundles, 'bundle.refresh': render_bundles,
     'tap': render_sources, 'untap': render_sources, 'search': render_catalog, 'info': render_skill,
     'uninstall': render_task, 'register': render_lifecycle, 'unregister': render_forget,
     'repair': render_lifecycle, 'status': render_doctor, 'pin': render_lifecycle, 'unpin': render_lifecycle,
@@ -991,6 +1016,16 @@ def task_review(proposal, output):
         else:
             exact.append(action)
     lines = [f"{output['command'].replace('.', ' ').capitalize()}: review {plural(len(roots), 'location')}", '']
+    bundle = output['data'].get('bundle_changes')
+    if bundle:
+        lines.append(f"  Bundle {clean(bundle['coordinate'])} at {clean(bundle['commit'])}")
+        lines.append(f"  Definition: {clean(bundle['definition_digest'])}")
+        lines.extend('    + ' + clean(key) for key in bundle['added'])
+        lines.extend('    - ' + clean(key) for key in bundle['removed'])
+        for item in bundle['changed']:
+            lines.append(f"    change {clean(item['skill'])}: {clean(item['before'])} -> {clean(item['after'])}")
+        lines.extend('    preserve ' + clean(item['skill']) + ': ' + clean(item['reason']) for item in bundle['preserved'])
+        lines.append('')
     for root, row in rows.items():
         parts = []
         if row['links']:
@@ -1286,6 +1321,9 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'bundle': 'Source-qualified bundle name: SOURCE/NAME',
+    'source': 'Filter bundles to one approved source alias',
+    'replace': 'Replace only this named local bundle contribution; review exclusive removals',
     'workflow-profile': 'Check a declared role subset: SKILL=PROFILE (status --check)',
     'approve-plan': 'Approve the exact reviewed task, including its disclosed setup and replacements',
     'no-update': 'Skip the preliminary program and catalog update; task-specific fetching remains allowed',

@@ -128,7 +128,7 @@ def path(value):
 
 def selection(value):
     canonical(value)
-    closed(value, ('schema_version', 'sources', 'skills'), ('default_agents',), versions=(2,))
+    closed(value, ('schema_version', 'sources', 'skills'), ('default_agents', 'bundle_state'), versions=(2,))
     if not isinstance(value['sources'], dict) or len(value['sources']) > 256:
         invalid('selection', 'Expected at most 256 source bindings.')
     sources = {}
@@ -168,7 +168,64 @@ def selection(value):
         if 'introduced_by' in binding:
             row['introduced_by'] = strings(binding['introduced_by'], 'selection')
         bindings.append(row)
-    return dict(schema_version=2, sources=sources, default_agents=defaults, skills=sorted(bindings, key=coordinate))
+    result = dict(schema_version=2, sources=sources, default_agents=defaults, skills=sorted(bindings, key=coordinate))
+    if 'bundle_state' in value:
+        result['bundle_state'] = bundle_state(value['bundle_state'], result)
+    return result
+
+
+def qualified(value, family='bundle'):
+    if not isinstance(value, str) or value.count('/') != 1:
+        invalid(family, 'Use one SOURCE/NAME coordinate.')
+    for token in value.split('/'):
+        c.skill_id(token)
+    return value
+
+
+def bundle_bindings(value):
+    """Validate flat definitions with the ordinary binding schema, preserving display order."""
+    if not isinstance(value, list) or len(value) > 1000:
+        invalid('bundle', 'Expected at most 1000 flat skill bindings.')
+    sources = {}
+    for binding in value:
+        closed(binding, ('source', 'id'), ('version', 'agents', 'when', 'introduced_by'), 'bundle')
+        name = c.skill_id(binding['source'])
+        sources[name] = dict(repository='https://example.invalid/' + name + '.git')
+    normalized = selection(dict(schema_version=2, sources=sources, skills=value))
+    rows = {coordinate(row): row for row in normalized['skills']}
+    return [rows[coordinate(row)] for row in value]
+
+
+def bundle_state(value, declaration):
+    """Explicit local contributions; introduced_by alone never grants removal authority."""
+    closed(value, ('manual', 'bundles'), family='bundle')
+    manual = strings(value['manual'], 'bundle', empty=True, limit=BINDINGS, length=129)
+    for key in manual:
+        qualified(key)
+    bundles = value['bundles']
+    if not isinstance(bundles, dict) or len(bundles) > 1000:
+        invalid('bundle', 'Expected a bounded expansion map.')
+    normalized, covered = {}, set(manual)
+    total = 0
+    for key, receipt in bundles.items():
+        qualified(key)
+        name = key.split('/')[0]
+        closed(receipt, ('repository', 'commit', 'definition_digest', 'bindings'), family='bundle')
+        repository(receipt['repository'], 'bundle')
+        if name not in declaration['sources'] or not s.same(receipt['repository'], declaration['sources'][name]['repository']):
+            invalid('bundle', 'Expansion source identity must remain declared.')
+        selector({'commit': receipt['commit']}, 'bundle')
+        if not isinstance(receipt['definition_digest'], str) or not SHA.fullmatch(receipt['definition_digest']):
+            invalid('bundle', 'Expansion needs an exact definition digest.')
+        bindings = bundle_bindings(receipt['bindings'])
+        total += len(bindings)
+        if total > BINDINGS:
+            invalid('bundle', 'Expanded contributions exceed 4096 bindings.')
+        covered.update(coordinate(row) for row in bindings)
+        normalized[key] = dict(receipt, bindings=bindings)
+    if covered != {coordinate(row) for row in declaration['skills']}:
+        invalid('bundle', 'Local contribution membership must cover exactly the explicit selection.')
+    return dict(manual=manual, bundles=normalized)
 
 
 def coordinate(row):

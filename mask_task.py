@@ -136,6 +136,7 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
     previous = r.lock(lock_value, declaration) if lock_value is not None else None
     prior_rows = {r.coordinate(row): row for row in previous['packages']} if previous else {}
     proposal = copy.deepcopy(declaration)
+    ledger = proposal.get('bundle_state')
     agents = sorted(set(r.agents(args.agent))) if installing and getattr(args, 'agent', None) else None
     changed, unchanged, new = [], [], set()
     for alias, identifier in requested:
@@ -151,6 +152,10 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
         present = next((row for row in proposal['skills'] if r.coordinate(row) == coordinate), None)
         if installing:
             if present is not None:
+                if ledger is not None and coordinate not in ledger['manual']:
+                    ledger['manual'].append(coordinate)
+                    changed.append(coordinate)
+                    continue
                 unchanged.append(coordinate)
                 continue
             entry = sources.selected(config, alias)
@@ -160,6 +165,8 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
             if agents:
                 binding['agents'] = agents
             proposal['skills'].append(binding)
+            if ledger is not None:
+                ledger['manual'].append(coordinate)
             new.add(coordinate)
             changed.append(coordinate)
         elif present is None:
@@ -167,6 +174,10 @@ def v2_proposal(args, declaration, config, requested, output, root, scope, home,
             output['warnings'].append(dict(code='selection.not_selected', message='Skill is not selected in this scope; nothing to remove.', skill=coordinate))
         else:
             proposal['skills'] = [row for row in proposal['skills'] if r.coordinate(row) != coordinate]
+            if ledger is not None:
+                ledger['manual'] = [key for key in ledger['manual'] if key != coordinate]
+                for receipt in ledger['bundles'].values():
+                    receipt['bindings'] = [row for row in receipt['bindings'] if r.coordinate(row) != coordinate]
             changed.append(coordinate)
     if changed:  # The declaration and lock are written anyway, so they take the canonical spelling (RFC-MASK-0022).
         for entry in proposal['sources'].values():

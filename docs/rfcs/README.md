@@ -27,7 +27,7 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC-MASK-0007 | Auto-Verified | Multiple sources, taps, curated imports and upstream provenance |
 | RFC-MASK-0008 | Implementing | True version pinning, immutable deployment artifacts and recoverable migration |
 | RFC-MASK-0009 | Implementing | Per-skill scope-specific agent targeting and advertised compatibility |
-| RFC-MASK-0010 | Accepted | Portable personal selections, reusable bundles and profile composition |
+| RFC-MASK-0010 | Implementing | Portable personal selections, reusable bundles and profile composition |
 | RFC-MASK-0011 | Implementing | Where-used inventory, update diffs and deployment impact reports |
 | RFC-MASK-0012 | Accepted | Explicit fleet enrollment, device identity and bounded remote transport |
 | RFC-MASK-0013 | Accepted | Declarative fleet rollouts, optional continuous convergence and completion reports |

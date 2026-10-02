@@ -65,6 +65,9 @@ checkout without upgrading versions.
 |---|---|
 | Add a skill here | `mask install ID` |
 | Add a personal skill | `mask install ID --user` |
+| Inspect a named bundle | `mask bundle show agentskills/rfc` |
+| Add a named bundle here | `mask bundle apply agentskills/rfc` |
+| Review changed bundle membership | `mask bundle refresh agentskills/rfc --dry-run` |
 | Show this checkout's skills | `mask list` |
 | Show personal skills | `mask list --user` |
 | Register and prepare this checkout | `mask register` |
@@ -100,6 +103,13 @@ returns one structured result without progress messages.
 `tap` lists shared sources; `tap NAME URL` adds one; `untap NAME` removes one.
 `search` and `info ID` browse their catalogs. These commands, `update`, and
 `cleanup` are independent of your working directory.
+
+Named bundles expand a fetched source definition into explicit selections and exact
+locks. The canonical `agentskills/rfc` bundle contains author-rfc, grill-rfc, grill-me
+and implement-rfc. Configure implement-rfc's consumer context before applying it;
+the installation review includes its required setup. Use `mask tap fetch agentskills`
+before browsing or previewing. Apply adds to existing selections, and later definition
+changes require an explicit, diffable refresh. See [bundle contributions](docs/guides/declarations.md#named-bundles).
 
 - `update` refreshes MASK and the tap catalogs; `upgrade` changes selected skill versions and makes them ready. Install/upgrade refresh automatically when needed. `--no-update` skips that preliminary refresh; `--offline` forbids network access altogether.
 - `--dry-run` previews without fetching, writing or running setup. `--json` gives scripts structured output and never prompts.

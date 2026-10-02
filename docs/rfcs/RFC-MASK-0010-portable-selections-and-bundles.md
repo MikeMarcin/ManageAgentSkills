@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0010"
 title: "Portable personal selections, reusable bundles and profile composition"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
 ---
@@ -89,3 +89,15 @@ Use two independent temporary machine roots with different local source and home
 ## Live authorization
 
 Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+
+## Named-bundle mandate refinement — 2026-10-02
+
+The owner authorized public bundle list/show/apply/refresh and the canonical
+AgentSkills RFC bundle as a bounded milestone. The amended execution request
+"dont use direct" selects coordinator-implementer. Existing v2 selections/locks
+provide the prerequisite; MASK-0041 export/import remains open. The implemented
+contribution receipt explicitly separates manual membership and frozen local
+bundle expansions. For this selected milestone, `apply --replace` and `refresh`
+replace only the named local bundle contribution, preserving manual/overlapping,
+held, locally modified and unrelated bindings. No profile/fleet or native host
+loading acceptance is implied. See the [milestone plan](plans/named-bundles/milestone-plan.json).

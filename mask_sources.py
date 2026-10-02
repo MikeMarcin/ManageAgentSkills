@@ -814,6 +814,8 @@ def validate_index(value):
             c.fields(binding, ('source', 'id'), ('agents', 'version', 'when', 'introduced_by'), family='source')
             alias(binding['source'])
             c.skill_id(binding['id'])
+        import mask_resolve
+        mask_resolve.bundle_bindings(bundle['skills'])
     return value
 
 
