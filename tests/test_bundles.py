@@ -20,6 +20,8 @@ class BundleTests(PublicFixture):
         self.call('tap', 'fetch', TAP)
 
     def call(self, *args, code=0, **kwargs):
+        if args[0] in ('install', 'upgrade'):
+            args = (*args, '--no-update')  # Fixture taps only; never refresh the real program checkout.
         run = self.raw(*args, '--json', **kwargs)
         self.assertEqual(run.returncode, code, run.stdout + run.stderr)
         self.assertEqual(run.stderr, '', run.stderr)
@@ -339,3 +341,35 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.assertIn('catalogue', self.declaration()['sources'])
         refused = self.call('untap', 'catalogue', code=4)
         self.assertEqual(refused['error']['code'], 'source.referenced')
+
+    def test_cold_approved_catalog_browse_offline_refusal_and_live_acquisition(self):
+        cold = self.base / 'cold-machine'
+        self.call('tap', TAP, self.upstream, '--home', cold)
+        listed = self.call('bundle', 'list', '--home', cold)
+        self.assertEqual(listed['data']['unavailable'][0]['source'], TAP)
+        refused = self.call('bundle', 'apply', TAP + '/first', '--home', cold, '--offline', code=4)
+        self.assertEqual(refused['error']['code'], 'bundle.catalog_required')
+        self.assertFalse((self.project / '.mask.json').exists())
+        installed = self.call('bundle', 'apply', TAP + '/first', '--home', cold)
+        self.assertEqual(installed['data']['network'], 'fetch')
+        self.assertEqual(installed['data']['acquisitions'][0]['source'], TAP)
+        self.assertEqual(self.selected(), {TAP + '/alpha'})
+
+    def test_exclusive_explicit_version_refresh_changes_only_authorized_lock(self):
+        old = self.git(self.source, 'rev-parse', 'HEAD')
+        self.index['bundles']['first']['skills'][0]['version'] = {'commit': old}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.apply_bundle()
+        self.call('install', TAP + '/beta')
+        beta = next(row for row in self.lock()['packages'] if row['id'] == 'beta')
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('\nNew explicitly selected version.\n')
+        changed = self.publish_index()
+        self.index['bundles']['first']['skills'][0]['version'] = {'commit': changed}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        preview = self.call('bundle', 'refresh', TAP + '/first', '--dry-run')
+        self.assertEqual(preview['data']['bundle_changes']['changed'][0]['skill'], TAP + '/alpha')
+        self.call('bundle', 'refresh', TAP + '/first', '--approve-plan', preview['data']['plan_hash'])
+        rows = {row['id']: row for row in self.lock()['packages']}
+        self.assertEqual(rows['alpha']['commit'], changed)
+        self.assertEqual(rows['beta'], beta)

@@ -3,7 +3,7 @@
 This bounded 2026-10-02 handoff implements only the named RFC bundle portion of
 MASK-0064. Upstream owns the real [ASK-0095 card](../../../AgentSkills/docs/issues/30-in-progress/ASK-0095-canonical-rfc-bundle.md)
 under RFC-ASK-0015; its mutable tracker is not copied here. Canonical source candidate
-`fb67261b` adds source index schema v1 with all 16
+`fb67261a5fd8a69231e963226189fd98458e4d82` adds source index schema v1 with all 16
 existing packages and flat `agentskills/rfc`: author-rfc, grill-rfc, grill-me,
 implement-rfc. Individual installation remains supported.
 
