@@ -68,13 +68,14 @@ canonical-handoff and upkeep exits pass. RFC_BASE_SHA above stays unchanged; thi
 slice's live intake baseline is `4b983e3516cf0928e2eeff2ce35e9c84ff10e1ee`.
 
 Runtime implementation: `ab625a6e1735a3d79fda24ae5b6c52355d465014`; exact verified
-MASK candidate: `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Canonical AgentSkills
+MASK candidate: `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. MASK-0042
+acceptance commit: `8181738c38553679d96b7179658b5240af29798c`. Canonical AgentSkills
 candidate: `fb67261a5fd8a69231e963226189fd98458e4d82`; upstream ASK-0095 acceptance:
 `b9e413673b7dc7b618487def3831049451010632`. [Evidence](../../development/named-bundles-evidence.json)
 records the actual commands, outcomes and corrections: first 70-test regression
 pass; final 23-test public/renderer pass; canonical four-skill installation with
 reviewed setup, healthy status and all 16 package discoveries. Two preexisting
-native/POSIX skips in the selected 81-test run remain declared. Initial human
+native Windows skips (junction behavior and symlink error mapping) in the selected 81-test run remain declared. Initial human
 preview/help issues and clean-checkout fixture auto-refresh failures were corrected
 and directly rechecked; the failed exact-candidate receipt is retained.
 

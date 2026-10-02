@@ -549,7 +549,11 @@
       "elapsed_seconds": 172.436,
       "exit_code": 1,
       "outcome": "failures corrected",
-      "detail": "Two new bundle assertions/presentation cases and four missing-help subtests failed. Existing selected manifest/recovery/target/user/CLI cases passed. Eight affected public/renderer tests then passed; final 23-test run passes."
+      "detail": "Two new bundle assertions/presentation cases and four missing-help subtests failed. Existing selected manifest/recovery/target/user/CLI cases passed. Eight affected public/renderer tests then passed; final 23-test run passes.",
+      "skip_reasons": [
+        "native Windows junction case",
+        "native Windows symlink error mapping"
+      ]
     },
     {
       "command": "python3 -B -m unittest three corrected public bundle cases tests.test_human_output.RendererRegistry",
@@ -607,5 +611,6 @@
     "macOS disposable fixtures; no native Windows claim.",
     "No real consumer deployment, push, publication, persistent approval, credential or permission change."
   ],
-  "command_state": "All test, setup, Git and verification commands ended. No review server or background process retained. All disposable consumers/remotes/machine roots cleaned by TemporaryDirectory."
+  "command_state": "All test, setup, Git and verification commands ended. No review server or background process retained. All disposable consumers/remotes/machine roots cleaned by TemporaryDirectory.",
+  "mask_acceptance_commit": "8181738c38553679d96b7179658b5240af29798c"
 }
