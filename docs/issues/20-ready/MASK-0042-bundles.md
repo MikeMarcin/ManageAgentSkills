@@ -2,9 +2,9 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0042"
 title: "Implement flat named bundle expansion and guarded refresh"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0010"]
-depends_on: ["MASK-0041"]
+depends_on: []
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "bundles", "stage": "C — portable composition", "provisional_id": false}
 ---
 
@@ -16,7 +16,10 @@ Governing RFC: [RFC-MASK-0010](../../rfcs/RFC-MASK-0010-portable-selections-and-
 
 Expand source-revision-bound bundles to explicit binding sets. Preserve manual target intent and overlapping membership, report conflicts, require source approval, stale changed definitions, and avoid naive bundle deletion/dependency execution.
 
-Own only: `mask_profiles.py`, `mask_sources.py`, `tests/test_bundles.py (new)`. Coordinate shared files with the integrator; no unrelated consumer or source publication is implied.
+Own the named-bundle runtime, public CLI/planner integration, selection schemas,
+focused public tests and truthful affected documentation. The owner explicitly
+authorized both source repositories for the canonical `agentskills/rfc` handoff.
+No profile/fleet implementation or consumer migration is implied.
 
 ## Acceptance and focused verification
 
@@ -31,4 +34,10 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+2026-10-02 mandate `named-bundles-v1`, strategy amendment: the owner said
+"dont use direct"; coordinator-implementer replaces the earlier direct request.
+The dispatched rfc-implementer owns this complete milestone without delegation.
+MASK-0041 remains open and unimplemented. Its full export/import prerequisite is
+removed for this bounded card because the shipped v2 selection, exact-lock,
+planner and recovery engines already support explicit bundle expansion.
+This refinement neither accepts nor implements profile export/import.
