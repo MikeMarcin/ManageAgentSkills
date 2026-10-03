@@ -456,7 +456,7 @@ def peeled_commit(root, revision):
 
 
 def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,
-        max_output=16 * 1024 * 1024, monitor=None):
+        max_output=16 * 1024 * 1024, monitor=None, index=None, commit_hooks=False):
     selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
                  'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
                  'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
@@ -464,14 +464,20 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
     environment.update(GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_MERGE_AUTOEDIT='no', GCM_INTERACTIVE='never',
                        GIT_ASKPASS=os.devnull, SSH_ASKPASS=os.devnull, MASK_INTERNAL_GIT='1',
                        GIT_NO_REPLACE_OBJECTS='1', GIT_NO_LAZY_FETCH='1')
+    if index is not None:
+        environment['GIT_INDEX_FILE'] = str(index)
+    if commit_hooks and (not args or args[0] != 'commit'):
+        fail('internal.invariant', 'Normal hooks are restricted to explicitly authorized Git commits.', 10)
+    if commit_hooks:
+        environment.pop('MASK_INTERNAL_GIT', None)
     if not environment.get('GIT_SSH') and not environment.get('GIT_SSH_COMMAND'):
         environment['GIT_SSH_COMMAND'] = 'ssh -o BatchMode=yes'
     if inspect_hooks and (not args or args[0] not in ('config', 'rev-parse')):
         fail('internal.invariant', 'Hook-path inspection is restricted to observational Git commands.', 10)
-    hook_options = [] if inspect_hooks else ['-c', 'core.hooksPath=' + os.devnull]
+    hook_options = [] if inspect_hooks or commit_hooks else ['-c', 'core.hooksPath=' + os.devnull]
     # Older Git ignores these settings; capable Git disables every known event.
     # An environment token alone cannot suppress third-party configured hooks.
-    if not inspect_hooks:
+    if not inspect_hooks and not commit_hooks:
         for event in HOOK_EVENTS:
             hook_options.extend(('-c', f'hook.{event}.enabled=false'))
     command = ['git', *hook_options, '-c', 'core.fsmonitor=false', '-C', str(root), *args]

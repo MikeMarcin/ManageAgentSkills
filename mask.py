@@ -107,7 +107,7 @@ COMMANDS = {
     'lock': (True, False, [('project', 'value'), ('user', 'flag'), ('refresh', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag')]),
     # brew/apt vocabulary: update refreshes what is available (this program and the taps); upgrade moves consumers to it.
     'update': (True, True, []),
-    'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag')]),
+    'upgrade': (True, True, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('offline', 'flag'), ('allow-setup', 'repeat'), ('repair', 'flag'), ('commit', 'flag')]),
     'self.status': (False, False, []),
     'self.install': (True, False, [('bin-dir', 'required')]),
     'self.uninstall': (True, False, []),
@@ -206,6 +206,8 @@ CONFLICTS['source.fetch'] = {'name': ['locked'], 'locked': ['name'], 'project': 
 
 def validate_arguments(args):
     command = args.command
+    if command == 'upgrade' and getattr(args, 'commit', False) and getattr(args, 'user', False):
+        raise MaskError('invocation.invalid', '--commit requires a project scope; personal controls are never committed.', 2)
     if command == 'ensure' and getattr(args, 'repair', False) and getattr(args, 'event', 'manual') != 'manual':
         raise MaskError('invocation.invalid', '--repair is a manual command and cannot be used by startup hooks.', 2)
     for key, conflicts in CONFLICTS.get(command, {}).items():

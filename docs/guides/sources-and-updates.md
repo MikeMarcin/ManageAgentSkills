@@ -31,6 +31,36 @@ collects one review if needed, then applies and verifies. `--dry-run` and
 `--approve-plan HASH` use cached content without fetching. JSON and redirected
 commands never prompt. Declining significant actions leaves consumers untouched.
 
+Use `mask upgrade --commit` to record the final changed `.mask.json` and
+`.mask.lock.json` after readiness succeeds. Existing staged, unstaged, partially
+staged and untracked changes to those controls are included in full, even when
+versions were already current. Unrelated staging and working files are preserved;
+setup outputs stay outside the commit. The message is `chore(mask): upgrade skills`.
+Normal Git identity, hooks and signing apply, with the configured Git timeout.
+MASK creates no empty commit and never pushes.
+
+`--all --commit` makes at most one commit per eligible project on its current
+branch, including linked worktrees. Personal skills upgrade normally and report
+`not_applicable`; `--user --commit` is invalid. Prospective differing controls need
+an attached branch with an existing HEAD, regular nonignored controls, no unmerged
+entries and no active merge, rebase, cherry-pick, revert or bisect. An ineligible
+project refuses before consumer changes; under `--all` only that project is blocked.
+Controls that already match HEAD need no commit eligibility check.
+
+Preview with `mask upgrade --commit --dry-run --json`, then pass the shown hash
+with `--approve-plan`. The preview discloses paths, existing changes, message and
+eligibility without staging or running hooks. Commit intent, Git identity, branch,
+HEAD, controls and staging bind the hash; changed observations refuse as `plan.stale`
+before consumer effects. Git state and final controls are rechecked before committing.
+
+A Git failure does not undo an applied upgrade or successful commits in other
+projects. A scoped failure returns `upgrade.commit_failed` (exit 5); aggregate
+blocking or commit failures return `upgrade.incomplete` (exit 4), with per-project
+outcomes. If setup or readiness fails, commits remain `not_attempted`. Created
+commits and hook effects are inspected and reported even after a timeout. Retry
+can record pending controls without duplicating completed commits. Recovery does
+not roll back, amend or resume these Git commits.
+
 For a branch selector, an upgrade keeps the existing exact lock when that package's
 path, bytes, executable modes, metadata and provenance are unchanged. Commits to
 other skills or repository bookkeeping do not advance its lock. This lets a skill

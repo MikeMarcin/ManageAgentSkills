@@ -127,6 +127,8 @@ def dispatch(args, output, home):
     import mask
     import mask_selection as selection
     import mask_store as store
+    import mask_upgrade_commit as commits
+    commit_requested = getattr(args, 'commit', False)
     if c.kind(home / 'pending.json') != 'missing':
         c.fail('recovery.required', 'Recover the pending operation before updating.', 8)
     config = c.config(c.read_json(home / 'config.json'))
@@ -139,23 +141,33 @@ def dispatch(args, output, home):
     for root in roots:
         scope = c.consumer_scope(state, root)
         c.registered_root(root, records[str(root)], scope)
-        declaration = r.selection(c.read_json(c.declaration_path(root, scope, home), 'manifest'))
+        unsafe = commit_requested and scope == 'project' and any(c.kind(root / path) != 'file' for path in commits.PATHS)
+        error = c.MaskError('upgrade.commit_ineligible', 'Both project controls must be regular files.', 4,
+                            details=dict(root=str(root))).as_dict() if unsafe else None
+        # An unsafe control is never followed, read or rewritten. Its last declared
+        # selection identifies a blocked consumer for aggregate/skill disclosure.
+        declaration = r.selection(records[str(root)]['last_manifest'] if unsafe else
+                                  c.read_json(c.declaration_path(root, scope, home), 'manifest'))
         bindings = {r.coordinate(binding) for binding in declaration['skills']}
         declared |= bindings
         named = sorted(set(requested) & bindings)
         if not requested or named:
             consumers.append(dict(root=root, scope=scope, declaration=declaration, skills=named,
-                                  row=dict(root=str(root), scope=scope, status='unchanged', changes=[], error=None)))
+                                  row=dict(root=str(root), scope=scope, status='blocked' if unsafe else 'unchanged', changes=[], error=error)))
     if len(set(requested)) != len(requested) or set(requested) - declared:
         c.fail('invocation.invalid', '--skill requires unique SOURCE/ID coordinates declared by the selected consumers.', 2)
     if not consumers:
         output['data'] = dict(consumers=[], fetches={}, network='none')
+        if commit_requested:
+            output['data']['commits'] = []
         output['warnings'].append(dict(code='project.empty_registry', message='No registered consumers selected.'))
         return
-    observed = [(item['root'], item['scope']) for item in consumers]
+    observed = [(item['root'], item['scope']) for item in consumers if item['row']['status'] != 'blocked']
     before = pinned.snapshot(home, observed)
     active, taps, selectors = [], set(), {}
     for item in consumers:
+        if item['row']['status'] == 'blocked':
+            continue
         if records[str(item['root'])].get('mode') == 'dev-link':
             if scoped:
                 c.fail('dev_link.active', 'Return the development link to pins before updating this consumer.', 4, root=str(item['root']))
@@ -175,6 +187,8 @@ def dispatch(args, output, home):
     fetching = not (output['dry_run'] or getattr(args, 'catalog_refreshed', False) or getattr(args, 'offline', False) or getattr(args, 'expect_plan_hash', None) is not None)
     fetches = {name: dict(NOT_ATTEMPTED) for name in sorted(taps)}
     disclosure = dict(consumers=rows, fetches=fetches, network='fetch' if fetching and taps else 'none')
+    if commit_requested:
+        disclosure['commits'] = [commits.result_row(item['root'], item['scope']) for item in consumers]
     output['data'] = dict(disclosure)  # A refusal after the fetch phase still discloses its effects.
     failures = {}
     if fetching and taps:
@@ -189,7 +203,8 @@ def dispatch(args, output, home):
                 if error is not None:
                     failures[name] = error
     import mask_bundles as bundles
-    locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers, blocked = {}, {}, {}, [], {}, [], []
+    locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers = {}, {}, {}, [], {}, []
+    blocked = [item['row']['root'] for item in consumers if item['row']['status'] == 'blocked']
     for item in active:
         row = item['row']
         failed = [name for name in item['taps'] if name in failures]
@@ -230,6 +245,7 @@ def dispatch(args, output, home):
             blocked.append(row['root'])
             continue
         locks[row['root']] = proposal
+        item['previous_lock'] = previous
         proposals[row['root']] = declaration
         descriptors[row['root']] = definitions
         row.update(status='unchanged' if proposal == previous and declaration == item['declaration'] else 'updated', changes=changes(previous, proposal))
@@ -240,6 +256,30 @@ def dispatch(args, output, home):
             row['bundle_changes'] = update
             bundle_updates.append(update)
         planned_consumers.append(item)
+    commit_rows, commit_observations, final_controls = [], {}, {}
+    if commit_requested:
+        for item in consumers:
+            key, scope = item['row']['root'], item['scope']
+            final = commits.controls(item['root']) if scope == 'project' else {}
+            if item in planned_consumers and scope == 'project':
+                if proposals[key] != item['declaration']:
+                    final['.mask.json'] = c.text_json(proposals[key]).encode('utf-8')
+                if locks[key] != item['previous_lock']:
+                    final['.mask.lock.json'] = c.text_json(locks[key]).encode('utf-8')
+            row, observed_git = commits.plan(item['root'], scope, final, config['git_timeout_seconds'],
+                                             skipped=item not in planned_consumers)
+            if item['row']['status'] == 'blocked' and scope == 'project':
+                row.update(status='blocked', error=item['row']['error'])
+            commit_rows.append(row)
+            if observed_git is not None:
+                commit_observations[key] = observed_git
+                final_controls[key] = final
+            if row['status'] == 'blocked' and item in planned_consumers:
+                item['row'].update(status='blocked', error=row['error'])
+                blocked.append(key)
+        disclosure['commits'] = commit_rows
+        output['data'].update(disclosure)
+        planned_consumers = [item for item in planned_consumers if item['row']['status'] != 'blocked']
     selected = [item['root'] for item in planned_consumers]
 
     def candidate_plan():
@@ -249,7 +289,15 @@ def dispatch(args, output, home):
                           operation='upgrade', payload_views=payload_views, repair_roles=True, retire_files=False)
         planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=[row for row in rows if row['status'] == 'blocked'],
                                              bundles=descriptors,
-                                             skipped=[row['root'] for row in rows if row['status'] == 'skipped']))
+                                             skipped=[row['root'] for row in rows if row['status'] == 'skipped'],
+                                             commit=dict(enabled=commit_requested, rows=commit_rows,
+                                                         observations={key: commits.fresh_observation(item['root'], commit_observations[key], config['git_timeout_seconds'])
+                                                                       for item in consumers if (key := item['row']['root']) in commit_observations})))
+        if commit_requested:
+            planned['commit_would_change'] = any(row['status'] == 'planned' for row in commit_rows)
+            planned['commits'] = commit_rows
+            if scoped:
+                planned['blockers'].extend(row['error'] for row in commit_rows if row['status'] == 'blocked')
         planned['bundle_updates'] = bundle_updates
         return planned
 
@@ -271,7 +319,34 @@ def dispatch(args, output, home):
                 old = r.lock(r.read_model(r.lock_path(item['root'], item['scope'], home), 'lock')[0])
                 store.ensure(home, item['declaration'], old, config, offline=True, coordinates=sorted(retired), effects=observation['effects'])
     import mask_lifecycle
-    mask_lifecycle.execute(args, output, home, config, selected, before_selected, candidate_plan, prepare,
-                           details=dict(disclosure, host_load='not_verified'))
+    try:
+        mask_lifecycle.execute(args, output, home, config, selected, before_selected, candidate_plan, prepare,
+                               details=dict(disclosure, host_load='not_verified'))
+    except (Exception, KeyboardInterrupt):
+        for row in commit_rows:
+            if row['status'] == 'planned':
+                row['status'] = 'not_attempted'
+        raise
+    commit_errors = []
+    if commit_requested and not output['dry_run']:
+        for row in commit_rows:
+            if row['status'] == 'planned':
+                progress.phase('Committing project controls at ' + row['root'])
+                try:
+                    commits.execute(row, commit_observations[row['root']], final_controls[row['root']], config['git_timeout_seconds'])
+                except KeyboardInterrupt:
+                    for remaining in commit_rows:
+                        if remaining['status'] == 'planned':
+                            remaining['status'] = 'not_attempted'
+                    raise
+                finally:
+                    if row['commit']:
+                        output['changed'] = True
+            if row['error']:
+                commit_errors.append(row['error'])
+        if scoped and commit_errors:
+            c.fail('upgrade.commit_failed', 'The upgrade is applied, but its Git commit did not complete cleanly.', 5, errors=commit_errors)
     if blocked and not output['dry_run']:
-        c.fail('upgrade.incomplete', 'Some selected consumers were blocked and not upgraded; the others were applied.', 4, blocked=blocked)
+        c.fail('upgrade.incomplete', 'Some selected consumers were blocked and not upgraded; the others were applied.', 4, blocked=blocked, errors=commit_errors)
+    if commit_errors and not output['dry_run']:
+        c.fail('upgrade.incomplete', 'Some project commits failed; applied upgrades and successful commits were retained.', 4, errors=commit_errors)

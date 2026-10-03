@@ -80,6 +80,7 @@ checkout without upgrading versions.
 | Update MASK itself and fetch your taps | `mask update` |
 | Upgrade every registered checkout and personal skills | `mask upgrade --all` |
 | Upgrade this checkout | `mask upgrade` |
+| Upgrade and commit changed project controls | `mask upgrade --commit` |
 | Upgrade personal skills | `mask upgrade --user` |
 | Preview unused storage and backups | `mask cleanup --dry-run` |
 
@@ -115,6 +116,7 @@ Ordinary `upgrade`, including `--all`, includes installed bundles too. Bundle un
 contribution while preserving other selections and held or locally edited members. See [bundle contributions](docs/guides/declarations.md#named-bundles).
 
 - `update` refreshes MASK and the tap catalogs; `upgrade` changes selected skill versions and makes them ready. Install/upgrade refresh automatically when needed. `--no-update` skips that preliminary refresh; `--offline` forbids network access altogether.
+- `upgrade --commit` creates one local commit per successful project after readiness, including existing changes to `.mask.json` and `.mask.lock.json`. It preserves unrelated staging and uses normal Git hooks and signing. Under `--all`, personal skills upgrade normally without a commit. `--user --commit` is invalid. Commit failures preserve applied upgrades; no push occurs.
 - `--dry-run` previews without fetching, writing or running setup. `--json` gives scripts structured output and never prompts.
 - Setup scripts and replacement of edited native role files share one review before any consumer changes. Automation approves the exact preview with `--approve-plan HASH`. Replaced files are backed up.
 - `cleanup` deletes verified unused storage and disposable backups only when explicitly invoked and reviewed. It preserves referenced versions, active locks, pending recovery and unknown content.

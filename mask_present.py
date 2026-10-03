@@ -649,6 +649,21 @@ def consumer_count(rows):
     return ' and '.join(parts) or 'no consumers'
 
 
+def commit_lines(data):
+    lines = []
+    for row in data.get('commits') or []:
+        label = clean(row['root']) + (' (personal)' if row['scope'] == 'user' else '')
+        detail = clean(row['status']) + (f" {short(row['commit'])}" if row.get('commit') else '')
+        lines.append(f'  Git commit: {label}: {detail}')
+        if row['status'] == 'planned':
+            lines.append('    paths: ' + ', '.join(row['paths']) + '; message: ' + clean(row['message']))
+            if row['included_existing_changes']:
+                lines.append('    includes existing changes: ' + ', '.join(row['included_existing_changes']))
+        if row.get('error'):
+            lines.append('    ' + clean(row['error']['message']) + ' (' + clean(row['error']['code']) + ')')
+    return lines
+
+
 def render_upgrade(data, output):
     """upgrade: fetch results, then the outcome, consumers and follow-ups that carry news."""
     rows = data.get('consumers') or []
@@ -658,8 +673,11 @@ def render_upgrade(data, output):
         head = f"Would upgrade {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
             'Would reconcile links and workflow setup; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to upgrade (dry run: cached taps only).'
     elif output['changed']:
-        head = f"Upgraded {plural(moved, 'skill')} in {touched}." if moved else 'Reconciled links and workflow setup; no skill versions changed.'
-        if output['transaction'] != 'committed':
+        recorded = sum(bool(row.get('commit')) for row in data.get('commits') or [])
+        head = f"Upgraded {plural(moved, 'skill')} in {touched}." if moved else \
+            f"Recorded {plural(recorded, 'Git commit')}; no skill versions changed." if recorded and output['transaction'] == 'not_needed' else \
+            'Reconciled links and workflow setup; no skill versions changed.'
+        if output['transaction'] not in ('committed', 'not_needed'):
             head += f" Transaction: {output['transaction']}."
     elif output['would_change']:
         head = 'Upgrade proposed; nothing applied.'
@@ -689,7 +707,8 @@ def render_upgrade(data, output):
     notes.extend(workflow_lines(data, quiet_ready=True))
     notes.extend(setup_lines(data))
     notes.extend(backup_lines(data))
-    if output['changed']:
+    notes.extend(commit_lines(data))
+    if output['changed'] and (moved or output['actions']):
         notes.append('  Restart running agents to load the new versions.')
     return lines + ([''] + notes if notes else []) + plan_guard(data, output)
 
@@ -1049,6 +1068,7 @@ def task_review(proposal, output):
         if row['setup']:
             parts.append('setup ' + joined(row['setup']))
         lines.append(f"  {clean(root)}  {'; '.join(parts) or 'check readiness'}")
+    lines.extend(commit_lines(output['data']))
     # One code disclosure can cover several consumers of the same frozen payload.
     for item in shared.values():
         action = item['action']
@@ -1140,6 +1160,7 @@ def render_error(output):
     if setup.get('confirmation') and output['dry_run'] and data.get('plan_hash'):
         lines.append(f"  plan hash: {data['plan_hash']}")
     lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
+    lines.extend(commit_lines(data))
     if output.get('changed') and output['transaction'] != 'not_started':
         lines.extend(action_summary(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
     retained = data.get('retained_preparation')

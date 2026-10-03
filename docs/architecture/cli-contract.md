@@ -52,6 +52,30 @@ operation types require advanced inspection and an explicit recovery direction.
 versions then makes the selected installations ready, even when versions do not
 change. Missing required inputs are diagnosed before consumer mutation.
 
+## Optional upgrade commits
+
+`upgrade --commit` authorizes local commits of each selected project's final
+`.mask.json` and `.mask.lock.json` files that differ from HEAD, including existing
+uncommitted changes. Commit-only work sets `would_change`; an actual created commit
+sets `changed`. Unrelated index entries and working files are preserved. The option
+has no persistent default, extra commit prompt, push, setup-output inclusion or
+personal-control commit. `--user --commit` returns exit 2 before refresh or effects.
+Normal Git hooks, identity and signing use the configured Git timeout.
+
+Commit eligibility and observations bind the task preview before consumer effects.
+Commits run only after activation, setup and readiness succeed, outside the MASK
+filesystem transaction and recovery journal. Ineligible scoped candidates return
+`upgrade.commit_ineligible` (exit 4); commit failures return `upgrade.commit_failed`
+(exit 5), preserving applied upgrades. Aggregate blocking and Git failures return
+`upgrade.incomplete` (exit 4) while retaining successful project commits.
+
+With the option, `data.commits` contains one row per selected consumer: `root`,
+`scope`, `status`, `paths`, `included_existing_changes`, `message`, `before_head`,
+`after_head`, `commit` and nullable structured `error`. Git IDs can be null. Statuses
+are `planned`, `not_needed`, `not_applicable`, `blocked`, `not_attempted`, `committed`,
+`failed` and `unknown`. An observed commit remains visible even when Git errors or
+post-commit checks fail. `transaction` continues to describe filesystem effects.
+
 ## Review and JSON
 
 The task pipeline is resolve, inspect, review, prepare, apply, verify. A single

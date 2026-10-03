@@ -29,6 +29,7 @@ def review(args, output, planned, rows):
     planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], command=getattr(args, 'public_command', args.command),
                                        setup=[row.get('fingerprint', row) for row in rows], review=significant))
     fs.public_plan(planned, output)
+    output['would_change'] |= planned.get('commit_would_change', False)
     if rows:
         output['data']['setup'] = dict(actions=rows)
     expected = getattr(args, 'expect_plan_hash', None)
