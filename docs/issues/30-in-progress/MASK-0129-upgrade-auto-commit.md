@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0129"
 title: "Upgrade project controls with optional isolated Git commits"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0024"]
 depends_on: []
 metadata: {"milestone_plan":{"id":"upgrade-auto-commit","path":"docs/rfcs/plans/upgrade-auto-commit/milestone-plan.json"}}

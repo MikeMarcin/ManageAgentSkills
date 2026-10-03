@@ -14,7 +14,7 @@ metadata: {"milestone_plan":{"id":"upgrade-auto-commit","path":"docs/rfcs/plans/
 ## Scope and acceptance
 
 Cover all acceptance in [RFC-MASK-0024](../../rfcs/RFC-MASK-0024-upgrade-auto-commit.md).
-The planned implementation card is [MASK-0129](../20-ready/MASK-0129-upgrade-auto-commit.md).
+The planned implementation card is [MASK-0129](../30-in-progress/MASK-0129-upgrade-auto-commit.md).
 Authorized live adoption records RFC_BASE_SHA and implementation revisions.
 RFC_BASE_SHA: `c8201e2eeef5d7d06b3d6526e63669570182fdbc`.
 Mandate: `upgrade-auto-commit`, revision 2. Owner: `/root/upgrade_commit`.
