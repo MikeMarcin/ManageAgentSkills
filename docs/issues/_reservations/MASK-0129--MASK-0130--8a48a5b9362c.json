@@ -1,0 +1,11 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0129",
+    "MASK-0130"
+  ],
+  "reserve_for": "upgrade-auto-commit",
+  "purpose": "Optional local upgrade commits and closeout",
+  "created": "2026-10-03T22:07:59.860381+00:00",
+  "base": "40080e0f739cee53390e93428e9d17daa5a983aa"
+}
