@@ -1,0 +1,92 @@
+{
+  "mandate_revision": "named-bundles-v2",
+  "segment_id": "coordinator-implementer-install-uninstall",
+  "authorization": "Owner: Make the admendment to the rfc and update it, after agreeing bundle install/uninstall vocabulary.",
+  "prior_checkpoint": {
+    "schema": "implement-rfc.milestone-checkpoint.v1",
+    "run_id": "mask-named-bundles-20261002",
+    "segment_id": "coordinator-implementer",
+    "mandate_revision": "named-bundles-v1",
+    "selection": {
+      "schema": "implement-rfc.strategy-selection.v1",
+      "strategy": "coordinator-implementer",
+      "topology_id": "coordinator-implementer",
+      "recipe_revision": "2",
+      "recipe_fingerprint": "sha256:f798ea0d5a9d86b935f1ffffe53670a9ac2a310037ceac6f960795b91a20b0e3",
+      "routing": {},
+      "requirement_profile": "coordinator-implementer",
+      "owners": {
+        "engineering": "implementer",
+        "bookkeeping": "implementer",
+        "product_edits": "implementer"
+      },
+      "delegation": "recipe",
+      "instruction_paths": [
+        "references/engineering-contract.md",
+        "references/strategies/coordinator-implementer.md"
+      ],
+      "configuration_complete": true,
+      "missing_routes": [],
+      "host_load": "not_verified"
+    },
+    "target": "MASK-0042",
+    "binding": {
+      "plan_id": "named-bundles",
+      "plan_path": "docs/rfcs/plans/named-bundles/milestone-plan.json",
+      "milestone_id": "named-bundles",
+      "definition_fingerprint": "sha256:77aa3397e97546aa09f3a51b4787f5399eeedc645aa629354e9788df0bff4022",
+      "obligations": [
+        {
+          "id": "MASK-0042:*",
+          "source": "MASK-0042",
+          "selector": null,
+          "source_fingerprint": "sha256:6d67e3265f9ddef1d187fa0decb556e366b204c459291c1ddb19b6d482ede615"
+        }
+      ],
+      "obligation_fingerprint": "sha256:038d4393a9cb4e935455168eb2f3840b62162c38521717835ae1c10e91a64a89",
+      "exit_criteria": [
+        {
+          "id": "named-bundles:exit:1",
+          "text": "The public bundle journeys, source-revision/digest guards, contribution-bounded refresh removals, conflict refusal, holds and setup/recovery checks pass."
+        },
+        {
+          "id": "named-bundles:exit:2",
+          "text": "AgentSkills ASK-0095 supplies the actual four-skill canonical RFC bundle revision and preserves all package discovery; MASK-0064 records the bounded handoff."
+        },
+        {
+          "id": "named-bundles:exit:3",
+          "text": "Affected documentation and advertised capabilities match implementation; explicit-path commits and durable evidence are complete; task-owned commands and writers are quiescent."
+        }
+      ],
+      "prerequisite_fingerprint": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "structural": "valid",
+      "references": "resolved",
+      "semantic_coverage": "unknown",
+      "diagnostics": [],
+      "diagnostics_truncated": false
+    },
+    "target_milestones": [
+      "named-bundles"
+    ],
+    "repository_state": {
+      "source_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+      "workflow_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+      "source_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+      "workflow_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+      "source_branch": "main",
+      "source_revision": "1b6d2bf8546994648d14afa1a04d80b0661fdcda",
+      "workflow_branch": "main",
+      "workflow_revision": "1b6d2bf8546994648d14afa1a04d80b0661fdcda"
+    }
+  },
+  "followup_issues": [
+    "MASK-0128",
+    "AgentSkills:ASK-0096"
+  ],
+  "changes": [
+    "Replace pre-release bundle apply with install without alias",
+    "Add removal of named frozen local contribution, preserving manual/overlap/held/locally edited skills",
+    "Preserve prior acceptance and profiles/fleet/native-host pending obligations"
+  ],
+  "ownership": "Same non-delegating leaf; prior commands ended, no other writer or review candidate"
+}

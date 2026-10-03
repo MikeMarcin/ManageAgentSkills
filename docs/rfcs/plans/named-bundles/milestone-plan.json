@@ -4,22 +4,26 @@
   "scope": {
     "rfcs": [],
     "issues": [
-      "MASK-0042"
+      "MASK-0042",
+      "MASK-0128"
     ]
   },
   "milestones": [
     {
       "id": "named-bundles",
-      "outcome": "Public flat bundle list/show/apply/refresh preserves exact locks, manual and overlapping selections through guarded lifecycle/recovery, and the canonical AgentSkills RFC bundle installs ready in a disposable consumer.",
+      "outcome": "Public flat bundle list/show/install/uninstall/refresh preserves exact locks, manual and overlapping selections through guarded lifecycle/recovery, and the canonical AgentSkills RFC bundle installs ready in a disposable consumer.",
       "work": [
         {
           "issue": "MASK-0042"
+        },
+        {
+          "issue": "MASK-0128"
         }
       ],
       "depends_on": [],
       "exit_criteria": [
-        "The public bundle journeys, source-revision/digest guards, contribution-bounded refresh removals, conflict refusal, holds and setup/recovery checks pass.",
-        "AgentSkills ASK-0095 supplies the actual four-skill canonical RFC bundle revision and preserves all package discovery; MASK-0064 records the bounded handoff.",
+        "The public bundle install/uninstall/refresh journeys, source-revision/digest guards, contribution-bounded removals, conflict refusal, holds and setup/recovery checks pass.",
+        "AgentSkills ASK-0095 and follow-up ASK-0096 supply the actual four-skill canonical RFC bundle revision and revised command verification while preserving all package discovery; MASK-0064 records the bounded handoff.",
         "Affected documentation and advertised capabilities match implementation; explicit-path commits and durable evidence are complete; task-owned commands and writers are quiescent."
       ],
       "boundary": "Only named bundles and canonical source handoff; profiles/fleet/native host loading remain separately open. No push/publication, permission or credential changes."

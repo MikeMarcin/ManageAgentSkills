@@ -94,3 +94,16 @@ review is imposed or substituted. MASK-0041/profile subscription/export/frozen-a
 and broader MASK-0064/fleet/native host-loading work remain outside this mandate.
 Next eligible continuation is coordinator selection of newly authorized scope;
 RFC-MASK-0010 remains Implementing with its other acceptance rows open.
+
+## Active install/uninstall amendment checkpoint
+
+Owner authorized `named-bundles-v2`; same leaf and preserved coordinator-implementer
+strategy, new segment `coordinator-implementer-install-uninstall`. Intake HEADs:
+MASK c3fdaf8676329d056c471be1797695e6e3d90771; AgentSkills
+b9e413673b7dc7b618487def3831049451010632. Prior commands were quiescent and
+repositories clean. Follow-up MASK-0128 / upstream ASK-0096 are claimed before
+source changes. Existing plan now includes this amendment; historical acceptance
+and RFC_BASE_SHA are preserved. Frontier: implement install vocabulary and receipt-
+bounded uninstall, then public removal/reinstall/recovery tests and canonical
+verification. No required human review. Profiles/fleet/native host loading remain
+outside the mandate. Ownership releases only after final cleanup and return.

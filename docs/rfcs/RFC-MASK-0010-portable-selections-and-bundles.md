@@ -40,8 +40,9 @@ mask profile subscribe LOCATION --user
 mask profile unsubscribe PROFILE --user
 mask bundle list [--source SOURCE]
 mask bundle show SOURCE/NAME
-mask bundle apply SOURCE/NAME [--project PATH | --user] [--replace]
+mask bundle install SOURCE/NAME [--project PATH | --user] [--replace]
 mask bundle refresh SOURCE/NAME [--project PATH | --user]
+mask bundle uninstall SOURCE/NAME [--project PATH | --user]
 ```
 
 All mutations support dry-run/guards; export writes only an explicit output destination and refuses unrelated existing files. Default import is an incremental merge. `--replace` deliberately replaces only the selected local declaration contribution, not all subscribed profiles or unrelated unmanaged skills. Plain exports default to the local contribution; `--effective` produces a self-contained flattened view and labels the loss of live subscription semantics. Do not clone profile internal machine state.
@@ -58,9 +59,20 @@ Bundle definitions belong in a versioned source index or a portable profile repo
 
 Flat bundles only: no recursive includes, dependency solver, post-install commands, or hidden source enrollment. If a bundle references an unapproved source, report the prerequisite before any consumer edit. Expansion must yield a collision-free candidate selection before commit/apply. A changed definition invalidates its plan hash.
 
-Apply defaults to set union and does not overwrite a manual per-skill target override. A conflict returns the competing origins for an explicit choice. `--replace` means exact resulting local selection, with its removals shown. Record `introduced_by` for explanation, not as a license to delete a shared skill later.
+Install defaults to set union and does not overwrite a manual per-skill target override. A conflict returns the competing origins for an explicit choice. `--replace` replaces only the named local bundle contribution, with its exclusive removals shown. Record `introduced_by` for explanation, not as a license to delete a shared skill later.
 
-There is deliberately no naive `bundle remove` that removes every member. A skill may be independently selected or present in several bundles. Initial removal is explicit unrequire, or an exact-set refresh preview that shows which bindings disappear. A future live-bundle contribution model would need ownership semantics; do not smuggle it into origin annotations.
+`bundle uninstall` removes the named frozen local contribution without consulting
+or adopting a newer source definition. Remove a skill only when its last bundle
+contribution disappears and it remains unchanged, unheld and not manually selected.
+Preserve overlapping/manual selections and exact locks. Held or locally edited
+last-origin bindings become positive manual selections. Consumer file ownership
+checks still refuse edited/unmanaged deployment removals. An absent contribution
+is an idempotent no-op. Reinstall creates a fresh local receipt; it preserves those
+manual survivors and follows the usual conflict checks and reviewed setup.
+Standalone `uninstall ID` explicitly removes that skill from all local expanded
+memberships; repeated bundle install preserves this choice until explicit refresh.
+These receipts implement bounded ownership, rather than deriving deletion authority
+from `introduced_by` annotations. Normal guarded planning/journaling/recovery applies.
 
 ## Subscriptions and local contributions
 
@@ -101,3 +113,14 @@ bundle expansions. For this selected milestone, `apply --replace` and `refresh`
 replace only the named local bundle contribution, preserving manual/overlapping,
 held, locally modified and unrelated bindings. No profile/fleet or native host
 loading acceptance is implied. See the [milestone plan](plans/named-bundles/milestone-plan.json).
+
+## Install/uninstall amendment — 2026-10-02
+
+The owner said "Make the admendment to the rfc and update it" after choosing
+install/uninstall to match MASK's ordinary vocabulary. Mandate `named-bundles-v2`
+replaces newly introduced pre-release `bundle apply` with `bundle install` (no
+compatibility alias) and adds ownership-safe `bundle uninstall` as specified above.
+The existing plan is amended; follow-up MASK-0128 and actual upstream ASK-0096
+preserve historical MASK-0042/ASK-0095 acceptance. AC03 now includes uninstall,
+reinstall, offline/no-op and frozen recovery. Profiles/fleet/native host loading
+and the original "dont use direct" strategy amendment remain unchanged.
