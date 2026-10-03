@@ -62,5 +62,20 @@ protection. Source/card evidence, not draft structural checks, establishes accep
 No repository writers or task commands remain active. No review server or protected
 review candidate exists. No push, publication, live migration or AgentSkills source
 change occurred. Preexisting live controls and unrelated .gitignore remain dirty
-and excluded. Next: finish MASK-0129, claim/finish MASK-0130, reconcile RFC/index,
-renew the plan binding for execution-record formatting and close the milestone.
+and excluded. MASK-0129 and MASK-0130 are Done. Card commits: `fc091529f24e9c08ce11498986585ba604ac14ca`
+and `993a0eefc7809297b5c15725fe758b03b907766e`. RFC/index are Auto-Verified.
+The initial plan checkpoint is retained; the current checkpoint renews its unchanged
+mandate, work selectors and exits after separating execution records from the closeout's
+acceptance definition. No obligation was removed. The final milestone observation/check
+is written after the terminal documentation commit to
+/tmp/mask-upgrade-commit-qualification/{milestone-observation.json,milestone-check.json}.
+
+Commands exercised: public CLI subprocess tests in tests.test_upgrade_commit; guarded
+focused integration using scripts/run_tests.py with upgrade-commit/readiness/stable-lock,
+bundle, public CLI, human-output, Git integration and subprocess-policy selectors;
+python3 scripts/verify_documentation.py --root .; git diff --check; milestone_checkpoint.py
+bind/check. Exact test commands, outcomes and live-byte receipts are in the tracked evidence.
+
+Continuation: selected pack complete; stop this owner. No pending decisions, commands,
+review session or protected candidate. Fixture checkouts were disposable and consumed;
+no task worktree remains. Only preexisting unrelated .gitignore and live controls stay dirty.

@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0024"
 title: "Opt-in commits of upgraded project selections and locks"
-status: "Accepted"
+status: "Auto-Verified"
 metadata: {"milestone_plan":{"id":"upgrade-auto-commit","path":"docs/rfcs/plans/upgrade-auto-commit/milestone-plan.json"}}
 ---
 
@@ -134,3 +134,15 @@ Preserve settled D2–D3. Feature implementation commits exclude this checkout's
 [closeout](../issues/60-done/MASK-0130-upgrade-auto-commit-closeout.md),
 [adopted plan](plans/upgrade-auto-commit/milestone-plan.json), and
 [retained pack](assets/upgrade-auto-commit/README.md).
+
+## Verification and execution record
+
+Mandate revision 2 is complete on main. Implementation
+`4ef044c1639d7ac106e1e86c65801592aee2c89b` satisfies AC01–AC07. Both planned cards
+are Done; the source candidate and actual checks are recorded in the
+[closeout](../issues/60-done/MASK-0130-upgrade-auto-commit-closeout.md) and
+[verification evidence](../development/upgrade-auto-commit-verification.json).
+Focused integration ran 126 tests in 14 classes: zero failures and one Windows-only
+Job Object prerequisite skip on macOS. The final affected feature rerun passed
+24 tests without skips. No push, live migration, native Windows acceptance or
+serving-runtime verification is claimed.
