@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0128"
+  ],
+  "reserve_for": "named-bundles-install-uninstall-v2",
+  "purpose": "",
+  "created": "2026-10-03T00:05:48.807911+00:00",
+  "base": "c3fdaf8676329d056c471be1797695e6e3d90771"
+}
