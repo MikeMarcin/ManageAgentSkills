@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0130"
 title: "Close out optional upgrade commits"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0024"]
 depends_on: ["MASK-0129"]
 closeout_for: ["RFC-MASK-0024"]
