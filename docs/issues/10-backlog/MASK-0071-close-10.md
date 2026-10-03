@@ -155,3 +155,14 @@ canonical verification and finish MASK-0128 / ASK-0096. Cards remain In Progress
 RFC-MASK-0010 and reopened RFC-ASK-0015 remain Implementing. Original profiles/
 fleet/native host-loading obligations stay open. No attended review is required.
 Writer ownership releases on this pending-choice return and can resume on reply.
+
+## Active combined-upgrade resumption
+
+Owner answered "yes go with recommendation" and requested `mask upgrade --all`
+catch installed bundles. Pending policy is resolved. Same leaf resumes from clean
+quiescent MASK 68fccad8 / AgentSkills 90b5678 under the preserved strategy and v3
+mandate. Scope adds existing mask_update.py per-consumer proposal integration.
+Frontier: combined receipt/version candidate through shared resolver/planner,
+default and aggregate upgrade definitions, focused stale/conflict/hold/recovery
+and mixed-scope tests, canonical upgrade check and final upkeep/acceptance.
+Historical pending checkpoint/evidence remains provenance, not current state.

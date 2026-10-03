@@ -36,5 +36,9 @@ No push, real consumer migration, credentials or permission changes.
 
 Terminology amendment: owner "refresh seems like it should be upgade, no?"
 selects install/uninstall/upgrade; mandate `named-bundles-v3`. Obsolete apply and
-refresh are removed before release. Package-version policy choice remains pending
-through the coordinator; existing install/uninstall acceptance work continues.
+refresh are removed before release. Policy resolved by owner: "yes go with recommendation". Upgrade adopts definition
+and newer unheld member versions in one reviewed operation. Owner additionally
+requested `mask upgrade --all` include installed bundles; own mask_update.py and
+its public/aggregate tests. Default scoped upgrade is consistent; selected-ID
+upgrade remains package-only. Source/ref safety and per-consumer partial reporting
+remain required.

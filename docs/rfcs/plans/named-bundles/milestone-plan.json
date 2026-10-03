@@ -22,7 +22,7 @@
       ],
       "depends_on": [],
       "exit_criteria": [
-        "The public bundle install/uninstall/upgrade journeys, source-revision/digest guards, contribution-bounded removals, conflict refusal, holds and setup/recovery checks pass.",
+        "Public install/uninstall and combined definition/unheld package upgrade pass, including default scoped upgrade and upgrade --all over installed receipts; source-revision/digest and stale-plan guards, bounded removals, conflicts, holds/local edits and setup/recovery remain intact.",
         "AgentSkills ASK-0095 and follow-up ASK-0096 supply the actual four-skill canonical RFC bundle revision and revised command verification while preserving all package discovery; MASK-0064 records the bounded handoff.",
         "Affected documentation and advertised capabilities match implementation; explicit-path commits and durable evidence are complete; task-owned commands and writers are quiescent."
       ],

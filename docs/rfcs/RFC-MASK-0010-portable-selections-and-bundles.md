@@ -130,6 +130,17 @@ and the original "dont use direct" strategy amendment remain unchanged.
 The owner asked "refresh seems like it should be upgade, no?" and selected the
 public bundle install/uninstall/upgrade vocabulary. Mandate `named-bundles-v3`
 renames pre-release refresh to upgrade, with no obsolete alias. The same active
-follow-up MASK-0128 / ASK-0096 and adopted milestone remain authoritative; exact
-version-update semantics are awaiting the owner's choice via the coordinator.
-No acceptance for that choice is asserted before implementation and verification.
+follow-up MASK-0128 / ASK-0096 and adopted milestone remain authoritative; the owner then answered "yes go with recommendation": upgrade adopts the latest
+definition plus newer unheld member versions in one reviewed task. The owner also
+requested that `mask upgrade --all` include installed bundles. Default scoped
+`mask upgrade` and `--all` adopt installed definitions and update unheld selected
+packages; `upgrade ID` keeps its package-only scope. Manual/overlapping membership,
+pins and local edits remain protected, incompatible selectors report origins, and
+immutable-ref safeguards apply. Aggregate failures are reported per consumer.
+
+Combined upgrades preserve explicit exact selectors and holds. Shared unheld
+members can advance only under compatible manual/other-bundle selectors; local
+binding edits retain their current exact package until separately upgraded.
+`bundle install --replace` still replaces only membership; `bundle upgrade` is
+the explicit combined definition/package operation. Diff/approval includes both
+receipt changes and package revisions. Frozen recovery never resolves newer data.
