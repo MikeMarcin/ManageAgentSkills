@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0128"
 title: "Amend named bundles to install and ownership-safe uninstall"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0042"]
 external_depends_on: ["AgentSkills:ASK-0096"]
