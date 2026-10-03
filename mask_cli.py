@@ -24,8 +24,9 @@ COMMANDS = {
     'info': (False, False, [('id', 'pos'), ('content', 'flag')]),
     'bundle.list': (False, False, [('source', 'value')]),
     'bundle.show': (False, False, [('bundle', 'pos')]),
-    'bundle.apply': (True, True, [('bundle', 'pos')] + SINGLE + [('replace', 'flag')] + OFFLINE),
-    'bundle.refresh': (True, True, [('bundle', 'pos')] + SINGLE + OFFLINE),
+    'bundle.install': (True, True, [('bundle', 'pos')] + SINGLE + [('replace', 'flag')] + OFFLINE),
+    'bundle.uninstall': (True, False, [('bundle', 'pos')] + SINGLE + OFFLINE),
+    'bundle.upgrade': (True, True, [('bundle', 'pos')] + SINGLE + OFFLINE),
     'register': (True, True, [('path', 'optional')] + SINGLE + OFFLINE),
     'unregister': (True, False, [('path', 'optional')] + SINGLE + [('keep-links', 'flag')]),
     'install': (True, True, [('ids', 'many')] + SINGLE + [('agent', 'repeat')] + REFRESH),
@@ -68,8 +69,9 @@ HELP = {
     'info': ('Inspect one available skill, its source and declared workflow. This reads the shared tap catalog.', 'mask info implement-rfc\nmask info implement-rfc --content'),
     'bundle.list': ('List flat bundles in fetched approved taps. Unfetched catalogs are reported; browsing never fetches.', 'mask bundle list\nmask bundle list --source agentskills'),
     'bundle.show': ('Show one fetched bundle definition, its exact source revision and digest.', 'mask bundle show agentskills/rfc'),
-    'bundle.apply': ('Expand a bundle and complete required setup. Existing manual targets, exact locks and other contributions remain. --replace explicitly refreshes only this named local bundle contribution, with exclusive removals shown.', 'mask bundle apply agentskills/rfc --dry-run\nmask bundle apply agentskills/rfc --approve-plan HASH'),
-    'bundle.refresh': ('Preview and apply an explicit update of an already-expanded named local contribution. Preserve manual, overlapping, held and locally modified selections; never refresh other bundles or package versions implicitly.', 'mask bundle refresh agentskills/rfc --dry-run\nmask bundle refresh agentskills/rfc --approve-plan HASH'),
+    'bundle.install': ('Expand a bundle and complete required setup. Existing manual targets, exact locks and other contributions remain. --replace explicitly refreshes only this named local bundle contribution, with exclusive removals shown.', 'mask bundle install agentskills/rfc --dry-run\nmask bundle install agentskills/rfc --approve-plan HASH'),
+    'bundle.uninstall': ('Remove only the named frozen local contribution, without fetching a source definition. Preserve manual, overlapping, held and locally modified skills and their exact locks; unchanged exclusive members are removed. An absent contribution is a no-op.', 'mask bundle uninstall agentskills/rfc --dry-run\nmask bundle uninstall agentskills/rfc --approve-plan HASH'),
+    'bundle.upgrade': ('Preview and apply an explicit update of an already-expanded named local contribution. Preserve manual, overlapping, held and locally modified selections; never refresh other bundles or package versions implicitly.', 'mask bundle upgrade agentskills/rfc --dry-run\nmask bundle upgrade agentskills/rfc --approve-plan HASH'),
     'cleanup': ('Preview and delete verified unused MASK storage and disposable backups. Referenced content, active locks, recovery data and unknown files are preserved.', 'mask cleanup --dry-run\nmask cleanup --approve-plan HASH'),
     'integration.run': ('Run an approved startup readiness event. This entrypoint never grants consent or runs package setup.', None),
 }
@@ -87,7 +89,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'bundle.apply', 'bundle.refresh') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -318,13 +320,13 @@ def capabilities(output, leaves, mask):
                          readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1,2,3], pending=[1,2,3]),
                          scopes=['project', 'user'], default_scope='current_checkout', aggregate_scope='all_registered',
                          deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap --autocrlf'), pinned_deployment=True, per_binding_targeting=True, targets=mask.ADAPTERS,
-                         bundles=dict(flat=True, source_index=1, contributions='explicit_local', refresh='explicit', recursive=False),
+                         bundles=dict(flat=True, source_index=1, contributions='explicit_local', upgrade='explicit', uninstall='named_local_contribution', recursive=False),
                          adapter_contracts=mask.adapters.capabilities(), python_minimum='3.11', program_root=str(mask.PROGRAM_ROOT),
                          workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1',
                                        profile_selection='status --check --workflow-profile SKILL=PROFILE', scope_contracts=['project','user'],
                                        setup_request_scope=True, native_roles=True, staged_setup=True, repair_with_backups=True,
-                                       setup_entrypoints=['register','install','repair','upgrade'], paths=mask.workflow.paths(),
-                                       retired_paths=True, compatible_locks=True, entrypoints=['register','install','uninstall','repair','upgrade','status','launch'], host_load='not_verified'))
+                                       setup_entrypoints=['register','install','repair','upgrade','bundle.install','bundle.upgrade','bundle.uninstall'], paths=mask.workflow.paths(),
+                                       retired_paths=True, compatible_locks=True, entrypoints=['register','install','uninstall','repair','upgrade','status','launch','bundle.install','bundle.upgrade','bundle.uninstall'], host_load='not_verified'))
 
 
 def help_text(parser, leaves, argv, mask):
@@ -350,7 +352,9 @@ Catalog browsing (your shared taps):
   search [QUERY]          Find available skills
   info SKILL              Inspect an available skill and its workflow
   bundle list / show      Inspect flat named bundles in fetched taps
-  bundle apply / refresh  Expand or explicitly refresh one local contribution
+  bundle install         Add a frozen local bundle contribution
+  bundle upgrade         Explicitly adopt changed bundle membership
+  bundle uninstall       Remove that contribution; preserve other selections
 
 This checkout:
   register [PATH]         Start managing a checkout and make it ready

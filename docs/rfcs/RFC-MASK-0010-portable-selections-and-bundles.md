@@ -8,7 +8,7 @@ created: "2026-09-05"
 
 # RFC-MASK-0010: Portable personal selections, reusable bundles and profile composition
 
-**Delivery stage:** C — portable composition. **Packet status:** proposed implementation contract; no implementation or acceptance is claimed.
+**Delivery stage:** C — portable composition. **Live delivery:** named bundles are implemented; profile/export/subscription acceptance remains open.
 
 **Predecessors:** RFC-MASK-0008, RFC-MASK-0009.
 
@@ -41,7 +41,7 @@ mask profile unsubscribe PROFILE --user
 mask bundle list [--source SOURCE]
 mask bundle show SOURCE/NAME
 mask bundle install SOURCE/NAME [--project PATH | --user] [--replace]
-mask bundle refresh SOURCE/NAME [--project PATH | --user]
+mask bundle upgrade SOURCE/NAME [--project PATH | --user]
 mask bundle uninstall SOURCE/NAME [--project PATH | --user]
 ```
 
@@ -94,7 +94,7 @@ Use two independent temporary machine roots with different local source and home
 
 - **RFC-MASK-0010-AC01** — Export/import round-trips selections and exact content locks between different machine/home/source paths without including credentials, registry identities, journals or launchers.
 - **RFC-MASK-0010-AC02** — Incremental and replace modes preserve their declared ownership scopes; exported all-agent behavior and optional frozen-agent behavior are explicit and tested.
-- **RFC-MASK-0010-AC03** — Bundle expansion/refresh is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.
+- **RFC-MASK-0010-AC03** — Bundle install/uninstall/upgrade is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.
 - **RFC-MASK-0010-AC04** — Profile subscription/removal preserves local contributions and reports version/target conflicts, unapproved sources, unavailable artifacts and offline freshness honestly.
 - **RFC-MASK-0010-AC05** — One public import-and-apply path bootstraps selected personal scope through normal validation/recovery, with native Windows/macOS focused tests and no internal-state editing.
 
@@ -124,3 +124,12 @@ The existing plan is amended; follow-up MASK-0128 and actual upstream ASK-0096
 preserve historical MASK-0042/ASK-0095 acceptance. AC03 now includes uninstall,
 reinstall, offline/no-op and frozen recovery. Profiles/fleet/native host loading
 and the original "dont use direct" strategy amendment remain unchanged.
+
+## Upgrade terminology amendment — 2026-10-02
+
+The owner asked "refresh seems like it should be upgade, no?" and selected the
+public bundle install/uninstall/upgrade vocabulary. Mandate `named-bundles-v3`
+renames pre-release refresh to upgrade, with no obsolete alias. The same active
+follow-up MASK-0128 / ASK-0096 and adopted milestone remain authoritative; exact
+version-update semantics are awaiting the owner's choice via the coordinator.
+No acceptance for that choice is asserted before implementation and verification.

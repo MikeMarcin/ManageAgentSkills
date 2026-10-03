@@ -878,9 +878,13 @@ def render_bundles(data, output):
             lines.append(f"  {clean(row['source'])}: fetch this approved tap to inspect its bundles")
         return lines
     row = data.get('bundle', {})
-    lines = [f"Bundle {clean(row.get('coordinate'))}", f"  revision: {clean(row.get('commit'))}", f"  definition: {clean(row.get('definition_digest'))}"]
+    lines = [f"Bundle {clean(row.get('coordinate'))}"]
+    if row.get('commit'):
+        lines.extend([f"  revision: {clean(row['commit'])}", f"  definition: {clean(row['definition_digest'])}"])
     if 'after' in data:
-        verb = 'Would apply' if output['dry_run'] else 'Applied' if output['changed'] else 'Unchanged'
+        action = output['command'].split('.')[-1]
+        completed = dict(install='Installed', uninstall='Uninstalled', upgrade='Upgraded')[action]
+        verb = 'Would ' + action if output['dry_run'] and output['would_change'] else completed if output['changed'] else 'Unchanged'
         lines[0] = f"{verb} bundle {clean(row.get('coordinate'))} in {place(data)}"
         lines.extend('  + ' + clean(key) for key in data.get('added', []))
         lines.extend('  - ' + clean(key) for key in data.get('removed', []))
@@ -898,7 +902,7 @@ def render_all_list(data, output):
 
 
 RENDERERS = {
-    'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.apply': render_bundles, 'bundle.refresh': render_bundles,
+    'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.install': render_bundles, 'bundle.uninstall': render_bundles, 'bundle.upgrade': render_bundles,
     'tap': render_sources, 'untap': render_sources, 'search': render_catalog, 'info': render_skill,
     'uninstall': render_task, 'register': render_lifecycle, 'unregister': render_forget,
     'repair': render_lifecycle, 'status': render_doctor, 'pin': render_lifecycle, 'unpin': render_lifecycle,

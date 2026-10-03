@@ -20,3 +20,12 @@ Final exact-candidate evidence is recorded in
 No publication, real consumer deployment, credentials, persistent approvals or host
 loading observation occurred. The remainder of MASK-0064's management/provenance/fleet
 guidance and prerequisite closeouts remains open; this handoff does not close RFC-0017.
+
+## Command vocabulary follow-up
+
+Owner-authorized `named-bundles-v3` changes the public vocabulary to bundle
+install/uninstall/upgrade. Real upstream ASK-0096 updates canonical instructions
+and verifies safe removal/reinstall while retaining a manually selected companion.
+MASK-0128 implements the runtime. Prior revisions above remain historical evidence.
+Exact amendment candidate and verification will be appended; package-version upgrade
+policy remains pending the owner's explicit choice. No broader handoff is accepted.

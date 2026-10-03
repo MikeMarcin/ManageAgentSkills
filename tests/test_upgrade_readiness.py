@@ -42,7 +42,7 @@ class UpgradeReadiness(SetupFixture):
 
     def test_unchanged_versions_reconcile_setup_and_missing_links_without_approval(self):
         capabilities = self.machine('capabilities')
-        self.assertEqual(capabilities['data']['workflow']['setup_entrypoints'], ['register', 'install', 'repair', 'upgrade'])
+        self.assertEqual(capabilities['data']['workflow']['setup_entrypoints'], ['register', 'install', 'repair', 'upgrade', 'bundle.install', 'bundle.upgrade', 'bundle.uninstall'])
         self.machine('integration', 'revoke', '--project', self.project)
         policy = (self.home / 'integration.json').read_bytes()
         self.assert_ready(self.approve_upgrade('--project', self.project))

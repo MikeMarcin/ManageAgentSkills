@@ -42,3 +42,10 @@ MASK-0041 remains open and unimplemented. Its full export/import prerequisite is
 removed for this bounded card because the shipped v2 selection, exact-lock,
 planner and recovery engines already support explicit bundle expansion.
 This refinement neither accepts nor implements profile export/import.
+
+## Authorized command follow-up
+
+The owner later selected bundle install/uninstall/upgrade. See active
+[MASK-0128](../30-in-progress/MASK-0128-bundle-install-uninstall.md) and the amended
+plan. The acceptance above describes its original exact candidate; it is not
+rewritten as evidence for the new interface.

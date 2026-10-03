@@ -5,7 +5,7 @@ title: "Coordinate canonical AgentSkills guidance and metadata handoff"
 status: "Backlog"
 rfcs: ["RFC-MASK-0017"]
 depends_on: ["MASK-0071", "MASK-0072", "MASK-0053"]
-external_depends_on: ["AgentSkills:ASK-0095"]
+external_depends_on: ["AgentSkills:ASK-0095", "AgentSkills:ASK-0096"]
 metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "agent-handoff", "stage": "A–D — integration and owner workflow", "provisional_id": false}
 ---
 
@@ -45,3 +45,8 @@ MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733` verifies the canonical public
 installation with healthy required setup, all four skills and all 16 packages.
 This card remains Backlog for its broader management/provenance/fleet handoff;
 its unrelated prerequisites and RFC-MASK-0017 acceptance remain open.
+
+Install/uninstall/upgrade vocabulary follow-up is owned by actual upstream
+ASK-0096 and MASK-0128 under `named-bundles-v3`. Prior candidate acceptance remains
+historical; current revision/verification is recorded on completion. Package-version
+upgrade policy awaits the owner's choice. Broader MASK-0064 remains Backlog.

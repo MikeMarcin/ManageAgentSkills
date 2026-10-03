@@ -77,6 +77,42 @@ def conflict(coordinate, dimension, before, after, competing):
            skill=coordinate, dimension=dimension, before=before, after=after, origins=competing)
 
 
+def retire_members(current, ledger, key, old, incoming):
+    """Release only exclusive unchanged/unheld members; retain other local intent."""
+    preserved, removed = [], []
+    for coordinate, binding in old.items():
+        if coordinate in incoming or coordinate not in current:
+            continue
+        competing = origins(ledger, coordinate)
+        existing = current[coordinate]
+        if coordinate not in ledger['manual'] and competing == [key] and semantics(existing) == semantics(binding) and not existing.get('pinned'):
+            del current[coordinate]
+            removed.append(coordinate)
+        else:
+            reason = 'manual_or_overlap' if coordinate in ledger['manual'] or competing != [key] else 'held_or_modified'
+            preserved.append(dict(skill=coordinate, reason=reason, origins=competing))
+            if competing == [key] and coordinate not in ledger['manual']:
+                ledger['manual'].append(coordinate)
+    return preserved, sorted(removed)
+
+
+def withdraw(declaration, key):
+    """Remove the frozen local receipt, without reading a current source definition."""
+    proposal = copy.deepcopy(declaration)
+    ledger = proposal['bundle_state']
+    old = {r.coordinate(row): row for row in ledger['bundles'][key]['bindings']}
+    current = {r.coordinate(row): row for row in proposal['skills']}
+    preserved, removed = retire_members(current, ledger, key, old, {})
+    del ledger['bundles'][key]
+    for binding in current.values():
+        if 'introduced_by' in binding:
+            binding['introduced_by'] = [origin for origin in binding['introduced_by'] if origin != 'bundle:' + key]
+            if not binding['introduced_by']:
+                del binding['introduced_by']
+    proposal['skills'] = list(current.values())
+    return r.selection(proposal), set(), preserved, removed
+
+
 def expand(declaration, previous, descriptor, config, *, replacing):
     """Merge only the selected local contribution; preserve manual intent and exact rows."""
     proposal = copy.deepcopy(declaration)
@@ -87,14 +123,14 @@ def expand(declaration, previous, descriptor, config, *, replacing):
         conflict(key, 'repository', prior['repository'], descriptor['repository'], [key])
     if prior and not replacing:
         if prior['definition_digest'] != descriptor['definition_digest']:
-            c.fail('bundle.refresh_required', 'The bundle definition changed; preview bundle refresh explicitly.', 4, bundle=key,
+            c.fail('bundle.upgrade_required', 'The bundle definition changed; preview bundle upgrade explicitly.', 4, bundle=key,
                    before=prior['definition_digest'], after=descriptor['definition_digest'])
         return proposal, set(), [], []
     old = {r.coordinate(row): row for row in prior['bindings']} if prior else {}
     current = {r.coordinate(row): row for row in proposal['skills']}
     incoming = {r.coordinate(row): row for row in descriptor['bindings']}
     rows = {r.coordinate(row): row for row in previous['packages']} if previous else {}
-    refresh, preserved, removed = set(), [], []
+    refresh, preserved = set(), []
     for coordinate, binding in incoming.items():
         sources.selected(config, binding['source'])  # Report every trust prerequisite before consumer changes.
         existing = current.get(coordinate)
@@ -119,20 +155,8 @@ def expand(declaration, previous, descriptor, config, *, replacing):
             conflict(coordinate, 'agents', existing.get('agents', declaration['default_agents']), binding['agents'], competing + [key])
         if manual_target and 'agents' in binding and binding['agents'] != existing.get('agents', declaration['default_agents']):
             preserved.append(dict(skill=coordinate, reason='manual_targets', agents=existing.get('agents', declaration['default_agents']), suggestion=binding['agents']))
-    for coordinate, binding in old.items():
-        if coordinate in incoming or coordinate not in current:
-            continue
-        competing = origins(ledger, coordinate)
-        existing = current[coordinate]
-        if coordinate not in ledger['manual'] and competing == [key] and semantics(existing) == semantics(binding) and not existing.get('pinned'):
-            del current[coordinate]
-            removed.append(coordinate)
-        else:
-            reason = 'manual_or_overlap' if coordinate in ledger['manual'] or competing != [key] else 'held_or_modified'
-            preserved.append(dict(skill=coordinate, reason=reason, origins=competing))
-            # A retained local edit/hold becomes a positive manual contribution when its bundle drops it.
-            if competing == [key] and coordinate not in ledger['manual']:
-                ledger['manual'].append(coordinate)
+    retained, removed = retire_members(current, ledger, key, old, incoming)
+    preserved.extend(retained)
     ledger['bundles'][key] = {field: copy.deepcopy(descriptor[field]) for field in ('repository', 'commit', 'definition_digest', 'bindings')}
     needed_sources = {row['source'] for row in current.values()} | {bundle.split('/')[0] for bundle in ledger['bundles']}
     for name in needed_sources:
@@ -152,19 +176,33 @@ def mutate(args, output, home):
     if c.kind(home / 'pending.json') != 'missing':
         c.fail('recovery.required', 'Inspect and recover the pending operation first.', 8)
     state, config = task.machine(home)
+    r.qualified(args.bundle)
+    uninstalling = args.command == 'bundle.uninstall'
     root, scope, key, record = task.consumer(args, state, home, creating=True)
     if record and record.get('mode') == 'dev-link':
-        c.fail('dev_link.active', 'Return to pins before applying a bundle.', 4)
+        c.fail('dev_link.active', 'Return to pins before changing a bundle contribution.', 4)
     declaration_path = c.declaration_path(root, scope, home)
     raw = c.read_text(declaration_path, 'manifest', missing=True)
     declaration = r.selection(c.parse_json(raw, 'manifest') if raw is not None else task.fresh_declaration(config))
+    receipt = declaration.get('bundle_state', {}).get('bundles', {}).get(args.bundle)
+    if uninstalling and receipt is None:
+        # No registration, source approval/fetch, lock rewrite or setup for an absent contribution.
+        plan_hash = c.digest(dict(command=args.command, root=key, scope=scope, declaration=declaration, record=record))
+        if getattr(args, 'expect_plan_hash', None) not in (None, plan_hash):
+            c.fail('plan.stale', 'The bundle contribution changed since the preview.', 4, bundle=args.bundle)
+        output['data'].update(root=key, scope=scope, bundle=dict(coordinate=args.bundle),
+                              before=declaration, after=declaration, added=[], removed=[], preserved=[],
+                              already=True, plan_hash=plan_hash, network='none')
+        return
     lock_value = r.read_model(r.lock_path(root, scope, home), 'lock', missing=True)[0]
     previous = r.lock(lock_value, declaration) if lock_value is not None else None
-    descriptor = definition(home, config, args.bundle, args, output, root if scope == 'project' else None)
-    replacing = args.command == 'bundle.refresh' or getattr(args, 'replace', False)
-    if args.command == 'bundle.refresh' and args.bundle not in declaration.get('bundle_state', {}).get('bundles', {}):
-        c.fail('bundle.not_applied', 'Apply this bundle before refreshing its local contribution.', 4, bundle=args.bundle)
-    proposal, refresh, preserved, removed = expand(declaration, previous, descriptor, config, replacing=replacing)
+    if uninstalling and previous is None:
+        c.fail('lock.resolution_required', 'Restore the missing exact lock with repair before uninstalling this contribution.', 4, bundle=args.bundle)
+    descriptor = dict(coordinate=args.bundle, **copy.deepcopy(receipt)) if uninstalling else definition(home, config, args.bundle, args, output, root if scope == 'project' else None)
+    replacing = args.command == 'bundle.upgrade' or getattr(args, 'replace', False)
+    if args.command == 'bundle.upgrade' and receipt is None:
+        c.fail('bundle.not_installed', 'Install this bundle before upgrading its local contribution.', 4, bundle=args.bundle)
+    proposal, refresh, preserved, removed = withdraw(declaration, args.bundle) if uninstalling else expand(declaration, previous, descriptor, config, replacing=replacing)
     entries = r.approved(proposal, config)
     prior_rows = {r.coordinate(row): row for row in previous['packages']} if previous else {}
     views, rows = {}, []
@@ -184,13 +222,14 @@ def mutate(args, output, home):
                             for coordinate in sorted(selected_before.keys() & selected_after.keys())
                             if semantics(selected_before[coordinate]) != semantics(selected_after[coordinate])])
     def candidate():
-        observed = definition(home, config, args.bundle, args, output, root if scope == 'project' else None)
-        if observed != descriptor:
-            c.fail('plan.stale', 'The bundle source revision or definition changed during this task.', 4, bundle=args.bundle)
+        if not uninstalling:
+            observed = definition(home, config, args.bundle, args, output, root if scope == 'project' else None)
+            if observed != descriptor:
+                c.fail('plan.stale', 'The bundle source revision or definition changed during this task.', 4, bundle=args.bundle)
         plan = fs.plan(config, state, [root], proposals={key: proposal}, lock_proposals={key: locked},
-                       register=[key] if record is None else (), operation='install', home=home,
+                       register=[key] if record is None else (), operation='remove' if uninstalling else 'install', home=home,
                        user_root=root if scope == 'user' else None, payload_views=views, repair_roles=True, retire_files=False)
-        plan['plan_hash'] = c.digest(dict(plan=plan['plan_hash'], bundle=descriptor, replacing=replacing))
+        plan['plan_hash'] = c.digest(dict(plan=plan['plan_hash'], bundle=descriptor, replacing=replacing, uninstalling=uninstalling))
         plan['bundle_changes'] = changes
         for blocker in plan['blockers']:
             if blocker['code'] in ('target.collision', 'selection.conflict'):
@@ -209,7 +248,7 @@ def mutate(args, output, home):
             store.ensure(home, selection_value, lock, config, offline=True, coordinates=coordinates, effects=row['effects'])
     lifecycle.execute(args, output, home, config, [root], before, candidate, prepare,
             details=dict(root=key, scope=scope, bundle=descriptor, replacing=replacing,
-                         expansion=proposal['bundle_state']['bundles'][args.bundle],
+                         expansion=proposal['bundle_state']['bundles'].get(args.bundle),
                          added=changes['added'],
                          removed=removed, preserved=preserved, before=declaration, after=proposal,
                          locked=locked, network='fetch' if output['data'].get('acquisitions') else 'none'))

@@ -1,0 +1,94 @@
+{
+  "mandate_revision": "named-bundles-v3",
+  "segment_id": "coordinator-implementer-install-uninstall-upgrade",
+  "authorization": "Owner: refresh seems like it should be upgade, no?",
+  "prior_checkpoint": {
+    "schema": "implement-rfc.milestone-checkpoint.v1",
+    "run_id": "mask-named-bundles-20261002",
+    "segment_id": "coordinator-implementer-install-uninstall",
+    "mandate_revision": "named-bundles-v2",
+    "selection": {
+      "schema": "implement-rfc.strategy-selection.v1",
+      "strategy": "coordinator-implementer",
+      "topology_id": "coordinator-implementer",
+      "recipe_revision": "2",
+      "recipe_fingerprint": "sha256:f798ea0d5a9d86b935f1ffffe53670a9ac2a310037ceac6f960795b91a20b0e3",
+      "routing": {},
+      "requirement_profile": "coordinator-implementer",
+      "owners": {
+        "engineering": "implementer",
+        "bookkeeping": "implementer",
+        "product_edits": "implementer"
+      },
+      "delegation": "recipe",
+      "instruction_paths": [
+        "references/engineering-contract.md",
+        "references/strategies/coordinator-implementer.md"
+      ],
+      "configuration_complete": true,
+      "missing_routes": [],
+      "host_load": "not_verified"
+    },
+    "target": "MASK-0128",
+    "binding": {
+      "plan_id": "named-bundles",
+      "plan_path": "docs/rfcs/plans/named-bundles/milestone-plan.json",
+      "milestone_id": "named-bundles",
+      "definition_fingerprint": "sha256:50bfde794c0cc225c1499a4fe82e01c4d75d6acaec5fa480cecff57c3a740bc0",
+      "obligations": [
+        {
+          "id": "MASK-0042:*",
+          "source": "MASK-0042",
+          "selector": null,
+          "source_fingerprint": "sha256:6d67e3265f9ddef1d187fa0decb556e366b204c459291c1ddb19b6d482ede615"
+        },
+        {
+          "id": "MASK-0128:*",
+          "source": "MASK-0128",
+          "selector": null,
+          "source_fingerprint": "sha256:d38a3aa0aa52044eda555efb32da457bef0adf7c3717e575dc3c8524c7f2b666"
+        }
+      ],
+      "obligation_fingerprint": "sha256:a0f0edcedbfc85d24d476423d7c1509a4eb4302c585d4d5cf34ca391c350183f",
+      "exit_criteria": [
+        {
+          "id": "named-bundles:exit:1",
+          "text": "The public bundle install/uninstall/refresh journeys, source-revision/digest guards, contribution-bounded removals, conflict refusal, holds and setup/recovery checks pass."
+        },
+        {
+          "id": "named-bundles:exit:2",
+          "text": "AgentSkills ASK-0095 and follow-up ASK-0096 supply the actual four-skill canonical RFC bundle revision and revised command verification while preserving all package discovery; MASK-0064 records the bounded handoff."
+        },
+        {
+          "id": "named-bundles:exit:3",
+          "text": "Affected documentation and advertised capabilities match implementation; explicit-path commits and durable evidence are complete; task-owned commands and writers are quiescent."
+        }
+      ],
+      "prerequisite_fingerprint": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "structural": "valid",
+      "references": "resolved",
+      "semantic_coverage": "unknown",
+      "diagnostics": [],
+      "diagnostics_truncated": false
+    },
+    "target_milestones": [
+      "named-bundles"
+    ],
+    "repository_state": {
+      "source_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+      "workflow_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+      "source_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+      "workflow_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+      "source_branch": "main",
+      "source_revision": "173eec8b9ff25e98d73f35cdcad00ce3d391c0eb",
+      "workflow_branch": "main",
+      "workflow_revision": "173eec8b9ff25e98d73f35cdcad00ce3d391c0eb"
+    }
+  },
+  "strategy": "preserved coordinator-implementer",
+  "changes": [
+    "Rename pre-release refresh to upgrade, no obsolete alias",
+    "Version policy pending owner answer; do not certify before implementation"
+  ],
+  "ownership": "Same leaf; prior focused runners ended; no other writer"
+}

@@ -32,3 +32,8 @@ stale guard, overlap/manual/hold/edit preservation, reinstall/no-op/offline and
 recovery checks; canonical all-four readiness plus safe removal; docs and clean
 explicit-path commits. Preserve profile/fleet/native-host pending obligations.
 No push, real consumer migration, credentials or permission changes.
+
+Terminology amendment: owner "refresh seems like it should be upgade, no?"
+selects install/uninstall/upgrade; mandate `named-bundles-v3`. Obsolete apply and
+refresh are removed before release. Package-version policy choice remains pending
+through the coordinator; existing install/uninstall acceptance work continues.

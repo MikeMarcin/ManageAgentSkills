@@ -11,7 +11,7 @@
   "milestones": [
     {
       "id": "named-bundles",
-      "outcome": "Public flat bundle list/show/install/uninstall/refresh preserves exact locks, manual and overlapping selections through guarded lifecycle/recovery, and the canonical AgentSkills RFC bundle installs ready in a disposable consumer.",
+      "outcome": "Public flat bundle list/show/install/uninstall/upgrade preserves exact locks, manual and overlapping selections through guarded lifecycle/recovery, and the canonical AgentSkills RFC bundle installs ready in a disposable consumer.",
       "work": [
         {
           "issue": "MASK-0042"
@@ -22,7 +22,7 @@
       ],
       "depends_on": [],
       "exit_criteria": [
-        "The public bundle install/uninstall/refresh journeys, source-revision/digest guards, contribution-bounded removals, conflict refusal, holds and setup/recovery checks pass.",
+        "The public bundle install/uninstall/upgrade journeys, source-revision/digest guards, contribution-bounded removals, conflict refusal, holds and setup/recovery checks pass.",
         "AgentSkills ASK-0095 and follow-up ASK-0096 supply the actual four-skill canonical RFC bundle revision and revised command verification while preserving all package discovery; MASK-0064 records the bounded handoff.",
         "Affected documentation and advertised capabilities match implementation; explicit-path commits and durable evidence are complete; task-owned commands and writers are quiescent."
       ],

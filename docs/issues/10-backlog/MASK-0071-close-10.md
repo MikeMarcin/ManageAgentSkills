@@ -107,3 +107,17 @@ and RFC_BASE_SHA are preserved. Frontier: implement install vocabulary and recei
 bounded uninstall, then public removal/reinstall/recovery tests and canonical
 verification. No required human review. Profiles/fleet/native host loading remain
 outside the mandate. Ownership releases only after final cleanup and return.
+
+Focused amendment run: 7 initial checks pass; the first 32-test run has one failure
+in new overlap/unrelated fixture preparation: implement-rfc install correctly
+refused missing required consumer inputs (`workflow.incomplete`), before changes.
+The fixture now supplies the existing consumer context. The other 31 checks passed.
+That runner ended; rename steering arrived afterward. Owner next requested
+refresh -> upgrade terminology; package-version semantics await an explicit answer
+through the coordinator. Install/uninstall work continues independently.
+
+Uninstall rollback fault check passes: after a journaled link removal, rollback
+restores the receipt, lock and links; the reviewed setup script launch count stays
+one. Current semantic frontier: owner choice between definition-only upgrade and
+combined definition/unheld package-version upgrade remains pending. No amendment
+completion or upgrade-version acceptance is asserted.
