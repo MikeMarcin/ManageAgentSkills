@@ -612,5 +612,661 @@
     "No real consumer deployment, push, publication, persistent approval, credential or permission change."
   ],
   "command_state": "All test, setup, Git and verification commands ended. No review server or background process retained. All disposable consumers/remotes/machine roots cleaned by TemporaryDirectory.",
-  "mask_acceptance_commit": "8181738c38553679d96b7179658b5240af29798c"
+  "mask_acceptance_commit": "8181738c38553679d96b7179658b5240af29798c",
+  "amendment_v3": {
+    "assignment": "MASK-0128 / named-bundles follow-up",
+    "mandate_revision": "named-bundles-v3",
+    "segment_id": "coordinator-implementer-install-uninstall-upgrade",
+    "authorization": [
+      "Make the admendment to the rfc and update it",
+      "refresh seems like it should be upgade, no?"
+    ],
+    "mask_candidate": "d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc",
+    "agentskills_candidate": "de0d3736f4767ac1af49f30f336f6a9c2bcd0314",
+    "upgrade_policy": "Required owner choice pending: combined definition/unheld package versions versus renamed definition-only behavior. Current candidate retains prior definition-only behavior; no combined-version acceptance claimed.",
+    "engineering_acceptance": "install/uninstall accepted; amended milestone incomplete",
+    "public_verification": {
+      "criterion": "named-bundles-install-uninstall",
+      "outcome": "pass",
+      "revision": "d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc",
+      "evidence": {
+        "kind": "command",
+        "detail": "[\"python3\", \"-B\", \"-m\", \"unittest\", \"tests.test_bundles.BundleTests.test_uninstall_preview_exclusive_repeat_and_fresh_reinstall\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_preserves_manual_overlap_and_unrelated_exact_rows\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_promotes_held_and_local_edit_survivors_for_reinstall\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_uses_frozen_receipt_without_catalogue_or_network\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_plan_stales_after_manual_promotion_or_receipt_removal\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_frozen_recovery_does_not_rerun_setup\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_rollback_restores_receipt_and_links_without_setup\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_refuses_edited_deployment_before_receipt_changes\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_refuses_missing_exact_lock_without_resolving_new_versions\", \"tests.test_bundles.BundleTests.test_personal_bundle_uninstall_preserves_manual_member_and_has_no_aggregate\", \"tests.test_human_output.RendererRegistry\"]",
+        "exit_code": 0,
+        "elapsed_seconds": 47.261,
+        "stdout_tail": "",
+        "stderr_tail": "...............\n----------------------------------------------------------------------\nRan 15 tests in 47.164s\n\nOK\n"
+      }
+    },
+    "canonical_bundle": {
+      "source_revision": "de0d3736f4767ac1af49f30f336f6a9c2bcd0314",
+      "mask_revision": "d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc",
+      "bundle": {
+        "bindings": [
+          {
+            "id": "author-rfc",
+            "source": "agentskills"
+          },
+          {
+            "id": "grill-rfc",
+            "source": "agentskills"
+          },
+          {
+            "id": "grill-me",
+            "source": "agentskills"
+          },
+          {
+            "id": "implement-rfc",
+            "source": "agentskills"
+          }
+        ],
+        "commit": "de0d3736f4767ac1af49f30f336f6a9c2bcd0314",
+        "coordinate": "agentskills/rfc",
+        "definition_digest": "sha256:4abf11c2b740f00b35e55ae753326ba7dc1fa593d06be2f75898739158c8d484",
+        "description": "Draft, grill and implement RFCs with their shared companions.",
+        "repository": "file:///private/var/folders/k7/43dlvy3n3v969dd3_xqz8w4m0000gn/T/agentskills-rfc-bundle-yvvg8440/AgentSkills.git"
+      },
+      "packages_discovered": 16,
+      "package_validation": true,
+      "selected": [
+        "author-rfc",
+        "grill-rfc",
+        "grill-me",
+        "implement-rfc"
+      ],
+      "workflow_readiness": [
+        {
+          "complete": true,
+          "root": "/private/var/folders/k7/43dlvy3n3v969dd3_xqz8w4m0000gn/T/agentskills-rfc-bundle-yvvg8440/consumer",
+          "scope": "project",
+          "skills": [
+            {
+              "complete": true,
+              "contract": null,
+              "inputs": [],
+              "roles": [],
+              "skill": "author-rfc",
+              "workflow": "not_declared"
+            },
+            {
+              "complete": true,
+              "contract": null,
+              "inputs": [],
+              "roles": [],
+              "skill": "grill-me",
+              "workflow": "not_declared"
+            },
+            {
+              "complete": true,
+              "contract": null,
+              "inputs": [],
+              "roles": [],
+              "skill": "grill-rfc",
+              "workflow": "not_declared"
+            },
+            {
+              "complete": true,
+              "contract": {
+                "descriptor": "mask-workflow.json",
+                "lock": "coherent",
+                "lock_path": ".mask/generated/implement-rfc/native-roles.lock.json",
+                "sha256": "8a51463e9274b68a95c4f5db33db208dccc8a8a787f616c1ae425aa2205ef5d3"
+              },
+              "inputs": [
+                {
+                  "id": "project-config",
+                  "kind": "json",
+                  "path": ".mask/skill-config/implement-rfc/project.json",
+                  "required": true,
+                  "sha256": "638a268ff6d576e513e9dd28bdfedff72fd67e681fafee1bf28f6caa4a4ff444",
+                  "state": "ok"
+                },
+                {
+                  "id": "project-rules",
+                  "kind": "text",
+                  "path": ".mask/skill-config/implement-rfc/project.md",
+                  "required": true,
+                  "sha256": "f7d49e005ad6518dced8685e1e03e8b4073a0dcbdfedec50ee4fa4395928ee50",
+                  "state": "ok"
+                },
+                {
+                  "id": "execution-selection",
+                  "kind": "json",
+                  "path": ".mask/generated/implement-rfc/execution-selection.json",
+                  "required": false,
+                  "sha256": null,
+                  "state": "absent"
+                }
+              ],
+              "package": {
+                "coordinate": "agentskills/implement-rfc",
+                "root": "/private/var/folders/k7/43dlvy3n3v969dd3_xqz8w4m0000gn/T/agentskills-rfc-bundle-yvvg8440/machine/store/v1/5302aef5ca1ed648cb95ff2ec1c3a6e86d38a2f5d78d2f55dea8fc3fb6da3c5d/payload/implement-rfc"
+              },
+              "retired_files": [
+                {
+                  "path": ".mask/skill-config/implement-rfc/native-roles.lock.json",
+                  "state": "absent"
+                }
+              ],
+              "roles": [
+                {
+                  "agent": "claude",
+                  "expected_sha256": "979bbc7ccbed16880723acb17973e27e0fcebb9e6850e9be9ff676474ef5dfab",
+                  "host_load": "not_verified",
+                  "name": "rfc-implementer",
+                  "observed_sha256": "979bbc7ccbed16880723acb17973e27e0fcebb9e6850e9be9ff676474ef5dfab",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-implementer.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "high",
+                    "model": "claude-opus-5-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "7ad0cc3b0ebbe33264c0ed57b4014c39601e717a2b673d0801085b4207eda2de",
+                  "host_load": "not_verified",
+                  "name": "rfc-integrator",
+                  "observed_sha256": "7ad0cc3b0ebbe33264c0ed57b4014c39601e717a2b673d0801085b4207eda2de",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-integrator.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "xhigh",
+                    "model": "claude-opus-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "87184be77b6da93193a681e3aa5aa214a996158795f0c72b0e2693183f5576d6",
+                  "host_load": "not_verified",
+                  "name": "rfc-reviewer",
+                  "observed_sha256": "87184be77b6da93193a681e3aa5aa214a996158795f0c72b0e2693183f5576d6",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-reviewer.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "medium",
+                    "model": "claude-fable-5-1"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "e6312e1b6eca531b6c3b30152f6babad7f802ed2ec6a849bc263dede95d65e6f",
+                  "host_load": "not_verified",
+                  "name": "rfc-reviewer-critical",
+                  "observed_sha256": "e6312e1b6eca531b6c3b30152f6babad7f802ed2ec6a849bc263dede95d65e6f",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-reviewer-critical.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "xhigh",
+                    "model": "claude-fable-5-1"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "0a5955542a1dc10aa12e64dccad5c1ff0d4cffd23bd49cc3f7099db0cb7a4c46",
+                  "host_load": "not_verified",
+                  "name": "rfc-scout",
+                  "observed_sha256": "0a5955542a1dc10aa12e64dccad5c1ff0d4cffd23bd49cc3f7099db0cb7a4c46",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-scout.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "low",
+                    "model": "claude-opus-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "d73f4ed790f28dc31a14a4221e81122fb9f048456b39ea2f26e6a6189b764d64",
+                  "host_load": "not_verified",
+                  "name": "rfc-test-runner",
+                  "observed_sha256": "d73f4ed790f28dc31a14a4221e81122fb9f048456b39ea2f26e6a6189b764d64",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-test-runner.md",
+                  "producer": "setup",
+                  "route": {
+                    "model": "claude-haiku-4-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "adbaefe92560ad0b8a0bb0a3d55871b654976d3b10450a14eb1663e2425589d5",
+                  "host_load": "not_verified",
+                  "name": "rfc-utility",
+                  "observed_sha256": "adbaefe92560ad0b8a0bb0a3d55871b654976d3b10450a14eb1663e2425589d5",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-utility.md",
+                  "producer": "setup",
+                  "route": {
+                    "model": "claude-haiku-4-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "b6e9a94598bc02c6a0b22b6576944004fe02d77d37abd91d262c3ea96566a35a",
+                  "host_load": "not_verified",
+                  "name": "rfc-worker",
+                  "observed_sha256": "b6e9a94598bc02c6a0b22b6576944004fe02d77d37abd91d262c3ea96566a35a",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-worker.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "xhigh",
+                    "model": "claude-opus-5"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "claude",
+                  "expected_sha256": "54015d82af5e3aef8a1bcc8aa03c5407d0f544a800af37a5d222978889c9886d",
+                  "host_load": "not_verified",
+                  "name": "rfc-worker-deep",
+                  "observed_sha256": "54015d82af5e3aef8a1bcc8aa03c5407d0f544a800af37a5d222978889c9886d",
+                  "ownership": "package-managed",
+                  "path": ".claude/agents/rfc-worker-deep.md",
+                  "producer": "setup",
+                  "route": {
+                    "effort": "high",
+                    "model": "claude-fable-5-1"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "4879637b24a73520c486e7581dd7d36d24b23ea7dd9d3030c1621b811c84fe0c",
+                  "host_load": "not_verified",
+                  "name": "rfc-implementer",
+                  "observed_sha256": "4879637b24a73520c486e7581dd7d36d24b23ea7dd9d3030c1621b811c84fe0c",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-implementer.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-6.1-sol",
+                    "model_reasoning_effort": "xhigh"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "ca9c7ec1152846218640983bda199cfa1a923693303f72d6da2139b75d01c5fe",
+                  "host_load": "not_verified",
+                  "name": "rfc-integrator",
+                  "observed_sha256": "ca9c7ec1152846218640983bda199cfa1a923693303f72d6da2139b75d01c5fe",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-integrator.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-5.6-sol",
+                    "model_reasoning_effort": "xhigh"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "2da971ef9a0ea0ee139733e39ec6d3459500bc127c3fbdc12fca68ef0910b5b0",
+                  "host_load": "not_verified",
+                  "name": "rfc-reviewer",
+                  "observed_sha256": "2da971ef9a0ea0ee139733e39ec6d3459500bc127c3fbdc12fca68ef0910b5b0",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-reviewer.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-6-astra",
+                    "model_reasoning_effort": "medium"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "50c338cf12893de8c8eba0c9e95feaf2c83b2be2cff36963617a660081ebb7f6",
+                  "host_load": "not_verified",
+                  "name": "rfc-reviewer-critical",
+                  "observed_sha256": "50c338cf12893de8c8eba0c9e95feaf2c83b2be2cff36963617a660081ebb7f6",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-reviewer-critical.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-6-astra",
+                    "model_reasoning_effort": "xhigh"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "24845c565bf9c88b65e9e2455b47e44580f4352d6f30f81c73bab393a6a0688b",
+                  "host_load": "not_verified",
+                  "name": "rfc-scout",
+                  "observed_sha256": "24845c565bf9c88b65e9e2455b47e44580f4352d6f30f81c73bab393a6a0688b",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-scout.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-5.6-sol",
+                    "model_reasoning_effort": "low"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "89b826ff31916230171d77e46d910576db9ba20e3a6990d9b98bb6654d86461a",
+                  "host_load": "not_verified",
+                  "name": "rfc-test-runner",
+                  "observed_sha256": "89b826ff31916230171d77e46d910576db9ba20e3a6990d9b98bb6654d86461a",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-test-runner.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-5.6-luna",
+                    "model_reasoning_effort": "xhigh"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "69834c4114c6e5f59b7ac4002b606e2ad9336012e718798d1e768ccf90ff2b8e",
+                  "host_load": "not_verified",
+                  "name": "rfc-utility",
+                  "observed_sha256": "69834c4114c6e5f59b7ac4002b606e2ad9336012e718798d1e768ccf90ff2b8e",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-utility.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-5.6-luna",
+                    "model_reasoning_effort": "xhigh"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "7259dacc1f7fd67b2510ce7d138065a9d338a72bd5ef170574a39ee91aab7d04",
+                  "host_load": "not_verified",
+                  "name": "rfc-worker",
+                  "observed_sha256": "7259dacc1f7fd67b2510ce7d138065a9d338a72bd5ef170574a39ee91aab7d04",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-worker.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-6-astra",
+                    "model_reasoning_effort": "low"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                },
+                {
+                  "agent": "codex",
+                  "expected_sha256": "fae6ca13a92f163439598a4b3b3c36ff1911964e85b936ca9474bef7e5d448dd",
+                  "host_load": "not_verified",
+                  "name": "rfc-worker-deep",
+                  "observed_sha256": "fae6ca13a92f163439598a4b3b3c36ff1911964e85b936ca9474bef7e5d448dd",
+                  "ownership": "package-managed",
+                  "path": ".codex/agents/rfc-worker-deep.toml",
+                  "producer": "setup",
+                  "route": {
+                    "model": "gpt-6-astra",
+                    "model_reasoning_effort": "high"
+                  },
+                  "setup": "prepare-roles",
+                  "skill": "implement-rfc",
+                  "state": "ok"
+                }
+              ],
+              "skill": "implement-rfc",
+              "workflow": "declared"
+            }
+          ]
+        }
+      ],
+      "setup": [
+        {
+          "skill": "implement-rfc",
+          "action": "prepare-roles",
+          "state": "published"
+        }
+      ],
+      "healthy": true,
+      "uninstall": {
+        "removed": [
+          "agentskills/author-rfc",
+          "agentskills/grill-rfc",
+          "agentskills/implement-rfc"
+        ],
+        "preserved": "agentskills/grill-me",
+        "repeat_noop": true,
+        "offline": true
+      },
+      "reinstall_healthy": true,
+      "host_load": "not_verified",
+      "platform": "darwin",
+      "commands": [
+        {
+          "argv": [
+            "tap",
+            "agentskills",
+            "/private/var/folders/k7/43dlvy3n3v969dd3_xqz8w4m0000gn/T/agentskills-rfc-bundle-yvvg8440/AgentSkills.git",
+            "--ref",
+            "de0d3736f4767ac1af49f30f336f6a9c2bcd0314"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "tap",
+            "fetch",
+            "agentskills"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "search"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "skill",
+            "validate",
+            "--all"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "show",
+            "agentskills/rfc"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "install",
+            "agentskills/rfc",
+            "--dry-run"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "install",
+            "agentskills/rfc",
+            "--approve-plan",
+            "sha256:e38b6e6e7a88a455530d3bd44f75d5510e625bf35ce3f08b42cf0324c6b7161c"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "status",
+            "--check"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "install",
+            "agentskills/rfc"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "install",
+            "grill-me",
+            "--no-update"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "uninstall",
+            "agentskills/rfc",
+            "--dry-run",
+            "--offline"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "uninstall",
+            "agentskills/rfc",
+            "--offline",
+            "--approve-plan",
+            "sha256:abcf4af4e9edf61101e5a94e06ee7aab5cc09f2048896ce35b84f31ae4124a77"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "uninstall",
+            "agentskills/rfc",
+            "--offline"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "install",
+            "agentskills/rfc",
+            "--dry-run"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "bundle",
+            "install",
+            "agentskills/rfc",
+            "--approve-plan",
+            "sha256:f774bd262d1efb3c9c5963f4961ab4323c854f779eed3d9be2981f5cfdeb9862"
+          ],
+          "exit_code": 0
+        },
+        {
+          "argv": [
+            "status",
+            "--check"
+          ],
+          "exit_code": 0
+        }
+      ],
+      "fixture_cleanup": "TemporaryDirectory removed on completion"
+    },
+    "other_runs": [
+      {
+        "command": "python3 -B -m unittest tests.test_bundles.BundleTests.test_uninstall_preview_exclusive_repeat_and_fresh_reinstall tests.test_bundles.BundleTests.test_bundle_uninstall_promotes_held_and_local_edit_survivors_for_reinstall tests.test_human_output.RendererRegistry",
+        "tests": 7,
+        "outcome": "pass",
+        "seconds": 10.523
+      },
+      {
+        "command": "python3 -B -m unittest tests.test_bundles tests.test_human_output.RendererRegistry",
+        "tests": 32,
+        "outcome": "fail",
+        "failures": 1,
+        "seconds": 99.713,
+        "diagnosis": "New unrelated implement-rfc fixture lacked required consumer context; workflow.incomplete refused before effects. Other 31 tests passed. Fixture supplies existing CONSUMER_CONTEXT; affected rerun passed."
+      },
+      {
+        "command": "python3 -B -m unittest tests.test_bundles.BundleTests.test_bundle_uninstall_preserves_manual_overlap_and_unrelated_exact_rows",
+        "tests": 1,
+        "outcome": "pass",
+        "seconds": 6.741
+      },
+      {
+        "command": "python3 -B -m unittest tests.test_bundles.BundleTests.test_bundle_uninstall_rollback_restores_receipt_and_links_without_setup",
+        "tests": 1,
+        "outcome": "pass",
+        "seconds": 5.44
+      },
+      {
+        "command": "python3 -B -m unittest tests.test_task_commands tests.test_cli_v2 tests.test_human_output.RendererRegistry tests.test_upgrade_readiness",
+        "tests": 44,
+        "outcome": "pass",
+        "seconds": 140.945
+      }
+    ],
+    "quiescence": "All task runners, Git/setup commands and descendants ended; no server/worktree/additional agent or protected candidate. Temporary consumers and bare remotes cleaned.",
+    "pending": [
+      "Owner upgrade version policy choice",
+      "Implement and verify selected upgrade package semantics if combined is chosen",
+      "Complete affected documentation/upstream canonical upgrade verification and follow-up cards"
+    ],
+    "limits": [
+      "No native host loading or Windows acceptance",
+      "Profiles/fleet and broader MASK-0064 remain outside this mandate",
+      "No push/publication/real consumer migration/credential or permission changes"
+    ]
+  }
 }

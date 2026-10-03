@@ -29,3 +29,12 @@ and verifies safe removal/reinstall while retaining a manually selected companio
 MASK-0128 implements the runtime. Prior revisions above remain historical evidence.
 Exact amendment candidate and verification will be appended; package-version upgrade
 policy remains pending the owner's explicit choice. No broader handoff is accepted.
+
+Independent amended candidate `de0d3736f4767ac1af49f30f336f6a9c2bcd0314` verified
+against MASK `d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc`: all four skills ready
+with reviewed setup; all 16 packages remain discoverable; offline uninstall
+retains manually installed grill-me; repeat no-op and healthy reinstall pass.
+[Actual canonical receipt](../../../AgentSkills/docs/development/rfc-bundle-install-uninstall-evidence.json)
+binds both candidates. ASK-0096 remains In Progress pending the owner upgrade
+version policy choice and final amended-scope verification. No broader MASK-0064
+acceptance or actual host loading is implied.

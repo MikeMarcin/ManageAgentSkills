@@ -1,0 +1,13 @@
+{
+  "criterion": "named-bundles-install-uninstall",
+  "outcome": "pass",
+  "revision": "d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc",
+  "evidence": {
+    "kind": "command",
+    "detail": "[\"python3\", \"-B\", \"-m\", \"unittest\", \"tests.test_bundles.BundleTests.test_uninstall_preview_exclusive_repeat_and_fresh_reinstall\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_preserves_manual_overlap_and_unrelated_exact_rows\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_promotes_held_and_local_edit_survivors_for_reinstall\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_uses_frozen_receipt_without_catalogue_or_network\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_plan_stales_after_manual_promotion_or_receipt_removal\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_frozen_recovery_does_not_rerun_setup\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_rollback_restores_receipt_and_links_without_setup\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_refuses_edited_deployment_before_receipt_changes\", \"tests.test_bundles.BundleTests.test_bundle_uninstall_refuses_missing_exact_lock_without_resolving_new_versions\", \"tests.test_bundles.BundleTests.test_personal_bundle_uninstall_preserves_manual_member_and_has_no_aggregate\", \"tests.test_human_output.RendererRegistry\"]",
+    "exit_code": 0,
+    "elapsed_seconds": 47.261,
+    "stdout_tail": "",
+    "stderr_tail": "...............\n----------------------------------------------------------------------\nRan 15 tests in 47.164s\n\nOK\n"
+  }
+}

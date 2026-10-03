@@ -7,6 +7,7 @@ rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0042"]
 external_depends_on: ["AgentSkills:ASK-0096"]
 metadata: {"milestone_plan":{"id":"named-bundles","path":"docs/rfcs/plans/named-bundles/milestone-plan.json"}}
+acceptance: [{"criterion":"bundle-install-uninstall","outcome":"pass","revision":"d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc","evidence":{"kind":"artifact","path":"docs/development/named-bundles-install-uninstall-tests.json","detail":"Exact candidate 15 tests pass: guarded/no-op/reinstall/manual/overlap/holds/local edits/offline/missing lock/edited deployment/frozen complete and rollback recovery, plus help/renderers."}},{"criterion":"canonical-install-uninstall-reinstall","outcome":"pass","revision":"d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc","evidence":{"kind":"artifact","path":"docs/development/named-bundles-evidence.json","detail":"Exact AgentSkills de0d373 canonical all-four healthy reviewed setup, 16 packages preserved, manual grill-me retained during offline removal and healthy reinstall."}},{"criterion":"bundle-upgrade-policy","outcome":"pending","revision":"d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc","evidence":{"kind":"observation","detail":"Required owner choice pending; package-version upgrade semantics and amended milestone completion are not accepted."}}]
 ---
 
 # Amend named bundles to install and ownership-safe uninstall

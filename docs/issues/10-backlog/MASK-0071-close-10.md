@@ -51,7 +51,7 @@ MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Broader profile handoffs remain
 |---|---|---|---|
 | RFC-MASK-0010-AC01 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0010-AC02 | Bundle union/manual/overlap/replace ownership passes in [public evidence](../../development/named-bundles-evidence.json); export/all-agent freezing still belongs to open MASK-0041 | Partial; remains open | bc4f9f9 |
-| RFC-MASK-0010-AC03 | 18 public bundle journeys plus 5 renderer checks; revision/digest stale guards, held/manual/overlap preservation, exact locks, conflicts, setup and recovery; canonical upstream bundle ready | Pass | bc4f9f9 |
+| RFC-MASK-0010-AC03 | 18 public bundle journeys plus 5 renderer checks; revision/digest stale guards, held/manual/overlap preservation, exact locks, conflicts, setup and recovery; canonical upstream bundle ready | Original pass; amendment pending | bc4f9f9 |
 | RFC-MASK-0010-AC04 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0010-AC05 | Not recorded | Not run | Unrecorded |
 
@@ -121,3 +121,37 @@ restores the receipt, lock and links; the reviewed setup script launch count sta
 one. Current semantic frontier: owner choice between definition-only upgrade and
 combined definition/unheld package-version upgrade remains pending. No amendment
 completion or upgrade-version acceptance is asserted.
+
+## Quiescent pending-choice handoff
+
+Current assignment MASK-0128 plus upstream ASK-0096, mandate `named-bundles-v3`,
+segment `coordinator-implementer-install-uninstall-upgrade`; same non-delegating
+leaf `/root/bundles`, gpt-6.1-sol/xhigh and preserved strategy. Runtime candidate
+`d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc`; canonical source/verifier candidate
+`de0d3736f4767ac1af49f30f336f6a9c2bcd0314`. Completed install/uninstall acceptance:
+15 exact-candidate public/renderer checks pass in 47.164s; 44 ordinary task/CLI/
+help/readiness regressions pass; canonical four-skill reviewed setup healthy, all
+16 packages preserved, offline removal preserves manually selected grill-me,
+repeat removal is a no-op and reinstall is healthy. [Amendment evidence](../../development/named-bundles-evidence.json)
+retains every actual run/failure/correction and exact canonical receipt.
+
+Changed paths: bundle runtime/CLI/rendering, focused bundle and capability tests,
+current user/CLI/RFC docs, same adopted plan/strategy/checkpoint, follow-up cards
+and bounded canonical README/verifier/evidence. Old completed card acceptance is
+preserved. No unrelated work was modified. All test/setup/Git subprocesses ended;
+all disposable consumers, source caches, local bare remotes and machine roots
+were cleaned. No server, protected review candidate, worktree or extra agent.
+Both repositories remain on main, with explicit-path commits and no publication,
+real consumer migration, permission or credential changes.
+
+Required pending: owner choice between bundle upgrade adopting the latest definition
+plus unheld package versions, and a rename retaining existing versions. Current
+candidate retains prior definition-only behavior; combined-version semantics are
+not implemented or accepted. Coordinator owns the pending question. Resume this
+same milestone/leaf with the answer; reuse ordinary `mask_resolve.resolve_candidate`
+for scoped updates, holds, identical-package lock preservation and immutable-ref
+safety if combined is selected. Then test that changed scope, reconcile docs/
+canonical verification and finish MASK-0128 / ASK-0096. Cards remain In Progress;
+RFC-MASK-0010 and reopened RFC-ASK-0015 remain Implementing. Original profiles/
+fleet/native host-loading obligations stay open. No attended review is required.
+Writer ownership releases on this pending-choice return and can resume on reply.
