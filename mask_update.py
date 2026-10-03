@@ -114,6 +114,15 @@ def changes(previous, proposal):
     return result
 
 
+def missing_selectors(home, name, entry, selectors):
+    cache = sources.cached(home, name, entry)
+    if cache is None:
+        return True
+    refs = sources.cached_refs(cache, entry) or {}
+    return any('commit' in value and c.peeled_commit(cache, value['commit']) != value['commit'] or
+               'ref' in value and value['ref'] not in refs for value in selectors if value)
+
+
 def dispatch(args, output, home):
     import mask
     import mask_selection as selection
@@ -179,7 +188,8 @@ def dispatch(args, output, home):
                 fetches[name], error = fetch_tap(home, name, config['sources'][name], config['git_timeout_seconds'], selectors.get(name, ()), lender)
                 if error is not None:
                     failures[name] = error
-    locks, payload_views, planned_consumers, blocked = {}, {}, [], []
+    import mask_bundles as bundles
+    locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers, blocked = {}, {}, {}, [], {}, [], []
     for item in active:
         row = item['row']
         failed = [name for name in item['taps'] if name in failures]
@@ -191,24 +201,56 @@ def dispatch(args, output, home):
             continue
         previous = r.lock(r.read_model(r.lock_path(item['root'], item['scope'], home), 'lock')[0])
         try:
-            proposal = r.resolve_candidate(item['declaration'], config, home, previous, refresh=True, skills=item['skills'],
+            declaration = item['declaration']
+            definitions = bundles.definitions(home, config, declaration, args, output, item['root'] if item['scope'] == 'project' else None) if not requested else {}
+            descriptors[row['root']] = definitions
+            preserved, removed = [], []
+            if definitions:
+                declaration, _, preserved, removed = bundles.upgrade_proposal(declaration, previous, definitions, config)
+            chosen = item['skills'] if requested else [r.coordinate(binding) for binding in declaration['skills']]
+            protected = {entry['skill'] for entry in preserved if entry['reason'] == 'locally_modified_version'}
+            chosen = [coordinate for coordinate in chosen if coordinate not in protected]
+            if fetching:
+                # New definitions can introduce an approved tap/selector absent from the old declaration.
+                for name in sorted({binding['source'] for binding in declaration['skills'] if r.coordinate(binding) in chosen}):
+                    selected = [r.declared_selector(declaration, binding) for binding in declaration['skills'] if binding['source'] == name and r.coordinate(binding) in chosen]
+                    missing = name not in fetches or missing_selectors(home, name, config['sources'][name], selected)
+                    if missing:
+                        with c.writer_lock(home):
+                            fetches[name], error = fetch_tap(home, name, config['sources'][name], config['git_timeout_seconds'], [value for value in selected if value], item['root'] if item['scope'] == 'project' else None)
+                        if error:
+                            raise error
+            proposal = r.resolve_candidate(declaration, config, home, previous, refresh=bool(chosen), skills=chosen,
                                            allow_ref_rebind=getattr(args, 'allow_ref_rebind', False), payload_views=payload_views)
         except c.MaskError as error:
-            if error.code != 'lock.resolution_required' or fetching:
+            bundle_failure = bool(item['declaration'].get('bundle_state', {}).get('bundles')) and error.code.startswith(('bundle.', 'source.', 'skill.', 'lock.resolution_required'))
+            if (bundle_failure and scoped) or (not bundle_failure and (error.code != 'lock.resolution_required' or fetching)):
                 raise
-            row.update(status='blocked', error=error.as_dict(), requires_fetch=True)
+            row.update(status='blocked', error=error.as_dict(), requires_fetch=error.code in ('lock.resolution_required', 'bundle.catalog_required'))
             blocked.append(row['root'])
             continue
         locks[row['root']] = proposal
-        row.update(status='unchanged' if proposal == previous else 'updated', changes=changes(previous, proposal))
+        proposals[row['root']] = declaration
+        descriptors[row['root']] = definitions
+        row.update(status='unchanged' if proposal == previous and declaration == item['declaration'] else 'updated', changes=changes(previous, proposal))
+        if definitions:
+            old_keys = {r.coordinate(binding) for binding in item['declaration']['skills']}
+            new_keys = {r.coordinate(binding) for binding in declaration['skills']}
+            update = dict(root=row['root'], definitions=list(definitions.values()), added=sorted(new_keys - old_keys), removed=removed, preserved=preserved, versions=row['changes'])
+            row['bundle_changes'] = update
+            bundle_updates.append(update)
         planned_consumers.append(item)
     selected = [item['root'] for item in planned_consumers]
 
     def candidate_plan():
-        planned = fs.plan(config, state, selected, home=home, lock_proposals=locks,
+        for item in consumers:
+            bundles.guard_definitions(home, config, descriptors.get(str(item['root']), {}), args, output, item['root'] if item['scope'] == 'project' else None)
+        planned = fs.plan(config, state, selected, home=home, proposals=proposals, lock_proposals=locks,
                           operation='upgrade', payload_views=payload_views, repair_roles=True, retire_files=False)
-        planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=blocked,
+        planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=[row for row in rows if row['status'] == 'blocked'],
+                                             bundles=descriptors,
                                              skipped=[row['root'] for row in rows if row['status'] == 'skipped']))
+        planned['bundle_updates'] = bundle_updates
         return planned
 
     # Only selected consumers participate in the activation; the snapshot still
@@ -221,8 +263,13 @@ def dispatch(args, output, home):
         for item in planned_consumers:
             observation = dict(root=item['row']['root'], effects={})
             effects.append(observation)
-            store.ensure(home, item['declaration'], locks[item['row']['root']], config, offline=True,
-                         coordinates=selection.applicable_coordinates(item['declaration']), effects=observation['effects'])
+            declaration = proposals[item['row']['root']]
+            store.ensure(home, declaration, locks[item['row']['root']], config, offline=True,
+                         coordinates=selection.applicable_coordinates(declaration), effects=observation['effects'])
+            retired = set(selection.applicable_coordinates(item['declaration'])) - set(selection.applicable_coordinates(declaration))
+            if retired:
+                old = r.lock(r.read_model(r.lock_path(item['root'], item['scope'], home), 'lock')[0])
+                store.ensure(home, item['declaration'], old, config, offline=True, coordinates=sorted(retired), effects=observation['effects'])
     import mask_lifecycle
     mask_lifecycle.execute(args, output, home, config, selected, before_selected, candidate_plan, prepare,
                            details=dict(disclosure, host_load='not_verified'))

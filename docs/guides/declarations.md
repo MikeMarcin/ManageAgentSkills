@@ -102,15 +102,21 @@ uninstalls. It does not change membership when a source branch advances.
 Fetch a newer catalog and review `mask bundle upgrade SOURCE/NAME --dry-run`. The
 result exposes the before/after selection, additions, removals, preserved contributions
 and frozen definition identity. Apply with the returned hash. A changed fetched source
-revision or definition makes an earlier plan stale. Package version upgrades remain
-the separate `upgrade` task; a refresh retains existing locks unless this contribution's
-explicit version selector changes without competing/manual/held authority.
+revision, definition or member resolution makes an earlier plan stale. Bundle upgrade
+also resolves newer unheld member versions through the normal upgrade resolver. Pins
+and exact commit selectors stay exact. Compatible manual/overlapping members may
+advance under their shared selector; conflicting constraints report origins. Local
+binding edits retain their package version until separately upgraded. A live bundle
+upgrade fetches its approved definition/member taps; previews, approved plans and
+`--offline` use cached data. Moved tags/non-fast-forward branches require the explicit
+`--allow-ref-rebind` guard.
 
-Both `upgrade` and `install --replace` replace **only the named bundle's local
+`bundle upgrade` and `bundle install --replace` replace **only the named bundle's local
 contribution**. They remove a former member only when it is exclusive to that
 contribution, unheld and unchanged from its expanded binding. Manual selections,
 overlapping bundles and unrelated bindings remain. Local target/condition edits or
-held removed members become explicit retained manual contributions. Exact removal
+held removed members become explicit retained manual contributions. `install --replace` changes only definition membership and keeps existing package
+versions unless an exclusive selector explicitly changes. Exact removal
 still refuses edited/unmanaged deployment collisions through the planner.
 
 `mask bundle uninstall SOURCE/NAME --dry-run` reviews removal of only that frozen
@@ -129,3 +135,12 @@ The newly introduced pre-release `bundle apply` spelling is replaced by
 `bundle install`; there is no compatibility alias. There is no recursion, dependency
 solver, source enrollment or automatic membership update. Project is the default scope; `--project PATH` and
 `--user` select one explicit consumer, with no aggregate bundle mutation.
+
+Default `mask upgrade` and `mask upgrade --all` also inspect installed bundle
+receipts. The latter includes every registered project plus personal scope. One
+review combines definition membership and unheld package versions, including ordinary
+manual skills. `mask upgrade ID` remains a package-only operation and leaves bundle
+receipts frozen. Aggregate JSON lists each consumer's definition/lock changes and
+blocked scopes. A conflicting/unavailable definition blocks that consumer before
+edits; valid consumers may apply, with `upgrade.incomplete` naming the partial result.
+Frozen journal recovery uses the approved declarations and package rows.

@@ -115,14 +115,14 @@ metadata and the declared project/personal workflow; neither command runs script
 
 Bundle browsing reads validated `mask-source.json` definitions at the approved cached
 ref. Definitions contain source-qualified skills and optional target, version and
-condition suggestions. Bundle install/refresh/uninstall are guarded project/personal tasks using
+condition suggestions. Bundle install/upgrade/uninstall are guarded project/personal tasks using
 the same planner, setup review, exact locks and journal as install. The plan hash
 includes the exact definition source commit and digest, including a definition source
 that contributes no package. Repeat install retains the previous expansion; changed
-definitions require explicit refresh. `--replace` replaces the named local bundle
+definitions require explicit upgrade. `--replace` replaces the named local bundle
 contribution, with only exclusive unchanged unheld removals; it preserves manual and
 overlapping contributions. `data.before`, `after`, `bundle`, `locked`, `added`,
-`removed` and `preserved` make the candidate diffable. No recursive dependency,
+`removed`, `preserved` and `versions` make membership and package changes diffable. No recursive dependency,
 profile subscription or fleet behavior is advertised. `bundle uninstall` removes
 only the named frozen receipt and exclusive unchanged unheld bindings. It preserves
 manual/overlapping/held/locally edited bindings, promotes last-origin survivors to
@@ -219,3 +219,11 @@ stale plan or missing consent; 5 external/filesystem/setup failure; 6 busy lock;
 The [accepted amendment](../rfcs/plans/upgrade-readiness/accepted-surface.md)
 records the owner decisions. Earlier engine/recovery detail is retained in the
 [historical v1 contract](../rfcs/plans/upgrade-readiness/legacy-cli-contract-v1.md).
+
+Bundle upgrade combines the latest fetched definition with newer unheld member
+versions using the ordinary resolver, exact selector/immutable-ref rules and setup
+review. Default scoped upgrade and upgrade --all include installed bundle receipts
+in their existing per-consumer plan; upgrade ID remains package-only. `bundle_updates`
+reports root, definition identities, additions/removals, preserved origins and package
+revisions/digests. Source/constraint failures are blocked per consumer; unaffected
+consumers may apply with the existing upgrade.incomplete partial-report exit.

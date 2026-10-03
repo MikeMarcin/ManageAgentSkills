@@ -52,7 +52,7 @@ mask upgrade
 mask upgrade --all
 ```
 
-Updates every registered checkout and your personal skills, including required
+Updates every registered checkout and your personal skills, including installed bundle definitions and required
 setup. Bare `mask upgrade` affects only the checkout you are working in.
 
 For a fresh clone or worktree, run `mask register`. It restores the declared
@@ -68,7 +68,7 @@ checkout without upgrading versions.
 | Inspect a named bundle | `mask bundle show agentskills/rfc` |
 | Install a named bundle here | `mask bundle install agentskills/rfc` |
 | Uninstall a bundle contribution here | `mask bundle uninstall agentskills/rfc` |
-| Review changed bundle membership | `mask bundle upgrade agentskills/rfc --dry-run` |
+| Review bundle membership and member versions | `mask bundle upgrade agentskills/rfc --dry-run` |
 | Show this checkout's skills | `mask list` |
 | Show personal skills | `mask list --user` |
 | Register and prepare this checkout | `mask register` |
@@ -110,7 +110,8 @@ locks. The canonical `agentskills/rfc` bundle contains author-rfc, grill-rfc, gr
 and implement-rfc. Configure implement-rfc's consumer context before installing it;
 the installation review includes its required setup. Use `mask tap fetch agentskills`
 before browsing or previewing. Install adds to existing selections, and later definition
-changes require an explicit, diffable refresh. Bundle uninstall removes its local
+changes and newer unheld members are reviewed together by `bundle upgrade`.
+Ordinary `upgrade`, including `--all`, includes installed bundles too. Bundle uninstall removes its local
 contribution while preserving other selections and held or locally edited members. See [bundle contributions](docs/guides/declarations.md#named-bundles).
 
 - `update` refreshes MASK and the tap catalogs; `upgrade` changes selected skill versions and makes them ready. Install/upgrade refresh automatically when needed. `--no-update` skips that preliminary refresh; `--offline` forbids network access altogether.

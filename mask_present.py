@@ -889,6 +889,7 @@ def render_bundles(data, output):
         lines.extend('  + ' + clean(key) for key in data.get('added', []))
         lines.extend('  - ' + clean(key) for key in data.get('removed', []))
         lines.extend('  preserved ' + clean(item['skill']) + ': ' + clean(item['reason']) for item in data.get('preserved', []))
+        lines.extend('  version ' + clean(item['coordinate']) + ': ' + clean(item.get('before_commit')) + ' -> ' + clean(item.get('after_commit')) for item in data.get('versions', []))
         lines.extend(action_summary(output))
         lines.extend(workflow_lines(data, quiet_ready=True))
         lines.extend(plan_guard(data, output))
@@ -1029,6 +1030,15 @@ def task_review(proposal, output):
         for item in bundle['changed']:
             lines.append(f"    change {clean(item['skill'])}: {clean(item['before'])} -> {clean(item['after'])}")
         lines.extend('    preserve ' + clean(item['skill']) + ': ' + clean(item['reason']) for item in bundle['preserved'])
+        lines.extend('    version ' + clean(item['coordinate']) + ': ' + clean(item.get('before_commit')) + ' -> ' + clean(item.get('after_commit')) for item in bundle.get('versions', []))
+        lines.append('')
+    for update in output['data'].get('bundle_updates', []):
+        lines.append('  Bundles in ' + clean(update['root']))
+        lines.extend('    ' + clean(item['coordinate']) + ' at ' + clean(item['commit']) + ' (' + clean(item['definition_digest']) + ')' for item in update['definitions'])
+        lines.extend('    + ' + clean(key) for key in update['added'])
+        lines.extend('    - ' + clean(key) for key in update['removed'])
+        lines.extend('    preserve ' + clean(item['skill']) + ': ' + clean(item['reason']) for item in update['preserved'])
+        lines.extend('    version ' + clean(item['coordinate']) + ': ' + clean(item.get('before_commit')) + ' -> ' + clean(item.get('after_commit')) for item in update['versions'])
         lines.append('')
     for root, row in rows.items():
         parts = []

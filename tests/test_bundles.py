@@ -199,7 +199,7 @@ class BundleTests(PublicFixture):
         self.assertNotIn('bundle.remove', commands)
         self.assertNotIn('profile.subscribe', commands)
 
-    def test_refresh_never_upgrades_package_rows_or_silently_changes_membership(self):
+    def test_install_keeps_frozen_rows_but_upgrade_advances_unheld_member_versions(self):
         self.install_bundle()
         prior = self.lock()['packages'][0]
         receipt = self.declaration()['bundle_state']['bundles'][TAP + '/first']
@@ -209,7 +209,8 @@ class BundleTests(PublicFixture):
         self.assertFalse(self.install_bundle()['changed'])
         self.assertEqual(self.declaration()['bundle_state']['bundles'][TAP + '/first'], receipt)
         self.call('bundle', 'upgrade', TAP + '/first')
-        self.assertEqual(self.lock()['packages'][0], prior)
+        self.assertNotEqual(self.lock()['packages'][0]['payload_digest'], prior['payload_digest'])
+        self.assertEqual(self.lock()['packages'][0]['commit'], head)
         self.assertEqual(self.declaration()['bundle_state']['bundles'][TAP + '/first']['commit'], head)
 
     def generated_bundle(self, before=''):
@@ -531,3 +532,207 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.assertFalse((self.project / '.mask.json').exists())
         self.assertFalse(self.call('bundle', 'uninstall', TAP + '/both', '--user')['changed'])
         self.assertEqual(self.raw('bundle', 'uninstall', TAP + '/both', '--all', '--json').returncode, 2)
+
+    def test_upgrade_combines_definition_and_versions_in_one_diff_and_guard(self):
+        self.install_bundle()
+        prior = self.lock()['packages'][0]
+        self.index['bundles']['first']['skills'].append(dict(source=TAP, id='beta'))
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('Updated alpha package.\n')
+        head = self.publish_index(); self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        preview = self.call('bundle', 'upgrade', TAP + '/first', '--dry-run')
+        self.assertEqual(preview['data']['added'], [TAP + '/beta'])
+        self.assertEqual(preview['data']['versions'][0]['before_commit'], prior['commit'])
+        self.assertEqual(self.consumer_bytes(), before)
+        human = self.human('bundle', 'upgrade', TAP + '/first', '--dry-run')
+        self.assertIn('version ' + TAP + '/alpha', human.stdout)
+        self.assertIn('+ ' + TAP + '/beta', human.stdout)
+        self.call('bundle', 'upgrade', TAP + '/first', '--approve-plan', preview['data']['plan_hash'])
+        self.assertEqual(next(row for row in self.lock()['packages'] if row['id'] == 'alpha')['commit'], head)
+        self.assertEqual(self.selected(), {TAP + '/alpha', TAP + '/beta'})
+        self.assertFalse(self.call('bundle', 'upgrade', TAP + '/first', '--offline')['changed'])
+
+    def test_upgrade_shared_manual_members_compatible_selectors_holds_and_local_edits(self):
+        self.install_bundle('both'); self.install_bundle('first')
+        self.call('install', TAP + '/alpha')
+        prior = {row['id']: row for row in self.lock()['packages']}
+        self.call('project', 'set-agents', TAP + '/beta', 'codex')
+        for name in ('alpha', 'beta'):
+            with (self.source / f'skills/{name}/SKILL.md').open('a') as stream:
+                stream.write('New fixture bytes.\n')
+        head = self.publish_index(); self.call('tap', 'fetch', TAP)
+        result = self.call('bundle', 'upgrade', TAP + '/both', '--offline')
+        current = {row['id']: row for row in self.lock()['packages']}
+        self.assertEqual(current['alpha']['commit'], head)  # Compatible manual + overlapping selectors follow the same ref.
+        self.assertEqual(current['beta'], prior['beta'])  # Local target edit retains its exact package.
+        self.assertIn(TAP + '/alpha', self.declaration()['bundle_state']['manual'])
+        self.assertIn(TAP + '/first', self.declaration()['bundle_state']['bundles'])
+        self.assertIn('locally_modified_version', [row['reason'] for row in result['data']['preserved']])
+        self.call('pin', TAP + '/alpha')
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('New held fixture bytes.\n')
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.call('bundle', 'upgrade', TAP + '/both', '--offline')
+        self.assertEqual(self.lock()['packages'], list(current.values()))
+
+    def test_upgrade_stale_package_preview_and_frozen_recovery(self):
+        self.install_bundle()
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('First update.\n')
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        preview = self.call('bundle', 'upgrade', TAP + '/first', '--dry-run')
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('Later update.\n')
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        result = self.call('bundle', 'upgrade', TAP + '/first', '--approve-plan', preview['data']['plan_hash'], code=4)
+        self.assertEqual(result['error']['code'], 'plan.stale')
+        self.assertEqual(self.consumer_bytes(), before)
+        preview = self.call('bundle', 'upgrade', TAP + '/first', '--dry-run')
+        self.fault('bundle', 'upgrade', TAP + '/first', '--approve-plan', preview['data']['plan_hash'], label='lock')
+        self.assertEqual(json.loads((self.home / 'pending.json').read_text())['operation'], 'upgrade')
+        self.index['bundles']['first']['skills'] = []
+        self.publish_index()
+        self.call('recover', '--complete')
+        self.assertEqual(self.declaration(), preview['data']['after'])
+        self.assertEqual(self.lock(), preview['data']['locked'])
+        self.call('status', '--check')
+
+    def test_upgrade_all_installed_definitions_projects_personal_holds_and_stale_guard(self):
+        second = self.base / 'second-project'; second.mkdir(); self.git(second, 'init', '-b', 'main')
+        self.install_bundle()
+        self.call('bundle', 'install', TAP + '/first', '--project', second)
+        self.call('bundle', 'install', TAP + '/first', '--user')
+        self.call('pin', TAP + '/alpha', '--project', second)
+        held = json.loads((second / '.mask.lock.json').read_text())['packages'][0]
+        self.call('install', TAP + '/beta')
+        self.index['bundles']['first']['skills'].append(dict(source=TAP, id='beta'))
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('Aggregate update.\n')
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        preview = self.call('upgrade', '--all', '--dry-run')
+        self.assertEqual(len(preview['data']['bundle_updates']), 3)
+        self.assertEqual(self.consumer_bytes(), before)
+        human = self.human('upgrade', '--all', '--dry-run')
+        self.assertIn('Bundles in ', human.stdout)
+        self.assertIn('+ ' + TAP + '/beta', human.stdout)
+        self.publish_index(); self.call('tap', 'fetch', TAP)  # Same definition, new source revision still stales approval.
+        before = self.consumer_bytes()
+        result = self.call('upgrade', '--all', '--approve-plan', preview['data']['plan_hash'], code=4)
+        self.assertEqual(result['error']['code'], 'plan.stale')
+        self.assertEqual(self.consumer_bytes(), before)
+        preview = self.call('upgrade', '--all', '--dry-run')
+        self.call('upgrade', '--all', '--approve-plan', preview['data']['plan_hash'])
+        for declaration in (self.declaration(), json.loads((second / '.mask.json').read_text()), json.loads((self.home / 'user.json').read_text())):
+            self.assertEqual({row['id'] for row in declaration['skills']}, {'alpha', 'beta'})
+        self.assertEqual(next(row for row in json.loads((second / '.mask.lock.json').read_text())['packages'] if row['id'] == 'alpha'), held)
+        self.call('status', '--all', '--check')
+
+    def test_default_upgrade_adopts_overlapping_definitions_together_and_ids_stay_bounded(self):
+        self.install_bundle('both'); self.install_bundle('first')
+        old = self.declaration()['bundle_state']['bundles'][TAP + '/first']
+        new = self.publish_index()
+        for key in ('first', 'both'):
+            self.index['bundles'][key]['skills'][0]['version'] = {'commit': new}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.call('upgrade', TAP + '/alpha', '--offline')
+        self.assertEqual(self.declaration()['bundle_state']['bundles'][TAP + '/first'], old)
+        self.call('upgrade', '--offline')
+        self.assertEqual(self.declaration()['skills'][0]['version'], {'commit': new})
+        self.assertEqual(self.lock()['packages'][0]['commit'], new)
+        self.assertIn(TAP + '/both', self.declaration()['bundle_state']['bundles'])
+
+    def test_upgrade_all_reports_conflicting_scope_and_applies_valid_scope_truthfully(self):
+        self.index['bundles']['first']['skills'][0]['agents'] = ['codex']
+        self.index['bundles']['both']['skills'][0]['agents'] = ['codex']
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.install_bundle('first')
+        second = self.base / 'second-project'; second.mkdir(); self.git(second, 'init', '-b', 'main')
+        self.call('bundle', 'install', TAP + '/first', '--project', second)
+        self.call('bundle', 'install', TAP + '/both', '--project', second)
+        original = (second / '.mask.json').read_bytes(), (second / '.mask.lock.json').read_bytes()
+        self.index['bundles']['first']['skills'][0]['agents'] = ['claude']
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        preview = self.call('upgrade', '--all', '--dry-run')
+        rows = {row['root']: row for row in preview['data']['consumers']}
+        self.assertEqual(rows[str(second)]['status'], 'blocked')
+        self.assertEqual(rows[str(second)]['error']['code'], 'bundle.conflict')
+        result = self.call('upgrade', '--all', '--approve-plan', preview['data']['plan_hash'], code=4)
+        self.assertEqual(result['error']['code'], 'upgrade.incomplete')
+        self.assertTrue(result['changed'])
+        self.assertEqual((second / '.mask.json').read_bytes(), original[0])
+        self.assertEqual((second / '.mask.lock.json').read_bytes(), original[1])
+        self.assertEqual(self.declaration()['skills'][0]['agents'], ['claude'])
+
+    def test_upgrade_respects_manual_exact_selector_and_reports_competing_origins(self):
+        old = self.git(self.source, 'rev-parse', 'HEAD')
+        self.index['bundles']['first']['skills'][0]['version'] = {'commit': old}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.install_bundle(); self.call('install', TAP + '/alpha')
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('Explicit new constraint.\n')
+        new = self.publish_index()
+        self.index['bundles']['first']['skills'][0]['version'] = {'commit': new}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        result = self.call('bundle', 'upgrade', TAP + '/first', '--offline', code=4)
+        self.assertEqual(result['error']['code'], 'bundle.conflict')
+        self.assertEqual(result['error']['details']['dimension'], 'version')
+        self.assertIn('manual', result['error']['details']['origins'])
+        self.assertEqual(self.consumer_bytes(), before)
+
+    def test_bundle_upgrade_moved_tag_requires_explicit_ref_rebind(self):
+        self.git(self.source, 'tag', 'release')
+        self.git(self.source, 'push', '-q', str(self.upstream), 'refs/tags/release')
+        self.index['bundles']['first']['skills'][0]['version'] = {'ref': 'refs/tags/release'}
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        self.install_bundle()
+        old = self.lock()['packages'][0]
+        with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
+            stream.write('Moved tagged package.\n')
+        new = self.publish_index()
+        self.git(self.source, 'tag', '-f', 'release')
+        self.git(self.source, 'push', '-q', '--force', str(self.upstream), 'refs/tags/release')
+        self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        result = self.call('bundle', 'upgrade', TAP + '/first', '--offline', code=4)
+        self.assertEqual(result['error']['code'], 'lock.ref_rebound')
+        self.assertEqual(self.consumer_bytes(), before)
+        preview = self.call('bundle', 'upgrade', TAP + '/first', '--allow-ref-rebind', '--dry-run')
+        self.call('bundle', 'upgrade', TAP + '/first', '--allow-ref-rebind', '--approve-plan', preview['data']['plan_hash'])
+        self.assertEqual(self.lock()['packages'][0]['commit'], new)
+        self.assertNotEqual(self.lock()['packages'][0]['payload_digest'], old['payload_digest'])
+
+    def test_aggregate_upgrade_recovery_uses_frozen_membership_and_package_rows(self):
+        self.install_bundle()
+        self.call('bundle', 'install', TAP + '/first', '--user')
+        self.index['bundles']['first']['skills'].append(dict(source=TAP, id='beta'))
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        preview = self.call('upgrade', '--all', '--dry-run')
+        self.fault('upgrade', '--all', '--offline', '--approve-plan', preview['data']['plan_hash'], label='lock')
+        self.index['bundles']['first']['skills'] = []
+        self.publish_index()
+        self.call('recover', '--complete')
+        self.assertEqual(self.selected(), {TAP + '/alpha', TAP + '/beta'})
+        self.assertEqual({row['id'] for row in json.loads((self.home / 'user.json').read_text())['skills']}, {'alpha', 'beta'})
+        self.call('status', '--all', '--check')
+
+    def test_upgrade_setup_still_requires_review_and_recovery_never_reruns_scripts(self):
+        self.generated_bundle()
+        preview = self.call('bundle', 'install', TAP + '/workflow', '--dry-run')
+        self.call('bundle', 'install', TAP + '/workflow', '--approve-plan', preview['data']['plan_hash'])
+        with (self.package / 'scripts/prepare_fixture_roles.py').open('a') as stream:
+            stream.write('\n# New declared setup input revision.\n')
+        self.publish_index(); self.call('tap', 'fetch', TAP)
+        before = self.consumer_bytes()
+        preview = self.call('bundle', 'upgrade', TAP + '/workflow', '--dry-run')
+        self.assertTrue(preview['data']['setup']['actions'])
+        self.assertEqual(self.consumer_bytes(), before)
+        self.assertEqual(self.call('bundle', 'upgrade', TAP + '/workflow', '--offline', code=4)['error']['code'], 'confirmation.required')
+        self.fault('bundle', 'upgrade', TAP + '/workflow', '--approve-plan', preview['data']['plan_hash'], label='setup.exited')
+        self.assertEqual(len(self.sentinel.read_text().splitlines()), 2)
+        self.assertEqual(self.call('recover', '--complete', code=8)['error']['code'], 'setup.unverified')
+        self.call('recover', '--rollback')
+        self.assertEqual(len(self.sentinel.read_text().splitlines()), 2)
