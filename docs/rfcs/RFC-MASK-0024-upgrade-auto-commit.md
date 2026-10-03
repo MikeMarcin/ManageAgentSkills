@@ -131,6 +131,6 @@ Preserve settled D2–D3. Feature implementation commits exclude this checkout's
 `.mask.json`, `.mask.lock.json`, unrelated `.gitignore`, and unrelated drafts.
 
 [Implementation](../issues/60-done/MASK-0129-upgrade-auto-commit.md),
-[closeout](../issues/10-backlog/MASK-0130-upgrade-auto-commit-closeout.md),
+[closeout](../issues/20-ready/MASK-0130-upgrade-auto-commit-closeout.md),
 [adopted plan](plans/upgrade-auto-commit/milestone-plan.json), and
 [retained pack](assets/upgrade-auto-commit/README.md).

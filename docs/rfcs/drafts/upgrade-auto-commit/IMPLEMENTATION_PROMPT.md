@@ -1,13 +1,12 @@
 # Implement this pack
 
-This is a proposed pack, not a current implementation mandate. When the owner
-authorizes implementation, use the repository's `.mask/skill-config/implement-rfc/`
+The owner authorized implementation and confirmed D4–D7 on 2026-10-03. Use the repository's `.mask/skill-config/implement-rfc/`
 consumer context and import these provisional documents/cards through its live
 workflow. Read [README.md](README.md),
 [RFC-DRAFT-0001](RFC-DRAFT-0001-upgrade-auto-commit.md),
 [DECISIONS.md](DECISIONS.md) and [draft checks](DRAFT_CHECKS.md).
-The exact pending frontier is D4–D7; preserve settled file-set and existing-change
-answers. Resolve material behavior before implementing affected scope.
+D4–D7 are settled exactly as proposed; preserve the settled file-set and existing-change
+answers. Live RFC-MASK-0024 and cards MASK-0129/MASK-0130 own current acceptance.
 
 Implement the authorized scope using the [authored milestone plan](milestone-plan.json).
 Read the consumer's instructions and live requirements, reconcile typed IDs, and

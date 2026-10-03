@@ -1,0 +1,83 @@
+{
+  "schema": "implement-rfc.milestone-checkpoint.v1",
+  "run_id": "upgrade-auto-commit-20261003",
+  "segment_id": "confirmed-implementation",
+  "mandate_revision": "2",
+  "selection": {
+    "schema": "implement-rfc.strategy-selection.v1",
+    "strategy": "coordinator-implementer",
+    "topology_id": "coordinator-implementer",
+    "recipe_revision": "2",
+    "recipe_fingerprint": "sha256:b236a31fbebd1a5d2cca1db05ac16f48fcd011dbc312f2d64c00f72dffbe2b14",
+    "routing": {},
+    "requirement_profile": "coordinator-implementer",
+    "owners": {
+      "engineering": "implementer",
+      "bookkeeping": "implementer",
+      "product_edits": "implementer"
+    },
+    "delegation": "recipe",
+    "instruction_paths": [
+      "references/engineering-contract.md",
+      "references/strategies/coordinator-implementer.md"
+    ],
+    "configuration_complete": true,
+    "missing_routes": [],
+    "host_load": "not_verified"
+  },
+  "target": "RFC-MASK-0024",
+  "binding": {
+    "plan_id": "upgrade-auto-commit",
+    "plan_path": "docs/rfcs/plans/upgrade-auto-commit/milestone-plan.json",
+    "milestone_id": "usable-upgrade-commits",
+    "definition_fingerprint": "sha256:3242f9324267b55b0e0c036ab18e57898718ecfc4fda330948f21534046e00c1",
+    "obligations": [
+      {
+        "id": "MASK-0129:*",
+        "source": "MASK-0129",
+        "selector": null,
+        "source_fingerprint": "sha256:05fe361a8b9e0a9bde00a4bd9968f313f91475388f4f5756f9536a5cd09993ca"
+      },
+      {
+        "id": "MASK-0130:*",
+        "source": "MASK-0130",
+        "selector": null,
+        "source_fingerprint": "sha256:1803c7455b88cb0ca7d62453f345b3aca47ea808636ad8325579293cfdc12ad4"
+      }
+    ],
+    "obligation_fingerprint": "sha256:9574db74d6508e6f9f67fe668f07b61abe45674c2bd2e6a065f7edb5707d1e1a",
+    "exit_criteria": [
+      {
+        "id": "usable-upgrade-commits:exit:1",
+        "text": "RFC-DRAFT-0001 AC01 through AC07 have direct public CLI, filesystem, Git and documentation evidence."
+      },
+      {
+        "id": "usable-upgrade-commits:exit:2",
+        "text": "Project controls, unrelated staged changes, linked worktrees and aggregate failures satisfy the agreed behavior."
+      },
+      {
+        "id": "usable-upgrade-commits:exit:3",
+        "text": "Live adoption and closeout record actual IDs, baseline and implementation evidence without touching unrelated consumer changes."
+      }
+    ],
+    "prerequisite_fingerprint": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "structural": "valid",
+    "references": "resolved",
+    "semantic_coverage": "unknown",
+    "diagnostics": [],
+    "diagnostics_truncated": false
+  },
+  "target_milestones": [
+    "usable-upgrade-commits"
+  ],
+  "repository_state": {
+    "source_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+    "workflow_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+    "source_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+    "workflow_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+    "source_branch": "main",
+    "source_revision": "203d50f3565b6f0c7d2efa20829b572a35e4060c",
+    "workflow_branch": "main",
+    "workflow_revision": "203d50f3565b6f0c7d2efa20829b572a35e4060c"
+  }
+}

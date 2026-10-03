@@ -1,0 +1,245 @@
+{
+  "schema": "mask.upgrade-commit-verification.v1",
+  "mandate": {
+    "id": "upgrade-auto-commit",
+    "revision": "2",
+    "confirmation": "confirm go ahead",
+    "settled": [
+      "D1",
+      "D2",
+      "D3",
+      "D4",
+      "D5",
+      "D6",
+      "D7"
+    ]
+  },
+  "source_revision": "4ef044c1639d7ac106e1e86c65801592aee2c89b",
+  "source_files_sha256": {
+    "mask.py": "90eda2b9a495aed60a580ab2b2d7de3de13c447d4f1023ba19c1a001d824ce9e",
+    "mask_cli.py": "2fc3e025aeb5b76f985e5821af4471cd84a77b14a671b9713be35f4ccf5bf71c",
+    "mask_core.py": "1c119735a51a5d127cb8d3ac1dedbff7f1c61ec76a3377d3386be6702bc06832",
+    "mask_lifecycle.py": "3184e75bd0d31032614a86bcf224c15281399985437cbd318bef52c1aadcdb8f",
+    "mask_update.py": "57509547ab99de35af88013d55c55dff37b38054da4d639da1e4bb604d5ba0f9",
+    "mask_upgrade_commit.py": "77f141df6dbae41fec916175740f75fa00c09ff690eb2189dd04158fd275f688",
+    "mask_present.py": "b11f7b5b5422666452f9fc323cde96dc25eed070601c192a1e1a9212dce0ee22",
+    "tests/test_upgrade_commit.py": "e35e37112abd6b5d7b5da513d0bb51e4a371b6aa36f63216ed7308caec2b0d9a",
+    "schemas/result.schema.json": "26f1274fec54d93821ea80a03db5df81b2ef1405fd0f3a98242fd129d1da1f80",
+    "README.md": "4b367e147778ea29a2335e51c42b848f0253b0600287881c0176e6b1709b2290",
+    "CONTRIBUTING.md": "87e3453699f15db3fa08be2f7a536fe54082835c4e04671ce6b4e1b19a75fa6c",
+    "docs/guides/sources-and-updates.md": "b66d22063d6296ffc2ec98c90856c1334af1015ae9e902ab6bc041072a74baac",
+    "docs/architecture/cli-contract.md": "a30fdd09c8c6cd22c382208b46feede8c22345d064019f735fb55fbc0670142a"
+  },
+  "checks": {
+    "AC01": "Public flag/help/capabilities, unchanged defaults, positional skill selection, setup consent and early personal-only refusal.",
+    "AC02": "Exact parent/message/control-only trees, both-control bundle upgrade, existing untracked and partial staging, real index synchronization, unrelated staged/working preservation and no-op convergence.",
+    "AC03": "Read-only preview/index bytes/hook sentinel, commit-only would_change, intent/control/staging/HEAD/branch/eligibility stale approval before consumer changes.",
+    "AC04": "Nonregular/ignored/no-HEAD/detached/unmerged/active-operation refusal, clean detached no-op, aggregate per-project blocking, linked worktree branch/index and personal not_applicable.",
+    "AC05": "Setup consent/readiness before hooks; setup failure not_attempted; identity/signing/hook/timeout/message/tree/control/index-race failures retain upgrades and observed commits; retry convergence.",
+    "AC06": "Aggregate eligible successes, blocked project controls unchanged, personal upgrades without commits, commit failure nested error; human review/error output and one JSON result.",
+    "AC07": "Guarded focused integration 126 tests/14 classes, 1 Windows-only skip, zero failed classes; final affected feature rerun 24 tests, zero skips/failures; docs/schema/help, documentation gate and whitespace/self-review."
+  },
+  "runs": [
+    {
+      "scope": "shortest composed public path plus existing CLI checks",
+      "tests": 9,
+      "seconds": 43.964,
+      "outcome": "pass",
+      "candidate": "before expanded implementation"
+    },
+    {
+      "scope": "expanded feature",
+      "tests": 13,
+      "seconds": 74.905,
+      "outcome": "12 passed; human dry-run disclosure failed and was corrected"
+    },
+    {
+      "scope": "expanded feature and setup",
+      "tests": 19,
+      "seconds": 102.686,
+      "outcome": "pass",
+      "candidate": "before final index lock and nonregular correction"
+    },
+    {
+      "scope": "core index-lock/stale-plan checks",
+      "tests": 2,
+      "seconds": 17.405,
+      "outcome": "pass"
+    },
+    {
+      "scope": "focused integration",
+      "tests": 126,
+      "classes": 14,
+      "seconds": 196,
+      "skipped": 1,
+      "skip_reason": "Windows suspended Job Object prerequisite path on macOS",
+      "outcome": "pass",
+      "candidate": "before nonregular-control classification correction",
+      "command": "python3 -B scripts/run_tests.py -j 4 -k test_upgrade_commit -k test_upgrade_readiness -k test_stable_locks -k test_subprocess_policy -k test_git_integration -k test_cli_v2 -k test_human_output -k test_bundles --slowest 8",
+      "guard_receipt": {
+        "allowed_roots": [
+          "/private/tmp/mask-upgrade-commit-qualification/fixtures"
+        ],
+        "command_returncode": 0,
+        "live_files": [
+          {
+            "after": {
+              "exists": true,
+              "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.lock.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.gitignore",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.lock.json",
+            "unchanged": true
+          }
+        ],
+        "live_roots": [
+          "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+          "/Users/jaeger/Documents/GitHub/AgentSkills"
+        ],
+        "status": "passed",
+        "target_root": "/private/tmp/mask-upgrade-commit-qualification/fixtures"
+      },
+      "output": " 196.2s  tests.test_bundles.BundleTests\n 130.0s  tests.test_upgrade_commit.UpgradeCommit\n  63.9s  tests.test_upgrade_readiness.UpgradeReadiness\n  37.9s  tests.test_cli_v2.SetupV2\n  34.9s  tests.test_cli_v2.CliV2\n  32.8s  tests.test_git_integration.GitIntegrationTests\n  19.0s  tests.test_stable_locks.StablePackageLocks\n  13.7s  tests.test_upgrade_commit.UpgradeCommitReadiness\n126 tests in 14 classes, 1 skipped, 0 failed classes, wall 196s\n"
+    },
+    {
+      "scope": "final affected feature and setup",
+      "tests": 24,
+      "seconds": 126.77,
+      "skipped": 0,
+      "outcome": "pass",
+      "command": "python3 -B -m unittest tests.test_upgrade_commit -v",
+      "guard_receipt": {
+        "allowed_roots": [
+          "/private/tmp/mask-upgrade-commit-qualification/fixtures"
+        ],
+        "command_returncode": 0,
+        "live_files": [
+          {
+            "after": {
+              "exists": true,
+              "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.lock.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.gitignore",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.json",
+            "unchanged": true
+          },
+          {
+            "after": {
+              "exists": true,
+              "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
+            },
+            "before": {
+              "exists": true,
+              "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
+            },
+            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.lock.json",
+            "unchanged": true
+          }
+        ],
+        "live_roots": [
+          "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
+          "/Users/jaeger/Documents/GitHub/AgentSkills"
+        ],
+        "status": "passed",
+        "target_root": "/private/tmp/mask-upgrade-commit-qualification/fixtures"
+      },
+      "output": "test_all_commit_failure_keeps_success_and_reports_nested_error (tests.test_upgrade_commit.UpgradeCommit.test_all_commit_failure_keeps_success_and_reports_nested_error) ... ok\ntest_all_retains_successes_and_blocks_only_ineligible_projects (tests.test_upgrade_commit.UpgradeCommit.test_all_retains_successes_and_blocks_only_ineligible_projects) ... ok\ntest_bundle_upgrade_commits_changed_declaration_and_lock (tests.test_upgrade_commit.UpgradeCommit.test_bundle_upgrade_commits_changed_declaration_and_lock) ... ok\ntest_changed_eligibility_invalidates_approved_preview (tests.test_upgrade_commit.UpgradeCommit.test_changed_eligibility_invalidates_approved_preview) ... ok\ntest_commit_message_hook_effect_is_reported_and_preserved (tests.test_upgrade_commit.UpgradeCommit.test_commit_message_hook_effect_is_reported_and_preserved) ... ok\ntest_commit_only_untracked_controls_preserves_unrelated_staging_and_converges (tests.test_upgrade_commit.UpgradeCommit.test_commit_only_untracked_controls_preserves_unrelated_staging_and_converges) ... ok\ntest_concurrent_real_index_edit_survives_created_commit (tests.test_upgrade_commit.UpgradeCommit.test_concurrent_real_index_edit_survives_created_commit) ... ok\ntest_configured_hooks_and_hook_control_edits_are_preserved (tests.test_upgrade_commit.UpgradeCommit.test_configured_hooks_and_hook_control_edits_are_preserved) ... ok\ntest_defaults_flag_and_personal_only_reject_before_refresh (tests.test_upgrade_commit.UpgradeCommit.test_defaults_flag_and_personal_only_reject_before_refresh) ... ok\ntest_existing_index_lock_survives_commit_bookkeeping_failure (tests.test_upgrade_commit.UpgradeCommit.test_existing_index_lock_survives_commit_bookkeeping_failure) ... ok\ntest_full_partially_staged_controls_and_new_version_exclude_other_files (tests.test_upgrade_commit.UpgradeCommit.test_full_partially_staged_controls_and_new_version_exclude_other_files) ... ok\ntest_git_ineligible_candidates_refuse_before_consumer_effects (tests.test_upgrade_commit.UpgradeCommit.test_git_ineligible_candidates_refuse_before_consumer_effects) ... ok\ntest_git_timeout_after_created_commit_is_observed_without_duplicate (tests.test_upgrade_commit.UpgradeCommit.test_git_timeout_after_created_commit_is_observed_without_duplicate) ... ok\ntest_hook_failure_preserves_upgrade_then_retry_commits_once (tests.test_upgrade_commit.UpgradeCommit.test_hook_failure_preserves_upgrade_then_retry_commits_once) ... ok\ntest_hook_unexpected_tree_is_reported_and_preserved (tests.test_upgrade_commit.UpgradeCommit.test_hook_unexpected_tree_is_reported_and_preserved) ... ok\ntest_human_output_discloses_preview_commit_and_failure (tests.test_upgrade_commit.UpgradeCommit.test_human_output_discloses_preview_commit_and_failure) ... ok\ntest_linked_worktree_commit_uses_its_branch_and_index (tests.test_upgrade_commit.UpgradeCommit.test_linked_worktree_commit_uses_its_branch_and_index) ... ok\ntest_missing_identity_and_signing_failure_preserve_controls (tests.test_upgrade_commit.UpgradeCommit.test_missing_identity_and_signing_failure_preserve_controls) ... ok\ntest_nonregular_controls_are_blocked_without_reading_or_replacing_them (tests.test_upgrade_commit.UpgradeCommit.test_nonregular_controls_are_blocked_without_reading_or_replacing_them) ... ok\ntest_noop_detached_head_needs_no_commit_eligibility (tests.test_upgrade_commit.UpgradeCommit.test_noop_detached_head_needs_no_commit_eligibility) ... ok\ntest_readonly_preview_and_git_control_and_intent_staleness (tests.test_upgrade_commit.UpgradeCommit.test_readonly_preview_and_git_control_and_intent_staleness) ... ok\ntest_unmerged_index_refuses_and_preserves_index (tests.test_upgrade_commit.UpgradeCommit.test_unmerged_index_refuses_and_preserves_index) ... ok\ntest_failed_setup_starts_no_commit_and_preserves_applied_upgrade (tests.test_upgrade_commit.UpgradeCommitReadiness.test_failed_setup_starts_no_commit_and_preserves_applied_upgrade) ... ok\ntest_setup_consent_and_readiness_precede_control_commit (tests.test_upgrade_commit.UpgradeCommitReadiness.test_setup_consent_and_readiness_precede_control_commit) ... ok\n\n----------------------------------------------------------------------\nRan 24 tests in 126.770s\n\nOK\n"
+    }
+  ],
+  "self_review": "Reviewed source diff, exact candidate trees, consent order, normal Git hook/signing route, concurrency and cleanup. Corrected nonregular-control preflight during this review; final affected checks pass. No independent review or native Windows result claimed.",
+  "limits": [
+    "Cooperative qualification compares selected final bytes; it is not a sandbox and cannot prove absence of transient changes.",
+    "No live consumer migration, push, publication or native Windows acceptance."
+  ],
+  "command_state": "quiescent; all test processes completed; fixture roots empty"
+}
