@@ -1,0 +1,13 @@
+{
+  "criterion": "named-bundles-combined-upgrade",
+  "outcome": "fail",
+  "revision": "b879f8136489a98cfa26e0aae1da7e7e268c589b",
+  "evidence": {
+    "kind": "command",
+    "detail": "[\"python3\", \"-B\", \"-m\", \"unittest\", \"tests.test_bundles\", \"tests.test_human_output.RendererRegistry\", \"tests.test_update.UpdateTests.test_u04_dry_run_and_offline_never_fetch_and_block_a_cold_selector\"]",
+    "exit_code": 1,
+    "elapsed_seconds": 192.326,
+    "stdout_tail": "",
+    "stderr_tail": "...........................................E\n======================================================================\nERROR: UpdateTests (unittest.loader._FailedTest.UpdateTests)\n----------------------------------------------------------------------\nAttributeError: module 'tests.test_update' has no attribute 'UpdateTests'\n\n----------------------------------------------------------------------\nRan 44 tests in 192.218s\n\nFAILED (errors=1)\n"
+  }
+}

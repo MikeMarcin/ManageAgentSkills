@@ -1,0 +1,13 @@
+{
+  "criterion": "named-bundles-scoped-offline-regression",
+  "outcome": "pass",
+  "revision": "b879f8136489a98cfa26e0aae1da7e7e268c589b",
+  "evidence": {
+    "kind": "command",
+    "detail": "[\"python3\", \"-B\", \"-m\", \"unittest\", \"tests.test_update.FetchingUpdate.test_u04_dry_run_and_offline_never_fetch_and_block_a_cold_selector\"]",
+    "exit_code": 0,
+    "elapsed_seconds": 8.494,
+    "stdout_tail": "",
+    "stderr_tail": ".\n----------------------------------------------------------------------\nRan 1 test in 8.448s\n\nOK\n"
+  }
+}

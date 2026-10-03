@@ -15,7 +15,9 @@ mask upgrade --all       # every registered checkout plus personal skills
 ## Upgrade skills
 
 Bare upgrade selects only the current checkout. `--user` selects personal skills;
-`--all` selects the complete registered set. `upgrade SOURCE/ID` narrows the skills.
+`--all` selects the complete registered set. These commands review installed bundle
+definitions and newer unheld member versions together with ordinary selected skills.
+`upgrade SOURCE/ID` narrows the package versions and keeps bundle definitions frozen.
 `pin SKILL` holds its current locked version; `unpin SKILL` releases that hold without
 upgrading immediately. Held skills still receive readiness repair and consented setup.
 
@@ -37,7 +39,7 @@ Real package changes and explicit selector changes still advance the resolution;
 unchanged packages still receive readiness repair. A lock inside the selected
 package itself is payload content, so changing it remains a package change.
 
-For `--all`, a failed tap blocks its dependent consumers and reports
+For `--all`, a failed tap or incompatible bundle constraint blocks its dependent consumers and reports
 `upgrade.incomplete` while independent consumers may complete. A single-checkout
 failure applies no consumer changes. Moved tag/non-fast-forward ref resolutions
 require explicit `--allow-ref-rebind`; an approved rebind records the new resolution

@@ -1267,6 +1267,99 @@
       "No native host loading or Windows acceptance",
       "Profiles/fleet and broader MASK-0064 remain outside this mandate",
       "No push/publication/real consumer migration/credential or permission changes"
-    ]
+    ],
+    "historical_checkpoint": true
+  },
+  "combined_upgrade_diagnostics": [
+    {
+      "command": "python3 -B -m unittest tests.test_bundles.BundleTests.test_upgrade_combines_definition_and_versions_in_one_diff_and_guard tests.test_bundles.BundleTests.test_upgrade_all_installed_definitions_projects_personal_holds_and_stale_guard tests.test_bundles.BundleTests.test_default_upgrade_adopts_overlapping_definitions_together_and_ids_stay_bounded tests.test_bundles.BundleTests.test_upgrade_all_reports_conflicting_scope_and_applies_valid_scope_truthfully",
+      "tests": 4,
+      "outcome": "pass",
+      "seconds": 37.433
+    },
+    {
+      "command": "python3 -B -m unittest tests.test_bundles tests.test_human_output.RendererRegistry",
+      "tests": 43,
+      "outcome": "fail",
+      "failures": 1,
+      "errors": 1,
+      "seconds": 207.932,
+      "working_tree_candidate": true,
+      "diagnosis": [
+        "Overlapping member preserved, but its preservation line was omitted from human diff; added explicit origin disclosure.",
+        "Setup fixture changed only SKILL.md, which correctly does not change declared setup fingerprint. Test now changes scripts/prepare_fixture_roles.py, a declared setup input."
+      ]
+    }
+  ],
+  "policy_answer": {
+    "authorization": [
+      "yes go with recommendation",
+      "also mask upgrade --all should catch installed bundles too if it doesnt yet"
+    ],
+    "decision": "Combined definition/unheld version updates with default and aggregate installed-receipt reconciliation.",
+    "status": "Implemented, verified and accepted under named-bundles-v3; earlier pending handoff is historical."
+  },
+  "combined_upgrade_completion": {
+    "schema": "mask.named-bundles-combined-acceptance.v1",
+    "assignment": "MASK-0128 / ASK-0096 / named-bundles",
+    "mandate_revision": "named-bundles-v3",
+    "mask_candidate": "b879f8136489a98cfa26e0aae1da7e7e268c589b",
+    "agentskills_candidate": "39a6de558252eb0bf8c3cf9ae0d48f3fb10fa0ee",
+    "agentskills_acceptance_commit": "ff9d05a15c767422d00d4f815297bbb3c5a7d5aa",
+    "outcome": "pass",
+    "judgment": "Engineering acceptance of the bound public behaviors; mechanical command receipts retain their original exit codes.",
+    "verification": [
+      {
+        "artifact": "docs/development/named-bundles-combined-upgrade-tests.json",
+        "successful_product_tests": 43,
+        "runner_exit_code": 1,
+        "runner_error": "One additional selector named nonexistent tests.test_update.UpdateTests. All 43 bundle and renderer tests succeeded; corrected selector separately passed."
+      },
+      {
+        "artifact": "docs/development/named-bundles-scoped-upgrade-test.json",
+        "successful_product_tests": 1,
+        "runner_exit_code": 0
+      },
+      {
+        "command": "python3 -B -m unittest tests.test_bundles.BundleTests.test_overlap_and_bounded_replace_preserve_other_contributions tests.test_bundles.BundleTests.test_upgrade_setup_still_requires_review_and_recovery_never_reruns_scripts tests.test_update",
+        "tests": 19,
+        "outcome": "pass",
+        "seconds": 137.538,
+        "working_tree_before_candidate_commit": true
+      },
+      {
+        "artifact": "AgentSkills:docs/development/rfc-bundle-upgrade-evidence.json",
+        "public_commands": 22,
+        "outcome": "pass",
+        "packages_discovered": 16,
+        "skills_ready": 4,
+        "derived_fixture_revision": "9b69813b7b4b41ae8ac0bc0ede94b4345c98f0f2"
+      }
+    ],
+    "covered": [
+      "additive install/repeat/reinstall/overlap/manual targets",
+      "ownership-safe offline uninstall/held and edited survivor promotion",
+      "combined definition and unheld versions in named, default scoped and aggregate upgrade",
+      "two projects plus personal scope; mixed ordinary skills; truthful blocked-scope partial results",
+      "compatible shared/manual selectors and exact selector conflict origins",
+      "holds/local edits, immutable ref rebind, exact package locks and source revision/digest stale guards",
+      "new source/member failures before consumer edits; no hidden source approval",
+      "reviewed setup, interruption, frozen completion and rollback without script rerun",
+      "canonical supported index preserves all existing package discovery; current CLI/help/capability advertisement"
+    ],
+    "pending": [],
+    "limits": [
+      "RFC-MASK-0010 profiles/export/native acceptance remains open",
+      "Broader MASK-0064 management/provenance/fleet handoff remains open",
+      "Actual running-host loading and native Windows were not exercised",
+      "No push/publication, consumer migration, credentials or permission changes"
+    ],
+    "command_state": "All product test, canonical verifier, setup and Git subprocesses ended; fixture temporary roots/remotes cleaned; no server, worktree or additional agent.",
+    "next_action": "Finish MASK-0128, bind final checkpoint and release quiescent ownership; no additional product tests required.",
+    "documentation_validation": {
+      "MASK": "23 RFCs, 128 cards; 0 structural violations",
+      "AgentSkills": "15 RFCs, 96 cards; 0 structural violations",
+      "git_diff_check": "pass"
+    }
   }
 }

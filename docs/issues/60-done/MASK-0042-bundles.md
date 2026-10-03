@@ -46,6 +46,6 @@ This refinement neither accepts nor implements profile export/import.
 ## Authorized command follow-up
 
 The owner later selected bundle install/uninstall/upgrade. See active
-[MASK-0128](../30-in-progress/MASK-0128-bundle-install-uninstall.md) and the amended
+[MASK-0128](MASK-0128-bundle-install-uninstall.md) and the amended
 plan. The acceptance above describes its original exact candidate; it is not
 rewritten as evidence for the new interface.

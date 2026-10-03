@@ -23,7 +23,7 @@ Own only: `docs/rfcs/RFC-MASK-0010-portable-selections-and-bundles.md`, `the cor
 
 - RFC-MASK-0010-AC01: Export/import round-trips selections and exact content locks between different machine/home/source paths without including credentials, registry identities, journals or launchers.
 - RFC-MASK-0010-AC02: Incremental and replace modes preserve their declared ownership scopes; exported all-agent behavior and optional frozen-agent behavior are explicit and tested.
-- RFC-MASK-0010-AC03: Bundle expansion/refresh is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.
+- RFC-MASK-0010-AC03: Bundle install/uninstall/combined upgrade is deterministic, source-revision bound and stale-plan guarded; overlapping bundles/manual selections do not cause accidental removals.
 - RFC-MASK-0010-AC04: Profile subscription/removal preserves local contributions and reports version/target conflicts, unapproved sources, unavailable artifacts and offline freshness honestly.
 - RFC-MASK-0010-AC05: One public import-and-apply path bootstraps selected personal scope through normal validation/recovery, with native Windows/macOS focused tests and no internal-state editing.
 
@@ -38,7 +38,7 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 RFC_BASE_SHA: 9dc90df45febf2a6e048ace60a4ac959807aaaf6
 
-Planned cards: MASK-0041, MASK-0042, MASK-0043.
+Planned cards: MASK-0041, MASK-0042, MASK-0043; owner-authorized named-bundle follow-up MASK-0128.
 
 Cross-repository named-bundle handoff: actual AgentSkills ASK-0095, source candidate
 `fb67261a5fd8a69231e963226189fd98458e4d82`, acceptance commit
@@ -51,13 +51,13 @@ MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Broader profile handoffs remain
 |---|---|---|---|
 | RFC-MASK-0010-AC01 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0010-AC02 | Bundle union/manual/overlap/replace ownership passes in [public evidence](../../development/named-bundles-evidence.json); export/all-agent freezing still belongs to open MASK-0041 | Partial; remains open | bc4f9f9 |
-| RFC-MASK-0010-AC03 | 18 public bundle journeys plus 5 renderer checks; revision/digest stale guards, held/manual/overlap preservation, exact locks, conflicts, setup and recovery; canonical upstream bundle ready | Original pass; amendment pending | bc4f9f9 |
+| RFC-MASK-0010-AC03 | 43 successful public bundle/renderer checks plus separate scoped regression; combined named/default/--all definitions and unheld versions, guards, ownership, conflicts, setup/recovery; actual canonical 22-command handoff | Pass for amended named-bundle boundary | b879f81 |
 | RFC-MASK-0010-AC04 | Not recorded | Not run | Unrecorded |
 | RFC-MASK-0010-AC05 | Not recorded | Not run | Unrecorded |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
 
-## Current named-bundle checkpoint
+## Historical initial named-bundle checkpoint
 
 Assignment MASK-0042 / `named-bundles`, mandate `named-bundles-v1`, run
 `mask-named-bundles-20261002`, segment `coordinator-implementer`; engineering owner
@@ -95,7 +95,7 @@ and broader MASK-0064/fleet/native host-loading work remain outside this mandate
 Next eligible continuation is coordinator selection of newly authorized scope;
 RFC-MASK-0010 remains Implementing with its other acceptance rows open.
 
-## Active install/uninstall amendment checkpoint
+## Historical install/uninstall amendment checkpoint
 
 Owner authorized `named-bundles-v2`; same leaf and preserved coordinator-implementer
 strategy, new segment `coordinator-implementer-install-uninstall`. Intake HEADs:
@@ -122,7 +122,7 @@ one. Current semantic frontier: owner choice between definition-only upgrade and
 combined definition/unheld package-version upgrade remains pending. No amendment
 completion or upgrade-version acceptance is asserted.
 
-## Quiescent pending-choice handoff
+## Historical quiescent pending-choice handoff
 
 Current assignment MASK-0128 plus upstream ASK-0096, mandate `named-bundles-v3`,
 segment `coordinator-implementer-install-uninstall-upgrade`; same non-delegating
@@ -156,7 +156,7 @@ RFC-MASK-0010 and reopened RFC-ASK-0015 remain Implementing. Original profiles/
 fleet/native host-loading obligations stay open. No attended review is required.
 Writer ownership releases on this pending-choice return and can resume on reply.
 
-## Active combined-upgrade resumption
+## Combined-upgrade resumption record
 
 Owner answered "yes go with recommendation" and requested `mask upgrade --all`
 catch installed bundles. Pending policy is resolved. Same leaf resumes from clean
@@ -166,3 +166,72 @@ Frontier: combined receipt/version candidate through shared resolver/planner,
 default and aggregate upgrade definitions, focused stale/conflict/hold/recovery
 and mixed-scope tests, canonical upgrade check and final upkeep/acceptance.
 Historical pending checkpoint/evidence remains provenance, not current state.
+
+Combined upgrade progress: four focused named/aggregate/default/partial-scope cases
+pass in 37.433s. First full affected run: 43 tests, one failure and one error.
+Overlapping alpha was preserved but omitted from human diff; added preservation
+disclosure. Setup test changed only SKILL.md, correctly leaving setup fingerprint
+unchanged; the fixture now changes a declared script input. Existing moved-tag/
+non-fast-forward whole-operation refusal remains intact; new bundle source/
+constraint errors are reported per scope. Corrected checks plus ordinary update
+regression passed (19 tests, 137.538s). Failure observations retained in current evidence.
+
+
+## Current completed amendment checkpoint — named-bundles-v3
+
+Assignment MASK-0128 / actual upstream ASK-0096; adopted plan `named-bundles`,
+run `mask-named-bundles-20261002`, segment
+`coordinator-implementer-install-uninstall-upgrade`. Owner answered "yes go with
+recommendation" and explicitly requested installed bundles in `mask upgrade --all`.
+Both decisions are implemented and accepted; the earlier pending-choice sections
+are historical. Same non-delegating leaf `/root/bundles`, gpt-6.1-sol/xhigh,
+preserved coordinator-implementer selection and original "dont use direct" amendment.
+RFC_BASE_SHA stays unchanged.
+
+Exact implementation/verified runtime: `b879f8136489a98cfa26e0aae1da7e7e268c589b`.
+Canonical source/verifier: `39a6de558252eb0bf8c3cf9ae0d48f3fb10fa0ee`; actual
+ASK-0096 completion: `ff9d05a15c767422d00d4f815297bbb3c5a7d5aa`.
+[Bound acceptance](../../development/named-bundles-combined-upgrade-acceptance.json)
+records 43 successful bundle/renderer checks from the exact runtime runner plus
+one separate passing scoped regression (8.448s). The original runner's exit 1 is
+retained: its sole error was an additional selector using a nonexistent test class,
+corrected without repeating the 43 successful checks. Earlier 4 focused tests and
+19 corrected/ordinary update checks pass; initial product/fixture failures and
+corrections remain in [durable evidence](../../development/named-bundles-evidence.json).
+Canonical receipt records 22 successful public commands: all four skills ready
+with reviewed setup, all 16 packages discovered/validated, manual-safe offline
+uninstall/reinstall and combined named preview/guarded `upgrade --all` application
+of a separately derived disposable source/package revision, healthy status and no-op.
+
+Runtime integration: recomposes frozen receipts together, then resolves eligible
+unheld member coordinates through the existing resolver. Default scoped and aggregate
+upgrade combine receipt and ordinary skill updates in one reviewed planner/setup/
+journal. IDs remain package-only. Exact selectors/ref safeguards, manual target
+choices, holds and local edits remain protected; conflicts are disclosed before
+consumer edits and aggregate valid scopes can finish with `upgrade.incomplete`.
+Uninstall drops only the named local contribution; manual/overlap/held/edited
+survivors and exact rows remain. Ordinary standalone uninstall and positive manual
+promotion are documented. Only implemented commands/capabilities are advertised.
+
+Changed paths: mask_bundles.py, mask_update.py, mask_cli.py, mask_present.py,
+focused bundle/update tests, current README/CLI/declaration/source guides, live RFC,
+same plan/strategy/checkpoint and policy answer, MASK-0128, bounded MASK-0064/
+canonical handoff and this closeout/evidence. Upstream owns canonical README,
+verifier, ASK-0096 and its RFC/closeout/evidence. No unrelated work was modified.
+
+All product/test/setup/Git subprocesses ended; disposable consumers, machine roots
+and bare remotes were cleaned. No server, worktree, extra agent, protected review
+candidate or uncertain command remains. No human review is required or substituted.
+Documentation gates pass: MASK 23 RFCs/128 cards and AgentSkills 15 RFCs/96 cards,
+zero structural violations; git diff --check passes. Final board/checkpoint validation
+is recorded with acceptance upkeep.
+Ownership releases after this completed return. No push/publication, real consumer
+migration, credential or permission changes occurred. No running-host loading or
+native Windows result is claimed.
+
+No pending obligation remains inside this named-bundles-v3 milestone. MASK-0041,
+MASK-0043, profile/export/frozen-agent/native acceptance and broader MASK-0064
+management/provenance/fleet remain open; RFC-MASK-0010 remains Implementing.
+Next action: stop this accepted milestone; coordinator selects newly authorized
+eligible scope. Public examples: `mask bundle upgrade agentskills/rfc --dry-run
+--json`, `mask upgrade --dry-run --json`, and `mask upgrade --all --dry-run --json`.

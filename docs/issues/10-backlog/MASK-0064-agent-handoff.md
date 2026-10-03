@@ -48,5 +48,10 @@ its unrelated prerequisites and RFC-MASK-0017 acceptance remain open.
 
 Install/uninstall/upgrade vocabulary follow-up is owned by actual upstream
 ASK-0096 and MASK-0128 under `named-bundles-v3`. Prior candidate acceptance remains
-historical; current revision/verification is recorded on completion. Package-version
-upgrade policy awaits the owner's choice. Broader MASK-0064 remains Backlog.
+historical. Owner selected combined definition/unheld member versions and installed
+bundles in ordinary/default/aggregate upgrade. ASK-0096 completed at
+`ff9d05a15c767422d00d4f815297bbb3c5a7d5aa`; canonical source
+`39a6de558252eb0bf8c3cf9ae0d48f3fb10fa0ee` with MASK
+`b879f8136489a98cfa26e0aae1da7e7e268c589b` passes 22 public commands, all four
+skills ready, all 16 packages preserved, manual-safe uninstall/reinstall and
+combined aggregate derived-fixture upgrade. Broader MASK-0064 remains Backlog.
