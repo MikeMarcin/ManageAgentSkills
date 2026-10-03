@@ -109,7 +109,7 @@ Lock-only commits could omit changed bundle selections; refusing dirty controls
 would retain the manual step. The owner chose both controls and existing changes.
 Requiring a clean index is simpler but interrupts unrelated staged work.
 
-Scope, Git eligibility, preview and failure policy remain proposed in
+Scope, Git eligibility, preview and failure policy were confirmed on 2026-10-03 in
 [DECISIONS.md](DECISIONS.md). Git/index implementation is deferred to engineering;
 message customization and broader commit sets are outside this feature.
 
