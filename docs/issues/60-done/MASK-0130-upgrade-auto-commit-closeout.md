@@ -19,7 +19,7 @@ The planned implementation card is MASK-0129.
 
 ## Verification and execution record
 Authorized live adoption records RFC_BASE_SHA and implementation revisions.
-RFC_BASE_SHA: `c8201e2eeef5d7d06b3d6526e63669570182fdbc`.
+RFC_BASE_SHA: c8201e2eeef5d7d06b3d6526e63669570182fdbc
 Mandate: `upgrade-auto-commit`, revision 2. Owner: `/root/upgrade_commit`.
 Planned cards: MASK-0129, MASK-0130. Actual evidence follows.
 
@@ -79,3 +79,6 @@ bind/check. Exact test commands, outcomes and live-byte receipts are in the trac
 Continuation: selected pack complete; stop this owner. No pending decisions, commands,
 review session or protected candidate. Fixture checkouts were disposable and consumed;
 no task worktree remains. Only preexisting unrelated .gitignore and live controls stay dirty.
+
+Terminal gate initially rejected Markdown backticks around the real RFC_BASE_SHA;
+the marker now uses the validator's plain SHA format. No source behavior changed.

@@ -241,5 +241,9 @@
     "Cooperative qualification compares selected final bytes; it is not a sandbox and cannot prove absence of transient changes.",
     "No live consumer migration, push, publication or native Windows acceptance."
   ],
-  "command_state": "quiescent; all test processes completed; fixture roots empty"
+  "command_state": "quiescent; all test processes completed; fixture roots empty",
+  "documentation_gate": {
+    "baseline_format_failure": "Terminal gate found backticks around the actual RFC_BASE_SHA marker; corrected to the required plain SHA.",
+    "final": "24 RFCs, 130 cards; 0 structural violations"
+  }
 }
