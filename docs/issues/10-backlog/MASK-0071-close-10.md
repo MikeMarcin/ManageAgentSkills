@@ -235,3 +235,9 @@ management/provenance/fleet remain open; RFC-MASK-0010 remains Implementing.
 Next action: stop this accepted milestone; coordinator selects newly authorized
 eligible scope. Public examples: `mask bundle upgrade agentskills/rfc --dry-run
 --json`, `mask upgrade --dry-run --json`, and `mask upgrade --all --dry-run --json`.
+
+MASK-0128 acceptance commit: `e982c3431de84a9308aff86d5fd50eaf85ae0c2d`.
+ASK-0096 acceptance/final upstream HEAD: `ff9d05a15c767422d00d4f815297bbb3c5a7d5aa`.
+Final [checkpoint](../../rfcs/plans/named-bundles/checkpoint.json) binds current
+Done cards and amended exits. Mechanical return checks continuation consistency;
+it does not substitute for the product evidence above.

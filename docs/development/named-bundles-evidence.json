@@ -1355,11 +1355,12 @@
       "No push/publication, consumer migration, credentials or permission changes"
     ],
     "command_state": "All product test, canonical verifier, setup and Git subprocesses ended; fixture temporary roots/remotes cleaned; no server, worktree or additional agent.",
-    "next_action": "Finish MASK-0128, bind final checkpoint and release quiescent ownership; no additional product tests required.",
+    "next_action": "Stop accepted named-bundles-v3 milestone; coordinator selects newly authorized eligible scope.",
     "documentation_validation": {
       "MASK": "23 RFCs, 128 cards; 0 structural violations",
       "AgentSkills": "15 RFCs, 96 cards; 0 structural violations",
       "git_diff_check": "pass"
-    }
+    },
+    "mask_acceptance_commit": "e982c3431de84a9308aff86d5fd50eaf85ae0c2d"
   }
 }
