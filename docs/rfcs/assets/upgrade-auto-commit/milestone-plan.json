@@ -1,0 +1,35 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "upgrade-auto-commit",
+  "scope": {
+    "rfcs": [
+      "RFC-DRAFT-0001"
+    ],
+    "issues": [
+      "DRAFT-0001",
+      "DRAFT-0002"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "usable-upgrade-commits",
+      "outcome": "Users can optionally commit upgraded project controls while preserving unrelated work and seeing accurate readiness and Git outcomes.",
+      "work": [
+        {
+          "issue": "DRAFT-0001"
+        },
+        {
+          "issue": "DRAFT-0002"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "RFC-DRAFT-0001 AC01 through AC07 have direct public CLI, filesystem, Git and documentation evidence.",
+        "Project controls, unrelated staged changes, linked worktrees and aggregate failures satisfy the agreed behavior.",
+        "Live adoption and closeout record actual IDs, baseline and implementation evidence without touching unrelated consumer changes."
+      ],
+      "boundary": "One integrated optional upgrade commit feature, focused regression checks, user documentation and RFC closeout; no push, source publication, personal-control commits or setup-output commits."
+    }
+  ],
+  "coverage": "complete"
+}

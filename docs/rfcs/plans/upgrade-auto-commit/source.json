@@ -1,0 +1,10 @@
+{
+  "mapping": {
+    "DRAFT-0001": "MASK-0129",
+    "DRAFT-0002": "MASK-0130",
+    "RFC-DRAFT-0001": "RFC-MASK-0024"
+  },
+  "plan_path": "docs/rfcs/plans/upgrade-auto-commit/milestone-plan.json",
+  "schema": "implement-rfc.plan-source.v1",
+  "source_sha256": "ba02ac578554090ba8f4a0a137c58da81a02918c8fc56a0087631b4e669777ac"
+}
