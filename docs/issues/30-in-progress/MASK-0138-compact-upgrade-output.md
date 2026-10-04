@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0138"
 title: "Make upgrade review, progress and outcomes readable"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
