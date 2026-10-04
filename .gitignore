@@ -10,6 +10,12 @@ __pycache__/
 /.claude/skills/wizard
 /.agents/skills/writing-for-agents
 /.claude/skills/writing-for-agents
+/.agents/skills/author-rfc
+/.claude/skills/author-rfc
+/.agents/skills/grill-rfc
+/.claude/skills/grill-rfc
+/.agents/skills/grill-me
+/.claude/skills/grill-me
 /.mask/attended-review/
 /.mask/sessions/
 /.claude/agents/rfc-*.md
