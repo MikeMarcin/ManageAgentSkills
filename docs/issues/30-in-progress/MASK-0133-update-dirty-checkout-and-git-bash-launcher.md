@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0133"
 title: "mask update gets past a dirty program checkout, and Git Bash finds mask on Windows"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 platforms: ["windows", "macos", "linux"]
