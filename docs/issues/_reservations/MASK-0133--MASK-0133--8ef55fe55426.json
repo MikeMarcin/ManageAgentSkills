@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0133"
+  ],
+  "reserve_for": "update-dirty-and-bash-launcher",
+  "purpose": "",
+  "created": "2026-10-04T01:21:32.804452+00:00",
+  "base": "9e90c701d20462e56b92c5293d60ec6bf74eebdc"
+}
