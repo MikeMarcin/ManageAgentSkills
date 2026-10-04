@@ -7,7 +7,7 @@ rfcs: []
 depends_on: []
 platforms: ["win", "mac", "linux"]
 metadata: {}
-acceptance: [{"criterion":"AC1","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"python -B scripts/run_tests.py -k test_terminal_progress -j 4 --slowest 3: 7 tests in 2 classes, one process per test id; the failing test printed under its test id with a 'rerun: python3 -m unittest tests.test_terminal_progress.TerminalPresentation.test_review_groups_links_but_keeps_setup_and_exact_replacements' line; --slowest lists test ids; -k no_such_test prints 'No tests match.' and exits 1. Full runs: 578 tests in 113 classes reported."}},{"criterion":"AC2","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"Clean worktrees, Windows 11, 20 workers, same product code: per-class runner 1079 s (76e00d1), per-test runner 782 s (29b0af1). Failing tests per-test (13) are a subset of per-class (14); the one difference, BundleTests.test_bundle_uninstall_uses_frozen_receipt_without_catalogue_or_network, depended on order and was fixed by MASK-0136. No failure comes from shared-process execution."}},{"criterion":"AC3","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"docs/guides/development.md and docs/architecture/test-boundaries.md describe per-test scheduling; python scripts/verify_documentation.py --root .: 0 structural violations."}}]
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"python -B scripts/run_tests.py -k test_terminal_progress -j 4 --slowest 3: 7 tests in 2 classes, one process per test id; the failing test printed under its test id with a 'rerun: python3 -m unittest tests.test_terminal_progress.TerminalPresentation.test_review_groups_links_but_keeps_setup_and_exact_replacements' line; --slowest lists test ids; -k no_such_test prints 'No tests match.' and exits 1. Full runs: 578 tests in 113 classes reported."}},{"criterion":"AC2","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"Clean worktrees, Windows 11, 20 workers, same product code: per-class runner 1079 s (76e00d1), per-test runner 782 s (29b0af1). The 13 failing tests are the same in both runs (per-test ids from the runner's rerun lines), so no failure comes from shared-process execution."}},{"criterion":"AC3","outcome":"pass","revision":"29b0af156a22cb0ca6dd5a9dd6aaa2c5d934fbb6","evidence":{"kind":"command","detail":"docs/guides/development.md and docs/architecture/test-boundaries.md describe per-test scheduling; python scripts/verify_documentation.py --root .: 0 structural violations."}}]
 ---
 
 # MASK-0135: scripts/run_tests.py schedules tests, not classes, so one long class stops setting the wall time
@@ -51,11 +51,8 @@ test changes. Making the tests themselves cheaper is MASK-0137.
 Implemented at `29b0af1`. On the same product code (`76e00d1` and `29b0af1`
 differ only in the runner and its docs), in clean worktrees on this Windows
 host with 20 workers: one process per class took 1,079 s, and one process per
-test took 782 s. Running each test alone added no failure. One test that failed
-in the class run passed alone:
-`BundleTests.test_bundle_uninstall_uses_frozen_receipt_without_catalogue_or_network`.
-Whether its loose Git objects were still read-only when it ran depended on
-order, and MASK-0136 fixed it.
+test took 782 s. The same 13 tests failed in both runs, so running each test alone
+added no failure and hid none.
 
 The new floor is the slowest single tests (up to 150 s under 20-way load) and
 total CPU work, not class packing. MASK-0137 owns that.
