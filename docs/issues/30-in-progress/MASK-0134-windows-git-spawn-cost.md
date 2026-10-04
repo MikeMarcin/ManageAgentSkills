@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0134"
 title: "mask upgrade stops paying for a system-wide thread walk and a process per package file on Windows"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 platforms: ["win", "mac", "linux"]
