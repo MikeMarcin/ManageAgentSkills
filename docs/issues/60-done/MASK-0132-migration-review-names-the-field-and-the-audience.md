@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0132"
 title: "Make the migration review name the changed field and only warn about files for persisted schemas"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: ["MASK-0131"]
 priority: "P2"
 metadata: {"origin":"Owner run of mask update 4ca5508 -> d7407ca on bpr-linux (2026-10-03)"}
+acceptance: [{"criterion":"MASK-0132-AC1","outcome":"pass","revision":"5c97bfbfc0b22776489acfee4cf53c3dd338088a","evidence":{"kind":"command","detail":"program_migration on the real repo 4ca5508..d7407ca gives result.schema.json breaking 'now constrains data.commits' audience output; tests.test_launcher test_output_only_breaking_change_names_the_field_and_spares_files asserts the same summary on a fixture"}},{"criterion":"MASK-0132-AC2","outcome":"pass","revision":"5c97bfbfc0b22776489acfee4cf53c3dd338088a","evidence":{"kind":"command","detail":"Same test: output-only breaking refusal prints the output-only sentence and not the files warning; adding a persisted machine-v3 breaking row restores the files warning"}},{"criterion":"MASK-0132-AC3","outcome":"pass","revision":"5c97bfbfc0b22776489acfee4cf53c3dd338088a","evidence":{"kind":"command","detail":"python3 -B -m unittest tests.test_launcher tests.test_human_output tests.test_consent tests.test_update tests.test_cli_protocol: 61 OK; JSON rows carry audience files|output"}}]
 ---
 
 # MASK-0132: Make the migration review name the changed field and only warn about files for persisted schemas
