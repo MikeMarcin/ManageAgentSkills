@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0134"
 title: "mask upgrade stops paying for a system-wide thread walk and a process per package file on Windows"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 platforms: ["win", "mac", "linux"]
 metadata: {}
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"76e00d1485bbbc691bf69a6a36fe5d53bc51f7ba","evidence":{"kind":"command","detail":"python -B -m unittest tests.test_subprocess_policy (Windows 11, Python 3.14): test_windows_spawn_resumes_its_recorded_thread_without_a_system_snapshot (sole_thread never called when the id is captured; the walk is used once when recorded_spawn yields None), test_windows_thread_of_another_process_is_never_resumed (the caller's own thread id -> git.containment_unavailable and the suspended program never ran), test_windows_assignment_failure_never_runs_suspended_program unchanged. Measured: c.git 108 ms -> 33 ms against a 31 ms bare spawn."}},{"criterion":"AC2","outcome":"pass","revision":"76e00d1485bbbc691bf69a6a36fe5d53bc51f7ba","evidence":{"kind":"command","detail":"python -B -m unittest tests.test_import_safety: test_validation_spawns_the_same_git_processes_for_many_files_as_for_one (1 file vs 123 files incl. a duplicate blob and an empty file: equal process counts, exact bytes; a second validation spawns nothing), test_batched_blob_answers_share_the_frozen_cache_and_refuse_malformed_output (missing/non-blob -> None and not cached; git_frozen hits the cache; short object names refused; truncated, oversized, trailing and mismatched batches -> git.failed and nothing cached), test_public_resource_policy_checks_zero_and_multiple_files_before_reads now also forbids a --batch content read before limits."}},{"criterion":"AC3","outcome":"pass","revision":"76e00d1485bbbc691bf69a6a36fe5d53bc51f7ba","evidence":{"kind":"observation","detail":"Profiled mask upgrade --all --dry-run: phases Preparing upgrade (0.75 s) -> Resolving selected skills (6.1 s, 184 processes) -> Checking selected installations; the work after the fetch no longer runs under 'Fetching tap'."}},{"criterion":"AC4","outcome":"pass","revision":"76e00d1485bbbc691bf69a6a36fe5d53bc51f7ba","evidence":{"kind":"command","detail":"PowerShell, owner's real state, read-only dry run: 84.6 s / 743 Git processes at aa38f33 -> 8.0 s / 220 at 76e00d1. Full python -B scripts/run_tests.py in clean worktrees: 2318 s at aa38f33, 1079 s at 76e00d1; the failing-test set at 76e00d1 is a strict subset of aa38f33's (13 vs 17; the 4 fixed were 60 s CLI timeouts). python scripts/verify_documentation.py --root .: 0 structural violations; git diff --check clean."}}]
 ---
 
 # MASK-0134: mask upgrade stops paying for a system-wide thread walk and a process per package file on Windows
@@ -80,3 +81,19 @@ is fetched, validated, locked or linked, and no change to the process
 containment contract. The tap cache keeps only loose objects because fetches
 disable auto-maintenance, and the fetch monitor rescans them every 50 ms. That
 is real but small here (0.2 s per scan) and stays out of scope.
+
+## Closeout
+
+Implemented at `76e00d1`. Measured from PowerShell on Windows 11 (20 logical
+CPUs, Python 3.14, Git 2.55): `c.git` 108 ms -> 33 ms against a 31 ms bare
+spawn; `mask upgrade --all --dry-run --json` on the owner's real machine state
+84.6 s / 743 Git processes -> 8.0 s / 220. The full suite (one process per
+class, the runner of that time) took 2,318 s at `aa38f33` and 1,079 s at
+`76e00d1` in a clean worktree. No test fails at `76e00d1` that does not fail at
+`aa38f33`. Four baseline failures, all 60 s CLI timeouts, now pass. The
+remaining Windows failures are MASK-0136.
+
+One `tap fetch` `git.failed` was seen once, under full load in a run whose
+checkout another session was editing at the same time. It did not recur in
+isolation, at 5-way concurrency on both trees, or in the clean run. MASK-0136
+owns it.
