@@ -1516,10 +1516,8 @@ def render_error(output):
         lines.extend(action_summary(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
     retained = data.get('retained_preparation')
     if retained and output['command'] != 'upgrade':
-        parts = ([plural(len(retained['artifacts']), 'store artifact')] if retained['artifacts'] else []) + \
-                ([plural(len(retained['acquisitions']), 'cache acquisition')] if retained['acquisitions'] else [])
-        if parts:
-            lines.append('  Cached preparation retained: ' + ' and '.join(parts) + '.')
+        lines.append(f"  retained preparation: {len(retained['artifacts'])} store artifact(s) and {len(retained['acquisitions'])} cache acquisition(s) "
+                     'kept under MASK_HOME; they are not deployment changes')
     state = 'applied changes remain saved' if output['command'] == 'upgrade' and output['transaction'] == 'committed' else PRESERVED.get(output['transaction'], output['transaction'])
     lines.append(f"  state: {state}")
     for step in error.get('remediation', []):
