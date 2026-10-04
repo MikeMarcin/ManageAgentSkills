@@ -208,4 +208,23 @@ retain objects and a staging ref for inspection, but do not select the package.
 
 `mask update` first fast-forwards the running ManageAgentSkills checkout from its `origin` `main`. It checks protocol/schema compatibility and reports `data.program` (`status`, `program_before`, `program_after`, `next_invocation_required`); the next command loads the new implementation. It then fetches every approved tap, exactly as `mask tap fetch` does, and reports each under `data.fetches`. It never changes a declaration, lock, link or consumer, and it does not reinstall the launcher.
 
-A program checkout that is ahead of its remote, diverged, detached, on another branch or carrying uncommitted changes is somebody's work in progress: `update` leaves it alone, reports `status: held` with the reason, and still fetches the taps. A candidate that fails the compatibility check refuses `source.candidate_invalid`. A Git failure while fetching the program is reported after the taps were still fetched. `--dry-run` contacts nothing. On a machine that predates taps, `update` advances the program and skips the taps.
+A program checkout that is ahead of its remote, diverged, detached, on another branch or carrying uncommitted changes is somebody's work in progress: `update` leaves it alone, reports `status: held` with the reason, and still fetches the taps. A candidate that is not a MASK program (a missing runtime module, or no readable `PROTOCOL_VERSION`) refuses `source.candidate_invalid`. A Git failure while fetching the program is reported after the taps were still fetched. `--dry-run` contacts nothing. On a machine that predates taps, `update` advances the program and skips the taps.
+
+<a id="program-update"></a>
+### When the new program changes its contracts
+
+Before moving, `update` compares the candidate's `PROTOCOL_VERSION` and `schemas/*.schema.json` with the running revision and classifies each changed schema:
+
+| Class | Meaning |
+|---|---|
+| `comment` | Only `$comment`, `description`, `title` or `examples` changed. |
+| `additive` | New optional properties or definitions; every existing file stays valid. |
+| `breaking` | A property removed, a new requirement, a narrowed type, enum or bound, or anything not provably additive. |
+
+A protocol change is always breaking. A candidate whose only changes are `comment` updates without asking and lists them in its output. Any other change is a `program.migration` consent, reported under `data.program.program_migration` with its rows and `plan_hash`:
+
+- In a terminal, `mask update` shows the change and asks one default-no question. Yes applies it in the same invocation.
+- With `--json`, redirected streams, or the background refresh inside `install` and `upgrade`, it never asks. It refuses `confirmation.required` (the background refresh only warns `update.review_required` and continues), and the human text gives the hash.
+- `mask update --approve-plan HASH` applies exactly that change. A hash for a different change refuses `plan.stale`. `--yes` never grants a migration.
+
+The taps are fetched either way, and the checkout does not move until consent. An interrupted, approved update records the hash in its journal, so `mask repair` / `mask recover --complete` finishes it without asking again.

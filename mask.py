@@ -129,6 +129,7 @@ GUARDED.add('ensure')
 GUARDED.update({'install', 'remove'})
 GUARDED.add('doctor')  # --expect-plan-hash binds a reviewed doctor --migrate preview.
 GUARDED.add('source.repair-cache')
+GUARDED.add('update')  # --expect-plan-hash approves one reviewed program contract migration (MASK-0129).
 IMPLEMENTED = set(COMMANDS)
 COMMON = [('json', 'flag'), ('debug', 'flag'), ('help', 'flag'), ('version', 'flag'), ('home', 'value')]
 

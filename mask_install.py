@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import json
 import os
 from pathlib import Path
 import shlex
@@ -68,24 +69,137 @@ def restore_launcher(pending, side):
             path.chmod(path.stat().st_mode | 0o111)
 
 
-def validate_program(root, candidate):
-    entries = {name: (mode, kind, oid) for mode, kind, oid, name in g.tree(root, candidate)}
-    for name in ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_bundles.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py'):
+RUNTIME_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py')
+# Annotation keywords: changing only these never changes what a document must contain.
+ANNOTATIONS = {'$comment', 'description', 'title', 'examples'}
+# Bounds that an additive change may widen: an upper bound may grow and a lower bound may shrink.
+UPPER = {'maxItems', 'maxLength', 'maxProperties', 'maximum', 'exclusiveMaximum'}
+LOWER = {'minItems', 'minLength', 'minProperties', 'minimum', 'exclusiveMinimum'}
+
+
+def protocol_version(root, revision):
+    """The program's PROTOCOL_VERSION at one commit; a candidate without a readable one is not a MASK program."""
+    entries = {name: (mode, kind, oid) for mode, kind, oid, name in g.tree(root, revision)}
+    for name in RUNTIME_MODULES:
         if name not in entries or entries[name][0] not in ('100644', '100755') or entries[name][1] != 'blob':
-            c.fail('source.candidate_invalid', 'Program candidate is missing a regular runtime module.', 4)
+            c.fail('source.candidate_invalid', f'MASK {revision[:7]} is missing its runtime module {name}.', 4, candidate=revision)
     try:
         source = c.git(root, 'cat-file', 'blob', entries['mask.py'][2], binary=True).decode('utf-8')
-        assignments = {node.targets[0].id: ast.literal_eval(node.value) for node in ast.parse(source).body if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'PROTOCOL_VERSION'}
-        if assignments.get('PROTOCOL_VERSION') != 2:
-            raise ValueError('protocol')
-        # Preserve exact contracts apart from Git's LF/CRLF checkout conversion.
-        candidate_schemas = {name: (mode, oid) for mode, kind, oid, name in g.tree(root, candidate, 'schemas')}
-        for path in sorted((root / 'schemas').glob('*.schema.json')):
-            mode, oid = candidate_schemas.get(path.name, ('', ''))
-            if mode not in ('100644', '100755') or c.git(root, 'cat-file', 'blob', oid, binary=True).replace(b'\r\n', b'\n') != path.read_bytes().replace(b'\r\n', b'\n'):
-                raise ValueError('schema')
-    except (ValueError, SyntaxError, UnicodeError, c.MaskError):
-        c.fail('source.candidate_invalid', 'Program protocol or schema migration requires explicit review.', 4)
+        found = [ast.literal_eval(node.value) for node in ast.parse(source).body if isinstance(node, ast.Assign) and len(node.targets) == 1
+                 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'PROTOCOL_VERSION']
+    except (ValueError, SyntaxError, UnicodeError):
+        found = []
+    if len(found) != 1 or type(found[0]) is not int:
+        c.fail('source.candidate_invalid', f'MASK {revision[:7]} has no readable PROTOCOL_VERSION in mask.py.', 4, candidate=revision)
+    return found[0]
+
+
+def schema_blobs(root, revision):
+    return {name: oid for mode, kind, oid, name in g.tree(root, revision, 'schemas') if name.endswith('.schema.json') and kind == 'blob'}
+
+
+def strip_annotations(value):
+    if isinstance(value, dict):
+        return {key: strip_annotations(item) for key, item in value.items() if key not in ANNOTATIONS}
+    if isinstance(value, list):
+        return [strip_annotations(item) for item in value]
+    return value
+
+
+def widening(old, new, path, added, narrowed):
+    """Walk an annotation-free schema pair; record each added optional property and each narrowing."""
+    def where(key=None):
+        return '.'.join(path + ([key] if key else [])) or 'the root'
+    if isinstance(old, dict) and isinstance(new, dict):
+        required = set(new.get('required', [])) if isinstance(new.get('required'), list) else set()
+        for key in sorted(old.keys() | new.keys()):
+            if key not in new:
+                narrowed.append(f'removes {where(key)}' if key in ('properties', '$defs', 'definitions') else f'drops {key} at {where()}')
+            elif key not in old:
+                narrowed.append(f'adds {key} at {where()}')
+            elif key in ('properties', '$defs', 'definitions') and isinstance(old[key], dict) and isinstance(new[key], dict):
+                for name in sorted(old[key].keys() | new[key].keys()):
+                    if name not in new[key]:
+                        narrowed.append(f'removes {where(name)}')
+                    elif name not in old[key]:
+                        if key == 'properties' and name in required:
+                            narrowed.append(f'requires new {where(name)}')
+                        else:
+                            added.append(where(name) if key == 'properties' else f'{where(name)} definition')
+                    else:
+                        widening(old[key][name], new[key][name], path + [name], added, narrowed)
+            elif key == 'required' and isinstance(old[key], list) and isinstance(new[key], list):
+                extra = [name for name in new[key] if name not in old[key] and name in (old.get('properties') or {})]
+                if extra:
+                    narrowed.append(f'now requires {where(extra[0])}')
+            elif key in ('enum', 'type') and isinstance(old[key], (list, str)) and isinstance(new[key], (list, str)):
+                before, after = ({old[key]} if isinstance(old[key], str) else old[key]), ({new[key]} if isinstance(new[key], str) else new[key])
+                if not all(item in after for item in before):
+                    narrowed.append(f'narrows {key} of {where()}')
+            elif key in UPPER | LOWER and type(old[key]) in (int, float) and type(new[key]) in (int, float):
+                if (new[key] < old[key]) if key in UPPER else (new[key] > old[key]):
+                    narrowed.append(f'tightens {key} of {where()}')
+            elif isinstance(old[key], dict) and isinstance(new[key], dict):
+                widening(old[key], new[key], path, added, narrowed)
+            elif old[key] != new[key]:
+                narrowed.append(f'changes {key} at {where()}')
+        return
+    if old != new:
+        narrowed.append(f'changes {where()}')
+
+
+def schema_change(before, after):
+    """Classify one schema file change as comment, additive or breaking, with a few plain words to say why."""
+    if after is None:
+        return 'breaking', 'removed'
+    if before is None:
+        return 'additive', 'new schema'
+    try:
+        old, new = (json.loads(raw.replace(b'\r\n', b'\n').decode('utf-8')) for raw in (before, after))
+    except (ValueError, UnicodeError):
+        return 'breaking', 'no longer readable JSON'
+    old, new = strip_annotations(old), strip_annotations(new)
+    if old == new:
+        return 'comment', 'wording only'
+    added, narrowed = [], []
+    widening(old, new, [], added, narrowed)
+    if narrowed:
+        return 'breaking', narrowed[0] + (f' (+{len(narrowed) - 1} more)' if len(narrowed) > 1 else '')
+    if not added:
+        return 'breaking', 'changes its rules'
+    names = ', '.join(added[:2]) + (f' and {len(added) - 2} more' if len(added) > 2 else '')
+    return 'additive', f'adds optional {names}'
+
+
+def program_migration(root, before, candidate):
+    """What moving the program from before to candidate changes in its contracts, and the consent hash binding exactly that."""
+    protocol = dict(before=protocol_version(root, before), after=protocol_version(root, candidate))
+    old, new = schema_blobs(root, before), schema_blobs(root, candidate)
+    schemas = []
+    for name in sorted(old.keys() | new.keys()):
+        if old.get(name) == new.get(name):
+            continue
+        raw = [c.git(root, 'cat-file', 'blob', blob, binary=True) if blob else None for blob in (old.get(name), new.get(name))]
+        if None not in raw and raw[0].replace(b'\r\n', b'\n') == raw[1].replace(b'\r\n', b'\n'):
+            continue
+        change, summary = schema_change(*raw)
+        schemas.append(dict(file=name, change=change, summary=summary, before_blob=old.get(name), after_blob=new.get(name)))
+    count = c.git(root, 'rev-list', '--count', f'{before}..{candidate}', optional=True)
+    breaking = protocol['before'] != protocol['after'] or any(row['change'] == 'breaking' for row in schemas)
+    migration = dict(before=before, candidate=candidate, commits=int(count) if count and count.isdigit() else None, protocol=protocol,
+                     schemas=schemas, breaking=breaking, requires_consent=breaking or any(row['change'] != 'comment' for row in schemas))
+    migration['plan_hash'] = c.digest(dict(kind='program.migration', before=before, candidate=candidate, protocol=protocol,
+                                           schemas=[(row['file'], row['before_blob'], row['after_blob']) for row in schemas]))
+    return migration
+
+
+def migration_proposal(root, migration):
+    import mask_consent as consent
+    proposal = consent.request('program.migration', 'this update changes the contracts MASK reads and writes', [str(root)],
+                               [dict(kind='program.update', path=str(root), before=migration['before'], after=migration['candidate'])],
+                               migration['plan_hash'], f"Update MASK to {migration['candidate'][:7]}?")
+    proposal['migration'] = migration
+    return proposal
 
 
 def on_path(path):
@@ -175,18 +289,27 @@ def dispatch(args, output, home, root):
         observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
     if observed['candidate'] is None or observed['relation'] in ('ahead', 'diverged'):
         c.fail('source.' + (observed['relation'] if observed['candidate'] else 'remote_unknown'), 'Program cannot fast-forward from the known remote.', 4)
-    validate_program(root, observed['candidate'])
     changed = observed['revision'] != observed['candidate']
     output['would_change'] = changed
     output['data'].update(program_before=observed['revision'], program_after=observed['revision'], requires_fetch=output['dry_run'], remote_freshness='last_fetched', next_invocation_required=False)
+    migration = program_migration(root, observed['revision'], observed['candidate']) if changed else None
+    if migration and (migration['schemas'] or migration['breaking']):
+        output['data']['program_migration'] = migration
     if not changed or output['dry_run']:
         return
+    if migration['requires_consent']:
+        import mask_consent as consent
+        if getattr(args, 'expect_plan_hash', None) not in (None, migration['plan_hash']):
+            c.fail('plan.stale', 'The approved hash is not this update; review it again with mask update.', 4, plan_hash=migration['plan_hash'])
+        consent.require(args, output, migration_proposal(root, migration))
     current = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
     if current['revision'] != observed['revision']:
         c.fail('plan.stale', 'Program changed before update.', 4)
     planned['would_change'] = True
     pending = fs.make_pending(planned, home)
     pending['git'] = dict(scope='program', root=str(root), before=observed['revision'], candidate=observed['candidate'])
+    if migration['requires_consent']:
+        pending['git']['consent'] = migration['plan_hash']  # Recovery completes this approved candidate without asking again.
     fs.validate_pending(pending, home)
     c.atomic_text(home / 'pending.json', c.text_json(pending), None)
     g.advance(root, observed['candidate'], pending, home, output, timeout)
