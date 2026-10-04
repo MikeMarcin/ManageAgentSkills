@@ -14,7 +14,7 @@ class CacheRepairTests(Fixture):
 
     def invalidate_identity(self):
         path = self.cache / 'mask-source.json'
-        marker = json.loads(path.read_text())
+        marker = json.loads(path.read_text(encoding='utf-8'))
         marker['identity']['device'] += 1
         path.write_text(json.dumps(marker))
 

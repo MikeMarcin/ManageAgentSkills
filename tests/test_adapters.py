@@ -54,7 +54,7 @@ class AdapterTests(unittest.TestCase):
                     walk(nested)
         for path in (ENTRY.parent / 'schemas').glob('*.json'):
             with self.subTest(schema=path.name):
-                walk(json.loads(path.read_text()))
+                walk(json.loads(path.read_text(encoding='utf-8')))
         self.assertGreaterEqual(count, 12)
 
     def test_reserved_and_active_package_boundaries_derive_from_data(self):

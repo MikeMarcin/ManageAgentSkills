@@ -116,8 +116,8 @@ class SetupFixture(EngineFixture):
                       if '__pycache__' in path.parts or path.suffix in ('.pyc', '.pyo')) if relative not in committed)
 
     def write_script(self, before='', after='', timeout=None):
-        (self.package / 'scripts/prepare_fixture_roles.py').write_text(SCRIPT.format(sentinel=str(self.sentinel), before=before, after=after), encoding='utf-8')
-        (self.package / 'scripts/helper.py').write_text(HELPER, encoding='utf-8')
+        (self.package / 'scripts/prepare_fixture_roles.py').write_text(SCRIPT.format(sentinel=str(self.sentinel), before=before, after=after), encoding='utf-8', newline='\n')
+        (self.package / 'scripts/helper.py').write_text(HELPER, encoding='utf-8', newline='\n')
         descriptor = self.package / 'mask-workflow.json'
         value = json.loads(descriptor.read_text(encoding='utf-8'))
         value['setup'][0]['package_inputs'] = ['scripts/prepare_fixture_roles.py', 'scripts/helper.py']
@@ -337,7 +337,7 @@ raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv
             self.assertEqual(role['route']['model'], 'fixture-model-do-not-run', role)
             self.assertEqual(role['host_load'], 'not_verified')
         # W09: a changed imported helper invalidates the prepared lock; nothing runs without fresh consent.
-        (self.package / 'scripts/helper.py').write_text(HELPER + '\n# changed\n', encoding='utf-8')
+        (self.package / 'scripts/helper.py').write_text(HELPER + '\n# changed\n', encoding='utf-8', newline='\n')
         self.commit('helper changed')
         changed = self.machine('ensure', '--project', self.project)
         self.assertEqual(changed['error']['code'], 'workflow.incomplete')

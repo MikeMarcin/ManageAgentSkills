@@ -27,7 +27,7 @@ class CliV2(PublicFixture):
         self.assertTrue(self.machine('install', 'alpha', '--project', other)['ok'])
         before = {root: (root / '.mask.lock.json').read_bytes() for root in (self.project, other)}
         user = (self.home / 'user.lock.json').read_bytes()
-        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Next version\n---\nNew.\n')
+        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Next version\n---\nNew.\n', encoding='utf-8', newline='\n')
         self.publish()
         run = self.machine('upgrade')
         self.assertTrue(run['ok'], run)
@@ -81,22 +81,22 @@ class CliV2(PublicFixture):
         self.assertTrue(next(row for row in self.machine('list')['data']['skills'] if row['id'] == 'alpha')['pinned'])
         self.assertIn('HELD', self.human('list').stdout)
         self.assertTrue(all(row['pinned'] for row in self.machine('list', '--all')['data']['rows'] if row['name'] == 'alpha'))
-        original = json.loads((self.project / '.mask.lock.json').read_text())['packages']
+        original = json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages']
         for name in ('alpha', 'beta'):
-            (self.source / f'skills/{name}/SKILL.md').write_text(f'---\nname: {name}\ndescription: New\n---\nNew.\n')
+            (self.source / f'skills/{name}/SKILL.md').write_text(f'---\nname: {name}\ndescription: New\n---\nNew.\n', encoding='utf-8', newline='\n')
         self.publish()
         run = self.machine('upgrade')
         self.assertTrue(run['ok'], run)
-        after = json.loads((self.project / '.mask.lock.json').read_text())['packages']
+        after = json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages']
         self.assertEqual(original[0], after[0])
         self.assertNotEqual(original[1]['commit'], after[1]['commit'])
         self.assertTrue(self.machine('unpin', '--all')['ok'])
-        self.assertEqual(after, json.loads((self.project / '.mask.lock.json').read_text())['packages'])
+        self.assertEqual(after, json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'])
         self.assertTrue(self.machine('upgrade')['ok'])
-        self.assertNotEqual(original[0]['commit'], json.loads((self.project / '.mask.lock.json').read_text())['packages'][0]['commit'])
+        self.assertNotEqual(original[0]['commit'], json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'])
         self.assertTrue(self.machine('install', 'alpha', '--user')['ok'])
         self.assertTrue(self.machine('pin', '--all', '--user')['ok'])
-        self.assertTrue(json.loads((self.home / 'user.json').read_text())['skills'][0]['pinned'])
+        self.assertTrue(json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills'][0]['pinned'])
         self.assertFalse(self.machine('pin', 'alpha', '--all')['ok'])
         self.assertFalse(self.machine('pin')['ok'])
 
@@ -132,7 +132,7 @@ class CliV2(PublicFixture):
         import os
         import subprocess
         import sys
-        (self.source / 'skills/alpha/helper.py').write_text('VALUE = 42\n')
+        (self.source / 'skills/alpha/helper.py').write_text('VALUE = 42\n', encoding='utf-8', newline='\n')
         self.publish('importable helper')
         self.assertTrue(self.machine('tap', 'fetch')['ok'])
         self.assertTrue(self.machine('install', 'alpha')['ok'])
@@ -205,7 +205,7 @@ class SetupV2(SetupFixture):
         old = (self.project / '.mask.lock.json').read_bytes()
         path = self.project / '.codex/agents/rfc-integrator.toml'
         path.unlink()
-        (self.package / 'scripts/helper.py').write_text((self.package / 'scripts/helper.py').read_text() + '\n# newer\n')
+        (self.package / 'scripts/helper.py').write_text((self.package / 'scripts/helper.py').read_text(encoding='utf-8') + '\n# newer\n', encoding='utf-8', newline='\n')
         self.publish()
         self.assertTrue(self.machine('tap', 'fetch')['ok'])
         run = self.reviewed('upgrade')
@@ -307,7 +307,7 @@ class CleanupV2(PublicFixture):
 
     def test_untapped_cache_cleanup_and_unknown_file_protection(self):
         self.assertTrue(self.machine('tap', 'fetch')['ok'])
-        cache = Path(json.loads((self.home / 'config.json').read_text())['sources'][TAP]['cache'])
+        cache = Path(json.loads((self.home / 'config.json').read_text(encoding='utf-8'))['sources'][TAP]['cache'])
         self.assertTrue(self.machine('untap', TAP)['ok'])
         unknown = cache / 'objects/notes'
         unknown.write_text('unrelated file')
@@ -324,7 +324,7 @@ class CleanupV2(PublicFixture):
     def test_cleanup_references_unknown_content_and_stale_review(self):
         self.assertTrue(self.machine('install', 'alpha')['ok'])
         old = next((self.home / 'store/v1').iterdir())
-        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Updated\n---\nNew.\n')
+        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: Updated\n---\nNew.\n', encoding='utf-8', newline='\n')
         self.publish()
         self.assertTrue(self.machine('upgrade')['ok'])
         unknown = self.home / 'store/v1/unknown'

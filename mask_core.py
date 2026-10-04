@@ -32,6 +32,14 @@ class MaskError(Exception):
                     remediation=[dict(kind='inspect', message=REMEDIATION.get(self.code, REMEDIATION[None]))])
 
 
+class ProgramUpdated(BaseException):
+    """The program advanced mid-invocation on Windows: ``mask.main`` runs ``command`` once every lock is released."""
+
+    def __init__(self, command):
+        super().__init__('program updated')
+        self.command = command
+
+
 REMEDIATION = {
     'repair.incomplete': 'The other scopes were still attempted. Resolve the specific remaining errors above and rerun mask repair --all. Backups are retained at the reported paths.',
     None: 'Inspect the reported inputs and retry only after resolving the condition.',

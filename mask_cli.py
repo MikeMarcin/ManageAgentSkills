@@ -202,7 +202,12 @@ def auto_refresh(args, output, home, leaves):
     output['data']['refresh'] = refresh['data']
     if refresh['data'].get('program', {}).get('status') == 'updated':
         # Do not plan a consumer task in modules loaded before the program update.
-        os.execv(sys.executable, [sys.executable, '-B', str(mask.PROGRAM_ROOT / 'mask.py'), *args.invocation_argv, '--no-update'])
+        command = [sys.executable, '-B', str(mask.PROGRAM_ROOT / 'mask.py'), *args.invocation_argv, '--no-update']
+        if os.name == 'nt':
+            # Windows execv neither quotes arguments (C:\Program Files splits) nor replaces this process,
+            # so it would keep holding lifecycle.lock: mask.main runs the program once the stack has unwound.
+            raise c.ProgramUpdated(command)
+        os.execv(sys.executable, command)
 
 
 def dispatch(args, output, leaves):

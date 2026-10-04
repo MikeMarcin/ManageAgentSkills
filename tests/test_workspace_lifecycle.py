@@ -88,7 +88,7 @@ __import__('tests.engine_cli', fromlist=['main']).main(['ensure','--home',sys.ar
     def test_crash_refuses_changed_branch_or_control_file(self):
         self.git(self.project, 'switch', 'inactive')
         self.crash('link')
-        pending = json.loads((self.home / 'pending.json').read_text())
+        pending = json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))
         self.assertEqual(pending['schema_version'], 3)
         self.git(self.project, 'switch', 'main')
         before = self.snapshot()
@@ -163,5 +163,5 @@ __import__('tests.engine_cli', fromlist=['main']).main(['ensure','--home',sys.ar
         self.git(self.project, 'worktree', 'remove', str(linked))
         self.call('workspace', 'forget', linked, '--expect-identity', 'wrong', code=4)
         self.call('workspace', 'forget', linked, '--expect-identity', identity)
-        state = json.loads((self.home / 'state.json').read_text())
+        state = json.loads((self.home / 'state.json').read_text(encoding='utf-8'))
         self.assertNotIn(str(linked), state['projects'])

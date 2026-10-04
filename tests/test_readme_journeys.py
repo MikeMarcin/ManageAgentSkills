@@ -12,7 +12,7 @@ substitutions:
 - The AgentSkills GitHub URL is the fixture's local bare tap upstream.
 - ``$HOME`` is the fixture's personal home, and ``mkdir -p`` is ``Path.mkdir`` (native Windows has no such executable).
 - ``mask`` and ``"$HOME/.local/bin/mask"`` are the launcher ``self install`` wrote (``mask.cmd`` on Windows).
-- The Everyday placeholder ``ID`` is a fixture skill.
+- The Everyday placeholders ``ID`` and ``TAP/BUNDLE`` are a fixture skill and a fixture bundle.
 
 Prompts are exercised on a POSIX pseudoterminal, which is the macOS lane's terminal boundary; it is not native
 Windows qualification.
@@ -56,18 +56,23 @@ MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 EVERYDAY = {
     'Add a skill here': 'mask install ID',
     'Add a personal skill': 'mask install ID --user',
+    'Remove a skill here': 'mask uninstall ID',
     "Show this checkout's skills": 'mask list',
     'Show personal skills': 'mask list --user',
-    'Register and prepare this checkout': 'mask register',
-    'Restore pinned setup, or review an interrupted setup': 'mask repair',
-    'Remove a skill here': 'mask uninstall ID',
+    "Inspect this checkout's readiness": 'mask status',
+    'Inspect a named bundle': 'mask bundle show TAP/BUNDLE',
+    'Install a named bundle here': 'mask bundle install TAP/BUNDLE',
+    'Review bundle membership and member versions': 'mask bundle upgrade TAP/BUNDLE --dry-run',
+    'Uninstall a bundle contribution here': 'mask bundle uninstall TAP/BUNDLE',
+    'Update MASK itself and fetch your taps': 'mask update',
+    'Upgrade this checkout': 'mask upgrade',
+    'Upgrade and commit changed project controls': 'mask upgrade --commit',
+    'Upgrade personal skills': 'mask upgrade --user',
+    'Upgrade every registered checkout and personal skills': 'mask upgrade --all',
     'Hold a skill at its installed version': 'mask pin ID',
     'Release a version hold': 'mask unpin ID',
-    "Inspect this checkout's readiness": 'mask status',
-    'Update MASK itself and fetch your taps': 'mask update',
-    'Upgrade every registered checkout and personal skills': 'mask upgrade --all',
-    'Upgrade this checkout': 'mask upgrade',
-    'Upgrade personal skills': 'mask upgrade --user',
+    'Register and prepare this checkout': 'mask register',
+    'Restore pinned setup, or review an interrupted setup': 'mask repair',
     'Preview unused storage and backups': 'mask cleanup --dry-run',
 }
 
@@ -247,6 +252,21 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(self.shell('mask repair --all').returncode, 0)
         self.assertEqual((self.links(self.project), self.links(self.personal)), (alpha, alpha))
 
+        # The README names the tap's rfc bundle; the fixture tap publishes one over alpha and beta.
+        index = dict(schema_version=1, packages={name: 'skills/' + name for name in ('alpha', 'beta', 'implement-rfc')},
+                     bundles={'rfc': dict(description='Fixture bundle', skills=[dict(source=TAP, id='alpha'), dict(source=TAP, id='beta')])})
+        (self.source / 'mask-source.json').write_text(json.dumps(index, indent=2) + '\n', encoding='utf-8', newline='\n')
+        self.git(self.source, 'add', 'mask-source.json')
+        self.publish('rfc bundle')
+        self.assertEqual(self.shell(f'mask tap fetch {TAP}').returncode, 0)
+        bundle = {'TAP/BUNDLE': f'{TAP}/rfc'}
+        self.assertIn(f'{TAP}/beta', run('Inspect a named bundle', **bundle).stdout)
+        run('Install a named bundle here', **bundle)
+        self.assertEqual(self.links(self.project), sorted(alpha + ['.agents/skills/beta', '.claude/skills/beta']))
+        run('Review bundle membership and member versions', **bundle)
+        run('Uninstall a bundle contribution here', **bundle)
+        self.assertEqual(self.links(self.project), alpha, 'alpha was installed by hand, so it stays')
+
         # Each update scope moves only its own lock to the fetched upstream commit.
         project_lock, user_lock = self.project / '.mask.lock.json', self.home / 'user.lock.json'
         installed = self.locked(user_lock)
@@ -255,6 +275,13 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (first, installed))
         run('Upgrade personal skills')
         self.assertEqual(self.locked(user_lock), first)
+        self.git(self.project, 'config', 'user.name', 'Fixture')
+        self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(self.project, 'commit', '-q', '--allow-empty', '-m', 'start')  # --commit needs a branch with a commit.
+        committed = push_upstream('Committed upstream change.')
+        run('Upgrade and commit changed project controls')
+        self.assertEqual(self.locked(project_lock), committed)
+        self.assertEqual(self.git(self.project, 'status', '--porcelain', '--', '.mask.json', '.mask.lock.json'), '')
         second = push_upstream('Second upstream change.')
         self.assertIn(f'tap {TAP}: fetched new commits', run('Upgrade every registered checkout and personal skills').stdout)
         self.assertEqual((self.locked(project_lock), self.locked(user_lock)), (second, second))

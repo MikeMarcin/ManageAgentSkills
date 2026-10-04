@@ -37,7 +37,7 @@ class UpgradeCommit(PublicFixture):
         return self.git(root or self.project, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').splitlines()
 
     def next_version(self):
-        (self.source / 'skills/alpha/support.txt').write_text('new payload\n')
+        (self.source / 'skills/alpha/support.txt').write_text('new payload\n', encoding='utf-8', newline='\n')
         return self.publish()
 
     def hook(self, body, name='pre-commit', root=None):
@@ -93,9 +93,10 @@ class UpgradeCommit(PublicFixture):
     def test_full_partially_staged_controls_and_new_version_exclude_other_files(self):
         self.commit_controls()
         declaration = self.project / '.mask.json'
-        declaration.write_text(declaration.read_text() + '\n')
+        # LF as MASK writes it: a CRLF working file would be committed as LF wherever core.autocrlf is set.
+        declaration.write_text(declaration.read_text(encoding='utf-8') + '\n', encoding='utf-8', newline='\n')
         self.git(self.project, 'add', '.mask.json')
-        declaration.write_text(declaration.read_text() + '\n')
+        declaration.write_text(declaration.read_text(encoding='utf-8') + '\n', encoding='utf-8', newline='\n')
         expected = declaration.read_bytes()
         (self.project / 'other.txt').write_text('staged unrelated\n')
         self.git(self.project, 'add', 'other.txt')
@@ -109,7 +110,7 @@ class UpgradeCommit(PublicFixture):
         self.assertEqual(self.git(self.project, 'ls-files', '--stage', 'other.txt'), staged)
         committed = subprocess.check_output(['git', '-C', str(self.project), 'show', 'HEAD:.mask.json'])
         self.assertEqual(committed, expected)
-        self.assertEqual(json.loads((self.project / '.mask.lock.json').read_text())['packages'][0]['commit'], candidate)
+        self.assertEqual(json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'], candidate)
         self.assertEqual(self.changed_paths(), ['.mask.json', '.mask.lock.json'])
         self.assertEqual(self.git(self.project, 'diff', '--cached', '--name-only', '--', '.mask.json', '.mask.lock.json'), '')
 
@@ -189,7 +190,7 @@ class UpgradeCommit(PublicFixture):
         self.assertEqual(self.row(run, worktree)['status'], 'committed')
         self.assertEqual(self.changed_paths(worktree), ['.mask.lock.json'])
         self.assertEqual(self.git(self.project, 'rev-parse', 'HEAD'), main_head)
-        self.assertEqual(json.loads((worktree / '.mask.lock.json').read_text())['packages'][0]['commit'], candidate)
+        self.assertEqual(json.loads((worktree / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'], candidate)
         self.assertEqual(self.git(worktree, 'symbolic-ref', '--short', 'HEAD'), 'linked')
 
     def test_hook_failure_preserves_upgrade_then_retry_commits_once(self):
@@ -204,7 +205,7 @@ class UpgradeCommit(PublicFixture):
         self.assertTrue(run['changed'])
         self.assertEqual(self.git(self.project, 'rev-parse', 'HEAD'), head)
         self.assertTrue((self.project / 'hook-ran').exists())
-        self.assertEqual(json.loads((self.project / '.mask.lock.json').read_text())['packages'][0]['commit'], candidate)
+        self.assertEqual(json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'], candidate)
         hook.unlink()
         retry = self.upgrade('--offline')
         self.assertTrue(retry['ok'], retry)
@@ -227,7 +228,7 @@ class UpgradeCommit(PublicFixture):
         self.assertEqual(self.row(run, other)['status'], 'blocked')
         self.assertEqual(self.row(run, self.personal)['status'], 'not_applicable')
         self.assertEqual((other / '.mask.lock.json').read_bytes(), before)
-        self.assertEqual(json.loads((self.home / 'user.lock.json').read_text())['packages'][0]['commit'], candidate)
+        self.assertEqual(json.loads((self.home / 'user.lock.json').read_text(encoding='utf-8'))['packages'][0]['commit'], candidate)
 
     def test_all_commit_failure_keeps_success_and_reports_nested_error(self):
         other = self.base / 'other-project'
@@ -324,9 +325,11 @@ class UpgradeCommit(PublicFixture):
 
     def test_unmerged_index_refuses_and_preserves_index(self):
         oid = self.git(self.project, 'rev-parse', 'HEAD:other.txt')
+        # Bytes: a text-mode stdin turns each \n into \r\n on Windows, and Git would read paths ending in \r.
         subprocess.run(['git', '-C', str(self.project), 'update-index', '--index-info'],
-                       input=f'0 {"0" * 40}\tother.txt\n100644 {oid} 1\tother.txt\n100644 {oid} 2\tother.txt\n',
-                       encoding='utf-8', check=True)
+                       input=f'0 {"0" * 40}\tother.txt\n100644 {oid} 1\tother.txt\n100644 {oid} 2\tother.txt\n'.encode('utf-8'),
+                       check=True)
+        self.assertIn('other.txt', self.git(self.project, 'diff', '--name-only', '--diff-filter=U'))
         index = (self.project / '.git/index').read_bytes()
         run = self.upgrade()
         self.assertEqual(run['error']['code'], 'upgrade.commit_ineligible', run)
@@ -379,7 +382,7 @@ class UpgradeCommit(PublicFixture):
         self.assertTrue(run['ok'], run)
         self.assertEqual(self.changed_paths(), ['.mask.json', '.mask.lock.json'])
         self.assertEqual(self.row(run)['included_existing_changes'], [])
-        self.assertEqual({row['id'] for row in json.loads((self.project / '.mask.json').read_text())['skills']}, {'alpha', 'beta'})
+        self.assertEqual({row['id'] for row in json.loads((self.project / '.mask.json').read_text(encoding='utf-8'))['skills']}, {'alpha', 'beta'})
 
     def test_nonregular_controls_are_blocked_without_reading_or_replacing_them(self):
         other = self.base / 'regular-project'

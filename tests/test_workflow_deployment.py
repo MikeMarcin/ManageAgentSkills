@@ -10,7 +10,7 @@ from tests.public_support import ENTRY
 class DeploymentContracts(SetupFixture):
     def descriptor(self, **changes):
         path = self.package / 'mask-workflow.json'
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding='utf-8'))
         value.update(changes)
         path.write_text(json.dumps(value, indent=2) + '\n')
         return self.commit('deployment contract fixture')
@@ -48,7 +48,7 @@ class DeploymentContracts(SetupFixture):
 
     def test_compatibility_keeps_consumer_inputs_and_hash_pair_enforced(self):
         self.assertTrue(self.repair()['ok'])
-        lock = json.loads(self.lock.read_text())
+        lock = json.loads(self.lock.read_text(encoding='utf-8'))
         pair = {key: lock[key] for key in ('contract_sha256', 'role_inputs_sha256')}
         self.descriptor(compatible_locks=[pair])
         config = self.project / '.mask/skill-config/implement-rfc/project.json'

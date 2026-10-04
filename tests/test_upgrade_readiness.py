@@ -59,7 +59,7 @@ class UpgradeReadiness(SetupFixture):
         self.assertEqual((self.home / 'integration.json').read_bytes(), policy)
 
     def test_candidate_setup_and_cold_preview_apply_with_one_hash(self):
-        (self.package / 'scripts/helper.py').write_text((self.package / 'scripts/helper.py').read_text() + '\n# next version\n')
+        (self.package / 'scripts/helper.py').write_text((self.package / 'scripts/helper.py').read_text(encoding='utf-8') + '\n# next version\n', encoding='utf-8', newline='\n')
         self.publish('next setup')
         self.machine('tap', 'fetch', 'agentskills')
         before = {str(path): path.read_bytes() for path in self.home.rglob('*') if path.is_file()}
@@ -140,7 +140,7 @@ raise SystemExit(mask.main(sys.argv[2:]))
                               '--approve-plan', preview['data']['plan_hash'], '--no-update', '--json'],
                              capture_output=True, text=True, env=self.environment(), timeout=60)
         self.assertEqual(run.returncode, 99, run.stdout + run.stderr)
-        self.assertEqual(json.loads((self.home / 'pending.json').read_text())['operation'], 'ensure')
+        self.assertEqual(json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))['operation'], 'ensure')
         self.assertEqual(self.machine('recover', '--complete')['error']['code'], 'setup.unverified')
         self.assertTrue(self.machine('recover', '--rollback')['ok'])
         self.assertEqual(self.launches(), 1)

@@ -162,9 +162,9 @@ __import__('tests.engine_cli', fromlist=['main']).main(sys.argv[3:])
         output=mask.result('apply');fs.public_plan(planned,output)
         with patch.object(fs,'checkpoint',side_effect=lambda label: (_ for _ in ()).throw(KeyboardInterrupt()) if label=='lock' else None),self.assertRaises(KeyboardInterrupt):
             fs.execute(planned,self.home,output)
-        self.assertEqual(json.loads((self.project/'.mask.lock.json').read_text()),self.lock)
+        self.assertEqual(json.loads((self.project/'.mask.lock.json').read_text(encoding='utf-8')),self.lock)
         fs.execute(planned,self.home,mask.result('apply'))
-        self.assertEqual(json.loads((self.project/'.mask.lock.json').read_text()),candidate)
+        self.assertEqual(json.loads((self.project/'.mask.lock.json').read_text(encoding='utf-8')),candidate)
         self.assertEqual(fs.normalized_link(self.project/'.agents/skills/alpha',os.readlink(self.project/'.agents/skills/alpha')),store.location(self.home,candidate['packages'][0]['payload_digest'],'alpha')[1])
 
     def test_recovery_refuses_branch_control_and_old_artifact_corruption(self):

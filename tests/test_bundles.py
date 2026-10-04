@@ -3,11 +3,23 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 
 from tests.public_support import PublicFixture, ENTRY
 from tests.support import TAP
+
+
+def remove_tree(path):
+    """``shutil.rmtree`` that also removes read-only files: Git writes its objects read-only and Windows refuses to unlink them."""
+    def writable(function, target, _):
+        os.chmod(target, stat.S_IWRITE)
+        function(target)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=writable)
+    else:
+        shutil.rmtree(path, onerror=writable)
 
 
 class BundleTests(PublicFixture):
@@ -30,17 +42,17 @@ class BundleTests(PublicFixture):
         return result
 
     def publish_index(self):
-        (self.source / 'mask-source.json').write_text(json.dumps(self.index, indent=2) + '\n', encoding='utf-8')
+        (self.source / 'mask-source.json').write_text(json.dumps(self.index, indent=2) + '\n', encoding='utf-8', newline='\n')
         self.git(self.source, 'add', 'skills', 'mask-source.json')
         self.git(self.source, 'commit', '-q', '--allow-empty', '-m', 'bundle fixture')
         self.git(self.source, 'push', '-q', str(self.upstream), 'HEAD:main')
         return self.git(self.source, 'rev-parse', 'HEAD')
 
     def declaration(self):
-        return json.loads((self.project / '.mask.json').read_text())
+        return json.loads((self.project / '.mask.json').read_text(encoding='utf-8'))
 
     def lock(self):
-        return json.loads((self.project / '.mask.lock.json').read_text())
+        return json.loads((self.project / '.mask.lock.json').read_text(encoding='utf-8'))
 
     def selected(self):
         return {row['source'] + '/' + row['id'] for row in self.declaration()['skills']}
@@ -187,7 +199,7 @@ class BundleTests(PublicFixture):
         self.assertFalse((self.project / '.mask.json').exists())
         self.call('uninstall', TAP + '/alpha', '--user')
         self.call('bundle', 'install', TAP + '/both', '--user')
-        value = json.loads((self.home / 'user.json').read_text())
+        value = json.loads((self.home / 'user.json').read_text(encoding='utf-8'))
         self.assertEqual([row['id'] for row in value['skills']], ['beta'])
         self.call('bundle', 'upgrade', TAP + '/both', '--user')
         self.call('status', '--user', '--check')
@@ -258,7 +270,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.generated_bundle()
         preview = self.call('bundle', 'install', TAP + '/workflow', '--dry-run')
         self.fault('bundle', 'install', TAP + '/workflow', '--approve-plan', preview['data']['plan_hash'], label='setup.exited')
-        self.assertEqual(json.loads((self.home / 'pending.json').read_text())['operation'], 'ensure')
+        self.assertEqual(json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))['operation'], 'ensure')
         self.assertEqual(self.call('recover', '--complete', code=8)['error']['code'], 'setup.unverified')
         self.call('recover', '--rollback')
         self.assertEqual(len(self.sentinel.read_text().splitlines()), 1)
@@ -446,8 +458,8 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.install_bundle('both')
         self.index['bundles'] = {}
         self.publish_index(); self.call('tap', 'fetch', TAP)
-        shutil.rmtree(self.home / 'sources')  # Only disposable cached fixture data.
-        shutil.rmtree(self.upstream)  # Even the remote is unavailable.
+        remove_tree(self.home / 'sources')  # Only disposable cached fixture data.
+        remove_tree(self.upstream)  # Even the remote is unavailable.
         result = self.call('bundle', 'uninstall', TAP + '/both', '--offline')
         self.assertEqual(result['data']['network'], 'none')
         self.assertEqual(self.selected(), set())
@@ -475,7 +487,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.assertEqual(len(self.sentinel.read_text().splitlines()), 1)
         preview = self.call('bundle', 'uninstall', TAP + '/workflow', '--dry-run')
         self.fault('bundle', 'uninstall', TAP + '/workflow', '--approve-plan', preview['data']['plan_hash'], label='lock')
-        self.assertEqual(json.loads((self.home / 'pending.json').read_text())['operation'], 'remove')
+        self.assertEqual(json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))['operation'], 'remove')
         self.index['bundles']['workflow']['skills'] = [dict(source=TAP, id='beta')]
         self.publish_index()
         blocked = self.call('bundle', 'uninstall', TAP + '/workflow', code=8)
@@ -524,7 +536,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.call('install', TAP + '/alpha', '--user')
         result = self.call('bundle', 'uninstall', TAP + '/both', '--user')
         self.assertEqual(result['data']['removed'], [TAP + '/beta'])
-        value = json.loads((self.home / 'user.json').read_text())
+        value = json.loads((self.home / 'user.json').read_text(encoding='utf-8'))
         self.assertEqual([row['id'] for row in value['skills']], ['alpha'])
         self.assertEqual(value['bundle_state']['bundles'], {})
         self.assertTrue((self.personal / '.agents/skills/alpha').is_symlink())
@@ -591,7 +603,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.assertEqual(self.consumer_bytes(), before)
         preview = self.call('bundle', 'upgrade', TAP + '/first', '--dry-run')
         self.fault('bundle', 'upgrade', TAP + '/first', '--approve-plan', preview['data']['plan_hash'], label='lock')
-        self.assertEqual(json.loads((self.home / 'pending.json').read_text())['operation'], 'upgrade')
+        self.assertEqual(json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))['operation'], 'upgrade')
         self.index['bundles']['first']['skills'] = []
         self.publish_index()
         self.call('recover', '--complete')
@@ -605,7 +617,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.call('bundle', 'install', TAP + '/first', '--project', second)
         self.call('bundle', 'install', TAP + '/first', '--user')
         self.call('pin', TAP + '/alpha', '--project', second)
-        held = json.loads((second / '.mask.lock.json').read_text())['packages'][0]
+        held = json.loads((second / '.mask.lock.json').read_text(encoding='utf-8'))['packages'][0]
         self.call('install', TAP + '/beta')
         self.index['bundles']['first']['skills'].append(dict(source=TAP, id='beta'))
         with (self.source / 'skills/alpha/SKILL.md').open('a') as stream:
@@ -625,9 +637,9 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.assertEqual(self.consumer_bytes(), before)
         preview = self.call('upgrade', '--all', '--dry-run')
         self.call('upgrade', '--all', '--approve-plan', preview['data']['plan_hash'])
-        for declaration in (self.declaration(), json.loads((second / '.mask.json').read_text()), json.loads((self.home / 'user.json').read_text())):
+        for declaration in (self.declaration(), json.loads((second / '.mask.json').read_text(encoding='utf-8')), json.loads((self.home / 'user.json').read_text(encoding='utf-8'))):
             self.assertEqual({row['id'] for row in declaration['skills']}, {'alpha', 'beta'})
-        self.assertEqual(next(row for row in json.loads((second / '.mask.lock.json').read_text())['packages'] if row['id'] == 'alpha'), held)
+        self.assertEqual(next(row for row in json.loads((second / '.mask.lock.json').read_text(encoding='utf-8'))['packages'] if row['id'] == 'alpha'), held)
         self.call('status', '--all', '--check')
 
     def test_default_upgrade_adopts_overlapping_definitions_together_and_ids_stay_bounded(self):
@@ -716,7 +728,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
         self.publish_index()
         self.call('recover', '--complete')
         self.assertEqual(self.selected(), {TAP + '/alpha', TAP + '/beta'})
-        self.assertEqual({row['id'] for row in json.loads((self.home / 'user.json').read_text())['skills']}, {'alpha', 'beta'})
+        self.assertEqual({row['id'] for row in json.loads((self.home / 'user.json').read_text(encoding='utf-8'))['skills']}, {'alpha', 'beta'})
         self.call('status', '--all', '--check')
 
     def test_upgrade_setup_still_requires_review_and_recovery_never_reruns_scripts(self):

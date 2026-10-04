@@ -53,12 +53,12 @@ class HostIntegrationTests(Fixture):
                 original = dict(description='mine', hooks=dict(SessionStart=[dict(hooks=[dict(type='command', command='echo unrelated')])]))
                 path.write_text(json.dumps(original))
                 self.call('integration', 'enable', '--agent', agent, '--project', self.project)
-                value = json.loads(path.read_text())
+                value = json.loads(path.read_text(encoding='utf-8'))
                 self.assertEqual(value['description'], 'mine')
                 self.assertEqual(value['hooks']['SessionStart'][0], original['hooks']['SessionStart'][0])
                 self.assertEqual(len(value['hooks']['SessionStart']), 2)
                 self.call('integration', 'disable', '--agent', agent, '--project', self.project)
-                self.assertEqual(json.loads(path.read_text()), original)
+                self.assertEqual(json.loads(path.read_text(encoding='utf-8')), original)
                 self.assertFalse((self.project / '.codex/config.toml').exists())
 
     def test_startup_preflights_personal_and_project_before_effects(self):
@@ -111,7 +111,7 @@ class HostIntegrationTests(Fixture):
     def test_changed_host_entry_and_parent_are_preserved(self):
         self.call('integration', 'enable', '--agent', 'codex', '--project', self.project)
         path = self.project / '.codex/hooks.json'
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding='utf-8'))
         value['hooks']['SessionStart'][0]['hooks'][0]['command'] = 'edited'
         path.write_text(json.dumps(value))
         before = self.snapshot()
@@ -146,7 +146,7 @@ class HostIntegrationTests(Fixture):
         self.register_user(personal, [])
         self.call('integration', 'enable', '--agent', 'claude')
         settings = personal / '.claude/settings.json'
-        command = json.loads(settings.read_text())['hooks']['SessionStart'][0]['hooks'][0]['command']
+        command = json.loads(settings.read_text(encoding='utf-8'))['hooks']['SessionStart'][0]['hooks'][0]['command']
         self.assertFalse((personal / '.claude/settings.local.json').exists())
         boundary = self.base / 'clones'
         boundary.mkdir()
@@ -163,4 +163,4 @@ class HostIntegrationTests(Fixture):
         self.assertTrue((clone / '.agents/skills/alpha').is_symlink())
         self.assertTrue(self.call('integration', 'inspect', '--agent', 'claude')['data']['coverage']['startup'])
         self.call('integration', 'disable', '--agent', 'claude')
-        self.assertEqual(json.loads(settings.read_text())['hooks']['SessionStart'], [])
+        self.assertEqual(json.loads(settings.read_text(encoding='utf-8'))['hooks']['SessionStart'], [])

@@ -8,6 +8,8 @@ For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_en
 
 Run the whole suite with `python3 -B scripts/run_tests.py`. It runs each test in its own process, one worker per CPU, starting with the tests of the largest classes, and prints output only for a test that fails; `-k TEXT` selects tests whose dotted id contains TEXT (a module or class name works), `-j 1` runs them serially and `--slowest N` lists the slowest tests. `python3 -m unittest MODULE` still works for one module.
 
+MASK reports a failed Git command as `git.failed` without Git's own message, so a credential in a URL can never reach a result. To see why Git failed in a test, rerun it with `GIT_TRACE2_EVENT` set to a file path: Git writes each command's `error` event, including its message, to that file, and MASK passes the variable through.
+
 To create a single Markdown file for ChatGPT project sources or a code review:
 
 ```sh

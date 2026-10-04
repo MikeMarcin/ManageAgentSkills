@@ -23,7 +23,7 @@ class CatalogTests(Fixture):
         # skill list/show/validate read the fetched tap cache (RFC-MASK-0021): nothing is written and package code never runs.
         self.init()
         marker = self.base / 'package-script-ran'
-        (self.source / 'skills/alpha/install.py').write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("executed")\n')
+        (self.source / 'skills/alpha/install.py').write_text(f'from pathlib import Path\nPath({str(marker)!r}).write_text("executed")\n', encoding='utf-8', newline='\n')
         self.publish('package with a script')
         before = self.snapshot()
         unfetched = self.call('skill', 'list')['data']
@@ -56,7 +56,7 @@ class CatalogTests(Fixture):
             self.assertEqual(self.call(*args, code=4)['error']['code'], 'skill.entry_unsupported', args)
         self.assertEqual(before, self.snapshot())
         os.rmdir(link) if os.name == 'nt' else link.unlink()
-        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: |\n  multiline\n---\n')
+        (self.source / 'skills/alpha/SKILL.md').write_text('---\nname: alpha\ndescription: |\n  multiline\n---\n', encoding='utf-8', newline='\n')
         self.publish('multiline metadata')
         self.call('source', 'fetch')
         before = self.snapshot()
@@ -73,7 +73,7 @@ class CatalogTests(Fixture):
             with self.assertRaises(core.MaskError): core.selection_manifest(value)
         self.init()
         path = self.home / 'config.json'
-        value = json.loads(path.read_text()); value['git_timeout_seconds'] = True; path.write_text(json.dumps(value))
+        value = json.loads(path.read_text(encoding='utf-8')); value['git_timeout_seconds'] = True; path.write_text(json.dumps(value))
         self.call('config', 'show', code=3)
 
     def test_defaults_change_without_links(self):

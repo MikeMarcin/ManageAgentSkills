@@ -102,7 +102,7 @@ raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(['instal
 """
         run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.home), str(self.project)], capture_output=True, encoding='utf-8', env=self.environment())
         self.assertEqual(run.returncode, 8, run.stdout + run.stderr)
-        self.assertEqual(json.loads((self.project / '.mask.json').read_text())['skills'], [])
+        self.assertEqual(json.loads((self.project / '.mask.json').read_text(encoding='utf-8'))['skills'], [])
         self.assertTrue((self.home / 'pending.json').exists())
         before = self.snapshot()
         self.call('recover', '--complete', code=8)

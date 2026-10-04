@@ -699,6 +699,11 @@ def main(argv=None):
                 visible = False
             with mask_progress.reporting(visible, f"Preparing {args.command.replace('.', ' ')}"):
                 mask_cli.dispatch(args, output, leaves)
+    except core.ProgramUpdated as updated:
+        # The updated program finishes this invocation on the same console; this process writes nothing of its own.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        return subprocess.run(updated.command).returncode
     except MaskError as error:
         output.update(ok=False, error=error.as_dict())
         if output['transaction'] == 'not_needed':

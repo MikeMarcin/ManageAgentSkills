@@ -118,7 +118,7 @@ raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv
                              capture_output=True, text=True, env=self.environment(), timeout=60)
         self.assertEqual(run.returncode, 97, run.stdout + run.stderr)
         self.assertEqual(self.launches(), 1)
-        journal = json.loads((self.home / 'pending.json').read_text())
+        journal = json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))
         self.assertTrue(all(row['repair'] for row in journal['native_roles']))
         result = self.machine('recover', '--rollback')
         self.assertTrue(result['ok'], result)
@@ -127,7 +127,7 @@ raise SystemExit(__import__('tests.engine_cli', fromlist=['main']).main(sys.argv
             self.assertEqual((self.project / relative).read_text(encoding='utf-8'), content)
         manifests = list((self.home / 'backups').glob('*/manifest.json'))
         self.assertEqual(len(manifests), 1)
-        for row in json.loads(manifests[0].read_text())['files']:
+        for row in json.loads(manifests[0].read_text(encoding='utf-8'))['files']:
             self.assertTrue(Path(row['backup']).is_file())
         self.assertFalse(self.lock.exists())
 

@@ -11,7 +11,7 @@ class StablePackageLocks(PublicFixture):
     raw = public_cli.CliV2.raw  # Never update the real program checkout.
 
     def packages(self, root):
-        return json.loads((root / '.mask.lock.json').read_text())['packages']
+        return json.loads((root / '.mask.lock.json').read_text(encoding='utf-8'))['packages']
 
     def commit_controls(self):
         self.git(self.source, 'add', '.mask.json', '.mask.lock.json')

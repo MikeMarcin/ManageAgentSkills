@@ -7,8 +7,8 @@ import sys
 import unittest
 from tests.support import Fixture, ENTRY
 
-# The runtime modules update requires in a program candidate (mask_install.protocol_version).
-PROGRAM_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_bundles.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py')
+# Every runtime module, so a new one can never be missing from the disposable program checkout.
+PROGRAM_MODULES = tuple(sorted(path.name for path in ENTRY.parent.glob('mask*.py')))
 
 # Runs update from a program checkout with one injected fault: a crash at the Git checkpoint after the checkout
 # advanced, a crash just after update --stash recorded its stash, a failing fast-forward merge, or a failure of
@@ -41,6 +41,11 @@ raise SystemExit(mask.main(['update', '--home', sys.argv[2], '--json', *sys.argv
 
 
 class LauncherTests(Fixture):
+    def test_update_requires_every_runtime_module_of_a_candidate(self):
+        # A module missing from this list lets update advance to a candidate that cannot import it.
+        import mask_install
+        self.assertEqual(sorted(mask_install.RUNTIME_MODULES), list(PROGRAM_MODULES))
+
     def test_install_dry_run_refusal_and_native_forwarding(self):
         directory = self.base / 'bin spaced ü'
         before = self.snapshot()

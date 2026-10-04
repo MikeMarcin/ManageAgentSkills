@@ -12,7 +12,7 @@ class WorkflowScopeTests(SetupFixture):
     def setUp(self):
         super().setUp()
         self.descriptor_path = self.package / 'mask-workflow.json'
-        value = json.loads(self.descriptor_path.read_text())
+        value = json.loads(self.descriptor_path.read_text(encoding='utf-8'))
         personal = copy.deepcopy(value)
         del personal['schema_version']
         personal['inputs'] = []
@@ -75,7 +75,7 @@ class WorkflowScopeTests(SetupFixture):
         self.assertTrue(capabilities['setup_request_scope'])
         self.install_personal()
         preview = self.machine('ensure', '--user', '--dry-run')
-        value = json.loads(self.descriptor_path.read_text())
+        value = json.loads(self.descriptor_path.read_text(encoding='utf-8'))
         value['scopes']['user']['setup'][0]['parameters']['mode'] = 'changed'
         self.descriptor_path.write_text(json.dumps(value))
         self.commit('change personal scope', user=True)
@@ -94,7 +94,7 @@ class WorkflowScopeTests(SetupFixture):
         self.assertEqual(self.launches(), 0)
 
     def test_invalid_inactive_scope_refuses_project_and_ambiguous_keys_refuse(self):
-        original = json.loads(self.descriptor_path.read_text())
+        original = json.loads(self.descriptor_path.read_text(encoding='utf-8'))
         for change in ('missing-inputs', 'project-override', 'unknown-scope', 'nested-scopes'):
             value = copy.deepcopy(original)
             if change == 'missing-inputs':

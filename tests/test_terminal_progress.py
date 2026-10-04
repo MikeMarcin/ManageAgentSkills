@@ -37,26 +37,29 @@ class TerminalPresentation(unittest.TestCase):
             self.assertEqual(present.paint('Ready.\n', stream), 'Ready.\n')
 
     def test_review_groups_links_but_keeps_setup_and_exact_replacements(self):
-        actions = [dict(kind='link.create', path=f'/repo/.agents/skills/{name}', target='/private/store/long-digest/' + name) for name in ('one', 'two')]
-        actions += [dict(kind='state.record'), dict(kind='lock.write', path='/repo/.mask.lock.json'),
-                    dict(kind='setup.run', root='/repo', skill='one', coordinate='tap/one', fingerprint='123456789abc',
-                         path='/private/store/hash/payload/one/scripts/setup.py', interpreter='/python', native_roles=['codex/worker']),
-                    dict(kind='file.backup_replace', path='/repo/.codex/agents/worker.toml')]
-        text = present.render_confirmation(dict(kind='task', scope=['/repo'], actions=actions), mask.result('upgrade'))
+        # Action paths are native: MASK writes str(Path), so a POSIX literal never sits under a Windows root.
+        repo, store = os.path.abspath(os.sep + 'repo'), os.path.join(os.path.abspath(os.sep + 'private'), 'store')
+        actions = [dict(kind='link.create', path=os.path.join(repo, '.agents', 'skills', name), target=os.path.join(store, 'long-digest', name)) for name in ('one', 'two')]
+        actions += [dict(kind='state.record'), dict(kind='lock.write', path=os.path.join(repo, '.mask.lock.json')),
+                    dict(kind='setup.run', root=repo, skill='one', coordinate='tap/one', fingerprint='123456789abc',
+                         path=os.path.join(store, 'hash', 'payload', 'one', 'scripts', 'setup.py'), interpreter='/python', native_roles=['codex/worker']),
+                    dict(kind='file.backup_replace', path=os.path.join(repo, '.codex', 'agents', 'worker.toml'))]
+        replaced = 'back up and replace ' + os.path.join(repo, '.codex', 'agents', 'worker.toml')
+        text = present.render_confirmation(dict(kind='task', scope=[repo], actions=actions), mask.result('upgrade'))
         self.assertIn('2 skill links', text)
-        self.assertIn('scripts/setup.py', text)
+        self.assertIn('scripts/setup.py', text)  # A package-relative path is POSIX on every OS.
         self.assertIn('tap/one (123456789abc)', text)
         self.assertIn('codex/worker', text)
-        self.assertIn('back up and replace /repo/.codex/agents/worker.toml', text)
-        self.assertNotIn('/private/store', text)
+        self.assertIn(replaced, text)
+        self.assertNotIn(store, text)
         self.assertNotIn('state.record', text)
         output = mask.result('upgrade', True)
         output['would_change'] = True
-        output['data'].update(review=dict(kind='task', scope=['/repo'], actions=actions), plan_hash='review-hash')
+        output['data'].update(review=dict(kind='task', scope=[repo], actions=actions), plan_hash='review-hash')
         preview = present.render(output)
-        self.assertIn('back up and replace /repo/.codex/agents/worker.toml', preview)
+        self.assertIn(replaced, preview)
         self.assertIn('--approve-plan review-hash', preview)
-        self.assertNotIn('/private/store', preview)
+        self.assertNotIn(store, preview)
 
     def test_progress_flushes_heartbeat_pauses_and_stops_on_exception(self):
         class Stream(io.StringIO):
@@ -170,6 +173,6 @@ raise SystemExit(mask.main(sys.argv[2:]))
         self.assertEqual(result['data']['workflow_readiness_observation'],'before_setup')
         self.assertTrue((self.home/'pending.json').exists())
         self.assertTrue(any(a['status'] == 'failed' and a.get('effects') == 'unknown' for a in result['actions']))
-        schema = json.loads((ENTRY.parent / 'schemas/result.schema.json').read_text())
+        schema = json.loads((ENTRY.parent / 'schemas/result.schema.json').read_text(encoding='utf-8'))
         statuses = schema['properties']['actions']['items']['properties']['status']['enum']
         self.assertTrue(all(action['status'] in statuses for action in result['actions']))

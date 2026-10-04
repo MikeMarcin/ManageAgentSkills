@@ -46,7 +46,9 @@ def artifact(path):
     value = store.manifest(c.read_json(path / 'manifest.json', 'artifact'))
     if not path.name.startswith('.mask-stage-') and path.name != value['payload_digest'][7:]:
         c.fail('artifact.invalid', 'Artifact directory does not match its manifest.', 4)
-    row = dict(source='cleanup', id=value['id'], repository='file:///mask-cleanup', path='.',
+    # A placeholder identity that must still validate: file:///mask-cleanup has no drive, so Windows rejected every artifact.
+    placeholder = Path(os.path.abspath(os.sep + 'mask-cleanup')).resolve().as_uri()
+    row = dict(source='cleanup', id=value['id'], repository=placeholder, path='.',
                commit='0' * 40, git_object_format='sha1', selector=dict(commit='0' * 40),
                **{key: value[key] for key in ('payload_digest','metadata_digest','provenance_digest') if key in value})
     store.verify_tree(path, row)

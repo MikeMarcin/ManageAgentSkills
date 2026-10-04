@@ -31,7 +31,7 @@ raise SystemExit(mask.main(sys.argv[3:]))
                               'install', 'implement-rfc', '--no-update', '--approve-plan', preview['data']['plan_hash'], '--json'],
                              cwd=self.project, env=self.environment(), capture_output=True, text=True, timeout=60)
         self.assertEqual(run.returncode, 99, run.stderr)
-        return json.loads((self.home / 'pending.json').read_text())
+        return json.loads((self.home / 'pending.json').read_text(encoding='utf-8'))
 
     def commit_work(self):
         (self.project / 'work.txt').write_text('Unrelated work\n')

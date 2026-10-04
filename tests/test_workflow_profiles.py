@@ -16,7 +16,7 @@ class WorkflowProfileTests(SetupFixture):
     def setUp(self):
         super().setUp()
         self.descriptor_path = self.package / 'mask-workflow.json'
-        value = json.loads(self.descriptor_path.read_text())
+        value = json.loads(self.descriptor_path.read_text(encoding='utf-8'))
         value['profiles'] = {'direct': {'native_roles': []},
                              'worker': {'native_roles': ['codex/rfc-integrator']}}
         personal = copy.deepcopy(value)
@@ -85,7 +85,7 @@ class WorkflowProfileTests(SetupFixture):
         self.assertEqual(self.launches(), 0)
 
     def test_inactive_profile_validation_and_legacy_descriptor(self):
-        value = json.loads(self.descriptor_path.read_text())
+        value = json.loads(self.descriptor_path.read_text(encoding='utf-8'))
         for selected in (['codex/missing'], ['codex/rfc-integrator'] * 2, 'all', [None]):
             bad = copy.deepcopy(value)
             bad['profiles']['unused'] = {'native_roles': selected}

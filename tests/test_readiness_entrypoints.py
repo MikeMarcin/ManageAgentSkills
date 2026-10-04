@@ -205,13 +205,13 @@ class TapUpdate(EntrypointFixture):
     def setUp(self):
         super().setUp()
         # Fingerprinted role assets must reach the tap byte-exact; a publisher disables line-ending normalization.
-        (self.source / '.gitattributes').write_text('* -text\n', encoding='utf-8')
+        (self.source / '.gitattributes').write_text('* -text\n', encoding='utf-8', newline='\n')
         self.git(self.source, 'add', '.gitattributes')
         self.package = self.source / 'skills/implement-rfc'
         shutil.copytree(STATIC, self.package)
         value = json.loads((self.package / 'mask-workflow.json').read_text(encoding='utf-8'))
         value['native_roles'] = [role for role in value['native_roles'] if role['name'] != 'rfc-integrator']
-        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8', newline='\n')
         Fixture.publish(self, 'descriptor without the integrator')
         shutil.copytree(CONTEXT, self.project / '.mask')
         installed = self.call('install', 'implement-rfc')
@@ -240,7 +240,7 @@ class TapUpdate(EntrypointFixture):
             for role in value['native_roles']:
                 if role['name'] == 'rfc-scout' and role['agent'] == agent:
                     role.update(name='rfc-explorer', asset=dict(path=f'runtime/roles/{agent}/rfc-explorer.{suffix}', sha256='0' * 64))
-        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8', newline='\n')
         candidate = self.publish('add integrator, rename scout')
         edited = self.project / '.claude/agents/rfc-scout.md'
         edited.write_text('---\nname: rfc-scout\nmodel: fixture-model-do-not-run\n---\n\nlocal edit\n', encoding='utf-8')
@@ -273,7 +273,7 @@ class TapUpdate(EntrypointFixture):
             if role['name'] == 'rfc-integrator':
                 role.pop('asset')
                 role['setup'] = 'prepare-roles'
-        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+        (self.package / 'mask-workflow.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8', newline='\n')
         shutil.copytree(GENERATED / 'scripts', self.package / 'scripts')
         converted = self.publish('generate the integrator')
         outcome = self.call('upgrade', code=4)

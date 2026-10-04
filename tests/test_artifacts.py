@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 from unittest.mock import patch
 
 import mask_core as c
@@ -127,7 +128,12 @@ class ArtifactTests(Fixture):
                 else: (cache / 'notes.txt').write_text('unknown')
                 with self.assertRaises(c.MaskError): store.verify_tree(root, self.row)
                 if leaf.is_dir(): leaf.rmdir()
-                elif leaf.exists(): leaf.unlink()
+                elif leaf.exists():
+                    # Windows refuses to unlink a read-only file, and a hard link shares run.py's read-only attribute.
+                    mode = (target / 'run.py').stat().st_mode
+                    if not leaf.is_symlink(): leaf.chmod(mode | stat.S_IWRITE)
+                    leaf.unlink()
+                    (target / 'run.py').chmod(stat.S_IMODE(mode))
                 if (cache / 'notes.txt').exists(): (cache / 'notes.txt').unlink()
         original = store.inventory
         calls = 0

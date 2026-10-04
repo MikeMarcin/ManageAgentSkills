@@ -65,27 +65,28 @@ checkout without upgrading versions.
 |---|---|
 | Add a skill here | `mask install ID` |
 | Add a personal skill | `mask install ID --user` |
-| Inspect a named bundle | `mask bundle show agentskills/rfc` |
-| Install a named bundle here | `mask bundle install agentskills/rfc` |
-| Uninstall a bundle contribution here | `mask bundle uninstall agentskills/rfc` |
-| Review bundle membership and member versions | `mask bundle upgrade agentskills/rfc --dry-run` |
+| Remove a skill here | `mask uninstall ID` |
 | Show this checkout's skills | `mask list` |
 | Show personal skills | `mask list --user` |
-| Register and prepare this checkout | `mask register` |
-| Restore pinned setup, or review an interrupted setup | `mask repair` |
-| Remove a skill here | `mask uninstall ID` |
-| Hold a skill at its installed version | `mask pin ID` |
-| Release a version hold | `mask unpin ID` |
 | Inspect this checkout's readiness | `mask status` |
+| Inspect a named bundle | `mask bundle show TAP/BUNDLE` |
+| Install a named bundle here | `mask bundle install TAP/BUNDLE` |
+| Review bundle membership and member versions | `mask bundle upgrade TAP/BUNDLE --dry-run` |
+| Uninstall a bundle contribution here | `mask bundle uninstall TAP/BUNDLE` |
 | Update MASK itself and fetch your taps | `mask update` |
-| Upgrade every registered checkout and personal skills | `mask upgrade --all` |
 | Upgrade this checkout | `mask upgrade` |
 | Upgrade and commit changed project controls | `mask upgrade --commit` |
 | Upgrade personal skills | `mask upgrade --user` |
+| Upgrade every registered checkout and personal skills | `mask upgrade --all` |
+| Hold a skill at its installed version | `mask pin ID` |
+| Release a version hold | `mask unpin ID` |
+| Register and prepare this checkout | `mask register` |
+| Restore pinned setup, or review an interrupted setup | `mask repair` |
 | Preview unused storage and backups | `mask cleanup --dry-run` |
 
 `register`, `install`, `uninstall`, `list`, `pin`, `unpin`, `upgrade`, `repair`, and
 `status` default to the **current checkout**. Add `--user` for personal skills.
+ID names a skill and TAP/BUNDLE a named bundle, such as `agentskills/rfc`.
 `upgrade`, `repair`, `status`, and `list` accept `--all` for every registered
 checkout plus personal skills. On `pin` and `unpin`, `--all` replaces ID and means
 all skills in the selected checkout; combine it with `--user` for personal skills.
