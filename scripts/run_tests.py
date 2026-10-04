@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Run the unittest suite in parallel: one process per TestCase class, standard library only.
+"""Run the unittest suite in parallel: one process per test, standard library only.
 
     python3 -B scripts/run_tests.py            # everything, one worker per CPU
-    python3 -B scripts/run_tests.py -k update  # classes whose id contains "update"
+    python3 -B scripts/run_tests.py -k update  # tests whose id contains "update"
     python3 -B scripts/run_tests.py -j 1       # serial
 
-Each class runs as its own ``python -B -m unittest`` process, so tests that patch the process environment,
-rebind a module function or crash on purpose stay isolated exactly as under ``python -m unittest MODULE``.
-Output is shown only for a class that fails.
+Each test runs as its own ``python -B -m unittest ID`` process, so a test that patches the process environment,
+rebinds a module function or crashes on purpose stays isolated exactly as under ``python -m unittest MODULE``,
+and one class with many slow tests no longer runs them one after another while other workers sit idle.
+Output is shown only for a test that fails.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -22,13 +23,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def classes(suite, found):
+def tests(suite, found):
+    """Test ids grouped by class, in discovery order."""
     for item in suite:
         if isinstance(item, unittest.TestSuite):
-            classes(item, found)
+            tests(item, found)
         else:
-            found.setdefault(f'{type(item).__module__}.{type(item).__qualname__}', 0)
-            found[f'{type(item).__module__}.{type(item).__qualname__}'] += 1
+            found.setdefault(f'{type(item).__module__}.{type(item).__qualname__}', []).append(item.id())
     return found
 
 
@@ -44,21 +45,21 @@ def run(name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('-j', '--jobs', type=int, default=os.cpu_count() or 4, help='parallel processes (default: CPU count)')
-    parser.add_argument('-k', dest='pattern', action='append', default=[], help='only classes whose dotted id contains this text; repeatable')
-    parser.add_argument('--slowest', type=int, default=0, metavar='N', help='also list the N slowest classes')
+    parser.add_argument('-k', dest='pattern', action='append', default=[], help='only tests whose dotted id contains this text; repeatable')
+    parser.add_argument('--slowest', type=int, default=0, metavar='N', help='also list the N slowest tests')
     args = parser.parse_args()
     sys.path.insert(0, str(ROOT))
-    found = classes(unittest.TestLoader().discover(str(ROOT / 'tests'), top_level_dir=str(ROOT)), {})
+    found = tests(unittest.TestLoader().discover(str(ROOT / 'tests'), top_level_dir=str(ROOT)), {})
     broken = [name for name in found if name.startswith('unittest.loader.')]
     if broken:
         print('A test module failed to import; run python3 -m unittest discover -s tests -t . to see it.')
         return 1
-    names = sorted(name for name in found if not args.pattern or any(text in name for text in args.pattern))
+    # Tests of the largest classes first: those are the slow integration tests, so they do not start last and set the wall time.
+    names = [name for owner in sorted(found, key=lambda owner: -len(found[owner])) for name in found[owner]
+             if not args.pattern or any(text in name for text in args.pattern)]
     if not names:
-        print('No test classes match.')
+        print('No tests match.')
         return 1
-    # Largest classes first, so the long ones do not start last and set the wall time.
-    names.sort(key=lambda name: -found[name])
     start, failed, total, skipped, timings = time.monotonic(), [], 0, 0, []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         for future in as_completed([pool.submit(run, name) for name in names]):
@@ -70,8 +71,9 @@ def main():
                 print(f'FAIL {name} ({seconds:.1f}s)\n{text.rstrip()}\n', flush=True)
     for seconds, name in sorted(timings, reverse=True)[:args.slowest]:
         print(f'{seconds:6.1f}s  {name}')
-    print(f"{total} tests in {len(names)} classes, {skipped} skipped, {len(failed)} failed classes, wall {time.monotonic() - start:.0f}s")
-    for name in failed:
+    classes = len({name.rsplit('.', 1)[0] for name in names})
+    print(f"{total} tests in {classes} classes, {skipped} skipped, {len(failed)} failed, wall {time.monotonic() - start:.0f}s")
+    for name in sorted(failed):
         print(f'  rerun: python3 -m unittest {name}')
     return 1 if failed else 0
 
