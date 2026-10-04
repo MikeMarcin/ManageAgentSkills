@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0129"
 title: "Let mask update show and ask about a program schema change instead of failing opaquely"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P1"
 metadata: {"origin":"Field report on bpr-linux (WSL) running mask update from 4b983e3 toward 40080e0 (2026-10-03)"}
+acceptance: [{"criterion":"MASK-0129-AC1","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"command","detail":"tests.test_launcher test_program_update_separate_and_comment_only_schema_change_needs_no_question: title/description-only schema edit updates with exit 0, HEAD at candidate, stdout row 'machine-v3.schema.json comment wording only'"}},{"criterion":"MASK-0129-AC2","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"command","detail":"test_terminal_update_asks_once_and_applies_or_declines (POSIX pty, Linux): n and bare Enter decline with exit 4, Git unmoved, tap fetched; y applies in the same invocation with exactly one [y/N]. test_breaking_schema_and_protocol_changes_are_marked covers removed property, new required property and protocol bump as breaking. Native Windows console not exercised."}},{"criterion":"MASK-0129-AC3","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"command","detail":"test_additive_schema_change_is_shown_and_approved_exactly: --json exit 4 confirmation.required with data.confirmation.kind program.migration and classified rows, taps fetched; wrong --approve-plan -> plan.stale; right hash -> updated. program.migration is SIGNIFICANT, not ORDINARY."}},{"criterion":"MASK-0129-AC4","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"observation","detail":"mask_install.program_migration on the real ManageAgentSkills repo 4b983e3..40080e0: project-v2.schema.json additive 'adds optional bundle_state'; source-index.schema.json comment 'wording only'; protocol 2->2; 15 commits"}},{"criterion":"MASK-0129-AC5","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"command","detail":"test_approved_migration_recovers_without_asking_again: crash at git checkpoint after --approve-plan; pending git.consent recorded; tampered consent -> plan.stale; restored journal -> recover --complete reaches candidate and clears pending.json"}},{"criterion":"MASK-0129-AC6","outcome":"pass","revision":"9bd51cba4bff536966437429fc28d6296414ff76","evidence":{"kind":"command","detail":"assert_readable in launcher tests: no ESC/mark bytes and <=80 columns for redirected refusal, breaking refusal and success text; pty run with NO_COLOR has no ESC; colored pty shows ESC[32m on class words. mask update --help and docs/guides/sources-and-updates.md#program-update describe the review."}}]
 ---
 
 # MASK-0129: Let mask update show and ask about a program schema change instead of failing opaquely
@@ -106,13 +107,29 @@ A candidate whose only schema changes are `comment` (no protocol bump) updates w
 
 ## Acceptance
 
-- With a fixture bare remote, a comment-only candidate updates without a prompt and lists its rows in the success output.
-- Using fixture bare remotes, for each class that asks (additive, breaking, protocol bump):
+- **MASK-0129-AC1:** With a fixture bare remote, a comment-only candidate updates without a prompt and lists its rows in the success output.
+- **MASK-0129-AC2:** For each class that asks (additive, breaking, protocol bump), using fixture bare remotes:
   - a manual TTY `mask update` shows the classified block and asks once;
   - yes fast-forwards in the same invocation;
   - no or EOF leaves Git unmoved, gives `confirmation.declined`, and still fetches taps.
-- `--json` and redirected runs never prompt. They return `confirmation.required` with `data.confirmation` and `data.program_migration`. `--expect-plan-hash` with that hash completes the update. A hash from a different candidate gives `plan.stale`. `--yes` alone refuses.
-- The 4b983e3 → 40080e0 change classifies as one `additive` row and one `comment` row.
-- An interrupted, consented update recovers through `recover_git` without asking again.
-- The text output matches the target layout, both with and without color. `NO_COLOR` gives no escape codes, and every line fits in 80 columns.
-- `mask update --help` and the CLI contract describe the review.
+- **MASK-0129-AC3:** `--json` and redirected runs never prompt. They return `confirmation.required` with `data.confirmation` and `data.program.program_migration`. `--approve-plan` with that hash completes the update. A hash from a different candidate gives `plan.stale`. `--yes` never grants `program.migration`.
+- **MASK-0129-AC4:** The 4b983e3 -> 40080e0 change classifies as one `additive` row and one `comment` row.
+- **MASK-0129-AC5:** An interrupted, consented update recovers through `recover_git` without asking again. A journal whose consent doesn't match gives `plan.stale`.
+- **MASK-0129-AC6:** The text output matches the target layout, both with and without color. `NO_COLOR` and redirected output give no escape codes, and every line fits in 80 columns. `mask update --help` and the update guide describe the review.
+
+## Run record
+
+Implemented at `9bd51cb` (direct strategy, one session, on bpr-linux / WSL2 Linux).
+
+Differences from the card as filed:
+- The public flag is `--approve-plan HASH`, MASK's existing spelling for an exact approval. It maps to the engine's `expect_plan_hash`. `update` has no `--yes`. `program.migration` is in `SIGNIFICANT` and not `ORDINARY`, so `--yes` couldn't grant it anyway.
+- Arrows are ASCII `->`, matching the rest of MASK's output, because every existing renderer is ASCII-only.
+- Added: the background refresh inside `install`/`upgrade` never asks. It warns `update.review_required` and continues with the fetched taps.
+- Added: a mismatched `--approve-plan` hash gives `plan.stale` instead of a second refusal.
+- `validate_program` is replaced by `protocol_version` (the module and protocol readability check) and `program_migration` (the classifier). The design doc is updated to match.
+
+Verification:
+- Ran `python3 -B -m unittest tests.test_launcher tests.test_human_output tests.test_consent tests.test_update tests.test_cli_protocol`: 60 tests OK.
+- Ran the full `scripts/run_tests.py`: 541 tests. 4 classes fail (`RecoveryEntrypoint`, `ReadmeText`, `RefreshV2`, `Readiness Launch`). They fail with the same 7 tests on an unmodified worktree at HEAD, so they predate this work and are unrelated to it.
+- `scripts/verify_documentation.py` reports 0 violations.
+- Native Windows console prompt: not exercised.
