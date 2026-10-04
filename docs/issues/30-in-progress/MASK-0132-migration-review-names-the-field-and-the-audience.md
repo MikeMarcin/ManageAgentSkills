@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0132"
 title: "Make the migration review name the changed field and only warn about files for persisted schemas"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: ["MASK-0131"]
 priority: "P2"
