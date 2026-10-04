@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0136"
 title: "The full test suite passes on Windows"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 platforms: ["win"]
