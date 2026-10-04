@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0135"
 title: "scripts/run_tests.py schedules tests, not classes, so one long class stops setting the wall time"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 platforms: ["win", "mac", "linux"]
