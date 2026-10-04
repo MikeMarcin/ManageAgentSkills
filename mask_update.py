@@ -73,29 +73,49 @@ PROGRAM_HELD = {'source.ahead': 'this checkout is ahead of its remote', 'source.
 
 
 def refresh(args, output, home, root):
-    """``update``: fast-forward the MASK program, then fetch every approved tap; no declaration, lock, link or consumer changes."""
+    """``update``: fast-forward the MASK program, then fetch every approved tap; no declaration, lock, link or consumer changes.
+
+    A program whose contracts change needs consent (``program.migration``). The taps are fetched before the
+    question is asked or refused, and an approved retry in the same invocation reuses that fetch.
+    """
+    import mask_consent as consent
     import mask_install
     progress.phase('Checking for MASK updates')
-    failure = None
+    failure, review = None, None
     try:
         mask_install.dispatch(args, output, home, root)
         program = dict(output['data'], status='updated' if output['changed'] else 'behind' if output['would_change'] else 'current')
+    except consent.ConsentRequired as error:
+        review = error
     except c.MaskError as error:
-        if error.code not in PROGRAM_HELD and not error.code.startswith('git.'):
+        if error.code == 'confirmation.required' and (output['data'].get('confirmation') or {}).get('kind') == 'program.migration':
+            review = error
+        elif error.code not in PROGRAM_HELD and not error.code.startswith('git.'):
             raise
-        program = dict(status='held' if error.code in PROGRAM_HELD else 'failed', reason=PROGRAM_HELD.get(error.code, str(error)), code=error.code)
-        failure = None if error.code in PROGRAM_HELD else error
+        else:
+            program = dict(status='held' if error.code in PROGRAM_HELD else 'failed', reason=PROGRAM_HELD.get(error.code, str(error)), code=error.code)
+            failure = None if error.code in PROGRAM_HELD else error
+    confirmation = output['data'].pop('confirmation', None)
+    if review is not None:
+        program = dict(output['data'], status='review')
     program_changed, program_would_change = output['changed'], output['would_change']
     raw = c.read_json(home / 'config.json', default={})
     output['data'] = dict(fetches={}, network='none')  # Stays so with no configuration yet, or on a machine that predates taps.
     try:
-        if raw:
+        if raw and getattr(args, 'tap_fetches', None) is not None:
+            output['data']['fetches'] = args.tap_fetches
+        elif raw:
             fetch_all(args, output, home)
     finally:  # A tap that fails to fetch still discloses what happened to the program.
         output['data']['program'] = program
+        if confirmation is not None:
+            output['data']['confirmation'] = confirmation
         if not output['dry_run']:
             output['data']['network'] = 'fetch'
         output.update(changed=program_changed, would_change=program_would_change)
+    if review is not None:
+        args.tap_fetches = output['data']['fetches']
+        raise review
     if failure is not None:
         raise failure
 

@@ -89,7 +89,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -174,11 +174,18 @@ def auto_refresh(args, output, home, leaves):
     last = recorded.get('completed_at', 0)
     if isinstance(last, (int, float)) and 0 <= time.time() - last < 86400:
         return
-    refresh_args = argparse.Namespace(command='update', home=str(home), json=getattr(args, 'json', False))
+    # The background refresh never asks: a program contract migration waits for a manual 'mask update'.
+    refresh_args = argparse.Namespace(command='update', home=str(home), json=getattr(args, 'json', False), event='refresh')
     refresh = mask.result('update')
     try:
         mask.dispatch(refresh_args, refresh, leaves)
     except c.MaskError as error:
+        if error.code == 'confirmation.required' and (refresh['data'].get('confirmation') or {}).get('kind') == 'program.migration':
+            refresh['data']['error'] = error.as_dict()
+            output['warnings'].append(dict(code='update.review_required', message="A newer MASK changes its contracts and was not applied; run 'mask update' to review it."))
+            args.catalog_refreshed = not any(row.get('ok') is False for row in refresh['data'].get('fetches', {}).values())
+            output['data']['refresh'] = refresh['data']
+            return
         if not any(row.get('ok') is False for row in refresh['data'].get('fetches', {}).values()):
             raise
         # An unrelated unavailable tap must not block the selected checkout. The

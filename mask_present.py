@@ -36,10 +36,30 @@ def clean(value):
     return text
 
 
+# A renderer marks one trusted word for color as SO tone GS word SI. clean() turns those control characters in any
+# value into '?', so only renderer code can produce a mark; paint() colors marks on a terminal and strips them elsewhere.
+MARK = re.compile('\x0e([a-z]+)\x1d([^\x0e\x0f]*)\x0f')
+INLINE = {'ok': '32', 'warn': '33', 'dim': '2'}
+
+
+def mark(text, tone):
+    return f'\x0e{tone}\x1d{text}\x0f'
+
+
+def scrub(line):
+    """Replace stray control characters in a rendered line; a well-formed mark survives with its word scrubbed too."""
+    parts, last = [], 0
+    for match in MARK.finditer(line):
+        parts += [CONTROL.sub('?', line[last:match.start()]), mark(CONTROL.sub('?', match.group(2)), match.group(1))]
+        last = match.end()
+    return ''.join(parts) + CONTROL.sub('?', line[last:])
+
+
 def paint(text, stream, *, tone='success'):
     """Decorate trusted structure after values are sanitized; pipes stay byte-for-byte plain."""
     if not stream.isatty() or 'NO_COLOR' in os.environ or os.environ.get('TERM') == 'dumb':
-        return text
+        return MARK.sub(lambda match: match.group(2), text)
+    text = MARK.sub(lambda match: f'\x1b[{INLINE.get(match.group(1), "1")}m{match.group(2)}\x1b[0m', text)
     lines = text.splitlines(keepends=True)
     if not lines:
         return text
@@ -694,6 +714,101 @@ def render_upgrade(data, output):
     return lines + ([''] + notes if notes else []) + plan_guard(data, output)
 
 
+CHANGE_TONE = {'comment': 'ok', 'additive': 'ok', 'breaking': 'warn'}
+
+
+def schema_rows(migration, indent='    ', width=80):
+    """One aligned row per changed schema: file, class word (colored on a terminal), and a summary cut to the width."""
+    rows = migration.get('schemas') or []
+    name_width = max((len(clean(row.get('file'))) for row in rows), default=0)
+    lines = []
+    for row in rows:
+        change = clean(row.get('change'))
+        room = max(width - len(indent) - name_width - 3 - 8 - 3, 12)
+        summary = clean(row.get('summary'))
+        summary = summary if len(summary) <= room else summary[:room - 3].rstrip() + '...'
+        lines.append(f"{indent}{clean(row.get('file')):<{name_width}}   {mark(f'{change:<8}', CHANGE_TONE.get(change, 'warn'))}   {summary}")
+    return lines
+
+
+def commit_span(migration):
+    commits = migration.get('commits')
+    span = f"{short(migration.get('before'))} -> {short(migration.get('candidate'))}"
+    return span + (f" ({plural(commits, 'commit')})" if isinstance(commits, int) else '')
+
+
+def protocol_text(migration):
+    protocol = migration.get('protocol') or {}
+    if protocol.get('before') == protocol.get('after'):
+        return f"v{clean(protocol.get('before'))}, unchanged"
+    return mark(f"v{clean(protocol.get('before'))} -> v{clean(protocol.get('after'))}, a new protocol", 'warn')
+
+
+def shell_path(path):
+    text = clean(path)
+    if text.startswith('~/'):
+        return '~/' + shlex.quote(text[2:])
+    return shlex.quote(text)
+
+
+def tap_outcome(data):
+    rows = (data.get('fetches') or {}).items()
+    if not rows:
+        return []
+    failed = [f"tap {clean(name)} could not be fetched ({clean((row.get('error') or {}).get('code'))})" for name, row in rows if row.get('ok') is False]
+    return [line[0].upper() + line[1:] + '.' for line in failed] or ['Taps were fetched.']
+
+
+def migration_review(proposal, output):
+    """The question a human answers before MASK moves to a program whose contracts changed."""
+    migration = proposal.get('migration') or {}
+    schemas = migration.get('schemas') or []
+    root = (proposal.get('scope') or ['-'])[0]
+    lines = [f"MASK {commit_span(migration)}", '',
+             '  This update changes the files MASK uses to describe your setup.', '',
+             f"  Protocol   {protocol_text(migration)}",
+             f"  Schemas    {plural(len(schemas), 'changed file') if schemas else 'unchanged'}"]
+    lines.extend(schema_rows(migration))
+    lines.append('')
+    lines.append('  ' + (mark('Some existing files may no longer validate with this version.', 'warn') if migration.get('breaking')
+                         else 'Your existing projects and taps stay valid with this version.'))
+    lines.append(f"  What's new: git -C {shell_path(root)} log --oneline {short(migration.get('before'))}..{short(migration.get('candidate'))}")
+    taps = tap_outcome(output.get('data') or {})
+    if taps:
+        lines.extend([''] + ['  ' + line for line in taps])
+    return '\n'.join(lines) + '\n\n'
+
+
+def migration_error(output):
+    """update refused or declined a program contract migration: what changes, what happened, and the two ways forward."""
+    error, data = output['error'], output.get('data') or {}
+    migration = (data.get('program') or {}).get('program_migration') or (data.get('confirmation') or {}).get('migration') or {}
+    schemas = migration.get('schemas') or []
+    if error['code'] == 'confirmation.declined':
+        lines = ['error: You declined, so MASK was not updated.', f"  code: {clean(error['code'])}"]
+        lines.extend(fetch_lines(data))
+        lines.append("  next: Run 'mask update' again when you want this version.")
+        return '\n'.join(lines + warnings(output)) + '\n'
+    what = plural(len(schemas), 'schema') if schemas else 'its protocol'
+    lines = [f"error: MASK update needs your approval: it changes {what}.", f"  code: {clean(error['code'])}",
+             f"  from: {commit_span(migration)}"]
+    protocol = migration.get('protocol') or {}
+    if protocol.get('before') != protocol.get('after'):
+        lines.append(f"  protocol: {protocol_text(migration)}")
+    if schemas:
+        lines.append('  schemas:')
+        lines.extend(schema_rows(migration))
+    if migration.get('breaking'):
+        lines.append('  ' + mark('Some existing files may no longer validate with this version.', 'warn'))
+    taps = [line[0].lower() + line[1:].rstrip('.') for line in tap_outcome(data)]
+    lines.append('  state: MASK was not moved' + (f"; {'; '.join(taps)}" if taps else ''))
+    lines.append("  next: Run 'mask update' in a terminal to review and confirm it, or approve")
+    lines.append("        exactly this change with 'mask update --approve-plan HASH'.")
+    if migration.get('plan_hash'):
+        lines.append(f"  hash: {clean(migration['plan_hash'])}")
+    return '\n'.join(lines + warnings(output)) + '\n'
+
+
 def render_refresh(data, output):
     """update: what became available. The program first, then each tap, then the one next step if there is one."""
     program = data.get('program') or {}
@@ -703,6 +818,16 @@ def render_refresh(data, output):
               'current': f"MASK is up to date ({before})." + (' Dry run: the remote was not contacted.' if output['dry_run'] else ''),
               'held': f"MASK was not updated: {clean(program.get('reason'))}.",
               'failed': f"MASK could not be updated: {clean(program.get('reason'))} ({clean(program.get('code'))})."}.get(program.get('status'), headline(output, 'update'))]
+    migration = program.get('program_migration')
+    if migration and program.get('status') in ('updated', 'behind'):
+        protocol = migration.get('protocol') or {}
+        if protocol.get('before') != protocol.get('after'):
+            lines.append(f"  Protocol   {protocol_text(migration)}")
+        if migration.get('schemas'):
+            lines.append(f"  Schemas    {plural(len(migration['schemas']), 'changed file')}")
+            lines.extend(schema_rows(migration))
+        if program.get('status') == 'behind' and migration.get('requires_consent'):
+            lines.append("  'mask update' will show this change and ask before applying it.")
     taps = fetch_lines(data)
     lines.extend(taps or ["  No taps are approved yet; add one with 'mask tap NAME URL'."])
     if any(row.get('remote_refs_changed') for row in (data.get('fetches') or {}).values()):
@@ -974,7 +1099,7 @@ def render(output):
         # Keep the command's outcome sentence, then the same review shown at the prompt.
         lines = lines[:1] + [''] + task_review(data['review'], output).splitlines()[2:] + plan_guard(data, output)
     lines += warnings(output)
-    return '\n'.join(CONTROL.sub('?', line) for line in lines) + '\n'
+    return '\n'.join(scrub(line) for line in lines) + '\n'
 
 
 PRESERVED = {'not_started': 'no deployment changes were applied', 'not_needed': 'no deployment changes were needed', 'rolled_back': 'the started change was rolled back',
@@ -985,6 +1110,8 @@ def render_confirmation(proposal, output):
     """The proposal a human answers or automation reviews: scope, planned actions, and the authority it does not grant."""
     if proposal.get('kind') == 'task':
         return task_review(proposal, output)
+    if proposal.get('kind') == 'program.migration':
+        return migration_review(proposal, output)
     lines = [f"{output['command'].replace('.', ' ')}: confirmation needed ({clean(proposal.get('reason'))})"]
     if proposal.get('kind') == 'package.setup':
         return '\n'.join(lines + setup_proposal_lines(proposal)) + '\n'
@@ -1112,6 +1239,8 @@ def render_error(output):
     data = output.get('data', {})
     if error['code'] == 'invocation.invalid' and not (data or output.get('changed') or output.get('actions') or output.get('warnings')):
         return render_invocation(error, output['command'])
+    if output.get('command') == 'update' and error['code'] in ('confirmation.required', 'confirmation.declined') and (data.get('program') or {}).get('status') == 'review':
+        return migration_error(output)
     message = error['message']
     if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
         count = sum(not entry.get('complete') for entry in data['workflow_readiness'])
@@ -1271,7 +1400,7 @@ COMMAND_HELP = {
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Use ensure for a fresh clone/worktree or to restore pinned versions without upgrading. Manual ensure and upgrade can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask repair --all --repair            # repair all registered scopes, with backups\nmask repair --all --repair --dry-run  # preview only\nmask repair\nmask repair --project /path/to/project --dry-run\nmask repair --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--approve-plan HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
-    'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update            # update MASK and fetch taps\nmask upgrade --dry-run # see what the fetched taps would change\nmask upgrade           # move every registered project and your personal skills'),
+    'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. A newer MASK that changes its protocol or schemas is shown first and needs a yes in a terminal, or --approve-plan HASH from a script; comment-only schema edits apply without asking. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update                      # update MASK and fetch taps\nmask update --approve-plan HASH  # apply one reviewed contract change\nmask upgrade --dry-run           # see what the fetched taps would change\nmask upgrade                     # move every registered project and your personal skills'),
     'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --approve-plan, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. After applying versions and links, reconcile workflow prerequisites even if versions were already current. Necessary generated roles use the same consented staged setup as ensure. A terminal asks before running package code; automation uses the preview hash and --allow-setup SOURCE/ID:ACTION. --repair explicitly authorizes setup and backs up then replaces conflicting native role files. --yes alone never authorizes setup. Missing inputs or declined/failed setup remain nonzero.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --approve-plan HASH.\nFor unattended setup, include --allow-setup SOURCE/ID:ACTION with the preview hash.\nUse mask upgrade --repair for explicit setup and role replacement with backups.\nUse ensure for a fresh clone/worktree or to restore pinned versions without upgrading.\nUse mask update to update the MASK program.'),
     'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found. When the tap catalog still records an older spelling of a tap identity, doctor says so, and doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask status --project . --check\nmask status --all --check\nmask status --migrate --dry-run\nmask status --migrate'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),

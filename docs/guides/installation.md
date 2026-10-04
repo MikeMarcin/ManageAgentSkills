@@ -46,10 +46,12 @@ policy. Each script is a single function called on its last line, so a download 
 is cut short runs nothing. Both installers are exercised end to end against disposable
 local program repositories by `tests.test_installer` on their native platforms.
 
-`mask update` deliberately refuses a candidate that changes the program protocol or
-persisted schema. That is `source.candidate_invalid`, not a partial update. Re-run the
-installer to review and cross that boundary; it fast-forwards only a clean checkout
-and then refreshes the owned launcher. Compatible updates continue to use `mask update`.
+When a newer MASK changes its protocol or a persisted schema, `mask update` shows
+each changed schema as `comment`, `additive` or `breaking` and asks before it moves.
+A change that only rewords schema comments is applied without asking. Scripts approve
+one exact change with `mask update --approve-plan HASH`; see
+[program updates](sources-and-updates.md#program-update). Re-running the installer
+also fast-forwards a clean checkout and refreshes the owned launcher.
 
 ### By hand
 

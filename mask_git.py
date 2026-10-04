@@ -102,8 +102,10 @@ def tree(root, revision, path='', recursive=False, *, max_output=16 * 1024 * 102
 
 def validate_git_intent(entry, program_root):
     """Only ``update`` advances a checkout through a journal, and only this program's own root."""
-    c.fields(entry, ('scope', 'root', 'before', 'candidate'), family='recovery')
+    c.fields(entry, ('scope', 'root', 'before', 'candidate'), ('consent',), family='recovery')
     if entry['scope'] != 'program' or entry['root'] != str(program_root) or any(not isinstance(entry[key], str) or not re.fullmatch('[0-9a-f]{40,64}', entry[key]) for key in ('before', 'candidate')):
+        c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
+    if 'consent' in entry and (not isinstance(entry['consent'], str) or not re.fullmatch('sha256:[0-9a-f]{64}', entry['consent'])):
         c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
 
 
@@ -137,8 +139,10 @@ def recover_git(pending, home, output, mode):
             output.update(changed=True, transaction='partial')
             c.fail('recovery.conflict', 'The source advanced; rollback never resets Git. Complete recovery against the new revision.', 8)
         return
-    from mask_install import validate_program
-    validate_program(root, entry['candidate'])
+    from mask_install import program_migration
+    migration = program_migration(root, entry['before'], entry['candidate'])
+    if migration['requires_consent'] and entry.get('consent') != migration['plan_hash']:
+        c.fail('plan.stale', 'The interrupted update no longer matches the change that was approved; recovery stopped without moving the checkout further.', 4)
     if observed['revision'] == entry['before'] and entry['candidate'] != entry['before']:
         if c.git(root, 'merge-base', '--is-ancestor', entry['before'], entry['candidate'], optional=True) is None:
             c.fail('recovery.conflict', 'Recorded candidate is no longer a fast-forward.', 8)
