@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0138"
 title: "Make upgrade review, progress and outcomes readable"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P1"
 metadata: {"milestone_plan":{"id":"compact-upgrade-output","path":"docs/rfcs/plans/compact-upgrade-output/milestone-plan.json"}}
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"f0cf20fbdeac364ea4a4becfba897e5d81efd4ad","evidence":{"kind":"artifact","path":"docs/rfcs/plans/compact-upgrade-output/verification.md","detail":"Compact default review and public details/decline/approval checks preserve significant exceptions and full frozen disclosures."}},{"criterion":"AC2","outcome":"pass","revision":"f0cf20fbdeac364ea4a4becfba897e5d81efd4ad","evidence":{"kind":"artifact","path":"docs/rfcs/plans/compact-upgrade-output/verification.md","detail":"Single-line terminal progress clears before prompts/results; live public heartbeat, JSON and NO_COLOR checks pass."}},{"criterion":"AC3","outcome":"pass","revision":"f0cf20fbdeac364ea4a4becfba897e5d81efd4ad","evidence":{"kind":"artifact","path":"docs/rfcs/plans/compact-upgrade-output/verification.md","detail":"Public partial setup preserves first-consumer roles and second-consumer links, names the stale location and summarizes commits truthfully."}},{"criterion":"AC4","outcome":"pass","revision":"f0cf20fbdeac364ea4a4becfba897e5d81efd4ad","evidence":{"kind":"artifact","path":"docs/rfcs/plans/compact-upgrade-output/verification.md","detail":"Focused runs pass: 66 lifecycle/commit/consent, 45 integration, 17 final affected checks; docs and whitespace pass; selected live controls unchanged."}}]
 ---
 
 # Make upgrade review, progress and outcomes readable
