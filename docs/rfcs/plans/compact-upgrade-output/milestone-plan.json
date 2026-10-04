@@ -1,0 +1,15 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "compact-upgrade-output",
+  "scope": {"rfcs": [], "issues": ["MASK-0138"]},
+  "milestones": [{
+    "id": "readable-upgrade",
+    "outcome": "An upgrade has a concise review, one live progress line and a truthful, actionable outcome.",
+    "work": [{"issue": "MASK-0138"}],
+    "depends_on": [],
+    "exit_criteria": ["AC1 through AC4 pass against focused public CLI and presentation evidence."],
+    "boundary": "Direct implementation; preserve live consumers and machine protocol; no publication."
+  }],
+  "coverage": "complete",
+  "unplanned_work": []
+}
