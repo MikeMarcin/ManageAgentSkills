@@ -24,6 +24,38 @@ class SubprocessTests(Fixture):
         self.assertEqual(error.exception.code, 'git.containment_unavailable')
         self.assertFalse(marker.exists())
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows suspended Job Object prerequisite path')
+    def test_windows_spawn_resumes_its_recorded_thread_without_a_system_snapshot(self):
+        # MASK-0134: a snapshot of every thread on the machine cost about 68 ms per Git process.
+        from mask_process import WindowsJob
+        with patch.object(WindowsJob, 'sole_thread', side_effect=OSError('fixture: no snapshot expected')) as walk:
+            self.assertEqual(c.git(self.source, 'rev-parse', '--is-inside-work-tree'), 'true')
+        walk.assert_not_called()
+        real = WindowsJob.sole_thread
+        with patch('mask_process.recorded_spawn', lambda start: (start(), None)), \
+                patch.object(WindowsJob, 'sole_thread', autospec=True, side_effect=real) as walk:
+            self.assertEqual(c.git(self.source, 'rev-parse', '--is-inside-work-tree'), 'true')
+        walk.assert_called_once()
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows suspended Job Object prerequisite path')
+    def test_windows_thread_of_another_process_is_never_resumed(self):
+        import threading
+        marker = self.base / 'uncontained'
+        real = subprocess.Popen
+        def fake(command, **kwargs):
+            return real([sys.executable, '-c', 'from pathlib import Path;Path(' + repr(str(marker)) + ').touch()'], **kwargs)
+        with patch.object(c.subprocess, 'Popen', fake), \
+                patch('mask_process.recorded_spawn', lambda start: (start(), threading.get_native_id())):
+            with self.assertRaises(c.MaskError) as error:
+                c.git(self.source, 'status')
+        self.assertEqual(error.exception.code, 'git.containment_unavailable')
+        self.assertFalse(marker.exists())
+
+    def test_input_reaches_the_child_and_stdin_closes(self):
+        data = b'stdin bytes\n' * 20000  # Larger than a pipe buffer, so writing must not wait for the child to finish.
+        expected = subprocess.run(['git', 'hash-object', '--stdin'], input=data, capture_output=True, check=True).stdout.decode().strip()
+        self.assertEqual(c.git(self.source, 'hash-object', '--stdin', input=data), expected)
+
     def test_pipe_read_failure_never_returns_a_partial_observation(self):
         real = subprocess.Popen
         class BrokenPipe:

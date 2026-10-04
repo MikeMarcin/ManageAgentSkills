@@ -132,9 +132,51 @@ class ImportSafetyTests(Fixture):
         with patch.object(packages, 'PACKAGE_BYTES', size + 15), patch.object(c, 'git', wraps=c.git) as calls:
             with self.assertRaises(c.MaskError):
                 self.validate(self.git(self.source, 'rev-parse', 'HEAD'))
-            self.assertFalse(any(call.args[1:3] == ('cat-file', 'blob') for call in calls.call_args_list))
+            self.assertFalse(any(call.args[1:3] in (('cat-file', 'blob'), ('cat-file', '--batch')) for call in calls.call_args_list))
         self.assertEqual((packages.FILE_BYTES, packages.PACKAGE_BYTES, packages.FILE_COUNT, packages.DEPTH),
                          (64 * 1024 * 1024, 256 * 1024 * 1024, 10000, 32))
+
+    def test_validation_spawns_the_same_git_processes_for_many_files_as_for_one(self):
+        # MASK-0134: two processes per file made a 167-file package cost 334 spawns, about 100 ms each on Windows.
+        def spawns(commit):
+            c.FROZEN.clear()
+            with patch.object(c, 'contained_run', wraps=c.contained_run) as calls:
+                payload = self.validate(commit)
+            return payload, calls.call_count
+        _, few = spawns(self.frozen({'one.txt': b'1\n'}))
+        files = {f'many/{index:03}.txt': f'file {index}\n'.encode() for index in range(120)}
+        files.update({'twin/a.txt': b'same bytes\n', 'twin/b.txt': b'same bytes\n', 'empty': b''})
+        payload, many = spawns(self.frozen(files))
+        self.assertEqual(many, few)
+        read = {item.path: item.data for item in payload.files}
+        for name, data in files.items():
+            self.assertEqual(read[name], data)
+        with patch.object(c, 'contained_run', wraps=c.contained_run) as calls:
+            self.assertEqual(self.validate(payload.commit).digest, payload.digest)
+        self.assertEqual(calls.call_count, 0, 'a second validation in one invocation asks Git nothing')
+
+    def test_batched_blob_answers_share_the_frozen_cache_and_refuse_malformed_output(self):
+        commit = self.frozen({'data.txt': b'payload\n'})
+        blob = self.git(self.source, 'rev-parse', commit + ':skills/alpha/data.txt')
+        tree = self.git(self.source, 'rev-parse', commit + '^{tree}')
+        absent = '0' * len(blob)
+        c.FROZEN.clear()
+        self.assertEqual(c.frozen_blobs(self.source, [blob, tree, absent], contents=False), {blob: '8', tree: None, absent: None})
+        self.assertEqual(c.frozen_blobs(self.source, [blob, blob], contents=True), {blob: b'payload\n'})
+        with patch.object(c, 'contained_run', side_effect=AssertionError('cached answers spawn nothing')):
+            self.assertEqual(c.git_frozen(self.source, 'cat-file', '-s', blob), '8')
+            self.assertEqual(c.git_frozen(self.source, 'cat-file', 'blob', blob, binary=True), b'payload\n')
+        self.assertNotIn((str(self.source), ('cat-file', '-s', tree), False), c.FROZEN)
+        with self.assertRaises(c.MaskError) as error:
+            c.frozen_blobs(self.source, ['HEAD'], contents=False)
+        self.assertEqual(error.exception.code, 'internal.invariant')
+        c.FROZEN.clear()
+        header = blob.encode() + b' blob '
+        for answer in (b'', header + b'9\npayload\n\n', header + b'8\npayload\n\nextra', absent.encode() + b' blob 8\npayload\n\n'):
+            with self.subTest(answer=answer), patch.object(c, 'git', return_value=answer):
+                with self.assertRaises(c.MaskError) as error:
+                    c.frozen_blobs(self.source, [blob], contents=True)
+                self.assertEqual(error.exception.code, 'git.failed')
 
     def test_portable_components_case_unicode_depth_and_activation(self):
         for path in ('../escape', '/absolute', 'a/../b', 'a\\b', 'a:b', 'nul.txt', 'x/COM1.log',

@@ -227,6 +227,7 @@ def dispatch(args, output, home):
                 fetches[name], error = fetch_tap(home, name, config['sources'][name], config['git_timeout_seconds'], selectors.get(name, ()), lender)
                 if error is not None:
                     failures[name] = error
+    progress.phase('Resolving selected skills')  # The fetch is over; this work must not run under its label.
     import mask_bundles as bundles
     locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers = {}, {}, {}, [], {}, []
     blocked = [item['row']['root'] for item in consumers if item['row']['status'] == 'blocked']

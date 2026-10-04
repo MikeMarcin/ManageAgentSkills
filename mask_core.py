@@ -284,12 +284,13 @@ HOOK_EVENTS = ('applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commi
                'p4-pre-submit', 'post-index-change')
 
 
-def contained_run(command, environment, *, timeout, max_output, max_error=65536, monitor=None, family='git', name='Git', cwd=None):
+def contained_run(command, environment, *, timeout, max_output, max_error=65536, monitor=None, family='git', name='Git', cwd=None, input=None):
     """Run one owned process tree (POSIX process group or Windows Job) with bounded wall time and output.
 
     Returns ``(returncode, stdout, stderr)``. Timeout, output overflow, read failure or
     interruption terminates the whole tree before raising; an unconfirmed termination is
-    ``recovery.required``. Error codes are ``<family>.timeout`` and so on.
+    ``recovery.required``. Error codes are ``<family>.timeout`` and so on. ``input`` bytes,
+    when given, are written to the child's stdin, which is then closed.
     """
     options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
     job = None
@@ -300,15 +301,22 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
         except OSError:
             fail(family + '.containment_unavailable', f'Windows Job Object containment is unavailable; {name} was not started.', 4)
         options['creationflags'] |= CREATE_SUSPENDED
+    stdin = subprocess.DEVNULL if input is None else subprocess.PIPE
+    def start():
+        return subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, cwd=cwd, **options)
     try:
-        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, cwd=cwd, **options)
+        if job is None:
+            process, thread_id = start(), None
+        else:
+            from mask_process import recorded_spawn
+            process, thread_id = recorded_spawn(start)
     except BaseException:
         if job is not None:
             job.close()
         raise
     if job is not None:
         try:
-            job.start(process.pid)
+            job.start(process.pid, thread_id)
         except (OSError, KeyboardInterrupt) as error:
             try:
                 job.close()
@@ -318,8 +326,9 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
             except (OSError, subprocess.TimeoutExpired):
                 fail('recovery.required', f'{name} containment setup failed and process termination could not be confirmed.', 8, indeterminate=True)
             finally:
-                process.stdout.close()
-                process.stderr.close()
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    if stream is not None:
+                        stream.close()
             if isinstance(error, KeyboardInterrupt):
                 raise
             fail(family + '.containment_unavailable', f'{name} could not join and resume in its Windows Job Object; the suspended process was terminated.', 4)
@@ -354,6 +363,18 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
                                               (process.stderr, buffers[1], max_error))]
     for reader in readers:
         reader.start()
+    if input is not None:
+        def feed():
+            try:
+                process.stdin.write(input)
+            except OSError:
+                pass  # The child stopped reading; its exit status and output say why.
+            finally:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+        threading.Thread(target=feed, daemon=True).start()
     try:
         deadline = time.monotonic() + timeout
         while True:
@@ -449,6 +470,45 @@ def git_frozen(root, *args, optional=False, binary=False, max_output=16 * 1024 *
     return answer
 
 
+def frozen_blobs(root, oids, *, contents, max_output=16 * 1024 * 1024):
+    """Many blob questions in one process: ``cat-file -s`` through ``--batch-check``, ``cat-file blob`` through ``--batch``.
+
+    A process per question is what Windows makes slow: one 167-file package took 334. Returns ``{oid: answer}``
+    in ``git_frozen``'s form and cache (size text, or bytes); a missing or non-blob object answers None and is not
+    kept. ``max_output`` bounds the whole batch.
+    """
+    if any(not isinstance(oid, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', oid) for oid in oids):
+        fail('internal.invariant', 'Batched object questions take full object ids only.', 10)
+    keys = {oid: (str(root), ('cat-file', 'blob' if contents else '-s', oid), contents) for oid in oids}
+    asked = [oid for oid in dict.fromkeys(oids) if keys[oid] not in FROZEN]
+    answers = {}
+    if asked:
+        raw = git(root, 'cat-file', '--batch' if contents else '--batch-check', binary=True, max_output=max_output,
+                  input=''.join(oid + '\n' for oid in asked).encode('ascii'))
+        position = 0
+        for oid in asked:
+            end = raw.find(b'\n', position)
+            header = raw[position:end].decode('ascii', errors='replace').split(' ') if end >= 0 else []
+            position = end + 1
+            if header == [oid, 'missing']:
+                answers[oid] = None
+                continue
+            if len(header) != 3 or header[0] != oid or not header[2].isdecimal():
+                fail('git.failed', 'Git returned a malformed object batch.', 5, operation='cat-file')
+            answer = header[2]
+            if contents:
+                size = int(header[2])
+                answer = raw[position:position + size]
+                if len(answer) != size or raw[position + size:position + size + 1] != b'\n':
+                    fail('git.failed', 'Git returned a malformed object batch.', 5, operation='cat-file')
+                position += size + 1
+            answers[oid] = answer if header[1] == 'blob' else None
+        if position != len(raw):
+            fail('git.failed', 'Git returned a malformed object batch.', 5, operation='cat-file')
+        FROZEN.update((keys[oid], answer) for oid, answer in answers.items() if answer is not None)  # Only a wholly parsed batch is kept.
+    return {oid: answers[oid] if oid in answers else FROZEN[keys[oid]] for oid in oids}
+
+
 def peeled_commit(root, revision):
     """The commit ``revision`` peels to, or None. A full object id is a frozen question; anything else is observed afresh."""
     ask = git_frozen if re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', revision) else git
@@ -456,7 +516,7 @@ def peeled_commit(root, revision):
 
 
 def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, inspect_hooks=False,
-        max_output=16 * 1024 * 1024, monitor=None, index=None, commit_hooks=False):
+        max_output=16 * 1024 * 1024, monitor=None, index=None, commit_hooks=False, input=None):
     selectors = {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
                  'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
                  'GIT_CEILING_DIRECTORIES', 'GIT_DISCOVERY_ACROSS_FILESYSTEM'}
@@ -481,7 +541,7 @@ def git(root, *args, timeout=30, optional=False, binary=False, mutating=False, i
         for event in HOOK_EVENTS:
             hook_options.extend(('-c', f'hook.{event}.enabled=false'))
     command = ['git', *hook_options, '-c', 'core.fsmonitor=false', '-C', str(root), *args]
-    returncode, stdout, stderr = contained_run(command, environment, timeout=timeout, max_output=max_output, monitor=monitor)
+    returncode, stdout, stderr = contained_run(command, environment, timeout=timeout, max_output=max_output, monitor=monitor, input=input)
     if returncode and not optional:
         lower = stderr.lower()
         auth = any(token in lower for token in (b'authentication failed', b'could not read username', b'permission denied (publickey)'))

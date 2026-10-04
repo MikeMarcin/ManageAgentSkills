@@ -155,21 +155,28 @@ def validate(root, commit, path, identifier):
         c.fail('skill.limit', 'Package exceeds its file count limit.', 4)
     check_paths([row[3] for row in rows], [row[3] for row in rows if row[1] != 'tree'])
     rows = [row for row in rows if row[:2] != ('040000', 'tree')]
-    sizes, total = [], 0
     for mode, kind, oid, name in rows:
         if mode not in ('100644', '100755') or kind != 'blob':
             c.fail('skill.entry_unsupported', 'Packages require regular blobs; links and submodules are unsupported.', 4)
-        size = c.git_frozen(root, 'cat-file', '-s', oid, max_output=32)
+    # Two batches, not two processes per file; every limit is checked before any content is read.
+    answers = c.frozen_blobs(root, [row[2] for row in rows], contents=False, max_output=len(rows) * 160)
+    sizes, total = [], 0
+    for mode, kind, oid, name in rows:
+        size = answers[oid]
+        if size is None:
+            c.fail('skill.object_invalid', 'Package names a blob the cache does not hold.', 4)
         if not size.isdecimal() or int(size) > FILE_BYTES:
             c.fail('skill.limit', 'Package exceeds its per-file byte limit.', 4)
         total += int(size)
         if total > PACKAGE_BYTES:
             c.fail('skill.limit', 'Package exceeds its cumulative byte limit.', 4)
         sizes.append(int(size))
+    blobs = c.frozen_blobs(root, [row[2] for row in rows], contents=True,
+                           max_output=sum(len(row[2]) + 7 + len(str(size)) + size + 1 for row, size in zip(rows, sizes)))
     files = []
     for (mode, kind, oid, name), size in zip(rows, sizes):
-        data = c.git_frozen(root, 'cat-file', 'blob', oid, binary=True, max_output=size)
-        if len(data) != size:
+        data = blobs[oid]
+        if data is None or len(data) != size:
             c.fail('skill.object_invalid', 'Frozen blob size changed during validation.', 4)
         files.append(PayloadFile(name, mode, data))
     return validate_files(files, identifier, commit=commit, path=path)
