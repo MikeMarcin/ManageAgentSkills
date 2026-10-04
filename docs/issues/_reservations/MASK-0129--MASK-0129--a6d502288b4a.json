@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0129"
+  ],
+  "reserve_for": "program-migration-consent",
+  "purpose": "",
+  "created": "2026-10-04T00:16:32.053739+00:00",
+  "base": "40080e0f739cee53390e93428e9d17daa5a983aa"
+}
