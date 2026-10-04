@@ -221,7 +221,7 @@ Before moving, `update` compares the candidate's `PROTOCOL_VERSION` and `schemas
 | `additive` | New optional properties or definitions; every existing file stays valid. |
 | `breaking` | A property removed, a new requirement, a narrowed type, enum or bound, or anything not provably additive. |
 
-A protocol change is always breaking. A candidate whose only changes are `comment` updates without asking and lists them in its output. Any other change is a `program.migration` consent, reported under `data.program.program_migration` with its rows and `plan_hash`:
+A protocol change is always breaking. `result.schema.json` describes command output (`audience: output`), so a breaking change there warns that `--json` output changes shape rather than that saved files may stop validating. A candidate whose only changes are `comment` updates without asking and lists them in its output. Any other change is a `program.migration` consent, reported under `data.program.program_migration` with its rows and `plan_hash`:
 
 - In a terminal, `mask update` shows the change and asks one default-no question. Yes applies it in the same invocation.
 - With `--json`, redirected streams, or the background refresh inside `install` and `upgrade`, it never asks. It refuses `confirmation.required` (the background refresh only warns `update.review_required` and continues), and the human text gives the hash.

@@ -220,6 +220,23 @@ class LauncherTests(Fixture):
         self.git(author, 'add', 'mask.py'); self.git(author, 'commit', '-m', 'unreadable'); self.git(author, 'push', 'origin', 'main')
         self.assertEqual(self.program(program, 'update', code=4)['error']['code'], 'source.candidate_invalid')
 
+    def test_output_only_breaking_change_names_the_field_and_spares_files(self):
+        program, author = self.program_checkout()
+        self.publish_schema(author, lambda schema: schema['properties']['data'].pop('properties', None), name='result.schema.json')
+        self.program(program, 'update', '--approve-plan', self.program(program, 'update', code=4)['data']['program']['program_migration']['plan_hash'])
+        self.publish_schema(author, lambda schema: schema['properties']['data'].update(properties={'commits': {'type': 'array'}}), name='result.schema.json')
+        row, = self.program(program, 'update', code=4)['data']['program']['program_migration']['schemas']
+        self.assertEqual((row['file'], row['change'], row['summary'], row['audience']), ('result.schema.json', 'breaking', 'now constrains data.commits', 'output'))
+        code, _, stderr = self.program_text(program, 'update')
+        self.assertEqual(code, 4)
+        self.assertIn("Only MASK's --json output changes shape; your files are unaffected.", stderr)
+        self.assertNotIn('Some existing files may no longer validate', stderr)
+        self.assert_readable(stderr)
+        self.publish_schema(author, lambda schema: schema['properties'].pop('forge_hosts'))
+        refused = self.program(program, 'update', code=4)
+        self.assertEqual([row['audience'] for row in refused['data']['program']['program_migration']['schemas']], ['files', 'output'])
+        self.assertIn('Some existing files may no longer validate with this version.', self.program_text(program, 'update')[2])
+
     @unittest.skipUnless(os.name == 'posix', 'POSIX pseudoterminal prompt; native Windows console journeys are recorded separately')
     def test_terminal_update_asks_once_and_applies_or_declines(self):
         program, author = self.program_checkout()

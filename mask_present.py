@@ -778,6 +778,15 @@ def tap_outcome(data):
     return [line[0].upper() + line[1:] + '.' for line in failed] or ['Taps were fetched.']
 
 
+def breaking_sentence(migration):
+    """Warn about saved files only when a persisted schema or the protocol breaks; an output-only change says so."""
+    rows = [row for row in migration.get('schemas') or [] if row.get('change') == 'breaking']
+    protocol = migration.get('protocol') or {}
+    if protocol.get('before') == protocol.get('after') and rows and all(row.get('audience') == 'output' for row in rows):
+        return "Only MASK's --json output changes shape; your files are unaffected."
+    return 'Some existing files may no longer validate with this version.'
+
+
 def migration_review(proposal, output):
     """The question a human answers before MASK moves to a program whose contracts changed."""
     migration = proposal.get('migration') or {}
@@ -789,7 +798,7 @@ def migration_review(proposal, output):
              f"  Schemas    {plural(len(schemas), 'changed file') if schemas else 'unchanged'}"]
     lines.extend(schema_rows(migration))
     lines.append('')
-    lines.append('  ' + (mark('Some existing files may no longer validate with this version.', 'warn') if migration.get('breaking')
+    lines.append('  ' + (mark(breaking_sentence(migration), 'warn') if migration.get('breaking')
                          else 'Your existing projects and taps stay valid with this version.'))
     lines.append(f"  What's new: git -C {shell_path(root)} log --oneline {short(migration.get('before'))}..{short(migration.get('candidate'))}")
     taps = tap_outcome(output.get('data') or {})
@@ -818,7 +827,7 @@ def migration_error(output):
         lines.append('  schemas:')
         lines.extend(schema_rows(migration))
     if migration.get('breaking'):
-        lines.append('  ' + mark('Some existing files may no longer validate with this version.', 'warn'))
+        lines.append('  ' + mark(breaking_sentence(migration), 'warn'))
     taps = [line[0].lower() + line[1:].rstrip('.') for line in tap_outcome(data)]
     lines.append('  state: MASK was not moved' + (f"; {'; '.join(taps)}" if taps else ''))
     lines.append("  next: Run 'mask update' in a terminal to review and confirm it, or approve")

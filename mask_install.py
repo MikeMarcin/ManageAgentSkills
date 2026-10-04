@@ -72,6 +72,8 @@ def restore_launcher(pending, side):
 RUNTIME_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py')
 # Annotation keywords: changing only these never changes what a document must contain.
 ANNOTATIONS = {'$comment', 'description', 'title', 'examples'}
+# Schemas that describe MASK's own command output; no saved file is validated against them.
+OUTPUT_SCHEMAS = {'result.schema.json'}
 # Bounds that an additive change may widen: an upper bound may grow and a lower bound may shrink.
 UPPER = {'maxItems', 'maxLength', 'maxProperties', 'maximum', 'exclusiveMaximum'}
 LOWER = {'minItems', 'minLength', 'minProperties', 'minimum', 'exclusiveMinimum'}
@@ -106,6 +108,17 @@ def strip_annotations(value):
     return value
 
 
+def new_rule(key, value, where):
+    """Name what a constraint keyword added where there was none now governs, in the reader's terms."""
+    names = sorted(value) if isinstance(value, (dict, list)) and all(isinstance(name, str) for name in value) else []
+    subjects = ', '.join(where(name) for name in names[:2]) + (f' and {len(names) - 2} more' if len(names) > 2 else '')
+    if key == 'properties' and names:
+        return f'now constrains {subjects}'
+    if key == 'required' and names:
+        return f'now requires {subjects}'
+    return f'adds a {key} rule to {where()}'
+
+
 def widening(old, new, path, added, narrowed):
     """Walk an annotation-free schema pair; record each added optional property and each narrowing."""
     def where(key=None):
@@ -116,7 +129,7 @@ def widening(old, new, path, added, narrowed):
             if key not in new:
                 narrowed.append(f'removes {where(key)}' if key in ('properties', '$defs', 'definitions') else f'drops {key} at {where()}')
             elif key not in old:
-                narrowed.append(f'adds {key} at {where()}')
+                narrowed.append(new_rule(key, new[key], where))
             elif key in ('properties', '$defs', 'definitions') and isinstance(old[key], dict) and isinstance(new[key], dict):
                 for name in sorted(old[key].keys() | new[key].keys()):
                     if name not in new[key]:
@@ -183,7 +196,8 @@ def program_migration(root, before, candidate):
         if None not in raw and raw[0].replace(b'\r\n', b'\n') == raw[1].replace(b'\r\n', b'\n'):
             continue
         change, summary = schema_change(*raw)
-        schemas.append(dict(file=name, change=change, summary=summary, before_blob=old.get(name), after_blob=new.get(name)))
+        schemas.append(dict(file=name, change=change, summary=summary, audience='output' if name in OUTPUT_SCHEMAS else 'files',
+                            before_blob=old.get(name), after_blob=new.get(name)))
     count = c.git(root, 'rev-list', '--count', f'{before}..{candidate}', optional=True)
     breaking = protocol['before'] != protocol['after'] or any(row['change'] == 'breaking' for row in schemas)
     migration = dict(before=before, candidate=candidate, commits=int(count) if count and count.isdigit() else None, protocol=protocol,
