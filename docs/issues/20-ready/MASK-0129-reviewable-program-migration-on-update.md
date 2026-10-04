@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0129"
 title: "Let mask update show and ask about a program schema change instead of failing opaquely"
-status: "Inbox"
+status: "Ready"
 rfcs: []
 depends_on: []
 priority: "P1"
