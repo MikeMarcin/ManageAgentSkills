@@ -11,7 +11,8 @@ from tests.support import Fixture, ENTRY
 PROGRAM_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_bundles.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py')
 
 # Runs update from a program checkout with one injected fault: a crash at the Git checkpoint after the checkout
-# advanced, a failing fast-forward merge, or a failure of the journal effects after the checkout advanced.
+# advanced, a crash just after update --stash recorded its stash, a failing fast-forward merge, or a failure of
+# the journal effects after the checkout advanced.
 FAULT = """
 import os, sys
 sys.path.insert(0, sys.argv[1])
@@ -19,6 +20,8 @@ import mask, mask_core, mask_fs
 fault = sys.argv[3]
 if fault == 'crash-at-git':
     mask_fs.checkpoint = lambda label: os._exit(99) if label == 'git' else None
+elif fault == 'crash-at-stash':
+    mask_fs.checkpoint = lambda label: os._exit(99) if label == 'stash' else None
 elif fault == 'merge-fails':
     original_git = mask_core.git
     def git(root, *args, **kwargs):
@@ -46,6 +49,7 @@ class LauncherTests(Fixture):
         result = self.call('self', 'install', '--bin-dir', directory, env={'PATH': str(directory) + os.pathsep + os.environ['PATH']})
         self.assertTrue(result['data']['on_path'])
         launcher = result['data']['launcher']
+        self.assertEqual(result['data']['launchers'], [str(directory / name) for name in (('mask.cmd', 'mask') if os.name == 'nt' else ('mask',))])
         self.assertFalse(self.call('self', 'install', '--bin-dir', directory)['changed'])
         args = [launcher, 'self', 'status', '--home', str(self.home), '--json']
         run = subprocess.run(args, capture_output=True, encoding='utf-8', shell=False)
@@ -325,3 +329,256 @@ class LauncherTests(Fixture):
         self.program(program, 'recover', '--complete')
         self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), candidate)
         self.assertFalse((self.home / 'pending.json').exists())
+
+    # MASK-0133: uncommitted work in the program checkout holds update only where the fast-forward would touch it.
+
+    def dirty(self, program, *, modified=(), untracked=(), staged=()):
+        """Uncommitted work in the program checkout: an appended line, a new untracked file, a new staged file."""
+        for name in modified:
+            with (program / name).open('a', encoding='utf-8', newline='\n') as handle:
+                handle.write('\n# local edit\n')
+        for name in untracked + staged:
+            (program / name).parent.mkdir(parents=True, exist_ok=True)
+            (program / name).write_text('local ' + name + '\n', encoding='utf-8', newline='\n')
+        if staged:
+            self.git(program, 'add', '--', *staged)
+
+    def publish_files(self, author, *names, text='published'):
+        """Publish new files beside a compatible program change."""
+        for name in names:
+            (author / name).parent.mkdir(parents=True, exist_ok=True)
+            (author / name).write_text(text + ' ' + name + '\n', encoding='utf-8', newline='\n')
+        self.git(author, 'add', '--', *names)
+        return self.publish_program(author, text)
+
+    def stashes(self, program):
+        return self.git(program, 'stash', 'list', '--format=%H').split()
+
+    def test_dirty_checkout_fast_forwards_when_the_update_touches_none_of_it(self):
+        program, author = self.program_checkout()
+        before = self.git(program, 'rev-parse', 'HEAD')
+        self.dirty(program, modified=('mask_adapters.py',), untracked=('notes/todo.txt',), staged=('staged.txt',))
+        local = sorted(self.git(program, 'status', '--porcelain', '--untracked-files=all').splitlines())
+        candidate = self.publish_program(author)
+        result = self.program(program, 'update')
+        self.assertEqual(result['data']['program']['status'], 'updated')
+        self.assertEqual(result['data']['program']['preserved'], ['mask_adapters.py', 'notes/todo.txt', 'staged.txt'])
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), candidate)
+        self.assertEqual(sorted(self.git(program, 'status', '--porcelain', '--untracked-files=all').splitlines()), local)
+        self.assertEqual(self.git(program, 'diff', '--cached', '--name-only'), 'staged.txt')  # Staging survives too.
+        self.assertTrue((program / 'mask_adapters.py').read_text(encoding='utf-8').endswith('# local edit\n'))
+        self.assertEqual(self.stashes(program), [])
+        self.publish_program(author, 'second')
+        code, stdout, stderr = self.program_text(program, 'update')
+        self.assertEqual(code, 0, stderr)
+        self.assertIn('MASK updated:', stdout)
+        self.assertIn('Kept 3 uncommitted paths in place; the update does not touch them.', stdout)
+        self.assert_readable(stdout)
+        # Interrupted fast-forwards of the same dirty checkout recover in both directions.
+        head = self.git(program, 'rev-parse', 'HEAD')
+        self.publish_program(author, 'third')
+        self.fault(program, 'merge-fails', 8)
+        self.program(program, 'recover', '--rollback')
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), head)
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.fault(program, 'merge-fails', 8)
+        completed = self.program(program, 'recover', '--complete')
+        self.assertEqual(completed['transaction'], 'committed')
+        latest = self.git(author, 'rev-parse', 'HEAD')
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), latest)
+        self.publish_program(author, 'fourth')
+        self.fault(program, 'crash-at-git', 99)
+        self.program(program, 'recover', '--complete')
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), self.git(author, 'rev-parse', 'HEAD'))
+        self.assertEqual(sorted(self.git(program, 'status', '--porcelain', '--untracked-files=all').splitlines()), local)
+        self.assertNotEqual(before, self.git(program, 'rev-parse', 'HEAD'))
+        # Overlapping dirt still blocks completing a recovery, and rollback still clears the journal.
+        self.publish_program(author, 'fifth')
+        self.fault(program, 'merge-fails', 8)
+        self.dirty(program, modified=('mask.py',))
+        refused = self.program(program, 'recover', '--complete', code=4)
+        self.assertEqual((refused['error']['code'], refused['error']['details']['blocking_paths']), ('source.dirty', ['mask.py']))
+        self.program(program, 'recover', '--rollback')
+        self.assertFalse((self.home / 'pending.json').exists())
+
+    def test_overlapping_changes_hold_the_program_and_name_the_way_out(self):
+        program, author = self.program_checkout()
+        self.init()
+        before = self.git(program, 'rev-parse', 'HEAD')
+        names = [f'extra/{letter}.txt' for letter in 'abcdef']
+        self.publish_files(author, *names, text='clash')
+        self.dirty(program, modified=('mask.py', 'mask_adapters.py'), untracked=tuple(names))
+        held = self.program(program, 'update')  # A hold is reported, not a failure.
+        program_row = held['data']['program']
+        self.assertEqual((program_row['status'], program_row['code']), ('held', 'source.dirty'))
+        self.assertEqual(program_row['blocking_paths'], sorted(names + ['mask.py']))
+        self.assertEqual(program_row['preserved'], ['mask_adapters.py'])
+        self.assertTrue(held['data']['fetches']['agentskills']['ok'])
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), before)
+        code, stdout, stderr = self.program_text(program, 'update')
+        self.assertEqual(code, 0, stderr)
+        self.assertIn('MASK was not updated: your uncommitted changes touch files this update changes.', stdout)
+        self.assertIn('In the way: 7 changed paths', stdout)
+        for name in names[:5]:
+            self.assertIn('    ' + name + '\n', stdout)
+        self.assertNotIn(names[5], stdout)
+        self.assertIn('    and 2 more', stdout)
+        self.assertIn('mask update --stash', stdout)
+        self.assertIn('tap agentskills: fetched', stdout)
+        self.assert_readable(stdout)
+        self.assertEqual(self.stashes(program), [])
+
+    def test_file_where_the_update_has_a_directory_blocks(self):
+        program, author = self.program_checkout()
+        self.publish_files(author, 'docs2/guide.txt', text='folder')
+        self.dirty(program, untracked=('docs2',))
+        held = self.program(program, 'update')
+        self.assertEqual(held['data']['program']['blocking_paths'], ['docs2'])
+
+    def test_stash_moves_only_the_blocking_paths_and_never_applies_them(self):
+        program, author = self.program_checkout()
+        before = self.git(program, 'rev-parse', 'HEAD')
+        candidate = self.publish_files(author, 'extra/new.txt', text='with a file')
+        self.dirty(program, modified=('mask.py', 'mask_adapters.py'), untracked=('extra/new.txt', 'notes.txt'))
+        edited = (program / 'mask.py').read_text(encoding='utf-8')
+        self.git(program, 'fetch', 'origin')  # A dry run contacts nothing; it previews the last fetched candidate.
+        preview = self.program(program, 'update', '--dry-run', '--stash')
+        self.assertEqual(preview['data']['program']['status'], 'behind')
+        self.assertEqual(preview['data']['program']['stash']['paths'], ['extra/new.txt', 'mask.py'])
+        self.assertIsNone(preview['data']['program']['stash']['commit'])
+        self.assertEqual((self.git(program, 'rev-parse', 'HEAD'), self.stashes(program)), (before, []))
+        self.assertEqual((program / 'mask.py').read_text(encoding='utf-8'), edited)
+        result = self.program(program, 'update', '--stash')
+        program_row = result['data']['program']
+        stash = program_row['stash']
+        self.assertEqual(program_row['status'], 'updated')
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), candidate)
+        self.assertEqual(self.stashes(program), [stash['commit']])  # Made once, never popped or applied.
+        self.assertRegex(stash['message'], rf'^mask update {before[:7]}\.\.{candidate[:7]} \d{{4}}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
+        self.assertEqual(self.git(program, 'stash', 'list', '--format=%gs'), 'On main: ' + stash['message'])
+        self.assertEqual((stash['paths'], stash['inspect']), (['extra/new.txt', 'mask.py'], f"git stash show -p {stash['commit']}"))
+        self.assertEqual(program_row['preserved'], ['mask_adapters.py', 'notes.txt'])
+        self.assertIn('# local edit', self.git(program, 'show', stash['commit'] + ':mask.py'))
+        self.assertEqual(self.git(program, 'show', stash['commit'] + '^3:extra/new.txt'), 'local extra/new.txt')
+        self.assertEqual((program / 'extra/new.txt').read_text(encoding='utf-8'), 'with a file extra/new.txt\n')
+        self.assertEqual((self.git(program, 'diff', '--name-only'), self.git(program, 'ls-files', '--others')), ('mask_adapters.py', 'notes.txt'))
+        # The human result names the stash and how to look at it.
+        self.publish_program(author, 'again')
+        self.dirty(program, modified=('mask.py',))
+        code, stdout, stderr = self.program_text(program, 'update', '--stash')
+        self.assertEqual(code, 0, stderr)
+        newest = self.stashes(program)[0]
+        self.assertEqual(len(self.stashes(program)), 2)
+        self.assertIn('Stashed 1 path that the update changed:', stdout)
+        self.assertIn(f'stash:   {newest}\n  message: mask update ', stdout)
+        self.assertIn(f'stash show -p {newest}', stdout)
+        self.assertIn('MASK never pops or applies this stash', stdout)
+        # With nothing in the way, --stash does nothing extra.
+        latest = self.publish_program(author, 'clean')
+        plain = self.program(program, 'update', '--stash')
+        self.assertNotIn('stash', plain['data']['program'])
+        self.assertEqual((self.git(program, 'rev-parse', 'HEAD'), len(self.stashes(program))), (latest, 2))
+        code, _, stderr = self.program_text(program, 'upgrade', '--stash')
+        self.assertEqual(code, 2, stderr)
+        self.assertIn('--stash', stderr)
+
+    def test_failure_after_the_stash_keeps_it_journaled_and_recovery_reports_it(self):
+        program, author = self.program_checkout()
+        before = self.git(program, 'rev-parse', 'HEAD')
+        candidate = self.publish_program(author)
+        self.dirty(program, modified=('mask.py',), untracked=('notes.txt',))
+        failed = self.fault(program, 'merge-fails', 8, '--stash')
+        self.assertEqual((failed['error']['code'], failed['transaction']), ('recovery.required', 'partial'))
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), before)
+        recorded = self.pending()['git']['stash']
+        self.assertEqual((self.stashes(program), recorded['paths']), ([recorded['commit']], ['mask.py']))
+        self.assertEqual(failed['data']['stash']['commit'], recorded['commit'])
+        self.assertEqual(self.git(program, 'status', '--porcelain', '--untracked-files=all'), '?? notes.txt')
+        inspected = self.program(program, 'recover')
+        self.assertEqual(inspected['data']['pending']['git']['stash'], recorded)
+        code, stdout, _ = self.program_text(program, 'recover', '--rollback', '--dry-run')
+        self.assertEqual(code, 0)
+        self.assertIn('update --stash was setting aside 1 path:', stdout)
+        self.assertIn(f"stash show -p {recorded['commit']}", stdout)
+        rolled = self.program(program, 'recover', '--rollback')
+        self.assertEqual(rolled['data']['stash']['commit'], recorded['commit'])
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), before)
+        self.assertEqual(self.stashes(program), [recorded['commit']])
+        self.assertFalse((self.home / 'pending.json').exists())
+        # A crash right after the stash is recorded completes forward and still names it.
+        self.dirty(program, modified=('mask.py',))
+        self.fault(program, 'crash-at-stash', 99, '--stash')
+        recorded = self.pending()['git']['stash']
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), before)
+        completed = self.program(program, 'recover', '--complete')
+        self.assertEqual(completed['data']['stash']['commit'], recorded['commit'])
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), candidate)
+        self.assertEqual(len(self.stashes(program)), 2)
+
+    # MASK-0133: Git Bash on Windows runs an extensionless sh launcher beside mask.cmd.
+
+    def test_launcher_style_follows_its_name(self):
+        import mask_install
+        record = dict(program_root=str(ENTRY.parent), interpreter=str(Path(sys.executable).resolve()))
+        batch = mask_install.launcher_text(record, str(self.base / 'mask.cmd'))
+        self.assertTrue(batch.startswith('@echo off\r\nrem MASK owned launcher v1\r\n'))
+        shell = mask_install.launcher_text(record, str(self.base / 'mask'))
+        self.assertTrue(shell.startswith('#!/bin/sh\n# MASK owned launcher v1\nexec '))
+        self.assertNotIn('\r', shell)
+        self.assertIn(ENTRY.as_posix(), shell)
+        if os.name == 'nt':
+            self.assertNotIn('\\', shell)
+        self.assertEqual(mask_install.LAUNCHERS, ('mask.cmd', 'mask') if os.name == 'nt' else ('mask',))
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows writes mask.cmd and a Git Bash launcher side by side')
+    def test_windows_writes_a_git_bash_launcher_beside_mask_cmd(self):
+        directory = self.base / 'bin spaced'
+        directory.mkdir()
+        batch, shell = directory / 'mask.cmd', directory / 'mask'
+        shell.write_text('#!/bin/sh\necho mine\n', encoding='utf-8', newline='\n')
+        first = self.call('self', 'install', '--bin-dir', directory)
+        self.assertEqual((first['data']['launcher'], first['data']['launchers']), (str(batch), [str(batch)]))
+        self.assertEqual([row['path'] for row in first['data']['kept']], [str(shell)])
+        self.assertIn('launcher.collision', [warning['code'] for warning in first['warnings']])
+        self.assertEqual(shell.read_text(encoding='utf-8'), '#!/bin/sh\necho mine\n')
+        shell.unlink()
+        again = self.call('self', 'install', '--bin-dir', directory)  # Rerunning adds the missing sh launcher.
+        self.assertTrue(again['changed'])
+        self.assertEqual([(action['kind'], action['path'], action['status']) for action in again['actions']], [('launcher.install', str(shell), 'applied')])
+        raw = shell.read_bytes()
+        self.assertTrue(raw.startswith(b'#!/bin/sh\n# MASK owned launcher v1\n'))
+        self.assertNotIn(b'\r', raw)
+        self.assertNotIn(b'\\', raw)
+        self.assertIn(ENTRY.as_posix().encode(), raw)
+        launchers = json.loads((self.home / 'state.json').read_text(encoding='utf-8'))['launchers']
+        self.assertEqual(sorted(launchers), sorted([str(batch), str(shell)]))
+        self.assertFalse(self.call('self', 'install', '--bin-dir', directory)['changed'])
+        bash = git_bash()
+        if bash is not None:
+            run = subprocess.run([str(bash), '-c', 'command -v mask >/dev/null && mask self status --home "$1" --json', 'bash', str(self.home)],
+                                 capture_output=True, encoding='utf-8', env=dict(os.environ, PATH=str(directory) + os.pathsep + os.environ['PATH']))
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertEqual(json.loads(run.stdout)['data']['program_root'], str(ENTRY.parent))
+        shell.write_bytes(raw + b'# mine\n')
+        partial = self.call('self', 'uninstall')
+        self.assertEqual((partial['data']['removed'], [row['path'] for row in partial['data']['kept']]), ([str(batch)], [str(shell)]))
+        self.assertTrue(shell.exists())
+        shell.write_bytes(raw)
+        self.assertEqual(self.call('self', 'uninstall')['data']['removed'], [str(shell)])
+        self.assertFalse(shell.exists() or batch.exists())
+        both = self.call('self', 'install', '--bin-dir', directory)
+        self.assertEqual([action['path'] for action in both['actions']], [str(batch), str(shell)])
+        self.assertEqual(sorted(self.call('self', 'uninstall')['data']['removed']), sorted([str(batch), str(shell)]))
+
+
+def git_bash():
+    """Git for Windows' own bash, never the WSL launcher in System32."""
+    found = shutil.which('git')
+    if not found:
+        return None
+    base = Path(found).resolve().parent.parent
+    for root in (base, base.parent):
+        for candidate in (root / 'bin' / 'bash.exe', root / 'usr' / 'bin' / 'bash.exe'):
+            if candidate.is_file():
+                return candidate
+    return None

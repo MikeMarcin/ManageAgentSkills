@@ -37,6 +37,15 @@ Old journal versions remain readable even though old public command spellings ha
 retired. Program self-update preserves protocol/schema compatibility checks; a
 breaking program transition needs an explicitly reviewed checkout update.
 
+An interrupted `mask update` recovers its program checkout without resetting Git.
+Uncommitted changes that the fast-forward does not touch never block recovery.
+`recover --complete` refuses with `source.dirty` and `blocking_paths` only when
+local changes touch files the update changes. `recover --rollback` never moves the
+checkout, so local changes never block it. When the update ran with `--stash`, the
+journal records the stash message and, once Git made it, its commit. `mask recover`
+reports that stash and `git stash show -p <id>` in every mode. Recovery never pops,
+applies or drops it.
+
 ## Reclaim unused storage
 
 ```sh

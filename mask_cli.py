@@ -18,7 +18,7 @@ COMMANDS = {
     'capabilities': (False, False, []),
     'tap': (True, False, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
     'untap': (True, False, [('name', 'pos')]),
-    'update': (True, True, []),
+    'update': (True, True, [('stash', 'flag')]),
     'cleanup': (True, False, []),
     'search': (False, False, [('query', 'optional')]),
     'info': (False, False, [('id', 'pos'), ('content', 'flag')]),

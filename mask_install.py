@@ -15,13 +15,21 @@ import mask_fs as fs
 import mask_git as g
 
 
-def launcher_text(record):
+# The launchers self install writes. Windows has two: mask.cmd for PowerShell and cmd, and an extensionless
+# sh launcher because Git Bash runs a #! file by its bare name but never a .cmd. The first one is required.
+LAUNCHERS = ('mask.cmd', 'mask') if os.name == 'nt' else ('mask',)
+
+
+def launcher_text(record, path):
+    """The launcher at ``path``: a batch file when its name ends in .cmd, otherwise a POSIX sh script."""
     interpreter, entry = record['interpreter'], str(Path(record['program_root']) / 'mask.py')
     if any(char in interpreter + entry for char in '\r\n\x00'):
         c.fail('config.invalid', 'Unsupported launcher path characters.')
-    if os.name == 'nt':
+    if Path(path).suffix.lower() == '.cmd':
         interpreter, entry = interpreter.replace('%', '%%'), entry.replace('%', '%%')
         return f'@echo off\r\nrem MASK owned launcher v1\r\nsetlocal DisableDelayedExpansion\r\n"{interpreter}" "{entry}" %*\r\nexit /b %errorlevel%\r\n'
+    if os.name == 'nt':  # Git Bash reads C:/forward/slash paths; LF endings come from c.atomic_text.
+        interpreter, entry = Path(interpreter).as_posix(), Path(entry).as_posix()
     return f'#!/bin/sh\n# MASK owned launcher v1\nexec {shlex.quote(interpreter)} {shlex.quote(entry)} "$@"\n'
 
 
@@ -32,20 +40,20 @@ def validate_launcher_intent(pending):
     record = after['launchers'].get(key) if pending['operation'] == 'self.install' else before['launchers'].get(key) if key not in after['launchers'] else None
     if pending['operation'] not in ('self.install', 'self.uninstall') or pending['selected'] or pending['links'] or pending['manifests'] or before['projects'] != after['projects'] or not record:
         c.fail('recovery.conflict', 'Invalid launcher transaction scope.', 8)
-    if record['program_root'] != str(Path(__file__).resolve().parent) or Path(key).name != ('mask.cmd' if os.name == 'nt' else 'mask'):
+    if record['program_root'] != str(Path(__file__).resolve().parent) or Path(key).name not in LAUNCHERS:
         c.fail('recovery.conflict', 'Launcher does not belong to this program.', 8)
     for side in (before, after):
         for path, item in side['launchers'].items():
             if path != key and before['launchers'].get(path) != after['launchers'].get(path):
                 c.fail('recovery.conflict', 'Launcher intent changes unrelated ownership.', 8)
         item = side['launchers'].get(key)
-        if item and c.digest(launcher_text(item).encode()) != item['content_digest']:
+        if item and c.digest(launcher_text(item, key).encode()) != item['content_digest']:
             c.fail('recovery.conflict', 'Launcher record does not describe recognized content.', 8)
 
 
 def launcher_values(pending):
     key = pending['launcher']['path']
-    return [launcher_text(pending[side + '_state']['launchers'][key]) if key in pending[side + '_state']['launchers'] else None for side in ('before', 'after')]
+    return [launcher_text(pending[side + '_state']['launchers'][key], key) if key in pending[side + '_state']['launchers'] else None for side in ('before', 'after')]
 
 
 def check_launcher(pending):
@@ -230,7 +238,7 @@ def uninstall(output, home, root, state, config):
     removable, kept = [], []
     for path, record in sorted(state['launchers'].items()):
         actual = c.read_text(Path(path), 'launcher', missing=True)
-        if actual is not None and (actual != launcher_text(record) or c.digest(actual.encode()) != record['content_digest']):
+        if actual is not None and (actual != launcher_text(record, path) or c.digest(actual.encode()) != record['content_digest']):
             kept.append(dict(path=path, reason='edited since MASK wrote it'))
         else:
             removable.append(path)
@@ -256,6 +264,63 @@ def uninstall(output, home, root, state, config):
         output['data']['removed'].append(path)
 
 
+def install(args, output, home, root, state, config):
+    """Write this program's launchers into a bin directory, each through its own launcher journal, as uninstall removes them.
+
+    An unrelated or edited first launcher refuses before anything is written. A later one (the Git Bash ``mask``
+    on Windows) that is somebody else's file is kept and reported, and the others are still written.
+    """
+    directory = Path(args.bin_dir).expanduser().absolute()
+    paths = [directory / name for name in LAUNCHERS]
+    for path in paths:
+        c.parents_safe(Path(path.anchor), path)
+    if c.kind(directory) == 'missing' and c.kind(directory.parent) != 'directory':
+        c.fail('config.invalid', 'Create the parent of the selected bin directory first.')
+    record = dict(program_root=str(root), interpreter=str(Path(sys.executable).resolve()))
+    writes, kept = [], []
+    for path in paths:
+        content = launcher_text(record, path)
+        wanted = dict(record, content_digest=c.digest(content.encode()))
+        actual = c.read_text(path, 'launcher', missing=True)
+        old = state['launchers'].get(str(path))
+        if actual is not None and (old is None or actual != launcher_text(old, path) or c.digest(actual.encode()) != old['content_digest']):
+            if path == paths[0]:
+                c.fail('launcher.collision', 'Existing launcher is unrelated or edited; preserve it.', 4, path=str(path))
+            kept.append(dict(path=str(path), reason='an unrelated or edited file is already there'))
+            continue
+        if actual != content or old != wanted or os.name != 'nt' and not os.access(path, os.X_OK):
+            writes.append((path, wanted))
+    output['data'] = dict(launcher=str(paths[0]), launchers=[str(path) for path in paths if str(path) not in {row['path'] for row in kept}],
+                          kept=kept, interpreter=record['interpreter'], on_path=on_path(paths[0]))
+    for row in kept:
+        output['warnings'].append(dict(code='launcher.collision', message=f"{row['path']} is unrelated or edited; it was kept and not replaced.", path=row['path']))
+    if not writes:
+        return
+    output['actions'] = [dict(kind='launcher.install', path=str(path), status='planned') for path, _ in writes]
+    output['would_change'] = True
+    if output['dry_run']:
+        return
+    for index, (path, wanted) in enumerate(writes):
+        current = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+        after = copy.deepcopy(current)
+        after['launchers'][str(path)] = wanted
+        after['generation'] += 1
+        intent = dict(operation='self.install', selected=[], links=[], manifests=[], before_state=current, after_state=after, config=config)
+        planned = dict(applicable=True, blockers=[], would_change=True, intent=intent)
+        pending = fs.make_pending(planned, home)
+        pending['launcher'] = dict(path=str(path))
+        pending['directories'] = [str(directory)] if c.kind(directory) == 'missing' else []
+        try:
+            fs.execute(planned, home, output, pending=pending)
+        except (Exception, KeyboardInterrupt):
+            for done in output['actions'][:index]:
+                done['status'] = 'applied'
+            for rest in output['actions'][index + 1:]:
+                rest['status'] = 'not_applied'
+            raise
+    output['data']['on_path'] = on_path(paths[0])
+
+
 def dispatch(args, output, home, root):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config_raw = c.read_json(home / 'config.json', default={})
@@ -266,46 +331,30 @@ def dispatch(args, output, home, root):
     intent = dict(operation=args.command, selected=[], links=[], manifests=[], before_state=state, after_state=copy.deepcopy(state), config=config)
     planned = dict(applicable=True, blockers=[], would_change=False, intent=intent)
     if args.command == 'self.install':
-        directory = Path(args.bin_dir).expanduser().absolute()
-        path = directory / ('mask.cmd' if os.name == 'nt' else 'mask')
-        c.parents_safe(Path(path.anchor), path)
-        if c.kind(directory) == 'missing' and c.kind(directory.parent) != 'directory':
-            c.fail('config.invalid', 'Create the parent of the selected bin directory first.')
-        record = dict(program_root=str(root), interpreter=str(Path(sys.executable).resolve()))
-        content = launcher_text(record)
-        record['content_digest'] = c.digest(content.encode())
-        actual = c.read_text(path, 'launcher', missing=True)
-        old = state['launchers'].get(str(path))
-        if actual is not None and (old is None or actual != launcher_text(old) or c.digest(actual.encode()) != old['content_digest']):
-            c.fail('launcher.collision', 'Existing launcher is unrelated or edited; preserve it.', 4, path=str(path))
-        intent['after_state']['launchers'][str(path)] = record
-        planned['would_change'] = actual != content or state != intent['after_state'] or os.name != 'nt' and not os.access(path, os.X_OK)
-        output['data'] = dict(launcher=str(path), interpreter=record['interpreter'], on_path=on_path(path))
-        if not planned['would_change']:
-            return
-        intent['after_state']['generation'] += 1
-        output['actions'] = [dict(kind='launcher.install', path=str(path), status='planned')]
-        output['would_change'] = True
-        if output['dry_run']:
-            return
-        pending = fs.make_pending(planned, home)
-        pending['launcher'] = dict(path=str(path))
-        pending['directories'] = [str(directory)] if c.kind(directory) == 'missing' else []
-        fs.execute(planned, home, output, pending=pending)
-        output['data']['on_path'] = on_path(path)
-        return
+        return install(args, output, home, root, state, config)
     if args.command == 'self.uninstall':
         return uninstall(output, home, root, state, config)
     timeout = (config or {}).get('git_timeout_seconds', 30)
-    observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
+    # Uncommitted work is held only where the fast-forward would touch it (blocking); the rest stays in place.
+    observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
     if not output['dry_run']:
         g.fetch(root, 'origin', 'main', timeout, output)
-        observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
+        observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
     if observed['candidate'] is None or observed['relation'] in ('ahead', 'diverged'):
         c.fail('source.' + (observed['relation'] if observed['candidate'] else 'remote_unknown'), 'Program cannot fast-forward from the known remote.', 4)
     changed = observed['revision'] != observed['candidate']
     output['would_change'] = changed
     output['data'].update(program_before=observed['revision'], program_after=observed['revision'], requires_fetch=output['dry_run'], remote_freshness='last_fetched', next_invocation_required=False)
+    local = g.local_changes(root, timeout) if changed and observed['dirty'] else []
+    blocking = g.blocking_paths(root, observed['candidate'], local, timeout)
+    stashing = bool(blocking) and getattr(args, 'stash', False)
+    if blocking and not stashing:
+        c.fail('source.dirty', 'Local changes touch files this update changes; commit them, or move just them aside with mask update --stash.', 4,
+               blocking_paths=blocking, preserved=[path for path in local if path not in blocking])
+    if local:
+        output['data']['preserved'] = [path for path in local if path not in blocking]
+    if stashing:
+        output['data']['stash'] = dict(root=str(root), paths=blocking, message=None, commit=None, inspect=None)
     migration = program_migration(root, observed['revision'], observed['candidate']) if changed else None
     if migration and (migration['schemas'] or migration['breaking']):
         output['data']['program_migration'] = migration
@@ -316,16 +365,26 @@ def dispatch(args, output, home, root):
         if getattr(args, 'expect_plan_hash', None) not in (None, migration['plan_hash']):
             c.fail('plan.stale', 'The approved hash is not this update; review it again with mask update.', 4, plan_hash=migration['plan_hash'])
         consent.require(args, output, migration_proposal(root, migration))
-    current = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
+    current = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
     if current['revision'] != observed['revision']:
         c.fail('plan.stale', 'Program changed before update.', 4)
+    now = g.local_changes(root, timeout) if current['dirty'] else []
+    if g.blocking_paths(root, observed['candidate'], now, timeout) != blocking:
+        c.fail('plan.stale', 'Local changes in the program checkout moved during update; run it again.', 4)
+    if now:
+        output['data']['preserved'] = [path for path in now if path not in blocking]
     planned['would_change'] = True
     pending = fs.make_pending(planned, home)
     pending['git'] = dict(scope='program', root=str(root), before=observed['revision'], candidate=observed['candidate'])
     if migration['requires_consent']:
         pending['git']['consent'] = migration['plan_hash']  # Recovery completes this approved candidate without asking again.
+    if stashing:  # Journaled before Git runs, so an interruption names the stash it may have made.
+        pending['git']['stash'] = dict(message=g.stash_message(observed['revision'], observed['candidate']), paths=blocking)
     fs.validate_pending(pending, home)
     c.atomic_text(home / 'pending.json', c.text_json(pending), None)
+    if stashing:
+        g.stash(root, pending, home, output, timeout)
+        output['data']['stash'] = g.stash_report(root, pending['git']['stash'], timeout)
     g.advance(root, observed['candidate'], pending, home, output, timeout)
     fs.execute(planned, home, output, pending=pending)
     output['data'].update(program_after=observed['candidate'], next_invocation_required=True)

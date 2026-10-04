@@ -32,7 +32,7 @@ python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
 "$HOME/.local/bin/mask" tap agentskills https://github.com/MikeMarcin/AgentSkills.git
 ```
 
-Keep the clone where it is: the launcher runs MASK from it. More in the [installation guide](docs/guides/installation.md), including private repositories and Windows.
+Keep the clone where it is: the launcher runs MASK from it. On Windows, `self install` writes `mask.cmd` for PowerShell and cmd, and an extensionless `mask` for Git Bash. More in the [installation guide](docs/guides/installation.md), including private repositories and Windows.
 
 </details>
 
@@ -116,6 +116,7 @@ Ordinary `upgrade`, including `--all`, includes installed bundles too. Bundle un
 contribution while preserving other selections and held or locally edited members. See [bundle contributions](docs/guides/declarations.md#named-bundles).
 
 - `update` refreshes MASK and the tap catalogs; `upgrade` changes selected skill versions and makes them ready. Install/upgrade refresh automatically when needed. `--no-update` skips that preliminary refresh; `--offline` forbids network access altogether.
+- Uncommitted edits in the MASK clone stay in place through `update` unless the update changes the same files. Then MASK names those files and holds; `mask update --stash` moves only them into a new `git stash`, updates, and prints the stash's id. MASK never pops or applies that stash.
 - `upgrade --commit` creates one local commit per successful project after readiness, including existing changes to `.mask.json` and `.mask.lock.json`. It preserves unrelated staging and uses normal Git hooks and signing. Under `--all`, personal skills upgrade normally without a commit. `--user --commit` is invalid. Commit failures preserve applied upgrades; no push occurs.
 - `--dry-run` previews without fetching, writing or running setup. `--json` gives scripts structured output and never prompts.
 - Setup scripts and replacement of edited native role files share one review before any consumer changes. Automation approves the exact preview with `--approve-plan HASH`. Replaced files are backed up.

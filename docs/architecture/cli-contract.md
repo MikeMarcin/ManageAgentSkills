@@ -155,8 +155,11 @@ fetched; source approval and artifact ownership validation remain in force. Abse
 contributions are guarded no-ops without registration. The public apply spelling
 was replaced before release; no obsolete alias appears in help or capabilities.
 
-`update` fast-forwards the program when safe and refreshes all tap catalogs; dirty,
-ahead or diverged program checkouts are preserved and reported. Install/upgrade
+`update` fast-forwards the program when safe and refreshes all tap catalogs; ahead,
+diverged or detached program checkouts are preserved and reported. Uncommitted
+changes the fast-forward does not touch stay in place (`program.preserved`);
+overlapping ones hold the program with `program.blocking_paths`, and
+`update --stash` moves only those into a new stash that MASK never applies. Install/upgrade
 perform this refresh when no successful refresh is recorded within 24 hours.
 `--no-update` skips that preliminary refresh; task-specific fetches remain allowed.
 `--offline` forbids all network. Preview and approved-plan application never

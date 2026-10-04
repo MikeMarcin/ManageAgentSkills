@@ -30,6 +30,84 @@ def status(root, remote='origin', branch='main', timeout=30):
                 candidate=candidate, dirty=dirty, relation=relation, remote_freshness='last_fetched', unborn=head is None)
 
 
+def paths(raw):
+    """NUL-separated repository-relative paths from a ``-z`` Git listing."""
+    try:
+        return [item.decode('utf-8') for item in raw.split(b'\0') if item]
+    except UnicodeError:
+        c.fail('source.candidate_invalid', 'Checkout has unsupported path names.', 4)
+
+
+def local_changes(root, timeout=30):
+    """Every modified, staged or untracked path, sorted and repository-relative. Ignored files are not changes."""
+    raw = c.git(root, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames', binary=True, timeout=timeout)
+    return sorted({item[3:] for item in paths(raw)})
+
+
+def parents(path):
+    parts = path.split('/')
+    return {'/'.join(parts[:index]) for index in range(1, len(parts))}
+
+
+def blocking_paths(root, candidate, local, timeout=30):
+    """The local changes a fast-forward from HEAD to ``candidate`` would touch.
+
+    A path blocks when the update changes it, or when one side has a file where the other has a directory.
+    Everything else stays in the working tree through Git's own ``merge --ff-only``.
+    """
+    if not local:
+        return []
+    folded = c.git(root, 'config', '--bool', '--get', 'core.ignorecase', optional=True, timeout=timeout) == 'true'
+    key = str.casefold if folded else str
+    incoming = {key(path) for path in paths(c.git(root, 'diff', '--name-only', '--no-renames', '-z', 'HEAD', candidate, binary=True, timeout=timeout))}
+    folders = set().union(*(parents(path) for path in incoming))
+    return sorted(path for path in local if key(path) in incoming or key(path) in folders or parents(key(path)) & incoming)
+
+
+def stash_message(before, candidate):
+    from datetime import datetime, timezone
+    return f"mask update {before[:7]}..{candidate[:7]} {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+
+
+def find_stash(root, message, timeout=30):
+    """The stash entry whose message is exactly ``message``, for a journal interrupted before it recorded the commit."""
+    listing = c.git(root, 'stash', 'list', '--format=%H%x00%gs', optional=True, timeout=timeout) or ''
+    for line in listing.splitlines():
+        commit, _, subject = line.partition('\0')
+        if subject.split(': ', 1)[-1] == message:
+            return commit
+    return None
+
+
+def stash_report(root, entry, timeout=30):
+    """Where ``update --stash`` put the blocking changes, and the command that shows them. MASK never pops or applies it."""
+    commit = entry.get('commit') or find_stash(root, entry['message'], timeout)
+    return dict(root=str(root), paths=entry['paths'], message=entry['message'], commit=commit,
+                inspect=f'git stash show -p {commit}' if commit else None)
+
+
+def stash(root, pending, home, output, timeout):
+    """Move only the journaled blocking paths into one new stash entry and record its commit in the pending intent."""
+    entry = pending['git']['stash']
+    previous = c.git(root, 'rev-parse', '--verify', '--quiet', 'refs/stash', optional=True, timeout=timeout)
+    try:
+        c.git(root, '--literal-pathspecs', 'stash', 'push', '--include-untracked', '-m', entry['message'], '--', *entry['paths'],
+              timeout=timeout, mutating=True)
+        created = c.git(root, 'rev-parse', '--verify', '--quiet', 'refs/stash', optional=True, timeout=timeout)
+        if created is None or created == previous:
+            c.fail('git.failed', 'Git did not record a stash.', 5)
+        before = copy.deepcopy(pending)
+        entry['commit'] = created
+        c.atomic_text(home / 'pending.json', c.text_json(pending), c.text_json(before))
+        fs.checkpoint('stash')
+        if blocking_paths(root, pending['git']['candidate'], local_changes(root, timeout), timeout):
+            c.fail('git.failed', 'The stash left changes that the update would overwrite.', 5)
+    except (Exception, KeyboardInterrupt):
+        output.update(changed=True, transaction='partial')
+        output['data']['stash'] = stash_report(root, entry, timeout)
+        c.fail('recovery.required', 'The blocking changes may have been stashed; pending intent retained without resetting Git.', 8)
+
+
 def checkout_preconditions(root, remote, branch, expected_name=None, timeout=30, *, clean=True):
     """A checkout on its branch with a known remote; ``expected_name`` is the remote repository basename (``update``)."""
     observed = status(root, remote, branch, timeout)
@@ -102,11 +180,18 @@ def tree(root, revision, path='', recursive=False, *, max_output=16 * 1024 * 102
 
 def validate_git_intent(entry, program_root):
     """Only ``update`` advances a checkout through a journal, and only this program's own root."""
-    c.fields(entry, ('scope', 'root', 'before', 'candidate'), ('consent',), family='recovery')
+    c.fields(entry, ('scope', 'root', 'before', 'candidate'), ('consent', 'stash'), family='recovery')
     if entry['scope'] != 'program' or entry['root'] != str(program_root) or any(not isinstance(entry[key], str) or not re.fullmatch('[0-9a-f]{40,64}', entry[key]) for key in ('before', 'candidate')):
         c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
     if 'consent' in entry and (not isinstance(entry['consent'], str) or not re.fullmatch('sha256:[0-9a-f]{64}', entry['consent'])):
         c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
+    if 'stash' in entry:  # update --stash: the blocking paths it moves aside, and the stash commit once Git made it.
+        c.fields(entry['stash'], ('message', 'paths'), ('commit',), family='recovery')
+        stashed = entry['stash']
+        if (not isinstance(stashed['message'], str) or not stashed['message'].startswith('mask update ') or any(char in stashed['message'] for char in '\r\n\0')
+                or not isinstance(stashed['paths'], list) or not stashed['paths'] or any(not isinstance(path, str) or not path for path in stashed['paths'])
+                or 'commit' in stashed and (not isinstance(stashed['commit'], str) or not re.fullmatch('[0-9a-f]{40,64}', stashed['commit']))):
+            c.fail('recovery.conflict', 'Invalid pending Git transition.', 8)
 
 
 def advance(root, candidate, pending, home, output, timeout):
@@ -131,10 +216,12 @@ def recover_git(pending, home, output, mode):
     entry = pending['git']
     root = Path(entry['root'])
     timeout = (pending['config'] or {}).get('git_timeout_seconds', 30)
-    observed = checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout)
+    observed = checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
     if observed['revision'] not in (entry['before'], entry['candidate']):
         c.fail('recovery.conflict', 'Checkout changed outside the recorded transition.', 8)
-    if mode == 'rollback':
+    if 'stash' in entry:
+        output['data']['stash'] = stash_report(root, entry['stash'], timeout)
+    if mode == 'rollback':  # Rollback never moves the checkout, so no local change can be lost by it.
         if observed['revision'] != entry['before']:
             output.update(changed=True, transaction='partial')
             c.fail('recovery.conflict', 'The source advanced; rollback never resets Git. Complete recovery against the new revision.', 8)
@@ -146,5 +233,9 @@ def recover_git(pending, home, output, mode):
     if observed['revision'] == entry['before'] and entry['candidate'] != entry['before']:
         if c.git(root, 'merge-base', '--is-ancestor', entry['before'], entry['candidate'], optional=True) is None:
             c.fail('recovery.conflict', 'Recorded candidate is no longer a fast-forward.', 8)
+        # The same tolerance as update: changes the fast-forward does not touch stay in the working tree.
+        blocking = blocking_paths(root, entry['candidate'], local_changes(root, timeout), timeout) if observed['dirty'] else []
+        if blocking:
+            c.fail('source.dirty', 'Local changes touch files this update changes; commit or stash them, then complete recovery.', 4, blocking_paths=blocking)
         if not output['dry_run']:
             advance(root, entry['candidate'], pending, home, output, timeout)

@@ -68,7 +68,7 @@ def fetch_all(args, output, home):
 
 # A program checkout in one of these states is somebody's deliberate work, not a failed refresh: say so and still fetch the taps.
 PROGRAM_HELD = {'source.ahead': 'this checkout is ahead of its remote', 'source.diverged': 'this checkout has diverged from its remote',
-                'source.dirty': 'this checkout has uncommitted changes', 'source.detached': 'this checkout is detached',
+                'source.dirty': 'your uncommitted changes touch files this update changes', 'source.detached': 'this checkout is detached',
                 'source.identity_mismatch': 'this checkout is not on main from the ManageAgentSkills remote'}
 
 
@@ -94,6 +94,11 @@ def refresh(args, output, home, root):
             raise
         else:
             program = dict(status='held' if error.code in PROGRAM_HELD else 'failed', reason=PROGRAM_HELD.get(error.code, str(error)), code=error.code)
+            if error.code == 'source.dirty' and not error.details.get('blocking_paths'):
+                program['reason'] = 'a Git merge, rebase, cherry-pick or revert is in progress in this checkout'
+            for key in ('blocking_paths', 'preserved'):  # Which paths are in the way, and which would simply stay.
+                if key in error.details:
+                    program[key] = error.details[key]
             failure = None if error.code in PROGRAM_HELD else error
     confirmation = output['data'].pop('confirmation', None)
     if review is not None:

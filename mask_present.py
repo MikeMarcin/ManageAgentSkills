@@ -583,6 +583,10 @@ def render_recover(data, output):
     if data.get('setup'):
         lines.append(f"  setup {clean(data['setup'].get('skill'))}: phase {clean(data['setup'].get('phase'))}; package script side effects are {clean(data['setup'].get('script_effects'))} and are not rolled back")
     lines.extend(actions(output))
+    if data.get('stash'):
+        lines.append(f"  update --stash was setting aside {plural(len(data['stash'].get('paths') or []), 'path')}:")
+        lines.extend(path_rows(data['stash'].get('paths') or []))
+        lines.extend(stash_lines(data['stash']))
     if data.get('retained_directories'):
         lines.append(f"  retained directories: {clean(data['retained_directories'])}")
     if output['changed']:
@@ -837,6 +841,21 @@ def migration_error(output):
     return '\n'.join(lines + warnings(output)) + '\n'
 
 
+def path_rows(paths, limit=5):
+    """Up to ``limit`` repository-relative paths, one per line, then how many more."""
+    return [f'    {clean(path)}' for path in paths[:limit]] + ([f'    and {len(paths) - limit} more'] if len(paths) > limit else [])
+
+
+def stash_lines(stash):
+    """Where update --stash put the blocking changes and how to look at them. MASK never pops or applies a stash."""
+    commit = stash.get('commit')
+    lines = [f"  stash:   {clean(commit) if commit else '(none found)'}", f"  message: {clean(stash.get('message'))}"]
+    if commit:
+        lines.append(f"  Inspect: git -C {shell_path(stash.get('root'))} stash show -p {clean(commit)}")
+    lines.append('  MASK never pops or applies this stash; take back what you need from it.')
+    return lines
+
+
 def render_refresh(data, output):
     """update: what became available. The program first, then each tap, then the one next step if there is one."""
     program = data.get('program') or {}
@@ -846,6 +865,22 @@ def render_refresh(data, output):
               'current': f"MASK is up to date ({before})." + (' Dry run: the remote was not contacted.' if output['dry_run'] else ''),
               'held': f"MASK was not updated: {clean(program.get('reason'))}.",
               'failed': f"MASK could not be updated: {clean(program.get('reason'))} ({clean(program.get('code'))})."}.get(program.get('status'), headline(output, 'update'))]
+    blocking, stash, preserved = program.get('blocking_paths') or [], program.get('stash'), program.get('preserved') or []
+    if program.get('status') == 'held' and blocking:
+        lines.append(f"  In the way: {plural(len(blocking), 'changed path')}")
+        lines.extend(path_rows(blocking))
+        lines.append('  To move just these aside and update: mask update --stash')
+    if stash and program.get('status') == 'behind':
+        lines.append(f"  --stash would move {plural(len(stash.get('paths') or []), 'path')} aside (dry run: nothing stashed):")
+        lines.extend(path_rows(stash.get('paths') or []))
+    if stash and program.get('status') == 'updated':
+        lines.append(f"  Stashed {plural(len(stash.get('paths') or []), 'path')} that the update changed:")
+        lines.extend(path_rows(stash.get('paths') or []))
+        lines.extend(stash_lines(stash))
+    if preserved and program.get('status') in ('updated', 'behind'):
+        count = plural(len(preserved), ('other ' if stash else '') + 'uncommitted path')
+        lines.append(f"  Kept {count} in place; the update does not touch them." if program['status'] == 'updated'
+                     else f"  {count[0].upper() + count[1:]} would stay in place; the update does not touch them.")
     migration = program.get('program_migration')
     if migration and program.get('status') in ('updated', 'behind'):
         protocol = migration.get('protocol') or {}
@@ -1084,7 +1119,7 @@ RENDERERS = {
     'source.fetch': render_fetch, 'source.list': render_sources, 'source.show': render_sources, 'source.inspect': render_sources, 'source.repair-cache': render_sources,
     'source.publish': render_sources, 'source.dev-link': render_manifest, 'tap.add': render_sources, 'tap.remove': render_sources, 'tap.transport': render_sources,
     'lock': render_lock, 'update': render_refresh, 'upgrade': render_upgrade,
-    'self.status': render_self_status, 'self.uninstall': render_uninstall, 'self.install': summary('self install', [('launcher', 'launcher'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
+    'self.status': render_self_status, 'self.uninstall': render_uninstall, 'self.install': summary('self install', [('launchers', 'launchers'), ('interpreter', 'interpreter'), ('on PATH', 'on_path')]),
 }
 
 
@@ -1287,6 +1322,8 @@ def render_error(output):
             lines.extend(f"    {clean(k).replace('_', ' ')}: {clean(v)}" for k, v in (value.get('details') or {}).items())
             continue
         lines.append(f"  {clean(key).replace('_', ' ')}: {clean(value)}")
+    if output.get('command') in ('update', 'recover') and isinstance(data.get('stash'), dict) and data['stash'].get('message'):
+        lines.extend(stash_lines(data['stash']))
     if output.get('data', {}).get('confirmation') and error['code'].startswith('confirmation.'):
         lines.extend(render_confirmation(output['data']['confirmation'], output).rstrip('\n').split('\n')[1:])
     lines.extend(workflow_lines(data, verb='can be restored from'))
@@ -1430,7 +1467,7 @@ COMMAND_HELP = {
     'remove': ('Remove selected skills and their managed links. Other selections and modified files are kept.', 'mask remove wizard\nmask remove wizard --user'),
     'list': ('Show selected skills and their status in the current project, another project, or your personal scope.', 'mask list\nmask list --user'),
     'ensure': ('Reconcile a project or personal scope and check its required inputs and native agent roles. Use ensure for a fresh clone/worktree or to restore pinned versions without upgrading. Manual ensure and upgrade can offer package setup. Normal ensure preserves unmanaged or modified files. --repair (--yolo) explicitly authorizes setup and backs up then replaces conflicting role files without prompts. --yes alone does not authorize setup.', 'mask repair --all --repair            # repair all registered scopes, with backups\nmask repair --all --repair --dry-run  # preview only\nmask repair\nmask repair --project /path/to/project --dry-run\nmask repair --user\n\nIf existing role files block setup, restore their matching lock from version\ncontrol or review and back up the files before deciding what to replace.\nRepeating normal ensure will not overwrite them. Use --repair for automatic\nbackup and replacement. See docs/guides/recovery.md.\n\nAutomatic startup and --check require prior integration approval.\nFor automation: preview with --dry-run --json, then pass that plan hash with\n--approve-plan HASH --allow-setup SOURCE/ID:ACTION on ensure.'),
-    'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged, detached or has uncommitted changes is left alone and reported, and the taps are still fetched. A newer MASK that changes its protocol or schemas is shown first and needs a yes in a terminal, or --approve-plan HASH from a script; comment-only schema edits apply without asking. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update                      # update MASK and fetch taps\nmask update --approve-plan HASH  # apply one reviewed contract change\nmask upgrade --dry-run           # see what the fetched taps would change\nmask upgrade                     # move every registered project and your personal skills'),
+    'update': ('Refresh what is available, as brew update and apt update do: fast-forward the MASK program from its Git remote, then fetch every approved tap into its MASK-owned cache. No declaration, lock, link or consumer changes; run mask upgrade to move projects to what was fetched. A program checkout that is ahead of its remote, diverged or detached is left alone and reported, and the taps are still fetched. Uncommitted changes that the update does not touch stay in place; changes it would overwrite hold the update and are named. --stash moves only those into a new git stash, then updates; MASK prints the stash and how to inspect it, and never pops or applies it. A newer MASK that changes its protocol or schemas is shown first and needs a yes in a terminal, or --approve-plan HASH from a script; comment-only schema edits apply without asking. --dry-run contacts nothing. An updated program takes effect on the next command.', 'mask update                      # update MASK and fetch taps\nmask update --approve-plan HASH  # apply one reviewed contract change\nmask update --stash              # stash only the changes in the way, then update\nmask upgrade --dry-run           # see what the fetched taps would change\nmask upgrade                     # move every registered project and your personal skills'),
     'upgrade': ('Move pinned skills to the newest versions their selectors allow. With no scope options, upgrade ALL registered consumers (every registered project and your personal scope), regardless of your current directory; --project, --user, --all and --skill SOURCE/ID narrow it. Each referenced tap is fetched once, except under --dry-run, --offline or --approve-plan, which use cached content only. Every selected consumer is re-resolved against its selectors, and all lock and link changes apply in one recoverable transaction. A tap that fails to fetch blocks only the consumers that use it: the others still apply and the command exits 4 with upgrade.incomplete. A moved tag or a branch that is not a fast-forward refuses unless --allow-ref-rebind. After applying versions and links, reconcile workflow prerequisites even if versions were already current. Necessary generated roles use the same consented staged setup as ensure. A terminal asks before running package code; automation uses the preview hash and --allow-setup SOURCE/ID:ACTION. --repair explicitly authorizes setup and backs up then replaces conflicting native role files. --yes alone never authorizes setup. Missing inputs or declined/failed setup remain nonzero.', 'mask upgrade --dry-run              # preview from cached taps; never fetches\nmask upgrade                        # fetch taps; upgrade every registered consumer\nmask upgrade --project .            # upgrade only this project\nmask upgrade --user                 # upgrade only your personal skills\nmask upgrade --skill agentskills/implement-rfc  # upgrade one selection wherever declared\n\nTo review fresh content before applying it, run mask update, then\nmask upgrade --dry-run, then mask upgrade --approve-plan HASH.\nFor unattended setup, include --allow-setup SOURCE/ID:ACTION with the preview hash.\nUse mask upgrade --repair for explicit setup and role replacement with backups.\nUse ensure for a fresh clone/worktree or to restore pinned versions without upgrading.\nUse mask update to update the MASK program.'),
     'doctor': ('Inspect health, missing files and drift without changing files. --check exits 7 when problems are found. When the tap catalog still records an older spelling of a tap identity, doctor says so, and doctor --migrate rewrites just those catalog entries in one atomic write; no project file, state record or cache changes.', 'mask status --project . --check\nmask status --all --check\nmask status --migrate --dry-run\nmask status --migrate'),
     'inventory': ('Inspect skill selections, source versions and per-agent links across registered scopes.', 'mask inventory --project .\nmask inventory --all'),
@@ -1439,7 +1476,7 @@ COMMAND_HELP = {
     'recover': ('Inspect or finish an interrupted MASK deployment transaction.', 'mask recover --inspect\nmask recover --complete\nmask recover --rollback'),
     'skill.list': ('List the skills in the fetched caches of your approved taps. A tap that is not fetched yet is named instead; run mask tap fetch first.', 'mask search'),
     'skill.show': ('Describe a skill from a fetched tap, optionally including its instructions. Name SOURCE/ID when more than one tap offers it.', 'mask info implement-rfc\nmask info implement-rfc --content'),
-    'self.install': ('Create a MASK launcher in an existing bin directory.', 'mask self install --bin-dir /path/to/bin'),
+    'self.install': ('Create the MASK launcher in an existing bin directory. On Windows it writes mask.cmd for PowerShell and cmd, and an extensionless sh launcher mask for Git Bash; an unrelated file named mask is kept and reported. Rerun it to add a missing launcher.', 'mask self install --bin-dir /path/to/bin'),
     'self.status': ('Show the MASK program, interpreter and installed launchers.', 'mask self status'),
     'self.uninstall': ('Remove the mask launchers this program wrote. A launcher edited since MASK wrote it is kept. MASK never deletes folders, so the command ends by listing what is left (the projects that still link skills, the machine state and the program clone) with the commands that remove them.', 'mask self uninstall --dry-run\nmask self uninstall'),
     'project.init': ('Create a project skill declaration without installing skills. For the everyday install task, use mask install ID.', 'mask project init --project .'),
@@ -1519,7 +1556,8 @@ OPTION_HELP = {
     'include-unmanaged': 'Also inspect entries MASK does not own',
     'content': 'Include SKILL.md content', 'inspect': 'Report the pending transaction without changing it',
     'complete': 'Complete the pending transaction', 'rollback': 'Roll back the pending transaction',
-    'bin-dir': 'Existing directory in which to create the launcher',
+    'bin-dir': 'Existing directory in which to create the launchers',
+    'stash': 'Move only the uncommitted changes the update would overwrite into a new git stash, then update',
     'allow-ref-rebind': 'Allow a moved tag or a branch that is not a fast-forward to replace a locked commit',
     'apply': 'Also deploy the resulting selection',
     'target': 'Agent target; repeat for multiple targets', 'targets': 'Agent targets to select',

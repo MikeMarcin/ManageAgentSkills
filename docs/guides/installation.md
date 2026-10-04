@@ -69,6 +69,8 @@ python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
 
 MASK writes a launcher that records the selected interpreter and program clone. It leaves PATH unchanged. Use the absolute launcher path immediately, or add its directory to PATH yourself before using the shorter `mask` commands. An unrelated or edited existing launcher is preserved and causes a refusal.
 
+On Windows, `self install` writes two launchers into the same directory, each owned, digested and journaled on its own. `mask.cmd` serves PowerShell and cmd. An extensionless `mask` serves Git Bash, which runs a `#!` file by its bare name but never a `.cmd`. That second launcher is a POSIX `sh` script with LF line endings and forward-slash interpreter and entry paths. If a file named `mask` that MASK did not write (or that was edited since) is already there, MASK keeps it, reports it as `launcher.collision`, and still writes `mask.cmd`. Rerun `self install` to add the Git Bash launcher to an install that predates it. `self uninstall` removes each unchanged launcher and keeps an edited one. Other platforms get only the `mask` launcher, as before.
+
 `tap NAME URL` approves the repository under the name `agentskills`. When `MASK_HOME/config.json` and the state file are missing, it creates them, so this one command bootstraps the machine; it does not use the network. `capabilities` confirms the program, interpreter and supported commands. `search` reads only fetched taps: before any fetch it lists nothing and names the unfetched tap, so `tap fetch` fills the tap's cache first without deploying anything. You can skip both and run `mask install ID` in a project instead, which fetches the tap on demand.
 
 On Windows, use PowerShell with a known supported Python installation. For example, if Python 3.14 is installed and the clone goes under `C:\work`:
@@ -82,5 +84,7 @@ py -3.14 'C:\work\ManageAgentSkills\mask.py' self install --bin-dir $maskBin
 & "$maskBin\mask.cmd" tap fetch
 & "$maskBin\mask.cmd" skill list
 ```
+
+The same directory also holds the Git Bash launcher `mask`. In Git Bash, `"$LOCALAPPDATA/Programs/MASK/mask" --help` runs it directly, and adding that directory to your user PATH lets both shells run plain `mask`.
 
 The direct entrypoint remains available if the launcher is missing: `python3 /absolute/path/to/ManageAgentSkills/mask.py ...` (or the corresponding supported Windows interpreter). `self status` reports the program, interpreter and launcher discovery. Approving the first tap initializes the machine configuration; registering a checkout is a separate operation.

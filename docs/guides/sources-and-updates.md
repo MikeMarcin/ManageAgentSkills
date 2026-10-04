@@ -24,7 +24,8 @@ upgrading immediately. Held skills still receive readiness repair and consented 
 Install and upgrade refresh MASK and the shared catalogs when the last successful
 refresh is older than 24 hours. `--no-update` skips this preliminary refresh while
 allowing task-specific acquisition; `--offline` forbids all network. Program updates
-re-execute before consumer planning. Dirty/ahead/diverged program checkouts are held.
+re-execute before consumer planning. Ahead, diverged and detached program checkouts are
+held, as are uncommitted changes that the program update would overwrite.
 
 Upgrade resolves candidates, inspects setup and exact native-role replacements,
 collects one review if needed, then applies and verifies. `--dry-run` and
@@ -208,7 +209,16 @@ retain objects and a staging ref for inspection, but do not select the package.
 
 `mask update` first fast-forwards the running ManageAgentSkills checkout from its `origin` `main`. It checks protocol/schema compatibility and reports `data.program` (`status`, `program_before`, `program_after`, `next_invocation_required`); the next command loads the new implementation. It then fetches every approved tap, exactly as `mask tap fetch` does, and reports each under `data.fetches`. It never changes a declaration, lock, link or consumer, and it does not reinstall the launcher.
 
-A program checkout that is ahead of its remote, diverged, detached, on another branch or carrying uncommitted changes is somebody's work in progress: `update` leaves it alone, reports `status: held` with the reason, and still fetches the taps. A candidate that is not a MASK program (a missing runtime module, or no readable `PROTOCOL_VERSION`) refuses `source.candidate_invalid`. A Git failure while fetching the program is reported after the taps were still fetched. `--dry-run` contacts nothing. On a machine that predates taps, `update` advances the program and skips the taps.
+A program checkout that is ahead of its remote, diverged, detached, on another branch or in the middle of a merge, rebase, cherry-pick or revert is somebody's work in progress: `update` leaves it alone, reports `status: held` with the reason, and still fetches the taps.
+
+Uncommitted changes are held only where the update would touch them. A modified, staged or untracked path that does not appear in `git diff --name-only --no-renames HEAD <candidate>` (and is not a file where the candidate has a directory, or the reverse) stays in the working tree: Git's own `merge --ff-only` keeps it, and the result lists it under `data.program.preserved`. When some of your changes do touch the update, the program stays `held` with code `source.dirty`, and `data.program.blocking_paths` lists those paths, sorted and repository-relative. The human output names up to five of them and suggests the way out:
+
+```sh
+mask update --stash            # stash only the paths in the way, then update
+mask update --stash --dry-run  # name the paths it would stash; touch nothing
+```
+
+`--stash` runs `git stash push --include-untracked -m "mask update <before>..<candidate> <UTC time>" -- <blocking paths>` and then fast-forwards. Changes that are not in the way stay where they are. `data.program.stash` gives the stash's commit id and message and `git stash show -p <id>` to inspect it; MASK never pops or applies it, so take back what you need yourself. With nothing in the way, `--stash` does nothing extra. The stash is journaled with the update: an interruption after the stash but before the fast-forward leaves the checkout at its old revision, and `mask recover` names the stash in either direction. Only `update` accepts `--stash`. A candidate that is not a MASK program (a missing runtime module, or no readable `PROTOCOL_VERSION`) refuses `source.candidate_invalid`. A Git failure while fetching the program is reported after the taps were still fetched. `--dry-run` contacts nothing. On a machine that predates taps, `update` advances the program and skips the taps.
 
 <a id="program-update"></a>
 ### When the new program changes its contracts
