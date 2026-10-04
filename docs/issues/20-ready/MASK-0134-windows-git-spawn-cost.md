@@ -5,7 +5,7 @@ title: "mask upgrade stops paying for a system-wide thread walk and a process pe
 status: "Ready"
 rfcs: []
 depends_on: []
-platforms: ["windows", "macos", "linux"]
+platforms: ["win", "mac", "linux"]
 metadata: {}
 ---
 
