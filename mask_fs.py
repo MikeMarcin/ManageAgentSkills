@@ -486,11 +486,11 @@ def pending_manifest_path(pending, entry, home):
     return c.declaration_path(root, c.consumer_scope(selected_state, root), home)
 
 
-def check_current(pending, home):
+def check_current(pending, home, *, side='after'):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
     if 'development' in pending:
-        pinned.check_development(pending)
+        pinned.check_development(pending, side=side)
     if 'pinned' in pending:
         pinned.check_observations(pending, home)
         pinned.verify_transition(pending, home)
@@ -559,7 +559,7 @@ def set_link(entry, side, *, inject=False):
 
 
 def restore(pending, home, side, *, inject=False):
-    check_current(pending, home)
+    check_current(pending, home, side=side)
     if side == 'after':
         from mask_repair import save_backups
         save_backups(pending, home)
@@ -571,7 +571,7 @@ def restore(pending, home, side, *, inject=False):
     entries = pending['links'] if side == 'after' else reversed(pending['links'])
     for entry in entries:
         if 'development' in pending:
-            pinned.check_development(pending)
+            pinned.check_development(pending, side=side)
         if 'pinned' in pending:
             pinned.check_observations(pending, home)
             pinned.verify_transition(pending, home, entry)
@@ -758,7 +758,7 @@ def recover(home, output, mode):
         output['data']['setup'] = dict(phase=pending['setup']['phase'], skill=pending['setup']['skill'], script_effects='unknown')
     if mode == 'inspect':
         return
-    check_current(pending, home)
+    check_current(pending, home, side='after' if mode == 'complete' else 'before')
     if mode == 'complete' and pending.get('setup', {}).get('phase') == 'launched':
         c.fail('setup.unverified', 'Package setup was launched but never validated; MASK does not rerun package code from a journal.', 8)
     if pending.get('git'):

@@ -11,6 +11,8 @@ ALPHA = TAP + '/alpha'
 class UpdateTests(Fixture):
     # Development links and publication from the fixture tap need its approved authoring checkout; the rest start from init().
     AUTHORING = {'test_dev_link_dirty_scope_and_guarded_return', 'test_development_recovery_binds_live_authoring_and_typed_extension',
+                 'test_development_rollback_after_cache_churn_preserves_destination_guards',
+                 'test_development_rollback_keeps_restored_source_checks',
                  'test_publication_index_mapping_and_retained_object_failure'}
 
     def setUp(self):
@@ -192,11 +194,54 @@ class RecoveryUpdateTests(UpdateTests):
         (self.home / 'pending.json').write_bytes(c.text_json(journal).encode('utf-8'))
         dirty = self.source / 'skills/alpha/recovery-edit'
         dirty.write_text('preserve')
-        self.call('recover', '--rollback', code=8)
+        self.call('recover', '--complete', code=8)
+        self.call('recover', '--rollback')
         self.assertEqual(dirty.read_text(), 'preserve')
+        self.assertFalse(self.call('apply')['changed'])
+
+    def test_development_rollback_after_cache_churn_preserves_destination_guards(self):
+        cache = self.source / 'skills/alpha/__pycache__/helper.pyc'
+        cache.parent.mkdir()
+        cache.write_bytes(b'old disposable cache')
+        leaf = self.project / '.agents/skills/alpha'
+        original_link = os.readlink(leaf)
+        original_state = (self.home / 'state.json').read_bytes()
+        self.crash(['source', 'dev-link', ALPHA, '--project', str(self.project), '--authoring-root', str(self.source)], 'link')
+        self.assertNotEqual(os.readlink(leaf), original_link)
+        cache.write_bytes(b'overwritten disposable cache')
+        (cache.parent / 'new.pyc').write_bytes(b'new disposable cache')
+        self.call('recover', '--complete', code=8)
+        switched_link = os.readlink(leaf)
+        leaf.unlink()
+        leaf.symlink_to(self.source / 'skills/beta', target_is_directory=True)
+        before = self.snapshot()
+        self.call('recover', '--rollback', code=8)
+        self.assertEqual(before, self.snapshot())
+        leaf.unlink()
+        leaf.symlink_to(switched_link, target_is_directory=True)
+        declaration = self.project / '.mask.json'
+        original_declaration = declaration.read_bytes()
+        declaration.write_text('{"schema_version":2,"sources":{},"skills":[]}')
+        before = self.snapshot()
+        self.call('recover', '--rollback', code=8)
+        self.assertEqual(before, self.snapshot())
+        declaration.write_bytes(original_declaration)
+        self.call('recover', '--rollback', '--dry-run')
+        self.assertTrue((self.home / 'pending.json').exists())
+        self.call('recover', '--rollback')
+        self.assertEqual(os.readlink(leaf), original_link)
+        self.assertEqual((self.home / 'state.json').read_bytes(), original_state)
+        self.assertFalse((self.home / 'pending.json').exists())
+        self.assertEqual(cache.read_bytes(), b'overwritten disposable cache')
+
+    def test_development_rollback_keeps_restored_source_checks(self):
+        self.call('source', 'dev-link', ALPHA, '--project', self.project, '--authoring-root', self.source)
+        self.crash(['source', 'dev-link', ALPHA, '--project', str(self.project), '--to-pinned'], 'link')
+        dirty = self.source / 'skills/alpha/recovery-edit'
+        dirty.write_text('preserve')
+        self.call('recover', '--rollback', code=8)
         dirty.unlink()
         self.call('recover', '--rollback')
-        self.assertFalse(self.call('apply')['changed'])
 
     def test_cold_update_metadata_and_source_effects_preserve_intent(self):
         (self.source / 'skills/alpha/mask-skill.json').write_text(json.dumps(dict(schema_version=1, agents='generic')))

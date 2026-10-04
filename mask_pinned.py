@@ -579,10 +579,24 @@ def validate_development(pending, home):
             c.fail('recovery.conflict', 'Only explicit development/retirement operations may change live overrides.', 8)
 
 
-def check_development(pending):
+def check_development(pending, *, side='after'):
+    # Rollback of a new development binding stops consuming its mutable bytes.
+    # Keep its identity/checkout guards, and keep full checks for bindings restored
+    # by rollback (including a dev-link -> pinned transition).
+    retained = {c.digest(value) for root, record in c.consumer_records(pending['before_state']).items()
+                if root in pending['selected'] for value in record.get('dev_links', {}).values()}
     try:
         for item in pending['development']:
-            if observe_dev(item['binding'], pending['config']) != item:
+            retiring = (side == 'before' and pending['operation'] == 'source.dev-link'
+                        and c.digest(item['binding']) not in retained)
+            if retiring:
+                import mask_provenance as provenance
+                validate_dev(item['binding'], pending['config'])
+                _, _, observation = provenance.destination(pending['config'], item['binding']['source'], item['binding']['id'])
+                observed = dict(item, observation=observation)
+            else:
+                observed = observe_dev(item['binding'], pending['config'])
+            if observed != item:
                 c.fail('recovery.conflict', 'Development source changed since the frozen operation.', 8)
     except c.MaskError as error:
         c.fail('recovery.conflict', 'Development authoring input changed; inspect pending recovery.', 8, cause=error.as_dict())
