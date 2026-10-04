@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0134"
+  ],
+  "reserve_for": "windows-git-spawn",
+  "purpose": "",
+  "created": "2026-10-04T02:21:21.400613+00:00",
+  "base": "aa38f33ac54a107c5c3ae86c5abeb13e18d5b86c"
+}
