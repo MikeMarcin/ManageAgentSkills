@@ -2,12 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0133"
 title: "mask update gets past a dirty program checkout, and Git Bash finds mask on Windows"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 platforms: ["windows", "macos", "linux"]
 metadata: {}
-acceptance: []
+acceptance: [{"criterion": "AC1", "outcome": "pass", "revision": "d61d4d953246d449e56fc22f796d4d501dfe2f7b", "evidence": {"kind": "command", "detail": "python -B -m unittest tests.test_launcher (Windows 11, Python 3.14, local bare remotes in temp roots): test_dirty_checkout_fast_forwards_when_the_update_touches_none_of_it. A modified, an untracked and a staged path the update does not touch survive merge --ff-only (staging kept) and appear in program.preserved; merge-fails and crash-at-git faults on the dirty checkout recover with --rollback and --complete; overlapping dirt refuses --complete with source.dirty and blocking_paths; rollback still clears. Ahead/diverged/detached/identity/in-progress holds unchanged (same checkout_preconditions checks)."}}, {"criterion": "AC2", "outcome": "pass", "revision": "d61d4d953246d449e56fc22f796d4d501dfe2f7b", "evidence": {"kind": "command", "detail": "python -B -m unittest tests.test_launcher (Windows 11, Python 3.14, local bare remotes in temp roots): test_overlapping_changes_hold_the_program_and_name_the_way_out (held, source.dirty, sorted blocking_paths, preserved, tap still fetched, exit 0; human output names five paths, then 'and 2 more', and suggests mask update --stash, all lines 80 columns or fewer) and test_file_where_the_update_has_a_directory_blocks."}}, {"criterion": "AC3", "outcome": "pass", "revision": "d61d4d953246d449e56fc22f796d4d501dfe2f7b", "evidence": {"kind": "command", "detail": "python -B -m unittest tests.test_launcher (Windows 11, Python 3.14, local bare remotes in temp roots): test_stash_moves_only_the_blocking_paths_and_never_applies_them (--dry-run --stash names paths, touches nothing; --stash stashes only blocking paths incl. untracked, message mask update <before>..<candidate> <UTC>, commit/message/inspect reported in JSON and human output, stash never popped, non-blocking dirt kept; no overlap does nothing extra; upgrade --stash exits 2) and test_failure_after_the_stash_keeps_it_journaled_and_recovery_reports_it (merge failure after stash leaves HEAD at before with stash commit in pending.json; recover/--rollback report it; crash at the stash checkpoint completes forward and reports it)."}}, {"criterion": "AC4", "outcome": "pass", "revision": "d61d4d953246d449e56fc22f796d4d501dfe2f7b", "evidence": {"kind": "observation", "detail": "Tests: test_launcher_style_follows_its_name and test_windows_writes_a_git_bash_launcher_beside_mask_cmd (unrelated mask kept and reported as launcher.collision, rerun adds the sh launcher, LF, no backslashes, digested state records, Git Bash runs it by bare name, edited sh launcher kept by uninstall, both removed otherwise). Live on this host: python mask.py self install --bin-dir C:/Users/mikem/AppData/Local/Programs/MASK --json applied launcher.install for mask.cmd and mask (exit 0). From Git Bash (/usr/bin/bash): command -v mask = /c/Users/mikem/AppData/Local/Programs/MASK/mask; mask --help exit 0; mask update --dry-run --json exit 0, ok true, program held source.ahead (expected: local commits not pushed)."}}, {"criterion": "AC5", "outcome": "pass", "revision": "d61d4d953246d449e56fc22f796d4d501dfe2f7b", "evidence": {"kind": "command", "detail": "Help text for update, --stash and self install in mask_present.py; README, installation, sources-and-updates, recovery guides and cli-contract updated. Tests placed in tests/test_launcher.py, the current owner of the update journal and launcher tests, because tests.test_refresh_v2 already fails on Windows at the baseline (spaced interpreter re-exec). Focused run of launcher/installer/human_output/cli_protocol/cli_v2/update/recovery/consent/readme_journeys/host_integration/task_commands/public_baseline: the only failures (public_baseline x3 classes, readme_journeys.ReadmeText, cli_v2.CleanupV2) fail identically on a git archive of the pre-change HEAD. verify_documentation: 0 violations; git diff --check clean."}}]
 ---
 
 # MASK-0133: mask update gets past a dirty program checkout, and Git Bash finds mask on Windows
@@ -85,3 +85,9 @@ territory and stays out of scope. No publication and no push.
 The stash `stash@{0}` "stale .mask.lock.json held by mask update
 (implement-rfc 827aa3b), 2026-10-03" in the owner's Windows program checkout
 is the owner's data. Leave it alone.
+
+## Closeout
+
+Implemented at `d61d4d9`. Tests for AC1 to AC4 live in `tests/test_launcher.py`.
+Recovery `--rollback` never moves the checkout, so it tolerates any local changes;
+`--complete` refuses only overlapping ones. The owner's `stash@{0}` was not touched.
