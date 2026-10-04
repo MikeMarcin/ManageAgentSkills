@@ -1,0 +1,12 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0135",
+    "MASK-0136",
+    "MASK-0137"
+  ],
+  "reserve_for": "test-suite-followups",
+  "purpose": "",
+  "created": "2026-10-04T03:24:12.113712+00:00",
+  "base": "76e00d1485bbbc691bf69a6a36fe5d53bc51f7ba"
+}
