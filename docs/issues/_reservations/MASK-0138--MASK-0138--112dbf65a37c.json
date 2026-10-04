@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0138"
+  ],
+  "reserve_for": "compact-upgrade-review",
+  "purpose": "",
+  "created": "2026-10-04T04:27:27.134180+00:00",
+  "base": "ee8bb172465f6a2b47307e1e0bace4eea7642fc8"
+}
