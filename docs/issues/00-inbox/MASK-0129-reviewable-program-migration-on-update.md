@@ -100,13 +100,14 @@ error: MASK update needs your approval: it changes 2 schemas.
         mask update --expect-plan-hash 3e9a5c1f…  to approve this exact change
 ```
 
-## Decision for the owner
+## Owner decision (2026-10-03)
 
-Should a candidate whose only schema changes are `comment` (no protocol bump) update without asking? It would still print its rows in the success output. Recommendation: yes. Comment wording isn't a contract change, and asking about it trains people to press `y` without reading.
+A candidate whose only schema changes are `comment` (no protocol bump) updates without asking. Its rows still appear in the success output under `Schemas`. The owner accepted this because comment wording isn't a contract change, and asking about it trains people to press `y` without reading.
 
 ## Acceptance
 
-- Using fixture bare remotes, for each class (comment, additive, breaking, protocol bump):
+- With a fixture bare remote, a comment-only candidate updates without a prompt and lists its rows in the success output.
+- Using fixture bare remotes, for each class that asks (additive, breaking, protocol bump):
   - a manual TTY `mask update` shows the classified block and asks once;
   - yes fast-forwards in the same invocation;
   - no or EOF leaves Git unmoved, gives `confirmation.declined`, and still fetches taps.
