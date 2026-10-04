@@ -33,6 +33,12 @@ HEAD and index may advance while the exact generation inputs and all other guard
 must still match. Broader operations retain their Git guards. Recovery never
 reruns a setup script.
 
+Rollback of a newly introduced development link may proceed after its mutable
+package bytes change, because it restores the previous pinned link rather than
+using those bytes. Source identity, checkout observations, destination links and
+controls must still match. Completion and development bindings that rollback
+keeps or restores retain their full source-byte checks.
+
 Old journal versions remain readable even though old public command spellings have
 retired. Program self-update preserves protocol/schema compatibility checks; a
 breaking program transition needs an explicitly reviewed checkout update.
