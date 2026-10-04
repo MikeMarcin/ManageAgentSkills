@@ -48,8 +48,12 @@ class TerminalPresentation(unittest.TestCase):
         text = present.render_confirmation(dict(kind='task', scope=[repo], actions=actions), mask.result('upgrade'))
         self.assertIn('2 skill links', text)
         self.assertIn('scripts/setup.py', text)  # A package-relative path is POSIX on every OS.
-        self.assertIn('tap/one (123456789abc)', text)
-        self.assertIn('codex/worker', text)
+        self.assertIn('tap/one:', text)
+        self.assertIn('1 role file for Codex', text)
+        self.assertNotIn('123456789abc', text)
+        detailed = present.task_review(dict(kind='task', scope=[repo], actions=actions), mask.result('upgrade'), details=True)
+        self.assertIn('tap/one (123456789abc)', detailed)
+        self.assertIn('codex/worker', detailed)
         self.assertIn(replaced, text)
         self.assertNotIn(store, text)
         self.assertNotIn('state.record', text)
@@ -81,6 +85,32 @@ class TerminalPresentation(unittest.TestCase):
             stopped = stream.getvalue(); time.sleep(.04)
             self.assertEqual(stream.getvalue(), stopped)
             self.assertIsNone(progress._active)
+            self.assertNotIn('\n', stopped)
+            self.assertTrue(stopped.endswith('\r'))
+
+    def test_progress_erases_long_status_before_prompt_and_final_output(self):
+        stream = io.StringIO()
+        stream.isatty = lambda: True
+        with patch.dict(os.environ, {'NO_COLOR': '1'}):
+            with progress.reporting(True, 'Long status with a full location', stream=stream):
+                progress.phase('Short')
+                with progress.paused():
+                    stream.write('Review\n')
+                progress.phase('Working')
+            stream.write('Done\n')
+        # Emulate the terminal's carriage-return overwrites rather than treating
+        # intermediate statuses in a PTY recording as lines the user sees.
+        screen, cursor = [''], 0
+        for char in stream.getvalue():
+            if char == '\r':
+                cursor = 0
+            elif char == '\n':
+                screen.append(''); cursor = 0
+            else:
+                line = screen[-1].ljust(cursor)
+                screen[-1] = line[:cursor] + char + line[cursor + 1:]
+                cursor += 1
+        self.assertEqual([line.rstrip() for line in screen], ['Review', 'Done', ''])
 
     def test_partial_result_uses_setup_outcomes_not_obsolete_diagnostics(self):
         output = mask.result('upgrade')
@@ -91,8 +121,11 @@ class TerminalPresentation(unittest.TestCase):
         text=present.render_error(output)
         self.assertNotIn('obsolete.toml',text)
         self.assertNotIn('needs attention',text)
-        for phrase in ('/one  tap/x:setup  done','/two  tap/x:setup  recovery needed','/three  tap/x:setup  not started','cause: Workspace changed','root: /two'):
+        for phrase in ('Setup: 1/3 completed; 1 recovery needed; 1 not started.',
+                       'recovery needed: /two (tap/x:setup)', 'not started: /three (tap/x:setup)',
+                       'cause: Workspace changed', 'root: /two'):
             self.assertIn(phrase,text)
+        self.assertNotIn('/one', text)
 
 
 class PublicProgress(PublicFixture):

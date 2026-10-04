@@ -98,10 +98,14 @@ attempt, without rerunning setup. This recovery ends the command; retry your
 original command afterward. Advanced `mask recover` inspects the pending operation
 without changing anything. See the [recovery guide](docs/guides/recovery.md).
 
-Long tasks show their current phase and setup location while they work. Reviews
-group changes by location; setup and file replacements remain explicit. Terminal
-output uses light color (`NO_COLOR=1` disables it). Pipes stay plain, and `--json`
-returns one structured result without progress messages.
+Long tasks update one terminal line with their current phase and setup location.
+Reviews summarize shared upgrades, setup and commits; blocked projects, existing
+control edits included in commits and file replacements stay explicit. Enter `d`
+at the approval prompt for full locations, versions and generated files. Results
+summarize completed work and name failures and unstarted setup. Terminal output
+uses light color (`NO_COLOR=1` disables it). Pipes stay plain, and `--json` returns
+one structured result without progress messages. For full preview details in a
+pipe, combine `--dry-run --json`.
 
 `tap` lists shared sources; `tap NAME URL` adds one; `untap NAME` removes one.
 `search` and `info ID` browse their catalogs. These commands, `update`, and

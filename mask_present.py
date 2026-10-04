@@ -518,11 +518,20 @@ def setup_lines(data):
     setup = data.get('setup') or {}
     rows = setup.get('actions', []) or []
     if len(rows) > 1:
-        lines.append('  Setup results:')
+        counts = {}
+        states = {'published': 'completed', 'granted': 'not started', 'consent_required': 'needs approval',
+                  'partial': 'recovery needed'}
         for row in rows:
-            state = {'published': 'done', 'granted': 'not started', 'consent_required': 'needs approval',
-                     'partial': 'recovery needed'}.get(row.get('state'), row.get('state'))
-            lines.append(f"    {clean(row.get('root'))}  {clean(row.get('subject'))}  {clean(state)}")
+            state = states.get(row.get('state'), row.get('state'))
+            counts[state] = counts.get(state, 0) + 1
+        parts = [f"{counts.pop('completed', 0)}/{len(rows)} completed"]
+        parts.extend(f'{count} {clean(state)}' for state, count in counts.items())
+        lines.append('  Setup: ' + '; '.join(parts) + '.')
+        for row in rows:
+            if row.get('state') == 'published':
+                continue
+            state = states.get(row.get('state'), row.get('state'))
+            lines.append(f"    {clean(state)}: {clean(row.get('root'))} ({clean(row.get('subject'))})")
             if row.get('state') in ('blocked', 'failed', 'stale', 'partial') and row.get('detail'):
                 lines.append(f"      {clean(row['detail'])}")
         return lines
@@ -673,9 +682,41 @@ def consumer_count(rows):
     return ' and '.join(parts) or 'no consumers'
 
 
-def commit_lines(data):
+def commit_lines(data, *, details=False):
+    rows = data.get('commits') or []
+    if not details:
+        lines, planned = [], {}
+        for row in rows:
+            if row['status'] == 'planned':
+                key = (tuple(row['paths']), row['message'])
+                planned.setdefault(key, []).append(row)
+        for (paths, message), group in planned.items():
+            lines.append(f"  Git commit: {plural(len(group), 'local commit')} after readiness succeeds")
+            lines.append('    paths: ' + ', '.join(paths) + '; message: ' + clean(message))
+        for row in rows:
+            if row['status'] == 'planned' and row['included_existing_changes']:
+                lines.append(f"    {clean(row['root'])} includes existing changes: " + ', '.join(row['included_existing_changes']))
+        committed = [row for row in rows if row['status'] == 'committed']
+        if committed:
+            lines.append(f"  Git commits: {plural(len(committed), 'local commit')} created.")
+            if len(committed) == 1:
+                row = committed[0]
+                lines.append(f"    {clean(row['root'])}: {short(row.get('commit'))}")
+        unstarted = sum(row['status'] == 'not_attempted' for row in rows)
+        if unstarted:
+            lines.append(f"  Git commits: not attempted in {plural(unstarted, 'project')}.")
+        if rows and all(row['status'] in ('not_needed', 'not_applicable') for row in rows):
+            lines.append('  No Git commits needed.')
+        for row in rows:
+            if row['status'] not in ('blocked', 'failed', 'unknown') and not row.get('error'):
+                continue
+            created = f" (commit {short(row['commit'])} was created)" if row.get('commit') else ''
+            lines.append(f"  Git commit {clean(row['status'])}: {clean(row['root'])}{created}")
+            if row.get('error'):
+                lines.append('    ' + clean(row['error']['message']) + ' (' + clean(row['error']['code']) + ')')
+        return lines
     lines = []
-    for row in data.get('commits') or []:
+    for row in rows:
         label = clean(row['root']) + (' (personal)' if row['scope'] == 'user' else '')
         detail = clean(row['status']) + (f" {short(row['commit'])}" if row.get('commit') else '')
         lines.append(f'  Git commit: {label}: {detail}')
@@ -688,11 +729,36 @@ def commit_lines(data):
     return lines
 
 
+def blocked_consumer_lines(data):
+    lines = []
+    for consumer in data.get('consumers') or []:
+        if consumer.get('status') not in ('blocked', 'skipped'):
+            continue
+        if any(row['root'] == consumer['root'] and row.get('error') == consumer.get('error') for row in data.get('commits') or []):
+            continue
+        lines.append(f"  {clean(consumer['status'])}: {clean(consumer['root'])}")
+        if consumer.get('error'):
+            error = consumer['error']
+            lines.append('    ' + clean(error['message']) + ' (' + clean(error['code']) + ')')
+    return lines
+
+
+def version_lines(consumers):
+    """Describe each shared destination once; full before/after revisions stay in the detailed review."""
+    versions = {}
+    for row in consumers:
+        for item in row.get('changes') or []:
+            key = (item.get('coordinate'), item.get('after_commit'))
+            versions.setdefault(key, set()).add(row.get('root'))
+    return [f"  {clean(coordinate)} -> {short(commit) if commit else 'removed'} ({plural(len(roots), 'location')})"
+            for (coordinate, commit), roots in versions.items()]
+
+
 def render_upgrade(data, output):
     """upgrade: fetch results, then the outcome, consumers and follow-ups that carry news."""
     rows = data.get('consumers') or []
-    moved = sum(len(row.get('changes') or []) for row in rows)
-    touched = consumer_count([row for row in rows if row.get('changes')])
+    moved = len({item['coordinate'] for row in rows if row.get('status') != 'blocked' for item in row.get('changes') or []})
+    touched = consumer_count([row for row in rows if row.get('changes') and row.get('status') in ('updated', 'unchanged')])
     if output['dry_run']:
         head = f"Would upgrade {plural(moved, 'skill')} in {touched} (dry run: nothing fetched or applied)." if moved else \
             'Would reconcile links and workflow setup; no skill versions would change (dry run).' if output['would_change'] else 'Nothing to upgrade (dry run: cached taps only).'
@@ -709,9 +775,9 @@ def render_upgrade(data, output):
         head = f'Already up to date ({consumer_count(rows)}).' if rows else 'Nothing to upgrade.'
     taps = fetch_lines(data)
     lines = (taps + [''] if taps else []) + [head]
-    width = max((len(clean(item.get('coordinate'))) for row in rows for item in row.get('changes') or []), default=0)
+    lines.extend(version_lines([row for row in rows if row.get('status') in ('unchanged', 'updated')]))
     for row in rows:
-        if not row.get('changes') and row.get('status') in ('unchanged', 'updated'):
+        if row.get('status') in ('unchanged', 'updated'):
             continue
         label = clean(row.get('root')) + (' (personal)' if row.get('scope') == 'user' else '')
         if row.get('status') not in ('unchanged', 'updated'):
@@ -720,8 +786,6 @@ def render_upgrade(data, output):
         lines += ['', f'  {label}']
         if row.get('requires_fetch'):
             lines.append("    not in the cache yet; run 'mask upgrade' without --dry-run, --offline or --approve-plan to fetch it")
-        lines.extend(f"    {clean(item.get('coordinate')).ljust(width)}  {clean((item.get('before_commit') or 'new')[:7])} -> {clean((item.get('after_commit') or 'removed')[:7])}"
-                     for item in row.get('changes') or [])
     notes = []
     for blocker in data.get('blockers', []) or []:
         notes.append(f"  blocked: {clean(blocker.get('message'))} ({clean(blocker.get('code'))})")
@@ -1126,11 +1190,19 @@ RENDERERS = {
 def warnings(output):
     """One line per distinct message; repeats of a message list their paths beneath it instead of repeating the sentence."""
     groups = {}
+    overlaps = {}
     for warning in output.get('warnings', []):
+        if warning.get('code') == 'target.scope_shadowing':
+            detail = warning.get('details') or warning
+            overlaps.setdefault(detail.get('name'), set()).add(detail.get('agent'))
+            continue
         detail = warning.get('details') or {key: value for key, value in warning.items() if key not in ('code', 'message')}
         detail = {key: value for key, value in detail.items() if not isinstance(value, (dict, list))} if isinstance(detail, dict) else detail
         groups.setdefault(clean(warning.get('message')), []).append(detail)
     lines = []
+    if overlaps:
+        names = [clean(name) + ' (' + joined(sorted(agents)) + ')' for name, agents in overlaps.items()]
+        lines.append('warning: Personal and project skills differ: ' + '; '.join(names) + '. Host precedence is unknown.')
     ignorable = [item.get('details') or item for item in output.get('warnings', []) if item.get('code') == 'project.link_ignore']
     if ignorable:
         # Managed links live two levels down (.claude/skills/ID), so the folder to ignore is relative to the project that holds it.
@@ -1185,10 +1257,11 @@ def render_confirmation(proposal, output):
     return '\n'.join(lines) + '\n'
 
 
-def task_review(proposal, output):
+def task_review(proposal, output, *, details=False):
     """Group ordinary bookkeeping; keep significant code and replacement choices explicit."""
     roots = proposal.get('scope', [])
     rows = {root: dict(root=root, links=0, controls=0, setup=[]) for root in roots}
+    ordered_roots = sorted(roots, key=len, reverse=True)
     shared, exact = {}, []
     for action in proposal.get('actions', []):
         kind = action.get('kind')
@@ -1202,7 +1275,7 @@ def task_review(proposal, output):
         if kind == 'state.record':
             continue
         path = str(action.get('path') or action.get('root') or '')
-        root = next((root for root in sorted(roots, key=len, reverse=True) if path == root or path.startswith(root + os.sep)), None)
+        root = next((root for root in ordered_roots if path == root or path.startswith(root + os.sep)), None)
         if kind in ('link.create', 'link.replace', 'link.remove') and root:
             rows[root]['links'] += 1
         elif kind in QUIET_ACTIONS:
@@ -1210,6 +1283,8 @@ def task_review(proposal, output):
                 rows[root]['controls'] += 1
         else:
             exact.append(action)
+    if not details:
+        return compact_task_review(output, rows, shared, exact)
     lines = [f"{output['command'].replace('.', ' ').capitalize()}: review {plural(len(roots), 'location')}", '']
     bundle = output['data'].get('bundle_changes')
     if bundle:
@@ -1239,7 +1314,14 @@ def task_review(proposal, output):
         if row['setup']:
             parts.append('setup ' + joined(row['setup']))
         lines.append(f"  {clean(root)}  {'; '.join(parts) or 'check readiness'}")
-    lines.extend(commit_lines(output['data']))
+    bundled_roots = {item['root'] for item in output['data'].get('bundle_updates', [])}
+    for consumer in output['data'].get('consumers', []):
+        if consumer['root'] in bundled_roots or not consumer.get('changes'):
+            continue
+        lines.append('  Versions in ' + clean(consumer['root']))
+        lines.extend('    ' + clean(item['coordinate']) + ': ' + clean(item.get('before_commit')) + ' -> ' + clean(item.get('after_commit'))
+                     for item in consumer['changes'])
+    lines.extend(commit_lines(output['data'], details=True))
     # One code disclosure can cover several consumers of the same frozen payload.
     for item in shared.values():
         action = item['action']
@@ -1260,6 +1342,82 @@ def task_review(proposal, output):
     if shared:
         lines.append('  Setup runs package code with your user permissions.')
     lines += ['', '  Approval applies only to this task.']
+    return '\n'.join(lines) + '\n'
+
+
+def compact_task_review(output, rows, shared, exact):
+    roots, data = list(rows), output['data']
+    lines = [f"{output['command'].replace('.', ' ').capitalize()}: review {plural(len(roots), 'location')}", '']
+    consumers = [row for row in data.get('consumers', []) if row['root'] in rows]
+    if len(roots) <= 3:
+        lines.extend('  ' + clean(root) for root in roots)
+    elif consumers:
+        lines.append('  Scope: ' + consumer_count(consumers) + ' (locations in details)')
+    else:
+        lines.append('  Full location list in details.')
+    lines.extend(version_lines(consumers))
+    bundle_rows = ([data['bundle_changes']] if data.get('bundle_changes') else []) + [
+        row for row in data.get('bundle_updates', []) if row['root'] in rows]
+    definitions, membership, preserved = {}, {}, {}
+    for row in bundle_rows:
+        for definition in row.get('definitions', [row] if row.get('coordinate') else []):
+            key = (definition['coordinate'], definition['commit'])
+            definitions[key] = definitions.get(key, 0) + 1
+        for verb, field in (('+', 'added'), ('-', 'removed')):
+            for coordinate in row.get(field, []):
+                key = (verb, coordinate)
+                membership[key] = membership.get(key, 0) + 1
+        for item in row.get('changed', []):
+            lines.append(f"    change {clean(item['skill'])}: {clean(item['before'])} -> {clean(item['after'])}")
+        for item in row.get('preserved', []):
+            key = (item['skill'], item['reason'])
+            preserved.setdefault(key, []).append(row.get('root'))
+        if not consumers and row.get('versions'):
+            lines.extend(version_lines([dict(root=row.get('root'), changes=row['versions'])]))
+    for (coordinate, commit), count in definitions.items():
+        lines.append(f"  Bundle {clean(coordinate)} -> {short(commit)} ({plural(count, 'location')})")
+    for (verb, coordinate), count in membership.items():
+        lines.append(f"    {verb} {clean(coordinate)} ({plural(count, 'location')})")
+    for (skill, reason), locations in preserved.items():
+        where = ': ' + clean(locations[0]) if len(locations) == 1 and locations[0] else ''
+        lines.append(f"    preserve {clean(skill)}: {clean(reason)} ({plural(len(locations), 'location')}{where})")
+    links = sum(row['links'] for row in rows.values())
+    controls = sum(bool(row['controls']) for row in rows.values())
+    if links or controls:
+        parts = ([plural(links, 'skill link')] if links else []) + ([f"save locked versions in {plural(controls, 'location')}"] if controls else [])
+        lines.append('  ' + '; '.join(parts))
+    if shared:
+        lines += ['', '  Run setup (package code with your user permissions):']
+    scripts = {}
+    for item in shared.values():
+        action = item['action']
+        key = (action.get('coordinate'), action.get('path'), action.get('interpreter'), action.get('fingerprint'))
+        scripts.setdefault(key, []).append(item)
+    for variants in scripts.values():
+        action = variants[0]['action']
+        coordinate = action.get('coordinate') or action.get('skill')
+        script = str(action.get('path', '')).replace('\\', '/')
+        marker = '/payload/' + str(action.get('skill')) + '/'
+        script = script.split(marker, 1)[-1] if marker in script else script
+        lines.append(f"    {clean(coordinate)}: {clean(script)} (Python: {clean(action.get('interpreter'))})")
+        for item in variants:
+            roles = item['action'].get('native_roles') or []
+            agents = sorted({role.split('/', 1)[0] for role in roles})
+            targets = joined([{'claude': 'Claude', 'codex': 'Codex'}.get(agent, agent) for agent in agents])
+            locations = list(dict.fromkeys(item['roots']))
+            where = plural(len(locations), 'location') + (': ' + clean(locations[0]) if len(locations) == 1 else '')
+            lines.append(f"      {plural(len(roles), 'role file')} for {targets} in {where}")
+    if data.get('commits'):
+        lines += [''] + commit_lines(data)
+    lines.extend(blocked_consumer_lines(data))
+    if exact:
+        lines += ['', '  File changes:']
+        for action in exact:
+            verb = 'back up and replace' if action.get('kind') == 'file.backup_replace' else ACTION_VERBS.get(action.get('kind'), action.get('kind'))
+            lines.append(f"    {clean(verb)} {clean(action.get('path') or action.get('root'))}")
+    lines += ['', '  Approval applies only to this task.']
+    if output['dry_run']:
+        lines.append('  Full details: repeat this preview with --json.')
     return '\n'.join(lines) + '\n'
 
 
@@ -1305,6 +1463,12 @@ def render_error(output):
         return render_invocation(error, output['command'])
     if output.get('command') == 'update' and error['code'] in ('confirmation.required', 'confirmation.declined') and (data.get('program') or {}).get('status') == 'review':
         return migration_error(output)
+    if error['code'].startswith('confirmation.') and (data.get('review') or {}).get('kind') == 'task':
+        lines = [f"error: {clean(error['message'])}", f"  code: {clean(error['code'])}"]
+        lines += task_review(data['review'], output).splitlines()[2:]
+        lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
+        lines.extend('  next: ' + clean(step.get('message')) for step in error.get('remediation', []))
+        return '\n'.join(lines + warnings(output)) + '\n'
     message = error['message']
     if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
         count = sum(not entry.get('complete') for entry in data['workflow_readiness'])
@@ -1317,6 +1481,13 @@ def render_error(output):
     for key, value in (error.get('details') or {}).items():
         if key == 'workflow' and data.get('workflow_readiness'):
             continue
+        if output['command'] == 'upgrade' and key == 'errors' and isinstance(value, list):
+            reported = [row.get('error') for row in (data.get('commits') or []) + (data.get('consumers') or [])]
+            if all(item in reported for item in value):
+                continue
+        if output['command'] == 'upgrade' and key == 'blocked' and isinstance(value, list):
+            if all(any(row.get('root') == root and row.get('status') == 'blocked' for row in data.get('consumers') or []) for root in value):
+                continue
         if key in ('cause', 'rollback') and isinstance(value, dict):
             lines.append(f"  {'cause' if key == 'cause' else 'rollback stopped'}: {clean(value.get('message'))} ({clean(value.get('code'))})")
             lines.extend(f"    {clean(k).replace('_', ' ')}: {clean(v)}" for k, v in (value.get('details') or {}).items())
@@ -1334,19 +1505,31 @@ def render_error(output):
         lines.extend(setup_proposal_lines(setup['confirmation']))
     if setup.get('confirmation') and output['dry_run'] and data.get('plan_hash'):
         lines.append(f"  plan hash: {data['plan_hash']}")
-    lines.extend(fetch_lines(output.get('data', {})))  # Cache effects before a decline are not activated content.
+    if output['command'] != 'upgrade':
+        lines.extend(fetch_lines(data))  # Cache effects before a decline are not activated content.
+    else:
+        lines.extend(fetch_lines(dict(fetches={key: row for key, row in (data.get('fetches') or {}).items() if row.get('ok') is False})))
     lines.extend(commit_lines(data))
+    if output['command'] == 'upgrade':
+        lines.extend(blocked_consumer_lines(data))
     if output.get('changed') and output['transaction'] != 'not_started':
         lines.extend(action_summary(output))  # A committed link/role transaction is reported even when readiness stayed incomplete.
     retained = data.get('retained_preparation')
-    if retained:
-        lines.append(f"  retained preparation: {len(retained['artifacts'])} store artifact(s) and {len(retained['acquisitions'])} cache acquisition(s) "
-                     'kept under MASK_HOME; they are not deployment changes')
-    lines.append(f"  state: {PRESERVED.get(output['transaction'], output['transaction'])}")
+    if retained and output['command'] != 'upgrade':
+        parts = ([plural(len(retained['artifacts']), 'store artifact')] if retained['artifacts'] else []) + \
+                ([plural(len(retained['acquisitions']), 'cache acquisition')] if retained['acquisitions'] else [])
+        if parts:
+            lines.append('  Cached preparation retained: ' + ' and '.join(parts) + '.')
+    state = 'applied changes remain saved' if output['command'] == 'upgrade' and output['transaction'] == 'committed' else PRESERVED.get(output['transaction'], output['transaction'])
+    lines.append(f"  state: {state}")
     for step in error.get('remediation', []):
         if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
             continue
+        if error['code'] == 'plan.stale' and output['command'] == 'upgrade':
+            continue
         lines.append(f"  next: {clean(step.get('message'))}")
+    if error['code'] == 'plan.stale' and output['command'] == 'upgrade':
+        lines.append('  next: Rerun your upgrade command to review the updated plan.')
     if error['code'] == 'workflow.incomplete' and data.get('workflow_readiness'):
         lines.extend(workflow_next_steps(data, command=output['command']))
     return '\n'.join(lines + warnings(output)) + '\n'

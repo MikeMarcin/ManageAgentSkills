@@ -40,6 +40,42 @@ class UpgradeReadiness(SetupFixture):
         self.assertEqual(self.setup_rows(result)[0]['state'], 'published')
         self.assert_published()
 
+    def test_public_partial_setup_reports_completed_work_and_failed_location(self):
+        later = self.base / 'z-later-consumer'
+        later.mkdir()
+        shutil.copytree(CONSUMER_CONTEXT, later / '.mask')
+        self.declare_consumer(later, ['implement-rfc'])
+        preview = self.machine('upgrade', '--all', '--dry-run')
+        self.assertTrue(preview['ok'], preview)
+        script = '''
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import mask, mask_setup
+original = mask_setup.publish
+def publish(output, home, replan, rows):
+    original(output, home, replan, rows)
+    if rows[0]['root'] == sys.argv[2]:
+        Path(sys.argv[3]).write_text('changed during earlier setup\\n')
+mask_setup.publish = publish
+raise SystemExit(mask.main(sys.argv[4:]))
+'''
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(ENTRY.parent), str(self.project),
+                              str(later / '.mask/skill-config/implement-rfc/project.md'),
+                              'upgrade', '--all', '--no-update', '--approve-plan', preview['data']['plan_hash']],
+                             cwd=self.project, env=self.environment(), capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 4, run.stderr)
+        self.assertEqual(run.stdout, '')
+        self.assertIn('Setup: 1/2 completed; 1 stale.', run.stderr)
+        self.assertIn('stale: ' + str(later), run.stderr)
+        self.assertIn('setup did not run in this location', run.stderr)
+        self.assertIn('applied changes remain saved', run.stderr)
+        self.assertIn('Rerun your upgrade command', run.stderr)
+        self.assert_published()
+        self.assertFalse((later / '.codex/agents/rfc-integrator.toml').exists())
+        self.assertTrue((later / '.agents/skills/implement-rfc').is_symlink())
+        self.assertFalse((self.home / 'pending.json').exists())
+
     def test_unchanged_versions_reconcile_setup_and_missing_links_without_approval(self):
         capabilities = self.machine('capabilities')
         self.assertEqual(capabilities['data']['workflow']['setup_entrypoints'], ['register', 'install', 'repair', 'upgrade', 'bundle.install', 'bundle.upgrade', 'bundle.uninstall'])
@@ -196,10 +232,31 @@ raise SystemExit(mask.main(sys.argv[2:]))
         self.assertEqual(self.launches(), 1)
 
     @unittest.skipUnless(os.name == 'posix', 'POSIX terminal journey')
+    def test_terminal_details_are_read_only_and_decline_applies_nothing(self):
+        code, text = self.terminal('upgrade', '--no-update', answer=[b'd\n', b'n\n'])
+        self.assertEqual(code, 4, text)
+        self.assertEqual(text.count('[y/N]'), 2)
+        self.assertIn('(d = details)', text)
+        self.assertIn('Run setup:', text)
+        self.assertIn('codex/rfc-integrator', text)
+        self.assertEqual(self.launches(), 0)
+        self.assertEqual(self.links(), [])
+        self.assert_nothing_published()
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX terminal journey')
+    def test_terminal_details_then_approval_runs_setup_once(self):
+        code, text = self.terminal('upgrade', '--no-update', answer=[b'd\n', b'y\n'])
+        self.assertEqual(code, 0, text)
+        self.assertEqual(text.count('[y/N]'), 2)
+        self.assertEqual(self.launches(), 1)
+        self.assert_published()
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX terminal journey')
     def test_input_changed_while_prompting_refuses_before_setup(self):
         def change():
             (self.project / '.mask/skill-config/implement-rfc/project.md').write_text('concurrent edit\n')
-        code, text = self.terminal('upgrade', '--no-update', '--project', self.project, answer=b'y\n', before_answer=change)
+        code, text = self.terminal('upgrade', '--no-update', '--project', self.project,
+                                   answer=[b'd\n', b'y\n'], before_answer=change)
         self.assertEqual(code, 4, text)
         self.assertIn('plan.stale', text)
         self.assertEqual(self.links(), [])

@@ -89,15 +89,20 @@ def require(args, output, proposal):
     c.fail('confirmation.required', proposal['question'], 4, reason=proposal['reason'], kind=proposal['kind'])
 
 
-def ask(proposal, text):
+def ask(proposal, text, *, details=None):
     """Show the proposal on stderr and read one default-no answer. EOF declines; Ctrl-C propagates."""
     import mask_present
     import mask_progress
     with mask_progress.paused():
         sys.stderr.write(mask_present.paint(text, sys.stderr, tone='review'))
-        sys.stderr.write(f"{proposal['question']} [y/N] ")
-        sys.stderr.flush()
-        answer = sys.stdin.readline()
+        while True:
+            choices = '[y/N] (d = details)' if details is not None else '[y/N]'
+            sys.stderr.write(f"{proposal['question']} {choices} ")
+            sys.stderr.flush()
+            answer = sys.stdin.readline()
+            if details is None or answer.strip().lower() != 'd':
+                break
+            sys.stderr.write(mask_present.paint(details, sys.stderr, tone='review'))
     if not answer:
         sys.stderr.write('\n')
     accepted = answer.strip().lower() in ('y', 'yes')

@@ -1,5 +1,6 @@
 """Transient terminal feedback; never part of the result protocol or task state."""
 from contextlib import contextmanager
+import os
 import sys
 import threading
 import time
@@ -15,12 +16,33 @@ class Reporter:
         self.stopped = threading.Event()
         self.lock = threading.Lock()
         self.label = None
+        self.width = 0
         self.started = self.last = time.monotonic()
         self.thread = threading.Thread(target=self.heartbeat, daemon=True)
 
     def write(self, text):
-        self.stream.write(present.paint(text + '\n', self.stream, tone='progress'))
+        # Overwrite the previous status without ANSI cursor commands, including
+        # when NO_COLOR is set. Consent and final output clear this line first.
+        try:
+            columns = os.get_terminal_size(self.stream.fileno()).columns or 80
+        except (AttributeError, OSError, ValueError):
+            columns = 80
+        limit = max(20, columns - 1)
+        if len(text) > limit:
+            tail = min(24, limit // 2)
+            text = text[:limit - tail - 3] + '...' + text[-tail:]
+        padding = ' ' * max(0, self.width - len(text))
+        self.stream.write('\r' + present.paint(text, self.stream, tone='progress') + padding)
+        self.width = len(text)
         self.stream.flush()
+
+    def clear(self):
+        with self.lock:
+            self.label = None
+            if self.width:
+                self.stream.write('\r' + ' ' * self.width + '\r')
+                self.stream.flush()
+                self.width = 0
 
     def phase(self, label):
         with self.lock:
@@ -54,6 +76,7 @@ def reporting(enabled, label, *, stream=None, interval=10):
             reporter.stopped.set()
             if reporter.thread.ident is not None:
                 reporter.thread.join()
+            reporter.clear()
         _active = previous
 
 
@@ -68,6 +91,5 @@ def phase(label, *, root=None):
 def paused():
     reporter = _active
     if reporter:
-        with reporter.lock:
-            reporter.label = None
+        reporter.clear()
     yield

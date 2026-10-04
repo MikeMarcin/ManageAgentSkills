@@ -36,7 +36,7 @@ def review(args, output, planned, rows):
     fs.ensure_applicable(planned, expected)
     proposal = dict(kind='task', reason='task.review', scope=planned['intent']['selected'],
                     actions=list(planned['actions']) + significant, plan_hash=planned['plan_hash'],
-                    question='Apply this task, including the setup and replacements shown?', granted_by=None)
+                    question='Apply these changes?', granted_by=None)
     output['data']['review'] = proposal
     output['would_change'] |= bool(significant)
     if output['dry_run']:
@@ -52,7 +52,8 @@ def review(args, output, planned, rows):
         if not consent.interactive(args):
             c.fail('confirmation.required', 'Review this task with --dry-run, then apply it with --approve-plan HASH.', 4)
         import mask_present as present
-        if not consent.ask(proposal, present.render_confirmation(proposal, output)):
+        if not consent.ask(proposal, present.render_confirmation(proposal, output),
+                           details=present.task_review(proposal, output, details=True)):
             c.fail('confirmation.declined', 'Declined; no consumer changes were applied.', 4)
         how = 'prompt'
     proposal['granted_by'] = how or 'command'

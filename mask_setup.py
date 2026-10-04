@@ -326,7 +326,8 @@ def stale(rows, ran, what):
         c.fail('setup.failed', f'Setup inputs changed while the script ran ({what}); nothing was published and script side effects outside the stage are unknown.', 5, action=rows[0]['subject'], reason='post-run')
     for item in rows:
         item.update(state='stale', detail=f'{what} after consent; nothing ran')
-    c.fail('plan.stale', 'Setup inputs changed after consent; nothing ran and nothing was published.', 4, action=rows[0]['subject'])
+    c.fail('plan.stale', 'Setup inputs changed after approval; setup did not run in this location.', 4,
+           root=rows[0]['root'], action=rows[0]['subject'])
 
 
 def execute(output, home, replan, rows):
