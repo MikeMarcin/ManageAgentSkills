@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0132"
+  ],
+  "reserve_for": "migration-output-wording",
+  "purpose": "",
+  "created": "2026-10-04T00:47:50.693196+00:00",
+  "base": "d7407ca6b9cf45c44f65295f4d3d215714dc1106"
+}
