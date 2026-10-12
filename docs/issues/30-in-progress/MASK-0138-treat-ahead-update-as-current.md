@@ -2,7 +2,7 @@
 schema: implement-rfc.card.v1
 id: MASK-0138
 title: Report an ahead-only program checkout as current during update
-status: Ready
+status: "In Progress"
 rfcs: []
 depends_on: []
 ---
