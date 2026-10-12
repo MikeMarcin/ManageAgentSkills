@@ -340,11 +340,19 @@ def dispatch(args, output, home, root):
     if not output['dry_run']:
         g.fetch(root, 'origin', 'main', timeout, output)
         observed = g.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
+    output['data'].update(program_before=observed['revision'], program_after=observed['revision'],
+                          candidate=observed['candidate'], relation=observed['relation'],
+                          requires_fetch=output['dry_run'],
+                          remote_freshness='last_fetched' if output['dry_run'] else 'fetched',
+                          next_invocation_required=False)
+    # An ahead-only checkout already contains the whole fetched upstream. There
+    # is no program update to apply, and no reason to call ordinary update held.
+    if observed['relation'] == 'ahead':
+        return
     if observed['candidate'] is None or observed['relation'] in ('ahead', 'diverged'):
         c.fail('source.' + (observed['relation'] if observed['candidate'] else 'remote_unknown'), 'Program cannot fast-forward from the known remote.', 4)
     changed = observed['revision'] != observed['candidate']
     output['would_change'] = changed
-    output['data'].update(program_before=observed['revision'], program_after=observed['revision'], requires_fetch=output['dry_run'], remote_freshness='last_fetched', next_invocation_required=False)
     local = g.local_changes(root, timeout) if changed and observed['dirty'] else []
     blocking = g.blocking_paths(root, observed['candidate'], local, timeout)
     stashing = bool(blocking) and getattr(args, 'stash', False)

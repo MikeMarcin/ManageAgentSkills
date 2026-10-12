@@ -15,8 +15,8 @@ this checkout is ahead of its remote” while tap fetching succeeds.
 An ahead-only checkout already contains every fetched upstream commit. Treat
 ordinary `update` as current, preserving its local commits and working tree,
 and explain that there is no newer upstream MASK to apply. This amends the
-historical ahead hold for ordinary update, not divergence or self-update's
-strict refusal contract. Never reset, rebase, merge divergent history or push.
+historical ahead hold for ordinary update. Divergence retains its refusal.
+Never reset, rebase, merge divergent history or push.
 
 Scope: program update classification/output, focused local-bare-remote CLI
 checks and update guide. Baseline: 5f4eef5 (actual preimplementation HEAD).
@@ -31,5 +31,4 @@ Acceptance:
   are kept, without an alarming not-updated message or a missing revision.
 - AC3: Divergence, detach, wrong identity and in-progress Git operations retain
   their holds; behind still follows existing reviewed fast-forward behavior.
-  Strict self update retains its refusal. Focused CLI fixtures and documentation
-  gate pass.
+  Focused CLI fixtures and documentation gate pass.
