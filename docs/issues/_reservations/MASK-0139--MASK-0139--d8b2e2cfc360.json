@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0139"
+  ],
+  "reserve_for": "reconcile-mac-compact-upgrade-output",
+  "purpose": "",
+  "created": "2026-10-12T04:23:59.472378+00:00",
+  "base": "6f1ce5cfd36881393552dae86403005acfbd9dd3"
+}

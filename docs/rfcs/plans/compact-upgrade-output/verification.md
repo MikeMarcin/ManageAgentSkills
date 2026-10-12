@@ -1,6 +1,6 @@
 # Compact upgrade output verification
 
-MASK-0138 was implemented directly on main from baseline
+MASK-0139 was implemented directly on main from baseline
 `ee8bb172465f6a2b47307e1e0bace4eea7642fc8`. Implementation: `e0079d9fdb3ab7419fd58fd5e3722fda795de21d`; final source
 revision: `f0cf20fbdeac364ea4a4becfba897e5d81efd4ad`.
 

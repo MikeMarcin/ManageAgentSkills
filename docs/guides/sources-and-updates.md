@@ -209,7 +209,14 @@ retain objects and a staging ref for inspection, but do not select the package.
 
 `mask update` first fast-forwards the running ManageAgentSkills checkout from its `origin` `main`. It checks protocol/schema compatibility and reports `data.program` (`status`, `program_before`, `program_after`, `next_invocation_required`); the next command loads the new implementation. It then fetches every approved tap, exactly as `mask tap fetch` does, and reports each under `data.fetches`. It never changes a declaration, lock, link or consumer, and it does not reinstall the launcher.
 
-A program checkout that is ahead of its remote, diverged, detached, on another branch or in the middle of a merge, rebase, cherry-pick or revert is somebody's work in progress: `update` leaves it alone, reports `status: held` with the reason, and still fetches the taps.
+An ahead-only program checkout already contains every upstream commit. `update`
+reports `status: current`, `relation: ahead` and the fetched `candidate`, keeps
+local commits and working files, and still fetches the taps. Human output says
+there is no newer upstream version. A dry run compares only the last-fetched ref.
+
+A program checkout that has diverged, is detached, is on another branch or is in
+the middle of a merge, rebase, cherry-pick or revert remains `status: held` with
+the reason. `update` leaves it alone and still fetches the taps.
 
 Uncommitted changes are held only where the update would touch them. A modified, staged or untracked path that does not appear in `git diff --name-only --no-renames HEAD <candidate>` (and is not a file where the candidate has a directory, or the reverse) stays in the working tree: Git's own `merge --ff-only` keeps it, and the result lists it under `data.program.preserved`. When some of your changes do touch the update, the program stays `held` with code `source.dirty`, and `data.program.blocking_paths` lists those paths, sorted and repository-relative. The human output names up to five of them and suggests the way out:
 

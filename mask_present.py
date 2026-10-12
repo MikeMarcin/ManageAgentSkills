@@ -929,6 +929,10 @@ def render_refresh(data, output):
               'current': f"MASK is up to date ({before})." + (' Dry run: the remote was not contacted.' if output['dry_run'] else ''),
               'held': f"MASK was not updated: {clean(program.get('reason'))}.",
               'failed': f"MASK could not be updated: {clean(program.get('reason'))} ({clean(program.get('code'))})."}.get(program.get('status'), headline(output, 'update'))]
+    if program.get('status') == 'current' and program.get('relation') == 'ahead':
+        lines[0] = f'MASK has no newer upstream version ({before}); local commits are kept.'
+        if output['dry_run']:
+            lines.append('  Dry run: compared with the last-fetched remote; no network or files changed.')
     blocking, stash, preserved = program.get('blocking_paths') or [], program.get('stash'), program.get('preserved') or []
     if program.get('status') == 'held' and blocking:
         lines.append(f"  In the way: {plural(len(blocking), 'changed path')}")

@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0138"
+  ],
+  "reserve_for": "update-ahead-message-20261011",
+  "purpose": "",
+  "created": "2026-10-12T03:17:31.134957+00:00",
+  "base": "5f4eef5feee41141a832b165aede1ce54b03d395"
+}

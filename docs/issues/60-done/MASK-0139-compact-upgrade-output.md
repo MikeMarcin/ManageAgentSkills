@@ -1,6 +1,6 @@
 ---
 schema: "implement-rfc.card.v1"
-id: "MASK-0138"
+id: "MASK-0139"
 title: "Make upgrade review, progress and outcomes readable"
 status: "Done"
 rfcs: []
@@ -33,3 +33,7 @@ Baseline: ee8bb172465f6a2b47307e1e0bace4eea7642fc8.
 Owned paths: human renderer, terminal progress, consent/lifecycle setup disclosure,
 focused tests and public output documentation. Test only disposable fixture roots
 with local bare taps. Preserve live controls and AgentSkills; no publication or push.
+
+## Integration identity
+
+Renumbered from the Mac-local MASK-0138 to MASK-0139 during Mac/Windows reconciliation; the Windows ahead-update card retains MASK-0138. Original commit acceptance and the historical reservation remain unchanged.
