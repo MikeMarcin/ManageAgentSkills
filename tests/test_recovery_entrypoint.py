@@ -15,8 +15,12 @@ from tests.test_setup import SetupFixture
 class RecoveryEntrypoint(PublicFixture):
     bootstrap = lifecycle.CliV2.bootstrap
     raw = lifecycle.CliV2.raw
-    setUp = lifecycle.SetupV2.setUp
     write_script = SetupFixture.write_script
+
+    def setUp(self):
+        lifecycle.SetupV2.setUp(self)
+        self.git(self.project, 'config', 'user.name', 'Fixture')
+        self.git(self.project, 'config', 'user.email', 'fixture@example.invalid')
 
     def interrupt_install(self, checkpoint='native_role'):
         preview = self.machine('install', 'implement-rfc', '--dry-run')
