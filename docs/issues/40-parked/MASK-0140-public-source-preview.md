@@ -2,11 +2,13 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0140"
 title: "Prepare MASK source preview and reproducible contributor checks"
-status: "In Progress"
+status: "Parked"
 rfcs: []
 depends_on: []
 priority: "P1"
 metadata: {"mandate":"public-prep-mask-push-v2","baseline":"f49ac404bdb1366637841ee42e35cb34b13b6eaa","external_input":"AgentSkills 8c9c80f05e02e0cbaca56edfde5dab8859f2f932","milestone_plan":{"id":"public-source-preview","path":"docs/rfcs/plans/public-source-preview/milestone-plan.json"}}
+parked_on: "human-review"
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Technical preview preparation verified. Existing owner license choice/adoption remains pending at M3; no second question or review session."}},{"criterion":"AC2","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Technical preview preparation verified. Existing owner license choice/adoption remains pending at M3; no second question or review session."}},{"criterion":"AC3","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Technical preview preparation verified. Existing owner license choice/adoption remains pending at M3; no second question or review session."}},{"criterion":"AC4","outcome":"pending","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Technical preview preparation verified. Existing owner license choice/adoption remains pending at M3; no second question or review session."}},{"criterion":"AC5","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Technical preview preparation verified. Existing owner license choice/adoption remains pending at M3; no second question or review session."}}]
 ---
 
 # MASK-0140: Public source preview
