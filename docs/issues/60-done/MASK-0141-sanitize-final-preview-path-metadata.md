@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0141"
 title: "Sanitize remaining mutable source-preview path metadata"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 metadata: {"mandate":"public-prep-final-reconciliation-v1","baseline":"4ba72a7235d8a94d0d8cb386a672a51e671702bc","milestone_plan":{"id":"public-source-finalization","path":"docs/rfcs/plans/public-source-finalization/milestone-plan.json"}}
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"7a97e948ac21ce4141f6850e8eebc921d2c37652","evidence":{"kind":"artifact","path":"docs/development/public-source-finalization.md","detail":"MASK-0133 comparison confirms only its Windows/Git Bash user prefixes changed to EXAMPLE in /acceptance/3/evidence/detail; other fields/body retained and privacy projection note appended."}},{"criterion":"AC2","outcome":"pass","revision":"7a97e948ac21ce4141f6850e8eebc921d2c37652","evidence":{"kind":"artifact","path":"docs/development/public-source-finalization.md","detail":"Docs24RFCs/142cards zero; exact7a97e94 credential scans zero; current path scan classifies only three immutable provenance locations in two files. No production/workflow/license change."}},{"criterion":"AC3","outcome":"pass","revision":"7a97e948ac21ce4141f6850e8eebc921d2c37652","evidence":{"kind":"artifact","path":"docs/development/public-source-finalization.md","detail":"Explicit source paths committed; latest origin reconciled; ordinary source push and exact7a97e94 remote identity confirmed. All test/scan commands complete; final board/push and M3 handoff precede writer release."}}]
 ---
 
 # Final path metadata correction
