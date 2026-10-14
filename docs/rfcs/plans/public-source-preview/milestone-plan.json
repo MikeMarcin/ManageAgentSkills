@@ -1,0 +1,33 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "public-source-preview",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0115",
+      "MASK-0140"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "m2",
+      "outcome": "MASK source preview has reviewed directory recovery and reproducible public/contributor verification, with licensing and native boundaries explicit.",
+      "work": [
+        {
+          "issue": "MASK-0115"
+        },
+        {
+          "issue": "MASK-0140"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "MASK-0115 acceptance proven through public argv/exit/JSON/filesystem behavior and replacement/approval negative controls.",
+        "MASK-0140 AC1 through AC5 technically verified, with pending owner licensing adoption and native roadmap obligations carried to M3."
+      ],
+      "boundary": "MASK main only; no visibility/access change, real migration, force push or history rewrite. Ordinary authorized push after acceptance and secret scan."
+    }
+  ],
+  "coverage": "complete",
+  "unplanned_work": []
+}

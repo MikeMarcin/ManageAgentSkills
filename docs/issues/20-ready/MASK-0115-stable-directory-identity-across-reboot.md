@@ -2,11 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0115"
 title: "Keep registered directory identity valid when macOS renumbers the volume device"
-status: "Inbox"
+status: "Ready"
 rfcs: []
 depends_on: []
 priority: "P1"
-metadata: {"origin":"Field report on macOS after pulling 7ccf671 (2026-09-16)"}
+metadata: {"origin":"Field report on macOS after pulling 7ccf671 (2026-09-16)","milestone_plan":{"id":"public-source-preview","path":"docs/rfcs/plans/public-source-preview/milestone-plan.json"}}
 ---
 
 # MASK-0115: Keep registered directory identity valid when macOS renumbers the volume device
