@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "public-source-finalization",
+  "scope": {
+    "issues": [
+      "MASK-0141"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "m3-mask-privacy",
+      "outcome": "The remaining mutable personal path metadata is sanitized without changing historical acceptance, with final MASK source identity and ordinary push bound in M3 evidence.",
+      "work": [
+        {
+          "issue": "MASK-0141"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "MASK-0141 AC1 through AC3 have direct evidence; pending license/native acceptance and retained immutable/history privacy limits remain explicit.",
+        "Final MASK remote main identity and source scans are recorded with no remaining task-owned command or writer."
+      ],
+      "boundary": "Only current MASK path metadata and its bounded M3 tracking. Ordinary push is authorized; visibility/access, unanswered license adoption, immutable packet edits, history rewriting, real deployments and model experiments remain outside scope."
+    }
+  ]
+}
