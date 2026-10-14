@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0141"
 title: "Sanitize remaining mutable source-preview path metadata"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 metadata: {"mandate":"public-prep-final-reconciliation-v1","baseline":"4ba72a7235d8a94d0d8cb386a672a51e671702bc","milestone_plan":{"id":"public-source-finalization","path":"docs/rfcs/plans/public-source-finalization/milestone-plan.json"}}
