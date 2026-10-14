@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0141"
+  ],
+  "reserve_for": "public-prep-final-privacy-m3",
+  "purpose": "",
+  "created": "2026-10-14T07:55:56.617767+00:00",
+  "base": "4ba72a7235d8a94d0d8cb386a672a51e671702bc"
+}
