@@ -22,9 +22,12 @@ recovery. Same-user hostile filesystem races and forged local state are outside
 its cooperative ownership guarantees. A payload hash identifies bytes; it does
 not certify that their instructions or scripts are safe.
 
-Program and tap updates use the existing Git route. MASK supplies no daemon,
-telemetry service, automatic program-update channel, credential vault or remote
-fleet controller. Release signatures, signer rotation and independently
+Program and tap updates use the configured Git route. Install and upgrade can
+refresh the program and tap catalogs automatically before their task; use
+`--no-update` to skip that refresh. Incompatible program contracts still require
+review. MASK supplies no separate hosted update service, daemon, telemetry
+service, credential vault or remote fleet controller. Release signatures,
+signer rotation and independently
 bootstrapped update authenticity remain proposed RFC work. Tests and recorded
 native acceptance establish only their named platform/behavior boundaries.
 See [state and recovery](docs/architecture/state-and-recovery.md),

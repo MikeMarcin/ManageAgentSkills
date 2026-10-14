@@ -47,6 +47,7 @@ class LauncherTests(Fixture):
         self.assertEqual(sorted(mask_install.RUNTIME_MODULES), list(PROGRAM_MODULES))
 
     def test_update_refuses_a_candidate_missing_directory_recovery(self):
+        self.init()
         program, author = self.program_checkout()
         self.git(author, 'rm', 'mask_identity.py')
         self.git(author, 'commit', '-m', 'incomplete candidate')
