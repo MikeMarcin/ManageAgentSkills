@@ -25,7 +25,7 @@
         "MASK-0115 acceptance proven through public argv/exit/JSON/filesystem behavior and replacement/approval negative controls.",
         "MASK-0140 AC1 through AC5 technically verified, with pending owner licensing adoption and native roadmap obligations carried to M3."
       ],
-      "boundary": "MASK main only; no visibility/access change, real migration, force push or history rewrite. Ordinary authorized push after acceptance and secret scan."
+      "boundary": "MASK main only; no visibility/access change, real migration, force push or history rewrite. Ordinary authorized push after acceptance and secret scan. M4 amendment (public-prep-mit-adoption-v1): the owner selected MIT for original material in both repositories on 2026-10-14. The sole cross-repository implementer adopts that choice, preserves all third-party notices, completes the existing preparation cards and ordinarily pushes both main branches. Prior licensing waits and M3 delegation are superseded; native, experimental and post-visibility public CI obligations remain separate."
     }
   ],
   "coverage": "complete",
