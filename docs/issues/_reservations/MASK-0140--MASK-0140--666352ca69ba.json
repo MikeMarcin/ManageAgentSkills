@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0140"
+  ],
+  "reserve_for": "public-source-preview-m2",
+  "purpose": "",
+  "created": "2026-10-14T07:13:19.408409+00:00",
+  "base": "f49ac404bdb1366637841ee42e35cb34b13b6eaa"
+}
