@@ -27,7 +27,7 @@ COMMANDS = {
     'bundle.install': (True, True, [('bundle', 'pos')] + SINGLE + [('replace', 'flag')] + OFFLINE),
     'bundle.uninstall': (True, False, [('bundle', 'pos')] + SINGLE + OFFLINE),
     'bundle.upgrade': (True, True, [('bundle', 'pos')] + SINGLE + [('allow-ref-rebind', 'flag')] + OFFLINE),
-    'register': (True, True, [('path', 'optional')] + SINGLE + OFFLINE),
+    'register': (True, True, [('path', 'optional'), ('rebind', 'flag')] + SINGLE + OFFLINE),
     'unregister': (True, False, [('path', 'optional')] + SINGLE + [('keep-links', 'flag')]),
     'install': (True, True, [('ids', 'many')] + SINGLE + [('agent', 'repeat')] + REFRESH),
     'uninstall': (True, False, [('ids', 'many')] + SINGLE),
@@ -54,7 +54,7 @@ KEEP = ('config.show', 'config.set', 'skill.where-used', 'skill.validate', 'skil
 HELP = {
     'tap': ('Advanced tap commands: fetch, show, inspect, transport, repair-cache, migrate and publish. List taps, or approve NAME URL as a shared skill source. The current checkout does not affect taps. A tap keeps exact bytes unless --autocrlf opts in to core.autocrlf=true.', 'mask tap\nmask tap agentskills https://github.com/MikeMarcin/AgentSkills.git'),
     'untap': ('Remove an unused tap. Cached files remain until cleanup.', 'mask untap NAME'),
-    'register': ('Register this checkout and prepare its declared skills, preserving locked versions. PATH selects another checkout; --user selects personal skills.', 'mask register\nmask register /path/to/worktree'),
+    'register': ('Register this checkout and prepare its declared skills, preserving locked versions. PATH selects another checkout; --user selects personal skills. --rebind reviews a device-number change for an existing canonical directory with the same inode, preserves its approvals and ends without running setup. Preview with --dry-run --json, then use --approve-plan HASH.', 'mask register\nmask register /path/to/worktree\nmask register --rebind --dry-run --json\nmask register --user --rebind --dry-run --json'),
     'unregister': ('Stop managing this checkout and remove unchanged managed deployment. Preserve its declaration and lock.', 'mask unregister\nmask unregister --user'),
     'install': ('Add skills to this checkout and complete their setup. --user selects personal skills. Review any scripts or replacements before consumer files change.', 'mask install implement-rfc\nmask install implement-rfc --user'),
     'uninstall': ('Remove selected skills from this checkout and its managed deployment. Shared cached versions remain until cleanup.', 'mask uninstall implement-rfc\nmask uninstall implement-rfc --user'),
@@ -249,6 +249,9 @@ def dispatch(args, output, leaves):
                 import mask_pin
                 return mask_pin.dispatch(args, output, home)
             if public in ('register', 'repair'):
+                if public == 'register' and getattr(args, 'rebind', False):
+                    import mask_identity
+                    return mask_identity.rebind(args, output, home)
                 if public == 'repair':
                     import mask_repair
                     if mask_repair.resume_pending(args, output, home):

@@ -33,7 +33,7 @@ Coordinate shared files with the integrator.
 - RFC-MASK-0022-AC05: Pre-RFC files and machines keep working, and `doctor --migrate` canonicalizes config and state recoverably.
 - RFC-MASK-0022-AC06: Rewrite, redirect, credential and content-integrity refusals are unchanged.
 - RFC-MASK-0022-AC07: Help, contract, schema, the documentation verifier and the full suite are truthful and green.
-- RFC-MASK-0022-AC08: The owner dogfood on JaegAW and on an SSH-approved machine succeeds with no hand edits to `MASK_HOME`.
+- RFC-MASK-0022-AC08: The owner dogfood on ExampleOwnerHost and on an SSH-approved machine succeeds with no hand edits to `MASK_HOME`.
 
 Proposed direct checks (not executed at filing):
 
@@ -51,7 +51,7 @@ Implementation revisions: `0726449` (identity, derived transport, pinning, fixtu
 
 Planned cards: none; implemented directly at the owner's direction.
 
-Cross-repository handoff: BetterPullReview `.mask.json` and `.mask.lock.json` may be relocked to the canonical spelling after the RFC lands. That is the owner's consumer change, not a MASK change.
+Cross-repository handoff: ExampleReview `.mask.json` and `.mask.lock.json` may be relocked to the canonical spelling after the RFC lands. That is the owner's consumer change, not a MASK change.
 
 ## Closeout checklist
 
@@ -64,6 +64,6 @@ Cross-repository handoff: BetterPullReview `.mask.json` and `.mask.lock.json` ma
 | RFC-MASK-0022-AC05 | Same run: `OneIdentity` (pre-RFC HTTPS and `/~/` files verify their recorded digests and stay byte-identical; a quiet `upgrade` writes nothing; the next writing `upgrade`/`install` records the canonical spelling with unchanged digests); `OlderMachine` (doctor reports, `--migrate --dry-run` previews, `--expect-plan-hash` guards, one write converts the catalog). **Deviation:** the catalog only is converted, atomically and without a journal, so the crash-at-each-checkpoint clause has nothing to exercise (RFC, Implementation notes) | Pass with recorded deviation | `413ad87` |
 | RFC-MASK-0022-AC06 | Same run, `Boundaries`: an `insteadOf` rewrite to another repository refuses `source.identity_mismatch` before any contact, one inside the identity is allowed; credential URL and effective redirect policy refuse; `Normalizer.test_every_derived_transport_is_a_spelling_of_the_tap_identity`. Commit and payload-digest refusals are unchanged code, covered by `tests.test_artifacts` and `tests.test_locks` in the full run | Pass | `0726449` |
 | RFC-MASK-0022-AC07 | `python3 -B scripts/run_tests.py`: 484 tests, 0 failed. `python3 -B scripts/verify_documentation.py --root .` (skill scripts from the store on PYTHONPATH): 22 RFCs, 113 cards, 0 structural violations. Help, README, sources guide, CLI contract and `machine-v3.schema.json` updated | Pass on Linux/WSL2 | `413ad87` |
-| RFC-MASK-0022-AC08 | JaegAW, no hand edits: this repository commits the HTTPS spelling and the machine catalog still records `ssh://git@github.com/~/MikeMarcin/AgentSkills.git`; `mask ensure --dry-run` no longer refuses `source.identity_mismatch` and reaches the `implement-rfc` setup consent step; `mask doctor` reports `migration.identity_canonicalization`; BetterPullReview (SSH spelling) reports ready. Not yet run: a real `ensure` to exit 0 here (needs the owner's interactive setup consent), and anything on the SSH-approved machine | **Open** | `413ad87` |
+| RFC-MASK-0022-AC08 | ExampleOwnerHost, no hand edits: this repository commits the HTTPS spelling and the machine catalog still records `ssh://git@github.com/~/MikeMarcin/AgentSkills.git`; `mask ensure --dry-run` no longer refuses `source.identity_mismatch` and reaches the `implement-rfc` setup consent step; `mask doctor` reports `migration.identity_canonicalization`; ExampleReview (SSH spelling) reports ready. Not yet run: a real `ensure` to exit 0 here (needs the owner's interactive setup consent), and anything on the SSH-approved machine | **Open** | `413ad87` |
 
 Closeout review runtime: not run. A skipped required native or owner check leaves its criterion open.

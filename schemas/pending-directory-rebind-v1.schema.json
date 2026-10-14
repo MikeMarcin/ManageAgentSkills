@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mask:pending:directory-rebind:v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "operation",
+    "root",
+    "scope",
+    "before",
+    "after"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "operation": {
+      "const": "directory.rebind"
+    },
+    "root": {
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "project",
+        "user"
+      ]
+    },
+    "before": {
+      "type": "object",
+      "required": [
+        "state.json",
+        "integration.json",
+        "integrations.json",
+        "selection-policy.json"
+      ],
+      "properties": {
+        "state.json": {
+          "type": "string"
+        },
+        "integration.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "integrations.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection-policy.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "after": {
+      "type": "object",
+      "required": [
+        "state.json",
+        "integration.json",
+        "integrations.json",
+        "selection-policy.json"
+      ],
+      "properties": {
+        "state.json": {
+          "type": "string"
+        },
+        "integration.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "integrations.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection-policy.json": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

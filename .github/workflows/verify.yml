@@ -1,0 +1,43 @@
+name: Source checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: MASK disposable fixture suite
+        run: python -B scripts/run_tests.py -j 6 --slowest 5
+      - name: Private source preparation scope
+        if: github.event.repository.private
+        run: echo 'Private preparation runs MASK tests. Canonical documentation and companion integrations require the explicit local AgentSkills checkout; no private companion token is installed.'
+      - name: Checkout public AgentSkills companion
+        if: '!github.event.repository.private'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: MikeMarcin/AgentSkills
+          path: .ci-agent-skills
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Public documentation and companion integrations
+        if: '!github.event.repository.private'
+        run: |
+          python -m pip install -r .ci-agent-skills/requirements-dev.txt
+          python -B scripts/verify_documentation.py --root . --agent-skills .ci-agent-skills
+          python -B .ci-agent-skills/scripts/verify_mask_examples.py --mask-program .
+          python -B .ci-agent-skills/scripts/verify_rfc_bundle.py --mask-program .
+          python -B .ci-agent-skills/scripts/verify_selected_skill_imports.py --mask-program .

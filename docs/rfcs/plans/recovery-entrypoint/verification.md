@@ -60,9 +60,9 @@ observed as incomplete at entry and does not prevent this source correction.
 ## Live recovery and update
 
 Transaction `24e6c819-77a1-4099-86b2-c06624bf760c` contained staged implement-rfc
-publication for PlaceOfMind. Its selected observations included eight consumers,
+publication for ExampleNotes. Its selected observations included eight consumers,
 but its remaining effects were only 18 role entries, the role lock and matching
-registry ownership in PlaceOfMind. There were no pending link, typed control,
+registry ownership in ExampleNotes. There were no pending link, typed control,
 selection or program changes. All 18 role files already matched the recorded
 after-state before recovery.
 

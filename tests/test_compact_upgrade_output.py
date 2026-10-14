@@ -9,13 +9,13 @@ import mask_present as present
 class CompactUpgradeOutput(unittest.TestCase):
     def task(self):
         root = os.path.abspath(os.sep + 'fixture')
-        projects = ['AgentSkills', 'AllTheThings', 'BetterPullReview', 'ChessStudyBuddy',
-                    'FindInMedia', 'GolfSwingFeedback', 'ManageAgentSkills', 'PlaceOfMind', 'SiftThroughLogs']
+        projects = ['AgentSkills', 'ExampleTools', 'ExampleReview', 'ExampleStudy',
+                    'ExampleMedia', 'ExampleSport', 'ManageAgentSkills', 'ExampleNotes', 'ExampleLogs']
         roots = [os.path.join(root, 'personal')]
-        roots += [os.path.join(root, 'worktrees', name, 'BetterPullReview') for name in ('15a6', '6264', '6ead', 'd061')]
+        roots += [os.path.join(root, 'worktrees', name, 'ExampleReview') for name in ('15a6', '6264', '6ead', 'd061')]
         roots += [os.path.join(root, 'projects', name) for name in projects]
-        roots.append(os.path.join(root, 'other', 'aito'))
-        skipped = os.path.join(root, 'tasks', 'GolfSwingFeedback')
+        roots.append(os.path.join(root, 'other', 'example-owner'))
+        skipped = os.path.join(root, 'tasks', 'ExampleSport')
         error = dict(code='upgrade.commit_ineligible', message='An attached branch with an existing HEAD is required.')
         roles = [agent + '/rfc-role-' + str(i) for agent in ('claude', 'codex') for i in range(9)]
         changes = [dict(coordinate='agentskills/' + skill, before_commit='a' * 40, after_commit='b' * 40)
@@ -37,9 +37,9 @@ class CompactUpgradeOutput(unittest.TestCase):
         for path in roots:
             actions += [dict(kind='link.replace', path=os.path.join(path, '.agents', 'skills', 'implement-rfc')),
                         dict(kind='lock.write', path=os.path.join(path, '.mask.lock.json'))]
-            if os.path.basename(path) == 'AllTheThings':
+            if os.path.basename(path) == 'ExampleTools':
                 continue
-            targets = [role for role in roles if role.startswith('codex/')] if os.path.basename(path) == 'FindInMedia' else roles
+            targets = [role for role in roles if role.startswith('codex/')] if os.path.basename(path) == 'ExampleMedia' else roles
             actions.append(dict(kind='setup.run', root=path, skill='implement-rfc', coordinate='agentskills/implement-rfc',
                                 fingerprint='5c0ee271ca58', interpreter='/python', native_roles=targets,
                                 path=os.path.join(root, 'store', 'payload', 'implement-rfc', 'scripts', 'prepare_mask_roles.py')))

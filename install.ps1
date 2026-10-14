@@ -1,8 +1,7 @@
 # MASK installer for Windows.
 #
-#   $install = gh api repos/MikeMarcin/ManageAgentSkills/contents/install.ps1 -H 'Accept: application/vnd.github.raw+json'
-#   if ($LASTEXITCODE -ne 0) { throw 'Could not download the MASK installer.' }
-#   Invoke-Expression ($install -join "`n")
+#   $install = (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1').Content
+#   Invoke-Expression $install
 #
 # It clones ManageAgentSkills (or fast-forwards an existing clone), then runs the program's own
 # `self install` to write the `mask.cmd` launcher. Nothing is elevated, your PATH is not edited, and
@@ -11,14 +10,15 @@
 #
 #   MASK_INSTALL_DIR  where the program clone lives   (default: %LOCALAPPDATA%\mask\program)
 #   MASK_BIN_DIR      where the launcher is written   (default: %LOCALAPPDATA%\mask\bin)
-#   MASK_REPO         Git URL/path to clone           (default: authenticated gh repo clone)
+#   MASK_REPO         Git URL/path to clone           (default: public HTTPS Git URL)
+#   MASK_CLONE_WITH_GH  1 to use an existing authenticated gh session instead
 #   MASK_PYTHON       Python 3.11+ interpreter to use (default: py -3, then python)
 #
 # The whole script is one function called on the last line, so a download that is cut short runs nothing.
 $ErrorActionPreference = 'Stop'
 
 function Install-Mask {
-    $repo = $env:MASK_REPO
+    $repo = if ($env:MASK_REPO) { $env:MASK_REPO } else { 'https://github.com/MikeMarcin/ManageAgentSkills.git' }
     $dir = if ($env:MASK_INSTALL_DIR) { $env:MASK_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'mask\program' }
     $bin = if ($env:MASK_BIN_DIR) { $env:MASK_BIN_DIR } else { Join-Path $env:LOCALAPPDATA 'mask\bin' }
     $check = 'import sys; sys.exit(sys.version_info < (3, 11))'
@@ -53,15 +53,15 @@ function Install-Mask {
         $before = $null
         Write-Host "Installing MASK into $dir"
         New-Item -ItemType Directory -Force -Path (Split-Path $dir) | Out-Null
-        if ($repo) {
+        if ($env:MASK_CLONE_WITH_GH -ne '1') {
             git clone --quiet $repo $dir
             if ($LASTEXITCODE -ne 0) { throw "Could not clone $repo. Check its address and your Git credentials." }
         } else {
             if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-                throw "GitHub CLI is required for the private MASK repository. Install gh and run 'gh auth login', or set MASK_REPO."
+                throw "GitHub CLI is required for the authenticated MASK checkout. Install gh and run 'gh auth login', or set MASK_REPO."
             }
             gh repo clone MikeMarcin/ManageAgentSkills $dir -- --quiet
-            if ($LASTEXITCODE -ne 0) { throw "Could not clone the private MASK repository. Run 'gh auth status', or set MASK_REPO." }
+            if ($LASTEXITCODE -ne 0) { throw "Could not clone the authenticated MASK checkout. Run 'gh auth status', or set MASK_REPO." }
         }
     }
 

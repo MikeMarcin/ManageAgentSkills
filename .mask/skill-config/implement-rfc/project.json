@@ -32,7 +32,7 @@
   },
   "terminal_rfc_status": "Auto-Verified",
   "structure_gate": [
-    "python scripts/verify_documentation.py --root ."
+    "python3 scripts/verify_documentation.py --root . --agent-skills ../AgentSkills"
   ],
   "attended_review_skill": "attended-review",
   "station_registry_doc": "docs/development/remote-stations.md",

@@ -14,7 +14,7 @@ acceptance: [{"criterion":"Doctor reports unavailable project/user scopes, conti
 
 ## Evidence
 
-On macOS (Darwin 25.6.0, Python 3.14.7), at `7ccf671`, a registered project had been deleted: a Claude Code worktree under `BetterPullReview/.claude/worktrees/bpr-dif-integration-rfc-3c2904`.
+On macOS (Darwin 25.6.0, Python 3.14.7), at `7ccf671`, a registered project had been deleted: a Claude Code worktree under `ExampleReview/.claude/worktrees/bpr-dif-integration-rfc-3c2904`.
 
 - `mask doctor --all --check` exited 5 with `filesystem.failed`, "A filesystem operation failed.", and empty `details`, even with `--debug`. It did not name the path or say what to run next.
 - Traceback, taken by hooking `MaskError`: `mask.diagnostics` → `mask_fs.plan` → `mask_pinned.observe` (line 247) → `mask_ensure.workspace_observation` (line 408) → `mask_core.identity` → `Path.stat()` raised `FileNotFoundError`.

@@ -508,6 +508,9 @@ def local_dispatch(args, output, leaves):
     if command == 'recover':
         mode = 'inspect' if getattr(args, 'inspect', False) else 'complete' if getattr(args, 'complete', False) else 'rollback'
         pending = core.read_json(home / 'pending.json', 'recovery', default={})
+        if pending.get('operation') == 'directory.rebind':
+            import mask_identity
+            return mask_identity.recover(home, output, mode)
         if str(pending.get('operation', '')).startswith('integration.'):
             return integration_ops.recover(home, output, mode)
         return fs.recover(home, output, mode)

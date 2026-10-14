@@ -11,10 +11,13 @@ import sys
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path.cwd())
-    root = parser.parse_args().root.resolve()
-    assets = root / 'skills/implement-rfc'
+    parser.add_argument('--agent-skills', type=Path, required=True,
+                        help='Explicit canonical AgentSkills source checkout (no personal installation required).')
+    args = parser.parse_args()
+    root = args.root.resolve()
+    assets = args.agent_skills.resolve() / 'skills/implement-rfc'
     if not (assets / 'scripts/board_model.py').is_file():
-        assets = root / '.agents/skills/implement-rfc'
+        parser.error('--agent-skills must contain skills/implement-rfc/scripts/board_model.py; clone AgentSkills first')
     sys.path.insert(0, str(assets / 'scripts'))
     import board_model as board
     import project_config

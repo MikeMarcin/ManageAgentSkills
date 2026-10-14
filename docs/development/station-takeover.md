@@ -22,7 +22,7 @@ Structure gate: 23 RFCs / 127 cards, zero violations. Concise changed-code revie
 checked portable keys, source identity, bounds, cache-only races and explicit rejection.
 
 Root's read-only actual environment observations on 2026-09-29: normal `python3 mask.py
-status --project ROOT --check --json` for BetterPullReview and AgentSkills both exit 0,
+status --project ROOT --check --json` for ExampleReview and AgentSkills both exit 0,
 `ready_pinned`, zero issues. The installed implement-rfc artifact's 101 Python sources
 and 5 bytecode files have identical before/after SHA-256 maps. Installed workflow
 preflight now reports ready with the configured project and personal rfc-implementer
@@ -31,7 +31,7 @@ stop was performed. No live native Windows evidence is claimed.
 
 Paired final AgentSkills engineering handoff:
 bf257dabf48dde0527dc8e92e012095d71e7126c; ASK-0091 acceptance
-bb82eb8c32ee14a80ef9cdbcfa9d443690c9be58. The coordinator's BetterPullReview
+bb82eb8c32ee14a80ef9cdbcfa9d443690c9be58. The coordinator's ExampleReview
 read-only dev-link preview has no blockers and exactly two skill links plus state
 record; actual deployment and new-chat host loading remain unperformed. Native
 owner-proxy stop could not be qualified on this host (absent existing control socket).

@@ -12,7 +12,7 @@ acceptance: [{"criterion":"AC1","outcome":"pass","revision":"76e00d1485bbbc691bf
 
 # MASK-0134: mask upgrade stops paying for a system-wide thread walk and a process per package file on Windows
 
-Owner request, 2026-10-03, from the Windows BetterPullReview lane.
+Owner request, 2026-10-03, from the Windows ExampleReview lane.
 
 ## What happened
 

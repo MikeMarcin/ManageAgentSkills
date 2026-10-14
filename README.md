@@ -7,18 +7,17 @@ Approve a Git repository of skills (a *tap*, such as [AgentSkills](https://githu
 ## Install once
 
 ```sh
-gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh \
-  -H 'Accept: application/vnd.github.raw+json' | sh
+curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh
 ```
 
 ```powershell
-$install = gh api repos/MikeMarcin/ManageAgentSkills/contents/install.ps1 -H 'Accept: application/vnd.github.raw+json'
-if ($LASTEXITCODE -ne 0) { throw 'Could not download the MASK installer.' }
-Invoke-Expression ($install -join "`n")
+$install = (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1').Content
+Invoke-Expression $install
 ```
 
-Needs Python 3.11+, Git, and an authenticated GitHub CLI (`gh auth login`) because
-this repository is private. Nothing runs as root and your shell profile is left
+Needs Python 3.11+ and Git. The HTTPS route works when this repository is public;
+before the visibility switch, use existing authenticated Git access as described in
+the [installation guide](docs/guides/installation.md#private-or-prepublication-access). Nothing runs as root and your shell profile is left
 alone. Run the same installer again to cross a reviewed MASK schema/protocol update;
 ordinary compatible updates can use `mask update`.
 
@@ -26,7 +25,7 @@ ordinary compatible updates can use `mask update`.
 <summary>Prefer to do it by hand?</summary>
 
 ```sh
-git clone git@github.com:MikeMarcin/ManageAgentSkills.git
+git clone https://github.com/MikeMarcin/ManageAgentSkills.git
 mkdir -p "$HOME/.local/bin"
 python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"
 "$HOME/.local/bin/mask" tap agentskills https://github.com/MikeMarcin/AgentSkills.git

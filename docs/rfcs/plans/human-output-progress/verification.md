@@ -67,10 +67,10 @@ progress at the presentation boundary, outside task decisions and result JSON.
 ## Pasted failure and remaining live state
 
 Read-only recovery inspection found a staged implement-rfc publication for
-PlaceOfMind in transaction `24e6c819-77a1-4099-86b2-c06624bf760c`, following the four
+ExampleNotes in transaction `24e6c819-77a1-4099-86b2-c06624bf760c`, following the four
 published setup groups shown in the user's transcript. The old failure path did
 not preserve its original cause, so that cause cannot be established afterward.
-The retained workspace observations currently differ at BetterPullReview's HEAD
+The retained workspace observations currently differ at ExampleReview's HEAD
 and at this MASK checkout's HEAD (which this source task has advanced). This is
 current drift, not proof of the original failure. The journal and live deployments
 were not modified, completed or rolled back by this task.

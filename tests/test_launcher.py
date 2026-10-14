@@ -181,9 +181,13 @@ class LauncherTests(Fixture):
     def program_terminal(self, program, answer):
         """mask update on a POSIX pseudoterminal, answering its one [y/N] question."""
         import pty, select, time
+        environment = dict(os.environ, TERM='xterm')
+        environment.pop('NO_COLOR', None)
+        if answer is None:
+            environment['NO_COLOR'] = '1'
         master, slave = pty.openpty()
         process = subprocess.Popen([sys.executable, '-B', str(program / 'mask.py'), 'update', '--home', str(self.home)], stdin=slave, stdout=slave, stderr=slave,
-                                   env=dict(os.environ, TERM='xterm', NO_COLOR='1') if answer is None else dict(os.environ, TERM='xterm'), close_fds=True)
+                                   env=environment, close_fds=True)
         os.close(slave)
         transcript, answered, deadline = b'', False, time.monotonic() + 60
         try:

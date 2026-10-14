@@ -35,7 +35,7 @@ def tests(suite, found):
 
 def run(name):
     start = time.monotonic()
-    done = subprocess.run([sys.executable, '-B', '-m', 'unittest', name], cwd=ROOT, stdin=subprocess.DEVNULL,
+    done = subprocess.run([sys.executable, '-B', '-m', 'unittest', '-v', name], cwd=ROOT, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8', errors='replace')
     ran = re.search(r'^Ran (\d+) test', done.stdout, re.MULTILINE)
     skipped = re.search(r'skipped=(\d+)', done.stdout)
@@ -66,6 +66,9 @@ def main():
             name, code, text, seconds, ran, skip = future.result()
             total, skipped = total + ran, skipped + skip
             timings.append((seconds, name))
+            if skip:
+                reason = re.search(r"\.\.\. skipped (.+)", text)
+                print(f"SKIP {name}: {reason.group(1) if reason else 'reason unavailable'}", flush=True)
             if code:
                 failed.append(name)
                 print(f'FAIL {name} ({seconds:.1f}s)\n{text.rstrip()}\n', flush=True)

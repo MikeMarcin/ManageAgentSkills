@@ -78,10 +78,10 @@
       "named-bundles"
     ],
     "repository_state": {
-      "source_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-      "workflow_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-      "source_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
-      "workflow_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+      "source_root": "/sanitized-runtime/ManageAgentSkills",
+      "workflow_root": "/sanitized-runtime/ManageAgentSkills",
+      "source_common_dir": "/sanitized-runtime/ManageAgentSkills/.git",
+      "workflow_common_dir": "/sanitized-runtime/ManageAgentSkills/.git",
       "source_branch": "main",
       "source_revision": "d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc",
       "workflow_branch": "main",

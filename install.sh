@@ -1,8 +1,7 @@
 #!/bin/sh
 # MASK installer for macOS and Linux.
 #
-#   gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh \
-#     -H 'Accept: application/vnd.github.raw+json' | sh
+#   curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh
 #
 # It clones ManageAgentSkills (or fast-forwards an existing clone), then runs the program's own
 # `self install` to write the `mask` launcher. Nothing runs as root, nothing is added to your shell
@@ -10,14 +9,15 @@
 #
 #   MASK_INSTALL_DIR  where the program clone lives   (default: ${XDG_DATA_HOME:-$HOME/.local/share}/mask)
 #   MASK_BIN_DIR      where the launcher is written   (default: $HOME/.local/bin)
-#   MASK_REPO         Git URL/path to clone           (default: authenticated gh repo clone)
+#   MASK_REPO         Git URL/path to clone           (default: public HTTPS Git URL)
+#   MASK_CLONE_WITH_GH  1 to use an existing authenticated gh session instead
 #   MASK_PYTHON       Python 3.11+ interpreter to use (default: first of python3, python)
 #
 # The whole script is one function called on the last line, so a download that is cut short runs nothing.
 set -eu
 
 main() {
-    repo=${MASK_REPO:-}
+    repo=${MASK_REPO:-https://github.com/MikeMarcin/ManageAgentSkills.git}
     dir=${MASK_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mask}
     bin=${MASK_BIN_DIR:-$HOME/.local/bin}
 
@@ -47,11 +47,11 @@ main() {
         before=
         say "Installing MASK into $dir"
         mkdir -p "$(dirname "$dir")"
-        if [ -n "$repo" ]; then
+        if [ "${MASK_CLONE_WITH_GH:-0}" != 1 ]; then
             git clone --quiet "$repo" "$dir" || fail "Could not clone $repo. Check its address and your Git credentials."
         else
-            command -v gh >/dev/null 2>&1 || fail "GitHub CLI is required for the private MASK repository. Install gh and run 'gh auth login', or set MASK_REPO."
-            gh repo clone MikeMarcin/ManageAgentSkills "$dir" -- --quiet || fail "Could not clone the private MASK repository. Run 'gh auth status', or set MASK_REPO."
+            command -v gh >/dev/null 2>&1 || fail "GitHub CLI is required for the authenticated MASK checkout. Install gh and run 'gh auth login', or set MASK_REPO."
+            gh repo clone MikeMarcin/ManageAgentSkills "$dir" -- --quiet || fail "Could not clone the authenticated MASK checkout. Run 'gh auth status', or set MASK_REPO."
         fi
     fi
 

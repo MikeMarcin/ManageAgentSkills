@@ -52,7 +52,7 @@ class ShellInstaller(InstallerFixture):
     def install(self, *, default_repository=False, **extra):
         env = dict(os.environ, HOME=str(self.home), MASK_HOME=str(self.base / 'machine'), MASK_REPO=str(self.remote), MASK_PYTHON=sys.executable,
                    PYTHONDONTWRITEBYTECODE='1', GIT_TERMINAL_PROMPT='0')
-        for name in ('XDG_DATA_HOME', 'MASK_INSTALL_DIR', 'MASK_BIN_DIR'):
+        for name in ('XDG_DATA_HOME', 'MASK_INSTALL_DIR', 'MASK_BIN_DIR', 'MASK_CLONE_WITH_GH'):
             env.pop(name, None)
         if default_repository:
             env.pop('MASK_REPO')
@@ -95,16 +95,27 @@ class ShellInstaller(InstallerFixture):
         self.assertNotIn('is not on your PATH', again.stdout)
         self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), self.git(self.author, 'rev-parse', 'HEAD'))
 
-    def test_default_repository_uses_authenticated_gh_clone(self):
+    def test_explicit_authenticated_gh_clone(self):
         binary, log = self.gh_shim()
         installed = self.install(
             default_repository=True,
+            MASK_CLONE_WITH_GH='1',
             PATH=str(binary) + os.pathsep + os.environ['PATH'],
             MASK_TEST_REMOTE=str(self.remote),
             MASK_TEST_GH_LOG=str(log))
         self.assertEqual(installed.returncode, 0, installed.stderr)
         self.assertTrue((self.home / '.local/share/mask/mask.py').is_file())
         self.assertIn('repo clone MikeMarcin/ManageAgentSkills', log.read_text(encoding='utf-8'))
+
+    def test_public_default_uses_https_git_without_gh(self):
+        # Redirect only this exact public URL to the disposable local remote.
+        config = self.base / 'fixture-gitconfig'
+        config.write_text(f'[url "{self.remote.as_posix()}"]\n\tinsteadOf = https://github.com/MikeMarcin/ManageAgentSkills.git\n')
+        installed = self.install(default_repository=True, GIT_CONFIG_GLOBAL=str(config), GIT_CONFIG_SYSTEM=os.devnull)
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        program = self.home / '.local/share/mask'
+        self.assertEqual(self.git(program, 'remote', 'get-url', 'origin'), 'https://github.com/MikeMarcin/ManageAgentSkills.git')
+        self.assertTrue((program / 'mask.py').is_file())
 
     def test_uninstall_removes_its_own_launcher_and_says_what_is_left(self):
         self.assertEqual(self.install().returncode, 0)
@@ -166,6 +177,7 @@ class PowerShellInstaller(InstallerFixture):
             GIT_TERMINAL_PROMPT='0')
         if default_repository:
             env.pop('MASK_REPO')
+        env.pop('MASK_CLONE_WITH_GH', None)
         env.update(extra)
         script = (ROOT / 'install.ps1').read_text(encoding='utf-8')
         return subprocess.run(
@@ -208,10 +220,11 @@ class PowerShellInstaller(InstallerFixture):
         self.assertRegex(again.stdout, r'Updated mask \S+ \([0-9a-f]+ -> [0-9a-f]+\)')
         self.assertEqual(self.git(self.program, 'rev-parse', 'HEAD'), self.git(self.author, 'rev-parse', 'HEAD'))
 
-    def test_default_repository_uses_authenticated_gh_clone(self):
+    def test_explicit_authenticated_gh_clone(self):
         binary, log = self.gh_shim()
         installed = self.install(
             default_repository=True,
+            MASK_CLONE_WITH_GH='1',
             PATH=str(binary) + os.pathsep + os.environ['PATH'],
             MASK_TEST_REMOTE=str(self.remote),
             MASK_TEST_GH_LOG=str(log))

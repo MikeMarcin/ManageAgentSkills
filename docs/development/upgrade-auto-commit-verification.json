@@ -91,7 +91,7 @@
               "exists": true,
               "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.json",
+            "path": "/sanitized-runtime/ManageAgentSkills/.mask.json",
             "unchanged": true
           },
           {
@@ -103,7 +103,7 @@
               "exists": true,
               "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.lock.json",
+            "path": "/sanitized-runtime/ManageAgentSkills/.mask.lock.json",
             "unchanged": true
           },
           {
@@ -115,7 +115,7 @@
               "exists": true,
               "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.gitignore",
+            "path": "/sanitized-runtime/ManageAgentSkills/.gitignore",
             "unchanged": true
           },
           {
@@ -127,7 +127,7 @@
               "exists": true,
               "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
             },
-            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.json",
+            "path": "/sanitized-runtime/AgentSkills/.mask.json",
             "unchanged": true
           },
           {
@@ -139,13 +139,13 @@
               "exists": true,
               "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
             },
-            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.lock.json",
+            "path": "/sanitized-runtime/AgentSkills/.mask.lock.json",
             "unchanged": true
           }
         ],
         "live_roots": [
-          "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-          "/Users/jaeger/Documents/GitHub/AgentSkills"
+          "/sanitized-runtime/ManageAgentSkills",
+          "/sanitized-runtime/AgentSkills"
         ],
         "status": "passed",
         "target_root": "/private/tmp/mask-upgrade-commit-qualification/fixtures"
@@ -174,7 +174,7 @@
               "exists": true,
               "sha256": "25aeaab15c4148a43d8a9835297150931e8fb5db322bb39674b14bc06857878f"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.json",
+            "path": "/sanitized-runtime/ManageAgentSkills/.mask.json",
             "unchanged": true
           },
           {
@@ -186,7 +186,7 @@
               "exists": true,
               "sha256": "e550802db1365967b2327a0bde4d77aae4ec9a0d3e4ba6468fafa51398a4c6d6"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.mask.lock.json",
+            "path": "/sanitized-runtime/ManageAgentSkills/.mask.lock.json",
             "unchanged": true
           },
           {
@@ -198,7 +198,7 @@
               "exists": true,
               "sha256": "9548592f8b9e85c7316d08ab0eca1fdde8de63cc03671cc6547151a4ad84328a"
             },
-            "path": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.gitignore",
+            "path": "/sanitized-runtime/ManageAgentSkills/.gitignore",
             "unchanged": true
           },
           {
@@ -210,7 +210,7 @@
               "exists": true,
               "sha256": "12df4c628381db20eb0a755a9f5de8f0524396218f073dd433ed943806a130e1"
             },
-            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.json",
+            "path": "/sanitized-runtime/AgentSkills/.mask.json",
             "unchanged": true
           },
           {
@@ -222,13 +222,13 @@
               "exists": true,
               "sha256": "447d12ae9dce23ccebf9743329dccffa172eb2a3597f2af886d901563cfd61e3"
             },
-            "path": "/Users/jaeger/Documents/GitHub/AgentSkills/.mask.lock.json",
+            "path": "/sanitized-runtime/AgentSkills/.mask.lock.json",
             "unchanged": true
           }
         ],
         "live_roots": [
-          "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-          "/Users/jaeger/Documents/GitHub/AgentSkills"
+          "/sanitized-runtime/ManageAgentSkills",
+          "/sanitized-runtime/AgentSkills"
         ],
         "status": "passed",
         "target_root": "/private/tmp/mask-upgrade-commit-qualification/fixtures"

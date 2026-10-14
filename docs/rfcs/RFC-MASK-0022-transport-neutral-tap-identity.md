@@ -26,10 +26,10 @@ Transport never changes content trust. Commits, object format and payload digest
 
 - `mask_sources.repository` is documented as "Normalize transport spelling without equating HTTPS and SSH authority". `git@github.com:O/R.git` becomes `ssh://git@github.com/~/O/R.git`, and `tests/test_sources.py` asserts it differs from both `ssh://git@github.com/O/R.git` and the HTTPS form. One GitHub repository therefore has three identities.
 - `mask_resolve.approved` compares `entry['repository'] != expected['repository']` as plain strings and fails `source.identity_mismatch` ("Selection repository or package layout does not match the machine approval."). The comparison is repeated in `mask_resolve` lock checks, `mask_pinned` link resolution, `mask_provenance` authoring-origin checks, and `mask_sources` catalog lookup and cache markers. `binding` derives the cache path from the identity digest.
-- **Between machines.** BetterPullReview `0efe3bf1` committed the tap as `https://github.com/MikeMarcin/AgentSkills.git`. A machine approved over SSH failed `mask ensure`, so `eeb16d13` relocked it as `ssh://git@github.com/~/MikeMarcin/AgentSkills.git`. That in turn failed on JaegAW, which was approved over HTTPS. `--yes` cannot override this, and no public command rebinds a tap: `tap add` refuses `source.alias_conflict`, and `tap remove` refuses `source.referenced`.
-- **On one machine.** ManageAgentSkills' own `.mask.json` pins the HTTPS spelling while BetterPullReview pins the SSH spelling. No single machine approval can make both projects ready.
+- **Between machines.** ExampleReview `0efe3bf1` committed the tap as `https://github.com/MikeMarcin/AgentSkills.git`. A machine approved over SSH failed `mask ensure`, so `eeb16d13` relocked it as `ssh://git@github.com/~/MikeMarcin/AgentSkills.git`. That in turn failed on ExampleOwnerHost, which was approved over HTTPS. `--yes` cannot override this, and no public command rebinds a tap: `tap add` refuses `source.alias_conflict`, and `tap remove` refuses `source.referenced`.
+- **On one machine.** ManageAgentSkills' own `.mask.json` pins the HTTPS spelling while ExampleReview pins the SSH spelling. No single machine approval can make both projects ready.
 - **The canonical SSH spelling is not a usable GitHub URL.** `git ls-remote ssh://git@github.com/~/MikeMarcin/AgentSkills.git` fails with "is not a valid repository name". Only the scp form `git@github.com:MikeMarcin/AgentSkills.git` or the absolute `ssh://git@github.com/MikeMarcin/AgentSkills.git` works, and those two normalize to different identities today.
-- **The only workaround broke a repository rule.** Recovering JaegAW on 2026-09-16 required editing `~/.mask/config.json` (identity, transport, cache path) and `~/.mask/state.json` (the project's `last_manifest`, `last_lock`, every `links.*.resolution.repository`, and both selection digests). AGENTS.md forbids editing MASK internal state as a workaround, so the supported product has no path out.
+- **The only workaround broke a repository rule.** Recovering ExampleOwnerHost on 2026-09-16 required editing `~/.mask/config.json` (identity, transport, cache path) and `~/.mask/state.json` (the project's `last_manifest`, `last_lock`, every `links.*.resolution.repository`, and both selection digests). AGENTS.md forbids editing MASK internal state as a workaround, so the supported product has no path out.
 
 ## Contract
 
@@ -92,7 +92,7 @@ For SSH, MASK uses the scp form (`git@H:P`), never the `/~/` URI. Every candidat
 - `python scripts/verify_documentation.py --root .` reports zero violations.
 - The full `python -B -m unittest` suite passes.
 
-**RFC-MASK-0022-AC08** — **Owner dogfood.** On the owner's JaegAW machine and on a machine approved over SSH, with no hand edits to `MASK_HOME`, `mask ensure` exits 0 in both BetterPullReview and ManageAgentSkills from the checked-in declarations. The transcripts are recorded in the closeout.
+**RFC-MASK-0022-AC08** — **Owner dogfood.** On the owner's ExampleOwnerHost machine and on a machine approved over SSH, with no hand edits to `MASK_HOME`, `mask ensure` exits 0 in both ExampleReview and ManageAgentSkills from the checked-in declarations. The transcripts are recorded in the closeout.
 
 ## Rollout and rollback
 

@@ -71,10 +71,10 @@
     "usable-upgrade-commits"
   ],
   "repository_state": {
-    "source_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-    "workflow_root": "/Users/jaeger/Documents/GitHub/ManageAgentSkills",
-    "source_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
-    "workflow_common_dir": "/Users/jaeger/Documents/GitHub/ManageAgentSkills/.git",
+    "source_root": "/sanitized-runtime/ManageAgentSkills",
+    "workflow_root": "/sanitized-runtime/ManageAgentSkills",
+    "source_common_dir": "/sanitized-runtime/ManageAgentSkills/.git",
+    "workflow_common_dir": "/sanitized-runtime/ManageAgentSkills/.git",
     "source_branch": "main",
     "source_revision": "fc091529f24e9c08ce11498986585ba604ac14ca",
     "workflow_branch": "main",

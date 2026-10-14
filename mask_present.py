@@ -495,6 +495,8 @@ def workflow_lines(data, verb='will be deployed from', quiet_ready=False):
                 lines.append(f"      {len(roles)} role file(s): {clean(label)}")
                 # Missing generated output needs one diagnosis; conflicts still name every file.
                 if all(row.get('state') == 'setup_required' and not row.get('observed_sha256') for row in roles):
+                    if not skill.get('complete'):
+                        lines.extend(f"        {clean(row.get('agent'))}/{clean(row.get('name'))}" for row in roles)
                     continue
                 lines.append(f"      {clean(note)}")
                 lines.extend(f"        {clean(row.get('path') or str(row.get('agent')) + '/' + str(row.get('name')))}" for row in roles)
@@ -1120,6 +1122,12 @@ def render_forget(data, output):
 
 
 def render_lifecycle(data, output):
+    if data.get('rebind'):
+        verb = 'Rebound' if output['changed'] else 'Would rebind' if output['would_change'] else 'Identity already current for'
+        lines = [f"{verb} {clean(data['scope'])}: {clean(data['root'])}",
+                 '  Existing approvals and managed links preserved.',
+                 '  Run mask repair to check readiness.']
+        return lines + plan_guard(data, output)
     if data.get('recovery'):
         return render_recover(data, output)
     return [headline(output, output['command'])] + actions(output) + workflow_lines(data, quiet_ready=True) + plan_guard(data, output)

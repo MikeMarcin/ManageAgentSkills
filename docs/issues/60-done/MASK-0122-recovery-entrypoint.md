@@ -43,7 +43,7 @@ postconditions. Seven public recovery cases, fourteen human-output cases, four
 retained setup recovery cases and eleven artifact cases pass. Two focused final
 guidance checks pass. No full-suite or native Windows result is claimed.
 
-The reported PlaceOfMind journal was safely completed through reviewed public
+The reported ExampleNotes journal was safely completed through reviewed public
 repair. Its roles and lock match the recorded after-state, the journal is gone,
 and the installed launcher's update succeeds. No setup scripts were rerun, skill
 versions upgraded, internal state hand-edited, pushes or publication performed.

@@ -6,8 +6,8 @@ implementation acceptance evidence.
 ## Offline plan validation
 
 ```sh
-python3 /Users/jaeger/.agents/skills/implement-rfc/examples/milestone-plans/validate.py /Users/jaeger/Documents/GitHub/ManageAgentSkills/docs/rfcs/drafts/upgrade-auto-commit/milestone-plan.json
-python3 /Users/jaeger/.agents/skills/implement-rfc/examples/milestone-plans/validate.py /Users/jaeger/Documents/GitHub/ManageAgentSkills/docs/rfcs/drafts/upgrade-auto-commit/milestone-plan.json --render
+python3 ../AgentSkills/skills/implement-rfc/examples/milestone-plans/validate.py docs/rfcs/drafts/upgrade-auto-commit/milestone-plan.json
+python3 ../AgentSkills/skills/implement-rfc/examples/milestone-plans/validate.py docs/rfcs/drafts/upgrade-auto-commit/milestone-plan.json --render
 ```
 
 Result: exit 0, “Structurally valid; references and semantic coverage unchecked.”

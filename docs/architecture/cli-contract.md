@@ -30,7 +30,9 @@ or all personal skills with `--user`. Bare `mask` is `status`.
 
 `register` creates an empty declaration when necessary, enrolls the selected root,
 restores existing locked versions and completes declared setup. A fresh worktree
-needs only `mask register`. Missing lock bindings are resolved without moving
+needs only `mask register`. `register --rebind` is a separate reviewed recovery task
+for a canonical directory whose inode matches but device number changed. It
+updates existing identity records only, then ends; see [recovery](../guides/recovery.md#device-number-changes-after-restart). Missing lock bindings are resolved without moving
 already locked selections. `install` can enroll a checkout automatically.
 
 `install` and `uninstall` change membership incrementally and reconcile deployment.

@@ -1,7 +1,7 @@
 # Canonical AgentSkills bundle handoff
 
 This bounded 2026-10-02 handoff implements only the named RFC bundle portion of
-MASK-0064. Upstream owns the real [ASK-0095 card](../../../AgentSkills/docs/issues/60-done/ASK-0095-canonical-rfc-bundle.md)
+MASK-0064. Upstream owns the real [ASK-0095 card](https://github.com/MikeMarcin/AgentSkills/blob/main/docs/issues/60-done/ASK-0095-canonical-rfc-bundle.md)
 under RFC-ASK-0015; its mutable tracker is not copied here. Canonical source candidate
 `fb67261a5fd8a69231e963226189fd98458e4d82` adds source index schema v1 with all 16
 existing packages and flat `agentskills/rfc`: author-rfc, grill-rfc, grill-me,
@@ -35,7 +35,7 @@ Independent amended candidate `de0d3736f4767ac1af49f30f336f6a9c2bcd0314` verifie
 against MASK `d31bf5cbbf85283e275f9668ae8ff8c702b9ddbc`: all four skills ready
 with reviewed setup; all 16 packages remain discoverable; offline uninstall
 retains manually installed grill-me; repeat no-op and healthy reinstall pass.
-[Actual canonical receipt](../../../AgentSkills/docs/development/rfc-bundle-install-uninstall-evidence.json)
+[Actual canonical receipt](https://github.com/MikeMarcin/AgentSkills/blob/main/docs/development/rfc-bundle-install-uninstall-evidence.json)
 binds both prior candidates; this independent checkpoint is historical. No broader
 MASK-0064 acceptance or actual host loading is implied.
 
@@ -45,7 +45,7 @@ MASK-0064 acceptance or actual host loading is implied.
 ASK-0096 completed at `ff9d05a15c767422d00d4f815297bbb3c5a7d5aa`.
 Canonical source/verifier `39a6de558252eb0bf8c3cf9ae0d48f3fb10fa0ee` with MASK
 `b879f8136489a98cfa26e0aae1da7e7e268c589b` passed
-[22 actual public commands](../../../AgentSkills/docs/development/rfc-bundle-upgrade-evidence.json):
+[22 actual public commands](https://github.com/MikeMarcin/AgentSkills/blob/main/docs/development/rfc-bundle-upgrade-evidence.json):
 all four skills ready with reviewed setup; all 16 packages remain discoverable and
 validate; offline removal preserves manually selected grill-me, repeat no-op and
 healthy reinstall. Named combined upgrade preview and guarded `upgrade --all`

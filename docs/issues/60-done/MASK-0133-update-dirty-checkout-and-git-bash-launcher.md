@@ -12,7 +12,7 @@ acceptance: [{"criterion": "AC1", "outcome": "pass", "revision": "d61d4d953246d4
 
 # MASK-0133: mask update gets past a dirty program checkout, and Git Bash finds mask on Windows
 
-Owner request, 2026-10-03, from the Windows BetterPullReview lane.
+Owner request, 2026-10-03, from the Windows ExampleReview lane.
 
 ## What happened
 

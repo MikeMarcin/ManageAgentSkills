@@ -4,7 +4,7 @@ Local smoke scenario, structure gate, source dumps, selection locks and the curr
 
 ## Development and reference
 
-For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_end.EndToEndTests.test_public_management_sequence` from this checkout. It uses disposable projects and local bare Git remotes. Run `python3 -B scripts/verify_documentation.py` for the RFC/issue structure gate; choose additional tests for the behavior being changed.
+For a local CLI smoke scenario, run `python3 -B -m unittest tests.test_end_to_end.EndToEndTests.test_public_management_sequence` from this checkout. It uses disposable projects and local bare Git remotes. Run `python3 -B scripts/verify_documentation.py --agent-skills ../AgentSkills` for the RFC/issue structure gate; choose additional tests for the behavior being changed.
 
 Run the whole suite with `python3 -B scripts/run_tests.py`. It runs each test in its own process, one worker per CPU, starting with the tests of the largest classes, and prints output only for a test that fails; `-k TEXT` selects tests whose dotted id contains TEXT (a module or class name works), `-j 1` runs them serially and `--slowest N` lists the slowest tests. `python3 -m unittest MODULE` still works for one module.
 
@@ -57,8 +57,8 @@ consumers deploy isolated store artifacts through the recoverable engine.
 Pinned engine verification is currently local; native pinned-deployment acceptance
 remains pending. [RFC-MASK-0021](../rfcs/RFC-MASK-0021-tap-only-deployment.md) makes deployment tap-only:
 `mask upgrade` fetches taps; its closeout records what
-is qualified. Scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Public profiles, bundles, fleet
-management and full update-impact reports remain RFC work. Importing their specifications does not
+is qualified. Scoped dev-link and isolated source publication are available. Per-binding targeting and local compatibility policy are available. Attributed contribution conflicts are checked. Named bundles are implemented with attributed selection contributions and exact member locks.
+Portable public profiles, fleet management and full update-impact reports remain RFC work. Importing their specifications does not
 make those features available. MASK has no daemon. Source publication requires explicit package paths and separate commit/push flags.
 
 Both named repositories consume the shared skills. Verified bootstrap copies

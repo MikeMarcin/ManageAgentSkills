@@ -88,3 +88,41 @@ To remove MASK itself, first disable its integrations and unregister consumers y
 intend to retire, then preview `mask self uninstall --dry-run`. Self-uninstall removes
 only unchanged launchers that MASK owns, preserves the program checkout and remaining
 data, and reports what remains. Cleanup never deletes arbitrary consumer directories.
+
+## Device-number changes after restart
+
+Registration and integration approvals use the canonical directory path plus
+its device and inode. Ordinary commands still refuse changed identity. When a
+volume's device number changes while the directory inode stays the same, use
+one explicit reviewed recovery step for each affected scope:
+
+```sh
+mask register --project /path/to/project --rebind --dry-run --json
+mask register --project /path/to/project --rebind --approve-plan sha256:HASH_FROM_PREVIEW
+mask register --user --rebind --dry-run --json
+mask register --user --rebind --approve-plan sha256:HASH_FROM_PREVIEW
+mask repair --all
+```
+
+A terminal can instead run `mask register --rebind` and answer its default-no
+question. The step ends after rebinding; it runs no setup and changes no links,
+declarations, locks or approval flags. It updates the selected registration and
+existing project approval `identity`/`common_identity`, matching installed
+integration identities and compatibility override identities. Existing
+repository-wide clone-boundary grants are separate: explicitly reapprove their
+boundary with `mask integration approve --repository ID --under ROOT` if needed.
+
+A replacement inode, changed Git common directory, linked parent, conflicting
+leaf or changed owned link refuses. Review hashes bind exact before/after
+controls; changed approvals refuse `plan.stale`. Inode reuse cannot establish
+physical continuity, so rebind requires the operator's reviewed decision rather
+than automatically trusting equal inodes on different devices. Missing scopes
+can be deliberately abandoned through the existing `unregister --keep-links`
+path, which leaves all content in place.
+
+The `directory.rebind` journal records only fixed machine controls and the
+selected canonical root. Interrupted publication is inspected and completed or
+rolled back with `mask recover`; changed controls or replacement identities
+refuse recovery. No package scripts are replayed. Keep the same program revision
+until the pending operation is resolved. After rebind, ordinary unregister can
+remove only unchanged owned leaf links under its existing checks.

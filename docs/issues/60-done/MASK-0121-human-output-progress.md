@@ -53,8 +53,8 @@ pass. No complete-suite or native Windows acceptance is claimed.
 
 The observational direct preflight reports incomplete installed readiness; its
 receipt is in the runtime session. This source task grants no live readiness
-approval and makes no host-loading claim. The existing staged PlaceOfMind recovery
-remains intact. Current journal drift includes BetterPullReview's HEAD and this
+approval and makes no host-loading claim. The existing staged ExampleNotes recovery
+remains intact. Current journal drift includes ExampleReview's HEAD and this
 checkout's advanced HEAD; the original failure cause was not retained by the old
 program. No live recovery, installed-skill migration, push or publication occurred.
 Unrelated lockfile edits remain preserved; task-owned test execution is quiescent.

@@ -17,7 +17,7 @@ metadata: {"origin":"Field report on macOS after pulling 7ccf671 (2026-09-16)","
 
 On macOS (APFS), `st_dev` for the Data volume changed from `16777230` to `16777231`, most likely after a reboot. Every inode was unchanged, so these were the same directories.
 
-- 7 of 8 scopes (six projects and the personal scope, `/Users/jaeger`) failed with "Registered directory identity changed." The only one that passed had been registered again after the change.
+- 7 of 8 scopes (six projects and the personal scope, `/sanitized-runtime/home`) failed with "Registered directory identity changed." The only one that passed had been registered again after the change.
 - `mask list --user` showed every skill as `excluded`, with "no links expected here".
 - `mask ensure --all --repair` ended `repair.incomplete` and couldn't fix it.
 - `mask project unregister PATH` also refused with `project.identity_changed`, so no public command could recover.

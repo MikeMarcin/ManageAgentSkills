@@ -13,6 +13,9 @@
     },
     {
       "$ref": "pending-integration-v3.schema.json"
+    },
+    {
+      "$ref": "pending-directory-rebind-v1.schema.json"
     }
   ]
 }

@@ -1,7 +1,7 @@
 # ManageAgentSkills local issue board
 
 IDs are MASK-NNNN. NEXT_ID is the next unused ID, including burned reservations.
-Use the [canonical board contract](../../.agents/skills/implement-rfc/references/bookkeeping.md)
+Use the [canonical board contract](https://github.com/MikeMarcin/AgentSkills/blob/main/skills/implement-rfc/references/bookkeeping.md)
 for card schema, commands, acceptance records and guarded commits.
 
 | Folder | Status |

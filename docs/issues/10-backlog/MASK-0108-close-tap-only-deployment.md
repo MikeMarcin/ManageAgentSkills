@@ -106,7 +106,7 @@ Governing RFC: [RFC-MASK-0021](../../rfcs/RFC-MASK-0021-tap-only-deployment.md).
 - **Board:** MASK-0110 to MASK-0112 promoted at `7bd13fe`. Claims: MASK-0106 `c354a59`, MASK-0110 `72f13e2`, MASK-0111 `47a5105`, MASK-0112 `4e8af51`. MASK-0107 stays Ready until its attended ask is prepared.
 - **Facts found:**
   - The global launcher `%LOCALAPPDATA%\Programs\MASK\mask.cmd` runs `C:\code\git\ManageAgentSkills\mask.py`, this main checkout. The owner's `mask` therefore runs whatever the main working tree holds. Product slices work in separate worktrees, and MASK-0107 must run on a clean tree at the recorded candidate.
-  - The host is `JaegAW`: Windows 11 Home 10.0.26200, Python 3.14.6, Git 2.55.0.windows.3, system `core.autocrlf=true`. It is not the registered station host ExampleWinHost.
+  - The host is `ExampleOwnerHost`: Windows 11 Home 10.0.26200, Python 3.14.6, Git 2.55.0.windows.3, system `core.autocrlf=true`. It is not the registered station host ExampleWinHost.
   - The station registry authorizes only the Windows station `mask-win-example-win-host` and names no macOS station. The earlier macOS evidence was run from an integrator on a Mac. No macOS path is authorized from this host.
   - The real AgentSkills clone is at `16192b76ec1bbaee001c718d3e82d447db4f25c5` on `main`, clean, with origin `git@github.com:MikeMarcin/AgentSkills.git`. The qualifier only clones it.
 - **Planned slices:**
