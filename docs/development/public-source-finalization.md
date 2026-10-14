@@ -1,5 +1,9 @@
 # Final public-source preparation evidence
 
+The M3 record below preserves its original licensing wait and verification history.
+The owner subsequently chose MIT; [M4 adoption](#m4-mit-adoption) supersedes that
+wait. Native and post-visibility public CI boundaries remain open.
+
 M3 / MASK-0141 and MASK-0142, mandate `public-prep-final-reconciliation-v1`,
 coordinator-implementer recipe revision 2. This follows
 [M2 verification](../rfcs/plans/public-source-preview/verification.md).
@@ -78,3 +82,27 @@ owner manually dispatches each Source checks workflow on main; visibility alone 
 not a configured trigger. Private CI and local companion evidence do not certify
 the post-switch public checkout/integration branch. The M3 handoff records actual
 ordinary pushes, final remote identities, pending decisions and writer release.
+
+## M4 MIT adoption
+
+On 2026-10-14 the owner selected MIT for original code, skills and documentation
+in both repositories. Mandate `public-prep-mit-adoption-v1` authorizes adoption
+and ordinary main pushes. The [root MIT license](../../LICENSE) and
+[README scope](../../README.md#license) implement that choice. This repository
+contained no tracked LICENSE/NOTICE files to replace. Dependencies and approved
+tap packages retain their own terms and provenance. AgentSkills preserves all
+existing third-party notices and carries its original-contribution MIT notice
+inside each independently distributed skill package.
+
+Accepted input `3f6101d7edafa0da28a71c45c5e1670b764ddcf9` passed exact private CI
+[38533348436](https://github.com/MikeMarcin/ManageAgentSkills/actions/runs/38533348436):
+601 cases, 12 skips, zero failures. This documentation/license-only adoption
+reuses that unchanged runtime evidence. Focused M4 checks and final source/push
+identities are recorded with MASK-0140's closeout and the coordinator handoff.
+Earlier M2/M3 pending-license statements remain historical observations.
+
+The licensing wait is resolved. Visibility and private security-reporting activation
+remain owner actions; after both repositories are public, manually dispatch both
+Source checks workflows and confirm their public companion steps. Native and
+attended roadmap acceptance remains on its live cards. The recorded consumer
+adapter drift is separate from source acceptance and is not repaired by this work.

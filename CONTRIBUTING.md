@@ -6,6 +6,11 @@ Do not treat a detailed RFC packet as completed work. Record actual baseline/int
 
 Use existing Git authentication and avoid adding credentials to skills, config, output or logs. Public projects must keep their contributor contract readable without access to private skill content.
 
+Original code and documentation contributions use the repository's
+[MIT License](LICENSE). Preserve third-party copyright, license notices and
+provenance when adapting material. Tap packages and dependencies keep their own
+terms, as described in the [license scope](README.md#license).
+
 When changing shared skill content, edit the canonical AgentSkills source through ordinary Git, not a per-project copy. MASK links consumers to locked store copies of a tap, so an edit reaches them only after it is pushed and `mask upgrade` runs (or through an explicit `skill dev-link`). MASK can explicitly commit changed project selections and locks with `upgrade --commit`, including their existing uncommitted changes. It preserves unrelated staging and runs normal Git hooks and signing after readiness succeeds. MASK never pushes or synchronizes edits back to skill sources. During the one-time bootstrap phase, follow the recorded temporary-copy instructions and retire those copies at cutover.
 
 ## Fresh source checkout
@@ -40,5 +45,7 @@ MASK suite and declares companion checks as local-only; it uses no extra token.
 
 Native Windows/macOS qualification and attended consumer migrations remain on
 their live cards. Linux CI fixtures establish only the tested Linux behavior.
-Source preview is conditional on an explicit owner license choice; the staged
-trust roadmap is not a completed signed release channel.
+The owner adopted MIT for original contributions on 2026-10-14. Repository
+visibility remains a separate owner action; the staged trust roadmap is not a
+completed signed release channel. After both repositories become public,
+manually dispatch each Source checks workflow to verify its companion checks.

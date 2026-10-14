@@ -1,5 +1,9 @@
 # MASK source preview preparation — M2
 
+This is the historical M2 verification record. The owner selected MIT on
+2026-10-14, and [M4 adoption](../../../development/public-source-finalization.md#m4-mit-adoption)
+supersedes the licensing wait below while retaining all original results.
+
 Assignment: public-source-preview/m2, mandate public-prep-mask-push-v2,
 coordinator-implementer recipe revision 2. Sole MASK engineering writer;
 implementation and self-review, no delegated or independent review. Baseline

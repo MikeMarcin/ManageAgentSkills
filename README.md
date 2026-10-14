@@ -135,3 +135,11 @@ contribution while preserving other selections and held or locally edited member
 - [CLI contract and exit codes](docs/architecture/cli-contract.md) · [Development](docs/guides/development.md) · [Contributing](CONTRIBUTING.md) · [RFCs](docs/rfcs/README.md)
 
 MASK is pre-release (`0.3.0`). It needs no daemon, account or subscription. What has been verified on which platform is recorded in the [acceptance records](docs/development/readiness-acceptance.md).
+
+## License
+
+Original code and documentation are licensed under the [MIT License](LICENSE),
+adopted by the owner on 2026-10-14. Dependencies and skills supplied by approved
+taps retain their own licenses and provenance; MASK's license does not grant
+rights to their content. The companion AgentSkills repository documents its
+[original contributions and third-party notices](https://github.com/MikeMarcin/AgentSkills/blob/main/docs/development/skill-provenance.md).
