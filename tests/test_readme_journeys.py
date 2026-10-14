@@ -39,18 +39,16 @@ from tests.public_support import ENTRY, PublicFixture
 from tests.support import TAP
 
 README = ENTRY.parent / 'README.md'
-PROGRAM_URL = 'git@github.com:MikeMarcin/ManageAgentSkills.git'
+PROGRAM_URL = 'https://github.com/MikeMarcin/ManageAgentSkills.git'
 TAP_URL = 'https://github.com/MikeMarcin/AgentSkills.git'
 INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
                 'mkdir -p "$HOME/.local/bin"',
                 'python3 ManageAgentSkills/mask.py self install --bin-dir "$HOME/.local/bin"',
                 f'"$HOME/.local/bin/mask" tap agentskills {TAP_URL}')
 # The piped installer is proven against a local program repository in tests.test_installer; this module replays the by-hand recipe.
-INSTALLER = ('gh api repos/MikeMarcin/ManageAgentSkills/contents/install.sh \\',
-             "  -H 'Accept: application/vnd.github.raw+json' | sh")
-WINDOWS_INSTALLER = ('$install = gh api repos/MikeMarcin/ManageAgentSkills/contents/install.ps1 -H \'Accept: application/vnd.github.raw+json\'',
-                     "if ($LASTEXITCODE -ne 0) { throw 'Could not download the MASK installer.' }",
-                     'Invoke-Expression ($install -join "`n")')
+INSTALLER = ('curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh',)
+WINDOWS_INSTALLER = ("$install = (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1').Content",
+                     'Invoke-Expression $install')
 IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask upgrade')
 MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 EVERYDAY = {

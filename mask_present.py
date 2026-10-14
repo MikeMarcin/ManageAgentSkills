@@ -1724,6 +1724,7 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'rebind': 'Review device-number recovery for an existing canonical directory with the same inode; preserves existing approvals and ends before setup',
     'bundle': 'Source-qualified bundle name: SOURCE/NAME',
     'source': 'Filter bundles to one approved source alias',
     'replace': 'Replace only this named local bundle contribution; review exclusive removals',

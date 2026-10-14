@@ -46,6 +46,20 @@ class LauncherTests(Fixture):
         import mask_install
         self.assertEqual(sorted(mask_install.RUNTIME_MODULES), list(PROGRAM_MODULES))
 
+    def test_update_refuses_a_candidate_missing_directory_recovery(self):
+        program, author = self.program_checkout()
+        self.git(author, 'rm', 'mask_identity.py')
+        self.git(author, 'commit', '-m', 'incomplete candidate')
+        self.git(author, 'push', 'origin', 'main')
+        before = self.git(program, 'rev-parse', 'HEAD')
+        state = (self.home / 'state.json').read_bytes()
+        refused = self.program(program, 'update', code=4)
+        self.assertEqual(refused['error']['code'], 'source.candidate_invalid')
+        self.assertIn('mask_identity.py', refused['error']['message'])
+        self.assertEqual(self.git(program, 'rev-parse', 'HEAD'), before)
+        self.assertEqual((self.home / 'state.json').read_bytes(), state)
+        self.assertFalse((self.home / 'pending.json').exists())
+
     def test_install_dry_run_refusal_and_native_forwarding(self):
         directory = self.base / 'bin spaced ü'
         before = self.snapshot()
