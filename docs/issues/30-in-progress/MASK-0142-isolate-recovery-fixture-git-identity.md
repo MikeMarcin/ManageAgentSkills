@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0142"
 title: "Make recovery fixture commits independent of host Git identity"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 metadata: {"mandate":"public-prep-final-reconciliation-v1","baseline":"4ba72a7235d8a94d0d8cb386a672a51e671702bc","failed_ci":"38529937342","milestone_plan":{"id":"public-source-ci-repair","path":"docs/rfcs/plans/public-source-ci-repair/milestone-plan.json"}}
