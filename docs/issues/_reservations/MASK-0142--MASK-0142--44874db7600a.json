@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0142"
+  ],
+  "reserve_for": "public-prep-final-ci-repair-m3",
+  "purpose": "",
+  "created": "2026-10-14T08:00:37.057473+00:00",
+  "base": "5648194410dbba068ec46b9929e9430e0a69c43c"
+}
