@@ -106,3 +106,11 @@ remain owner actions; after both repositories are public, manually dispatch both
 Source checks workflows and confirm their public companion steps. Native and
 attended roadmap acceptance remains on its live cards. The recorded consumer
 adapter drift is separate from source acceptance and is not repaired by this work.
+
+M4 license source candidate: `11c5109559f30cdcec229e036559f0a25d203d38`. The root license exactly matches the
+reviewed standard MIT text with the repository-contributor copyright. Focused
+documentation checks pass (24 RFCs / 142 cards); changed local Markdown links and
+whitespace pass. Existing notice-file hashes match the accepted inputs. Outgoing
+commit content, the exact tracked tree and new commit metadata report zero
+Gitleaks findings with forced default rules, empty ignore and full redaction.
+Final bookkeeping/push identities and scan receipts remain in the durable handoff.
