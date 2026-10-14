@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0115"
 title: "Keep registered directory identity valid when macOS renumbers the volume device"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 priority: "P1"
 metadata: {"origin":"Field report on macOS after pulling 7ccf671 (2026-09-16)","milestone_plan":{"id":"public-source-preview","path":"docs/rfcs/plans/public-source-preview/milestone-plan.json"}}
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Public recovery/replacement/unregister/approval/docs acceptance; focused and installed CLI checks pass, full failures corrected narrowly."}},{"criterion":"AC2","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Public recovery/replacement/unregister/approval/docs acceptance; focused and installed CLI checks pass, full failures corrected narrowly."}},{"criterion":"AC3","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Public recovery/replacement/unregister/approval/docs acceptance; focused and installed CLI checks pass, full failures corrected narrowly."}},{"criterion":"AC4","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Public recovery/replacement/unregister/approval/docs acceptance; focused and installed CLI checks pass, full failures corrected narrowly."}},{"criterion":"AC5","outcome":"pass","revision":"3aac8aeb06f5eb36518fffc07a53eae6f11ac7ae","evidence":{"kind":"artifact","path":"docs/rfcs/plans/public-source-preview/verification.md","detail":"Public recovery/replacement/unregister/approval/docs acceptance; focused and installed CLI checks pass, full failures corrected narrowly."}}]
 ---
 
 # MASK-0115: Keep registered directory identity valid when macOS renumbers the volume device
