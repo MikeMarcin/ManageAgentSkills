@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0115"
 title: "Keep registered directory identity valid when macOS renumbers the volume device"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
