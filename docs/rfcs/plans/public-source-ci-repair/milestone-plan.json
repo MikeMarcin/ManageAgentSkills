@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "public-source-ci-repair",
+  "scope": {
+    "issues": [
+      "MASK-0142"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "m3-mask-ci-repair",
+      "outcome": "Private-source recovery tests commit only with explicit fixture identity and pass from an isolated exact candidate without changing behavior assertions.",
+      "work": [
+        {
+          "issue": "MASK-0142"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "MASK-0142 AC1 through AC3 have direct baseline and corrected-candidate evidence, with final CI observation and native skips retained truthfully.",
+        "The corrected candidate is ordinarily pushed, final identities and scans are recorded, and engineering commands are quiescent."
+      ],
+      "boundary": "Narrow M3 CI fixture correction plus its evidence and guarded closeout. No production change, visibility/access, unanswered license adoption, real deployment or model experiment."
+    }
+  ]
+}
