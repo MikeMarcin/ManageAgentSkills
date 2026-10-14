@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0140"
 title: "Prepare MASK source preview and reproducible contributor checks"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 priority: "P1"
