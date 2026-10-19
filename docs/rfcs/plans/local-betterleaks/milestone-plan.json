@@ -1,0 +1,28 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "local-betterleaks",
+  "scope": {
+    "issues": [
+      "MASK-0145"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "local-integration",
+      "outcome": "Contributors can set up pinned BetterLeaks, scan staged/tracked/history locally, and safely opt into a pre-commit check without adding CI work.",
+      "work": [
+        {
+          "issue": "MASK-0145"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "MASK-0145 AC1 through AC4 have direct focused evidence against the exact local candidate; native platform limitations and prior readiness drift are recorded.",
+        "The current checkout has the verified pinned tool and opt-in hook, all authorized source and tracker changes are locally committed, and task-owned commands and writers are quiescent."
+      ],
+      "boundary": "One standalone local integration on ManageAgentSkills main under local-betterleaks-v1; no GitHub scanner, push, global configuration, other consumer or live credential validation."
+    }
+  ]
+}
