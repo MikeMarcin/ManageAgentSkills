@@ -5,7 +5,6 @@ title: "Integrate pinned BetterLeaks for local developer scans"
 status: "Ready"
 rfcs: []
 depends_on: []
-milestone_plan: {"id":"local-betterleaks","path":"docs/rfcs/plans/local-betterleaks/milestone-plan.json"}
 metadata: {"mandate_revision":"local-betterleaks-v1","baseline":"ff24d8a4f1221d1ebad5f4a72ad089378fe4fe19","milestone_plan":{"id":"local-betterleaks","path":"docs/rfcs/plans/local-betterleaks/milestone-plan.json"}}
 ---
 
