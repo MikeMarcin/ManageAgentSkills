@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0144"
+  ],
+  "reserve_for": "public-readme-replay-correction",
+  "purpose": "",
+  "created": "2026-10-19T17:43:37.787256+00:00",
+  "base": "fd2dc1cf82fc47f44399f0d2a575c6f32d1f7a21"
+}
