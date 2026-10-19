@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0143"
+  ],
+  "reserve_for": "public-launch-readme-review",
+  "purpose": "",
+  "created": "2026-10-19T17:30:44.815249+00:00",
+  "base": "1232ff1e7036d4ae0632996ba98d9076667b81c3"
+}
