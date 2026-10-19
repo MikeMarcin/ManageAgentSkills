@@ -15,10 +15,16 @@ $install = (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/MikeMarcin
 Invoke-Expression $install
 ```
 
-Needs Python 3.11+ and Git. The HTTPS route works when this repository is public;
-before the visibility switch, use existing authenticated Git access as described in
-the [installation guide](docs/guides/installation.md#private-or-prepublication-access). Nothing runs as root and your shell profile is left
-alone. Run the same installer again to cross a reviewed MASK schema/protocol update;
+Needs Python 3.11+, Git and directory symlink support. On Windows, enable Developer
+Mode or use an account with symlink privileges. Nothing runs as root and your shell
+profile is left alone. Follow the installer's PATH instructions, then approve the
+companion skill source once:
+
+```sh
+mask tap agentskills https://github.com/MikeMarcin/AgentSkills.git
+```
+
+Run the same installer again to cross a reviewed MASK schema/protocol update;
 ordinary compatible updates can use `mask update`.
 
 <details>
@@ -38,12 +44,16 @@ Keep the clone where it is: the launcher runs MASK from it. On Windows, `self in
 ## In your project
 
 ```sh
-mask install implement-rfc
+mask install code-simplifier
 mask list
 mask upgrade
 ```
 
 `install` locks the selected version and links it for Claude Code and Codex. `upgrade` updates it and puts its declared prerequisites in place, asking before it runs any setup a skill ships. It also reconciles prerequisites when the version is already current. Use `pin` to hold a version across upgrades; its links and setup still receive repairs.
+
+Commit `.mask.json` and `.mask.lock.json` so other checkouts can restore the same
+selections and versions. To use `implement-rfc`, first configure its
+[consumer workflow context](https://github.com/MikeMarcin/AgentSkills#configure-implement-rfc).
 
 ## Make everything work
 
