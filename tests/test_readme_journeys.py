@@ -49,7 +49,8 @@ INSTALL_ONCE = (f'git clone {PROGRAM_URL}',
 INSTALLER = ('curl -fsSL https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.sh | sh',)
 WINDOWS_INSTALLER = ("$install = (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/MikeMarcin/ManageAgentSkills/main/install.ps1').Content",
                      'Invoke-Expression $install')
-IN_YOUR_PROJECT = ('mask install implement-rfc', 'mask list', 'mask upgrade')
+APPROVE_TAP = (f'mask tap agentskills {TAP_URL}',)
+IN_YOUR_PROJECT = ('mask install code-simplifier', 'mask list', 'mask upgrade')
 MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 EVERYDAY = {
     'Add a skill here': 'mask install ID',
@@ -88,7 +89,7 @@ class ReadmeText(unittest.TestCase):
         found = sections(README.read_text(encoding='utf-8'))
         blocks = {name: [tuple(block.splitlines()) for block in FENCE.findall(body)] for name, body in found.items()}
         self.assertEqual({name: rows for name, rows in blocks.items() if rows},
-                         {'Install once': [INSTALLER, WINDOWS_INSTALLER, INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
+                         {'Install once': [INSTALLER, WINDOWS_INSTALLER, APPROVE_TAP, INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
         table = [[cell.strip() for cell in line.strip('|').split('|')] for line in found['Everyday commands'].splitlines() if line.startswith('|')]
         self.assertEqual(table, [['Task', 'Command'], ['---', '---'], *([task, f'`{command}`'] for task, command in EVERYDAY.items())])
 
@@ -194,17 +195,21 @@ class ReadmeRecipes(PublicFixture):
         return json.loads(path.read_text(encoding='utf-8'))['packages'][0]['commit']
 
     def test_install_once_then_in_your_project(self):
-        from tests.public_support import CONSUMER_CONTEXT
-        shutil.copytree(CONSUMER_CONTEXT, self.project / '.mask')
-        for command in IN_YOUR_PROJECT + MAKE_EVERYTHING_WORK:
+        skill = self.source / 'skills/code-simplifier'
+        skill.mkdir()
+        (skill / 'SKILL.md').write_text('---\nname: code-simplifier\ndescription: Fixture skill\n---\n\nFixture only.\n',
+                                       encoding='utf-8', newline='\n')
+        self.publish('quick-start skill')
+        self.assertFalse((self.project / '.mask').exists())
+        for command in APPROVE_TAP + IN_YOUR_PROJECT + MAKE_EVERYTHING_WORK:
             run = self.shell(command)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.assertEqual(self.links(self.project), ['.agents/skills/implement-rfc', '.claude/skills/implement-rfc'])
-        self.assertTrue((self.project / '.codex/agents/rfc-integrator.toml').is_file())
+        self.assertEqual(self.links(self.project), ['.agents/skills/code-simplifier', '.claude/skills/code-simplifier'])
         self.assertTrue((self.project / '.mask.lock.json').is_file())
+        self.assertFalse((self.project / '.mask/skill-config/implement-rfc').exists())
 
     def test_missing_input_preserves_fresh_checkout(self):
-        installed = self.shell(IN_YOUR_PROJECT[0])
+        installed = self.shell('mask install implement-rfc')
         self.assertEqual(installed.returncode, 4, installed.stdout + installed.stderr)
         self.assertIn('workflow.incomplete', installed.stderr)
         self.assertFalse((self.project / '.mask.json').exists())
