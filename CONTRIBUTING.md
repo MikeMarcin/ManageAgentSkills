@@ -11,6 +11,12 @@ Original code and documentation contributions use the repository's
 provenance when adapting material. Tap packages and dependencies keep their own
 terms, as described in the [license scope](README.md#license).
 
+For opt-in local secret checks, run `python3 -B scripts/betterleaks.py setup`,
+then `python3 -B scripts/betterleaks.py staged`. The
+[local scanning guide](docs/development/local-secret-scanning.md) covers tracked
+source/history scans and safe pre-commit hook installation. BetterLeaks runs
+locally only; it is separate from the standard test suite and GitHub workflows.
+
 When changing shared skill content, edit the canonical AgentSkills source through ordinary Git, not a per-project copy. MASK links consumers to locked store copies of a tap, so an edit reaches them only after it is pushed and `mask upgrade` runs (or through an explicit `skill dev-link`). MASK can explicitly commit changed project selections and locks with `upgrade --commit`, including their existing uncommitted changes. It preserves unrelated staging and runs normal Git hooks and signing after readiness succeeds. MASK never pushes or synchronizes edits back to skill sources. During the one-time bootstrap phase, follow the recorded temporary-copy instructions and retire those copies at cutover.
 
 ## Fresh source checkout

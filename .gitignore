@@ -4,6 +4,7 @@
 /.mask/bootstrap-retired/
 __pycache__/
 /artifacts/
+/.tools/
 /.agents/skills/attended-review
 /.claude/skills/attended-review
 /.agents/skills/wizard
