@@ -47,7 +47,7 @@ class LocalChecks(unittest.TestCase):
 
     def command(self, mode, expected=0, script=SCRIPT, env=None):
         result = subprocess.run([sys.executable, "-B", str(script), mode, "--repo", str(self.repo)],
-                                env=env or self.env, capture_output=True, text=True)
+                                cwd=self.root, env=env or self.env, capture_output=True, text=True)
         output = result.stdout + result.stderr
         self.assertTrue(self.sample not in output, "secret sample escaped redaction")
         self.assertEqual(result.returncode, expected, output)
@@ -97,13 +97,23 @@ class LocalChecks(unittest.TestCase):
         (self.repo / ".gitleaks.toml").write_text("prefilter = 'true'\n")
         (self.repo / "data.txt").write_text("github_token = " + self.sample +
                                             " # betterleaks:allow gitleaks:allow\n")
-        for name in (".betterleaksignore", ".gitleaksignore"):
-            (self.repo / name).write_text("data.txt:github-pat:1\n")
         self.git("add", "data.txt")
         env = dict(self.env, BETTERLEAKS_CONFIG_TOML="prefilter = 'true'",
                    GITLEAKS_CONFIG=str(self.repo / ".gitleaks.toml"), BETTERLEAKS_VALIDATION="true")
         self.command("staged", 1, env=env)
         self.command("tracked", 1, env=env)
+        for name in (".betterleaksignore", ".gitleaksignore"):
+            # Caller cwd is outside --repo; its ignore must not affect the target.
+            caller_ignore = self.root / name
+            caller_ignore.write_text("data.txt:github-pat:1\n")
+            self.command("staged", 1, env=env)
+            ignore = self.repo / name
+            ignore.write_text("data.txt:github-pat:1\n")
+            for mode in ("staged", "tracked", "history"):
+                self.assertIn("Source ignore files", self.command(mode, 2, env=env))
+            self.assertEqual(ignore.read_text(), "data.txt:github-pat:1\n")
+            ignore.unlink()
+            caller_ignore.unlink()
 
     def test_fixture_allowlist_is_intersection(self):
         folder = self.repo / "tests"

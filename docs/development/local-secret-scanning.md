@@ -49,6 +49,12 @@ decoding and archive scanning use explicit depths of 5 and 8. The embedded rules
 own filters still apply; scanner success is not proof that every possible secret
 format is absent.
 
+BetterLeaks 1.9.0 reads source-directory ignore files even when an explicit empty
+ignore file is selected. The wrapper therefore refuses a checkout containing
+`.betterleaksignore` or `.gitleaksignore`, including untracked ones, and preserves
+their contents. Review and move those files aside explicitly before scanning;
+this error cannot be mistaken for a clean result.
+
 The only repository exception applies to `generic-credential-uri`, the exact
 files `tests/test_tap_identity.py`, `tests/test_sources.py`, `tests/test_ensure.py`,
 and the literal synthetic password values `secret`, `token` or `TOPSECRET` at

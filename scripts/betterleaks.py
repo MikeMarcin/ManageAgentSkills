@@ -163,6 +163,11 @@ def tracked_snapshot(root: Path, destination: Path) -> None:
 def scan(root: Path, mode: str) -> int:
     _, binary = tool_location()
     check_version(binary)  # Fail before doing any scan work; never auto-install.
+    # v1.9.0 also reads source ignore files even with an explicit empty ignore.
+    # Preserve them and fail closed instead of accepting suppressed findings.
+    if any((root / name).exists() or (root / name).is_symlink()
+           for name in (".betterleaksignore", ".gitleaksignore")):
+        raise CheckError("Source ignore files are present; preserve/review them and move them aside before scanning.")
     if mode == "history" and git(root, "rev-parse", "--is-shallow-repository").strip() == b"true":
         raise CheckError("History scan requires a complete local clone; obtain its history explicitly before retrying.")
     with tempfile.TemporaryDirectory(prefix="mask-betterleaks-") as work:
