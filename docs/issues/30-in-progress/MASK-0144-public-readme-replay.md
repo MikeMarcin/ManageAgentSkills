@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0144"
 title: "Replay the revised public README commands"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: ["MASK-0143"]
 ---
