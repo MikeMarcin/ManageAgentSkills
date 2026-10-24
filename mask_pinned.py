@@ -257,6 +257,38 @@ def observe(roots, state, home, *, user_root=None, blockers=None):
     return observations
 
 
+def unrelated_upgrade_head(pending, root, expected, actual):
+    """A forward, control-free commit cannot alter an immutable link/lock upgrade.
+
+    Setup, development, branch retirement and Git-writing operations retain their
+    original guards. Setup after an upgrade takes a fresh input snapshot.
+    """
+    import re
+    if pending['operation'] != 'upgrade' or any(pending.get(key) for key in
+            ('setup', 'git', 'launcher', 'controls', 'development', 'selection_change', 'native_roles', 'retired_files')):
+        return False
+    old, new = expected['head'], actual['head']
+    if old == new or any(not isinstance(oid, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', oid) for oid in (old, new)):
+        return False
+    # Do not relax observation of the running program's own checkout.
+    if any(entry.get('program_root') == str(root) for entry in pending['before_state'].get('launchers', {}).values()):
+        return False
+    if c.git_frozen(root, 'merge-base', '--is-ancestor', old, new, optional=True) is None:
+        return False
+    # Protect workflow inputs and the exact managed destinations, not unrelated
+    # user-authored skills elsewhere in the same agent discovery directory.
+    paths = {'.mask.json', '.mask.lock.json', '.mask', 'AGENTS.md',
+             '.codex/config.toml', '.claude/settings.json', '.claude/settings.local.json'}
+    for side in ('before_state', 'after_state'):
+        record = c.consumer_records(pending[side]).get(str(root), {})
+        paths.update(record.get('links', {}))
+        paths.update(record.get('native_roles', {}))
+    # Walk the range, not just endpoints: reverted relevant changes still refuse.
+    changed = c.git_frozen(root, 'log', '--format=%H', '--full-history', old + '..' + new,
+                           '--', *(':(literal)' + path for path in sorted(paths)))
+    return not changed
+
+
 def check_observations(pending, home):
     import mask_ensure as readiness
     from mask_setup import frozen_publication, check_frozen_inputs
@@ -295,6 +327,8 @@ def check_observations(pending, home):
                     actual[field] = expected[field]
                 else:
                     actual.pop(field, None)
+        if actual.get('head') != expected.get('head') and unrelated_upgrade_head(pending, root, expected, actual):
+            actual['head'] = expected['head']
         if actual != expected:
             c.fail('recovery.conflict', 'Pinned workspace, index or branch changed.', 8,
                    root=str(root), changed_fields=sorted(key for key in actual.keys() | expected.keys() if actual.get(key) != expected.get(key)))
