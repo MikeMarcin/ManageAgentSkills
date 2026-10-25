@@ -24,3 +24,5 @@ __pycache__/
 /.mask/skill-config/*/native-roles.lock.json
 /.remote-station.json
 .DS_Store
+/.agents/skills/remote-station
+/.claude/skills/remote-station

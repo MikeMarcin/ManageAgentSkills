@@ -53,12 +53,25 @@
       "source": "agentskills"
     },
     {
-      "commit": "fc71c7f2263bed51b2fa89f369db829f22b32dcd",
+      "commit": "049a46e75b2cdcc4b92be6e41c068078db955104",
       "git_object_format": "sha1",
       "id": "implement-rfc",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
       "path": "skills/implement-rfc",
-      "payload_digest": "sha256:a5d3a12460a0154f1b0df99692f3371be3414568c75d42c818b55b2105ea2510",
+      "payload_digest": "sha256:96505b1615cf367eed06153717f8dea0c2f22a51e5aad15fc5080a8e9f928588",
+      "repository": "https://github.com/MikeMarcin/AgentSkills.git",
+      "selector": {
+        "ref": "refs/heads/main"
+      },
+      "source": "agentskills"
+    },
+    {
+      "commit": "049a46e75b2cdcc4b92be6e41c068078db955104",
+      "git_object_format": "sha1",
+      "id": "remote-station",
+      "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "path": "skills/remote-station",
+      "payload_digest": "sha256:9c6817f0cc054779db6ad618b30682d6901e2f58695a707ed7d119e88d9a515a",
       "repository": "https://github.com/MikeMarcin/AgentSkills.git",
       "selector": {
         "ref": "refs/heads/main"
@@ -94,5 +107,5 @@
   ],
   "resolver": "mask-lock-v1",
   "schema_version": 1,
-  "selection_digest": "sha256:88fbdfa5bef01b34052d8c40f5b0bfb79ca59f84f4433914087a434a594fd47d"
+  "selection_digest": "sha256:7d203c074ea59247e03c7021a088dfb9eae75f911e94697a16c45a4ec9bddd41"
 }
