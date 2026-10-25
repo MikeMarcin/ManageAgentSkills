@@ -1,5 +1,5 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+* text=auto eol=lf
 
 # Package fixtures carry declared byte fingerprints; never normalize their line endings.
 docs/rfcs/assets/mask-corrective-ux-readiness/fixtures/** -text
