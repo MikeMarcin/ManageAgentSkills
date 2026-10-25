@@ -148,6 +148,22 @@ def missing_selectors(home, name, entry, selectors):
                'ref' in value and value['ref'] not in refs for value in selectors if value)
 
 
+def invoking(state):
+    """The registered project containing the working directory, if any; it is the preferred canonical checkout."""
+    import os
+    try:
+        root = c.project_root(None)
+    except c.MaskError:
+        return None
+    for known in c.consumer_records(state):
+        try:
+            if os.path.samefile(root, known):
+                return known
+        except OSError:
+            continue
+    return None
+
+
 def dispatch(args, output, home):
     import mask
     import mask_selection as selection
@@ -181,6 +197,11 @@ def dispatch(args, output, home):
                                   row=dict(root=str(root), scope=scope, status='blocked' if unsafe else 'unchanged', changes=[], error=error)))
     if len(set(requested)) != len(requested) or set(requested) - declared:
         c.fail('invocation.invalid', '--skill requires unique SOURCE/ID coordinates declared by the selected consumers.', 2)
+    groups = None
+    if not scoped and not getattr(args, 'independent', False):
+        # One canonical checkout per repository resolves; its other checkouts adopt that result (MASK-0146).
+        import mask_upgrade_groups as grouping
+        groups = grouping.plan(consumers, records, invoking(state), commit_requested, config['git_timeout_seconds'])
     if not consumers:
         output['data'] = dict(consumers=[], fetches={}, network='none')
         if commit_requested:
@@ -212,6 +233,8 @@ def dispatch(args, output, home):
     fetching = not (output['dry_run'] or getattr(args, 'catalog_refreshed', False) or getattr(args, 'offline', False) or getattr(args, 'expect_plan_hash', None) is not None)
     fetches = {name: dict(NOT_ATTEMPTED) for name in sorted(taps)}
     disclosure = dict(consumers=rows, fetches=fetches, network='fetch' if fetching and taps else 'none')
+    if groups is not None:
+        disclosure['groups'] = groups
     if commit_requested:
         disclosure['commits'] = [commits.result_row(item['root'], item['scope']) for item in consumers]
     output['data'] = dict(disclosure)  # A refusal after the fetch phase still discloses its effects.
@@ -231,7 +254,7 @@ def dispatch(args, output, home):
     import mask_bundles as bundles
     locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers = {}, {}, {}, [], {}, []
     blocked = [item['row']['root'] for item in consumers if item['row']['status'] == 'blocked']
-    for item in active:
+    def resolve(item):
         row = item['row']
         failed = [name for name in item['taps'] if name in failures]
         if failed:
@@ -239,7 +262,7 @@ def dispatch(args, output, home):
                 raise failures[failed[0]]
             row.update(status='blocked', error=failures[failed[0]].as_dict())
             blocked.append(row['root'])
-            continue
+            return
         previous = r.lock(r.read_model(r.lock_path(item['root'], item['scope'], home), 'lock')[0])
         try:
             declaration = item['declaration']
@@ -269,7 +292,7 @@ def dispatch(args, output, home):
                 raise
             row.update(status='blocked', error=error.as_dict(), requires_fetch=error.code in ('lock.resolution_required', 'bundle.catalog_required'))
             blocked.append(row['root'])
-            continue
+            return
         locks[row['root']] = proposal
         item['previous_lock'] = previous
         proposals[row['root']] = declaration
@@ -282,18 +305,62 @@ def dispatch(args, output, home):
             row['bundle_changes'] = update
             bundle_updates.append(update)
         planned_consumers.append(item)
+
+    def final_of(item):
+        """The control bytes the activation leaves in a planned project consumer."""
+        key = item['row']['root']
+        final = commits.controls(item['root'])
+        if proposals[key] != item['declaration']:
+            final['.mask.json'] = c.text_json(proposals[key]).encode('utf-8')
+        if locks[key] != item['previous_lock']:
+            final['.mask.lock.json'] = c.text_json(locks[key]).encode('utf-8')
+        return final
+
+    def member(item):
+        group, key = item['group'], item['row']['root']
+        canonical = group['canonical']
+        if canonical not in planned_consumers:
+            group['disclosure'].update(action='blocked', reason='canonical_blocked')
+            item['row'].update(status='blocked', error=c.MaskError(
+                'upgrade.canonical_blocked', 'The canonical checkout of this repository was not upgraded; this checkout was left unchanged.', 4,
+                details=dict(root=key, canonical=canonical['row']['root'])).as_dict())
+            blocked.append(key)
+            return
+        final = {path: c.digest(value) if value is not None else None for path, value in final_of(canonical).items()}
+        action, reason = grouping.adoption(item, group['canonical_git']['controls'], final, commit_requested)
+        group['disclosure'].update(action=action, reason=reason)
+        if action == 'independent':
+            item['fallback'] = reason
+            resolve(item)
+            return
+        previous = r.lock(r.read_model(r.lock_path(item['root'], item['scope'], home), 'lock')[0])
+        declaration, proposal = (proposals[canonical['row']['root']], locks[canonical['row']['root']]) if action == 'adopt' else (item['declaration'], previous)
+        locks[key], proposals[key], descriptors[key], item['previous_lock'] = proposal, declaration, {}, previous
+        item['row'].update(status='unchanged' if proposal == previous and declaration == item['declaration'] else 'updated',
+                           changes=changes(previous, proposal), adopted_from=canonical['row']['root'])
+        planned_consumers.append(item)
+
+    for item in active:
+        if item.get('group', {}).get('role') != 'member':
+            resolve(item)
+    for item in active:
+        if item.get('group', {}).get('role') == 'member':
+            member(item)
     commit_rows, commit_observations, final_controls = [], {}, {}
     if commit_requested:
         for item in consumers:
             key, scope = item['row']['root'], item['scope']
             final = commits.controls(item['root']) if scope == 'project' else {}
             if item in planned_consumers and scope == 'project':
-                if proposals[key] != item['declaration']:
-                    final['.mask.json'] = c.text_json(proposals[key]).encode('utf-8')
-                if locks[key] != item['previous_lock']:
-                    final['.mask.lock.json'] = c.text_json(locks[key]).encode('utf-8')
-            row, observed_git = commits.plan(item['root'], scope, final, config['git_timeout_seconds'],
-                                             skipped=item not in planned_consumers)
+                final = final_of(item)
+            grouped = item.get('group', {}).get('role') == 'member' and item in planned_consumers
+            if grouped and item.get('fallback'):
+                row, observed_git = commits.uncommitted(item['root'], scope, item['fallback']), None
+            elif grouped:
+                row, observed_git = commits.plan_member(item['root'], scope, final, item['group']['canonical']['row']['root'], config['git_timeout_seconds'])
+            else:
+                row, observed_git = commits.plan(item['root'], scope, final, config['git_timeout_seconds'],
+                                                 skipped=item not in planned_consumers)
             if item['row']['status'] == 'blocked' and scope == 'project':
                 row.update(status='blocked', error=item['row']['error'])
             commit_rows.append(row)
@@ -303,6 +370,23 @@ def dispatch(args, output, home):
             if row['status'] == 'blocked' and item in planned_consumers:
                 item['row'].update(status='blocked', error=row['error'])
                 blocked.append(key)
+        by_root = {row['root']: row for row in commit_rows}
+        for item in planned_consumers:
+            group = item.get('group', {})
+            row = by_root[item['row']['root']]
+            if group.get('role') == 'member' and row['status'] == 'planned':
+                # A member at the canonical HEAD is fast-forwarded to the canonical commit; any other is cherry-picked.
+                canonical_head = by_root[group['canonical']['row']['root']]['before_head']
+                row['propagation'] = 'fast_forward' if row['before_head'] == canonical_head else 'cherry_pick'
+            if group.get('role') == 'member' and row['status'] == 'planned' and \
+                    by_root[group['canonical']['row']['root']]['status'] == 'blocked':
+                # Adopting the controls of a canonical checkout that cannot commit would leave an unrecorded copy.
+                error = c.MaskError('upgrade.canonical_blocked', 'The canonical checkout of this repository cannot commit; this checkout was left unchanged.', 4,
+                                    details=dict(root=row['root'], canonical=group['canonical']['row']['root'])).as_dict()
+                row.update(status='blocked', error=error)
+                item['row'].update(status='blocked', error=error)
+                group['disclosure'].update(action='blocked', reason='canonical_blocked')
+                blocked.append(row['root'])
         disclosure['commits'] = commit_rows
         output['data'].update(disclosure)
         planned_consumers = [item for item in planned_consumers if item['row']['status'] != 'blocked']
@@ -314,7 +398,7 @@ def dispatch(args, output, home):
         planned = fs.plan(config, state, selected, home=home, proposals=proposals, lock_proposals=locks,
                           operation='upgrade', payload_views=payload_views, repair_roles=True, retire_files=False)
         planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=[row for row in rows if row['status'] == 'blocked'],
-                                             bundles=descriptors,
+                                             bundles=descriptors, groups=groups,
                                              skipped=[row['root'] for row in rows if row['status'] == 'skipped'],
                                              commit=dict(enabled=commit_requested, rows=commit_rows,
                                                          observations={key: commits.fresh_observation(item['root'], commit_observations[key], config['git_timeout_seconds'])
@@ -355,11 +439,16 @@ def dispatch(args, output, home):
         raise
     commit_errors = []
     if commit_requested and not output['dry_run']:
-        for row in commit_rows:
+        by_root = {row['root']: row for row in commit_rows}
+        for row in sorted(commit_rows, key=lambda row: 'canonical' in row):
             if row['status'] == 'planned':
-                progress.phase('Committing project controls at ' + row['root'])
+                progress.phase(('Propagating the upgrade commit to ' if 'canonical' in row else 'Committing project controls at ') + row['root'])
                 try:
-                    commits.execute(row, commit_observations[row['root']], final_controls[row['root']], config['git_timeout_seconds'])
+                    if 'canonical' in row:
+                        source = dict(by_root[row['canonical']], branch=commit_observations[row['canonical']]['branch'])
+                        commits.propagate(row, commit_observations[row['root']], final_controls[row['root']], source, config['git_timeout_seconds'])
+                    else:
+                        commits.execute(row, commit_observations[row['root']], final_controls[row['root']], config['git_timeout_seconds'])
                 except KeyboardInterrupt:
                     for remaining in commit_rows:
                         if remaining['status'] == 'planned':

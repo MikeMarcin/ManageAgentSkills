@@ -41,12 +41,58 @@ Normal Git identity, hooks and signing apply, with the configured Git timeout.
 MASK creates no empty commit and never pushes.
 
 `--all --commit` makes at most one commit per eligible project on its current
-branch, including linked worktrees. Personal skills upgrade normally and report
+branch; checkouts of one repository share one commit, as described below. Personal skills upgrade normally and report
 `not_applicable`; `--user --commit` is invalid. Prospective differing controls need
 an attached branch with an existing HEAD, regular nonignored controls, no unmerged
 entries and no active merge, rebase, cherry-pick, revert or bisect. An ineligible
 project refuses before consumer changes; under `--all` only that project is blocked.
 Controls that already match HEAD need no commit eligibility check.
+
+### One upgrade per repository
+
+`upgrade --all` upgrades each repository once. Registered checkouts are one
+repository when they are linked worktrees (they share a Git common directory) or
+clones whose `origin` remote has the same normalized fetch URL (`https://host/o/r.git`,
+`git@host:o/r` and `ssh://git@host/o/r` are the same). Other remotes are not compared,
+so forks that share an `upstream` remote stay separate. Personal skills, non-Git
+checkouts and unrelated repositories are upgraded on their own, as before.
+
+In each repository one canonical checkout resolves the upgrade: the checkout you run
+the command in when it belongs to that repository, otherwise the checkout on the
+origin default branch (`origin/HEAD`, or `main`/`master` when that is unknown),
+preferring clean project controls, then the first path. With `--commit` the canonical
+checkout needs an attached branch. When two or more checkouts qualify and none is on
+the default branch, the repository is blocked with `upgrade.group_ambiguous`; run the
+command inside the intended checkout, or use `--independent`.
+
+The other checkouts adopt the canonical result without resolving again when their
+`.mask.json` and `.mask.lock.json` equal the canonical checkout's starting controls;
+the adopted bytes are identical. With `--commit` an adopting checkout must also have
+clean controls. It then receives the canonical commit: a checkout at the canonical
+HEAD is fast-forwarded to that very commit, and any other checkout gets a
+cherry-picked commit with the same author, message and controls, made with normal
+hooks and signing. A detached HEAD is propagated the same way; a cherry-pick there is
+reported as reachable only from that HEAD, and MASK creates or moves no branch for it.
+A separate clone first fetches the canonical commit from the canonical checkout by
+local path, without writing `FETCH_HEAD` or any ref. Nothing is pushed.
+
+A checkout whose controls have uncommitted changes, or differ from the canonical
+start (so a cherry-pick could conflict), is upgraded on its own and never committed:
+its commit row reports `uncommitted` with the reason. Pull or rebase it, then run
+`mask repair`. A checkout that already has the canonical result is only made ready.
+If the canonical checkout is blocked or cannot commit, its repository's other
+checkouts are blocked with `upgrade.canonical_blocked` and left unchanged.
+
+The preview and `data.groups` show each repository's identity, canonical checkout and
+reason, and every member's branch and action (`canonical`, `adopt`, `current`,
+`independent`, `skipped` or `blocked`); commit rows show `propagation`
+(`fast_forward` or `cherry_pick`). The plan hash covers the grouping and each member's
+Git observation. `mask upgrade --all --independent` restores separate per-checkout
+upgrades and commits.
+
+Checkouts registered in another MASK home, such as WSL clones of a Windows checkout,
+are not coordinated. After the commit reaches them, run `git pull --ff-only` and
+`mask repair` there; repair acquires locked commits that the tap cache lacks.
 
 Preview with `mask upgrade --commit --dry-run --json`, then pass the shown hash
 with `--approve-plan`. The preview discloses paths, existing changes, message and

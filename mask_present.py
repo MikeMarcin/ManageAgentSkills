@@ -684,26 +684,73 @@ def consumer_count(rows):
     return ' and '.join(parts) or 'no consumers'
 
 
+PROPAGATION = {'fast_forward': 'fast-forwarded to', 'cherry_pick': 'cherry-picked as'}
+MEMBER_ACTIONS = {
+    'canonical': 'upgrades here', 'adopt': 'adopts the canonical result', 'current': 'already has the canonical result',
+    'independent': 'upgraded on its own', 'skipped': 'skipped', 'blocked': 'blocked'}
+MEMBER_REASONS = {
+    'invoking_checkout': 'this checkout', 'only_candidate': 'only eligible checkout', 'default_branch': 'default branch',
+    'default_branch_first_path': 'default branch; first by path', 'ambiguous': 'no checkout on the default branch; run inside the intended one or use --independent',
+    'no_candidate': 'no eligible canonical checkout', 'controls_modified': 'its project controls have uncommitted changes',
+    'controls_diverged': 'its project controls differ from the canonical start; pull or rebase, then mask repair',
+    'dev_link': 'development link', 'canonical_blocked': 'the canonical checkout was not upgraded'}
+
+
+def group_lines(data):
+    """One block per repository with several registered checkouts (MASK-0146)."""
+    lines = []
+    for group in data.get('groups') or []:
+        canonical = group.get('canonical')
+        lines.append(f"  Repository {clean(group['identity'])}: " +
+                     (f"canonical {clean(canonical)} ({clean(MEMBER_REASONS.get(group['reason'], group['reason']))})" if canonical else
+                      clean(MEMBER_REASONS.get(group['reason'], group['reason']))))
+        for member in group['members']:
+            if member['root'] == canonical:
+                continue
+            where = clean(member['branch']) if member.get('branch') else 'detached HEAD' if member.get('detached') else 'no HEAD'
+            text = f"    {clean(member['root'])} ({where}): {MEMBER_ACTIONS.get(member['action'], clean(member['action'] or 'pending'))}"
+            if member.get('reason') and member['action'] not in ('adopt', 'current') and member['reason'] != group['reason']:
+                text += ' - ' + clean(MEMBER_REASONS.get(member['reason'], member['reason']))
+            lines.append(text)
+    return lines
+
+
 def commit_lines(data, *, details=False):
     rows = data.get('commits') or []
     if not details:
         lines, planned = [], {}
         for row in rows:
-            if row['status'] == 'planned':
+            if row['status'] == 'planned' and 'canonical' not in row:
                 key = (tuple(row['paths']), row['message'])
                 planned.setdefault(key, []).append(row)
         for (paths, message), group in planned.items():
             lines.append(f"  Git commit: {plural(len(group), 'local commit')} after readiness succeeds")
             lines.append('    paths: ' + ', '.join(paths) + '; message: ' + clean(message))
+        propagated = [row for row in rows if row['status'] == 'planned' and 'canonical' in row]
+        if propagated:
+            lines.append(f"  Git propagation: {plural(len(propagated), 'checkout')} receive the canonical commit (never pushed)")
+            for row in propagated:
+                method = 'fast-forward' if row.get('propagation') == 'fast_forward' else 'cherry-pick'
+                if row.get('detached') and row.get('propagation') != 'fast_forward':
+                    method += ' on its detached HEAD; the commit is reachable only from that HEAD'
+                lines.append(f"    {clean(row['root'])}: {method}")
         for row in rows:
             if row['status'] == 'planned' and row['included_existing_changes']:
                 lines.append(f"    {clean(row['root'])} includes existing changes: " + ', '.join(row['included_existing_changes']))
-        committed = [row for row in rows if row['status'] == 'committed']
+        committed = [row for row in rows if row['status'] == 'committed' and 'canonical' not in row]
         if committed:
             lines.append(f"  Git commits: {plural(len(committed), 'local commit')} created.")
             if len(committed) == 1:
                 row = committed[0]
                 lines.append(f"    {clean(row['root'])}: {short(row.get('commit'))}")
+        for row in rows:
+            if row['status'] == 'committed' and 'canonical' in row:
+                lines.append(f"  Git propagation: {clean(row['root'])} {PROPAGATION.get(row.get('propagation'), 'received')} {short(row.get('commit'))}")
+                if row.get('detached_only'):
+                    lines.append('    reachable only from that detached HEAD; create a branch there to keep it')
+        uncommitted = [row for row in rows if row['status'] == 'uncommitted']
+        for row in uncommitted:
+            lines.append(f"  Not committed: {clean(row['root'])} -{clean(MEMBER_REASONS.get(row.get('reason'), row.get('reason')))}")
         unstarted = sum(row['status'] == 'not_attempted' for row in rows)
         if unstarted:
             lines.append(f"  Git commits: not attempted in {plural(unstarted, 'project')}.")
@@ -722,7 +769,12 @@ def commit_lines(data, *, details=False):
         label = clean(row['root']) + (' (personal)' if row['scope'] == 'user' else '')
         detail = clean(row['status']) + (f" {short(row['commit'])}" if row.get('commit') else '')
         lines.append(f'  Git commit: {label}: {detail}')
-        if row['status'] == 'planned':
+        if 'canonical' in row:
+            lines.append('    from canonical ' + clean(row['canonical']) + (f" ({PROPAGATION[row['propagation']]} {short(row.get('commit'))})" if row.get('propagation') in PROPAGATION else '') +
+                         ('; detached HEAD' if row.get('detached') else ''))
+        if row['status'] == 'uncommitted':
+            lines.append('    ' + clean(MEMBER_REASONS.get(row.get('reason'), row.get('reason'))))
+        if row['status'] == 'planned' and 'canonical' not in row:
             lines.append('    paths: ' + ', '.join(row['paths']) + '; message: ' + clean(row['message']))
             if row['included_existing_changes']:
                 lines.append('    includes existing changes: ' + ', '.join(row['included_existing_changes']))
@@ -778,6 +830,9 @@ def render_upgrade(data, output):
     taps = fetch_lines(data)
     lines = (taps + [''] if taps else []) + [head]
     lines.extend(version_lines([row for row in rows if row.get('status') in ('unchanged', 'updated')]))
+    grouped = group_lines(data)
+    if grouped:
+        lines += [''] + grouped
     for row in rows:
         if row.get('status') in ('unchanged', 'updated'):
             continue
@@ -1333,6 +1388,7 @@ def task_review(proposal, output, *, details=False):
         lines.append('  Versions in ' + clean(consumer['root']))
         lines.extend('    ' + clean(item['coordinate']) + ': ' + clean(item.get('before_commit')) + ' -> ' + clean(item.get('after_commit'))
                      for item in consumer['changes'])
+    lines.extend(group_lines(output['data']))
     lines.extend(commit_lines(output['data'], details=True))
     # One code disclosure can cover several consumers of the same frozen payload.
     for item in shared.values():
@@ -1419,6 +1475,8 @@ def compact_task_review(output, rows, shared, exact):
             locations = list(dict.fromkeys(item['roots']))
             where = plural(len(locations), 'location') + (': ' + clean(locations[0]) if len(locations) == 1 else '')
             lines.append(f"      {plural(len(roles), 'role file')} for {targets} in {where}")
+    if data.get('groups'):
+        lines += [''] + group_lines(data)
     if data.get('commits'):
         lines += [''] + commit_lines(data)
     lines.extend(blocked_consumer_lines(data))

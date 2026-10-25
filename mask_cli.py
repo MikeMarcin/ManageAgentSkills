@@ -32,7 +32,7 @@ COMMANDS = {
     'install': (True, True, [('ids', 'many')] + SINGLE + [('agent', 'repeat')] + REFRESH),
     'uninstall': (True, False, [('ids', 'many')] + SINGLE),
     'list': (False, False, SCOPES + [('include-unmanaged', 'flag'), ('limit', 'int'), ('offset', 'int')]),
-    'upgrade': (True, True, [('ids', 'some')] + SCOPES + [('allow-ref-rebind', 'flag'), ('commit', 'flag')] + REFRESH),
+    'upgrade': (True, True, [('ids', 'some')] + SCOPES + [('allow-ref-rebind', 'flag'), ('commit', 'flag'), ('independent', 'flag')] + REFRESH),
     'pin': (True, False, [('id', 'optional')] + SCOPES),
     'unpin': (True, False, [('id', 'optional')] + SCOPES),
     'repair': (True, True, SCOPES + OFFLINE),
@@ -59,7 +59,7 @@ HELP = {
     'install': ('Add skills to this checkout and complete their setup. --user selects personal skills. Review any scripts or replacements before consumer files change.', 'mask install implement-rfc\nmask install implement-rfc --user'),
     'uninstall': ('Remove selected skills from this checkout and its managed deployment. Shared cached versions remain until cleanup.', 'mask uninstall implement-rfc\nmask uninstall implement-rfc --user'),
     'list': ('List selected skills and versions in this checkout. --user selects personal skills; --all lists every registered checkout and personal skills.', 'mask list\nmask list --all'),
-    'upgrade': ('Upgrade this checkout, including installed bundle definitions, and make its skills ready. --user selects personal skills; --all upgrades every registered checkout plus personal skills. IDs select package versions only, keeping bundle definitions frozen. --commit records the final changed .mask.json and .mask.lock.json after readiness, including existing changes, with normal Git hooks and signing. Unrelated staging is preserved; personal controls are never committed. A commit failure preserves applied upgrades. Preview with --dry-run before approving setup.', 'mask upgrade\nmask upgrade --commit\nmask upgrade --commit --dry-run\nmask upgrade --user\nmask upgrade --all --commit'),
+    'upgrade': ('Upgrade this checkout, including installed bundle definitions, and make its skills ready. --user selects personal skills; --all upgrades every registered checkout plus personal skills. With --all, checkouts of one repository (linked worktrees, or clones with the same origin URL) are upgraded once: a canonical checkout (this checkout if it is one, else the one on the default branch) resolves, and the others adopt its exact controls; with --commit they receive its commit by fast-forward or cherry-pick, a detached HEAD included. A checkout with modified or diverged controls is upgraded on its own and left uncommitted. --independent upgrades and commits every checkout separately. IDs select package versions only, keeping bundle definitions frozen. --commit records the final changed .mask.json and .mask.lock.json after readiness, including existing changes, with normal Git hooks and signing. Unrelated staging is preserved; personal controls are never committed; nothing is pushed. A commit failure preserves applied upgrades. Preview with --dry-run before approving setup.', 'mask upgrade\nmask upgrade --commit\nmask upgrade --commit --dry-run\nmask upgrade --user\nmask upgrade --all --commit --dry-run\nmask upgrade --all --commit\nmask upgrade --all --independent'),
     'repair': ('Restore this checkout to its declared, pinned state, including required setup. Interrupted setup is reviewed first at its recorded location, even in another checkout. --user selects personal skills; --all restores every registered installation.', 'mask repair\nmask repair --all'),
     'recover': ('Inspect an interrupted operation. Bare recover changes nothing. Advanced modes complete validated effects or roll back journaled changes without rerunning package scripts; repair offers guided recovery.', 'mask recover\nmask repair\nmask recover --complete --dry-run\nmask recover --rollback --dry-run'),
     'pin': ('Hold SKILL at its installed version. --all holds every skill in this checkout; --user selects personal skills. Upgrade still completes readiness.', 'mask pin implement-rfc\nmask pin --all --user'),
@@ -122,6 +122,7 @@ def parser(engine, common, parser_type, add_argument, help_entries):
             add_argument(leaf, name, shape)
         if command == 'upgrade':
             next(action for action in leaf._actions if action.dest == 'commit').help = 'Commit changed project controls after readiness, including existing MASK changes'
+            next(action for action in leaf._actions if action.dest == 'independent').help = 'With --all, upgrade every checkout separately instead of once per repository'
         if command in ('pin', 'unpin'):
             next(action for action in leaf._actions if action.dest == 'all').help = 'Select every skill in the chosen checkout or personal scope'
         if mutates:
@@ -149,6 +150,8 @@ def normalize(argv):
 def validate(args):
     if args.command == 'upgrade' and getattr(args, 'commit', False) and getattr(args, 'user', False):
         c.fail('invocation.invalid', '--commit requires a project scope; personal controls are never committed.', 2)
+    if args.command == 'upgrade' and getattr(args, 'independent', False) and not getattr(args, 'all', False):
+        c.fail('invocation.invalid', '--independent applies only to --all; a single checkout is always upgraded on its own.', 2)
     if args.command == 'recover' and not any(getattr(args, mode, False) for mode in ('inspect', 'complete', 'rollback')):
         args.inspect = True
     scope = [name for name in ('project', 'user', 'all') if getattr(args, name, False)]

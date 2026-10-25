@@ -75,8 +75,23 @@ With the option, `data.commits` contains one row per selected consumer: `root`,
 `scope`, `status`, `paths`, `included_existing_changes`, `message`, `before_head`,
 `after_head`, `commit` and nullable structured `error`. Git IDs can be null. Statuses
 are `planned`, `not_needed`, `not_applicable`, `blocked`, `not_attempted`, `committed`,
-`failed` and `unknown`. An observed commit remains visible even when Git errors or
+`failed`, `unknown` and `uncommitted`. An observed commit remains visible even when Git errors or
 post-commit checks fail. `transaction` continues to describe filesystem effects.
+
+## Repository groups
+
+`upgrade --all` groups registered projects that share a Git common directory or a
+normalized `origin` fetch URL, upgrades one canonical checkout per group and lets the
+others adopt its exact controls. `--independent` (valid only with `--all`) disables
+grouping. `data.groups` lists `identity`, `canonical`, `reason` and `members`, each
+with `root`, `branch`, `detached`, `head`, `action` and `reason`. With `--commit`, a
+member's commit row adds `canonical`, `propagation` (`fast_forward` or
+`cherry_pick`), `detached` and, after success, `canonical_commit` and
+`detached_only`. Members that fall back to an independent upgrade report
+`uncommitted` with a `reason`. `upgrade.group_ambiguous` and
+`upgrade.canonical_blocked` block a group's members; `upgrade.canonical_commit_missing`
+reports a member that could not receive a commit. The plan hash binds the groups.
+See [one upgrade per repository](../guides/sources-and-updates.md#one-upgrade-per-repository).
 
 ## Review and JSON
 
