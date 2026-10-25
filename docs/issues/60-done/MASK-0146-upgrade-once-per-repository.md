@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0146"
 title: "Upgrade once per repository and propagate to its other registered checkouts"
-status: "In Progress"
+status: "Done"
 rfcs: []
 depends_on: []
 metadata: {"mandate_revision":"upgrade-once-per-repository-v1","baseline":"8acc16ce935f05820f10500fdc61fb3b16c6ff4d","requested":"2026-10-25","follow_up":"MASK-0147"}
+acceptance: [{"criterion":"AC1","outcome":"pass","revision":"813b4a9e8b7729ea495dda56c44f59ced439feb4","evidence":{"kind":"observation","detail":"tests.test_upgrade_groups: dry-run/JSON groups, canonical invoking_checkout and default_branch_first_path selection, member actions, approve-plan over the grouped hash; --independent restores per-checkout rows and is rejected without --all (exit 2)."}},{"criterion":"AC2","outcome":"pass","revision":"813b4a9e8b7729ea495dda56c44f59ced439feb4","evidence":{"kind":"observation","detail":"Real Git: one canonical commit; feature worktree and same-HEAD clone fast-forwarded to it; clone with local work and detached worktree cherry-picked (same author/date/message, detached_only reported, no branch created); dirty clone uncommitted; unrelated repo commits on its own; origin and origin/main unmoved; failed canonical hook leaves members not_attempted."}},{"criterion":"AC3","outcome":"pass","revision":"813b4a9e8b7729ea495dda56c44f59ced439feb4","evidence":{"kind":"observation","detail":"11 tests: URL normalization, union of common dir and origin, canonical ranking, ambiguity/detached/operation/dev-link, adoption rules; integration with two worktrees, three clones and an unrelated repo; ambiguous feature worktrees block outside and succeed inside."}},{"criterion":"AC4","outcome":"pass","revision":"813b4a9e8b7729ea495dda56c44f59ced439feb4","evidence":{"kind":"observation","detail":"Help, README, sources-and-updates guide and CLI contract updated. Full suite baseline 8acc16c: 601 tests/43 skipped/5 failed (test_directory_rebind Windows KeyError); candidate: 612/43/same 5. Documentation gate 0 violations; git diff --check clean."}}]
 ---
 
 # Upgrade once per repository
