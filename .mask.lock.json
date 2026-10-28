@@ -66,12 +66,12 @@
       "source": "agentskills"
     },
     {
-      "commit": "049a46e75b2cdcc4b92be6e41c068078db955104",
+      "commit": "2f83c317ae91bc44367473ce3b0ab0ca07858a84",
       "git_object_format": "sha1",
       "id": "remote-station",
       "metadata_digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
       "path": "skills/remote-station",
-      "payload_digest": "sha256:9c6817f0cc054779db6ad618b30682d6901e2f58695a707ed7d119e88d9a515a",
+      "payload_digest": "sha256:640efad6ba82b8e73ee74e7291ba8ebd09467d20021bb76818525ba751565d5c",
       "repository": "https://github.com/MikeMarcin/AgentSkills.git",
       "selector": {
         "ref": "refs/heads/main"
@@ -107,5 +107,5 @@
   ],
   "resolver": "mask-lock-v1",
   "schema_version": 1,
-  "selection_digest": "sha256:7d203c074ea59247e03c7021a088dfb9eae75f911e94697a16c45a4ec9bddd41"
+  "selection_digest": "sha256:722d69dd705aa44adbadaa672c01936bff69f5042d9a9693e3158c4c02f81870"
 }
