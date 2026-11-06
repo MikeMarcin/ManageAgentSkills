@@ -696,6 +696,10 @@ def main(argv=None):
                 command_path = ' '.join(('mask', *prefix))
                 raise MaskError('invocation.invalid', f"A subcommand is required for '{command_path}'." if members else 'A command is required.', 2,
                                 details=dict(command_path=command_path, subcommands=members))
+            if args.command == 'rpc':
+                mask_cli.validate(args)
+                import mask_rpc
+                return mask_rpc.stdio(machine_home(args))
             output = result(args.command, getattr(args, 'dry_run', False))
             import mask_progress
             visible = not machine and sys.stdout.isatty() and args.command in ('install', 'uninstall', 'upgrade', 'repair', 'register', 'update', 'cleanup', 'tap', 'tap.fetch', 'recover')

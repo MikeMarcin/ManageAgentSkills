@@ -344,7 +344,7 @@ def validate_pending(pending, home):
     import mask_selection as selection
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
-             ('git', 'launcher', 'controls', 'files', 'pinned', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
+             ('git', 'launcher', 'controls', 'files', 'pinned', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files', 'fleet'), 'recovery', versions=(1, 2, 3))
     if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set-targets', 'user.register', 'user.unregister', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove', 'profile.subscribe', 'profile.unsubscribe'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
@@ -499,6 +499,12 @@ def validate_pending(pending, home):
             continue
         if not isinstance(text, str) or c.state(c.parse_json(text, 'state')) != expected:
             c.fail('recovery.conflict', 'Pending state text disagrees with intent.', 8)
+    if 'fleet' in pending:
+        import mask_rpc
+        try:
+            mask_rpc.validate_journal(pending)
+        except c.MaskError as error:
+            c.fail('recovery.conflict', 'Invalid fleet receipt journal binding.', 8, cause=error.as_dict())
     return pending
 
 
@@ -511,6 +517,9 @@ def pending_manifest_path(pending, entry, home):
 def check_current(pending, home, *, side='after'):
     """Preflight every recoverable before/after state before any recovery effect."""
     validate_pending(pending, home)
+    if 'fleet' in pending:
+        import mask_rpc
+        mask_rpc.check_journal(home, pending)
     if 'development' in pending:
         pinned.check_development(pending, side=side)
     if 'pinned' in pending:
@@ -665,6 +674,11 @@ def restore(pending, home, side, *, inject=False):
         path.unlink()
     if inject:
         checkpoint('state')
+    if 'fleet' in pending:
+        import mask_rpc
+        mask_rpc.restore_journal(home, pending, side)
+        if inject:
+            checkpoint('fleet-receipt')
 
 
 def check_final_controls(pending, home, side):
@@ -678,6 +692,10 @@ def check_final_controls(pending, home, side):
 
 def clear_pending(home, pending, side='after'):
     check_final_controls(pending, home, side)
+    if 'fleet' in pending:
+        import mask_rpc
+        if mask_rpc.check_journal(home, pending) != mask_rpc.journal_record(pending, side):
+            c.fail('recovery.conflict', 'Fleet receipt is not committed for the recovered side.', 8)
     path = home / 'pending.json'
     if c.read_json(path, 'recovery') != pending:
         c.fail('recovery.conflict', 'Pending journal changed before cleanup.', 8)

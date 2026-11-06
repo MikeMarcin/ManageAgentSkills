@@ -25,6 +25,7 @@ COMMANDS = {
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
     'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag'), ('limit', 'int'), ('offset', 'int'), ('output', 'value')]),
+    'rpc': (False, False, [('stdio', 'flag')]),
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
     'fleet.device.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
@@ -66,6 +67,7 @@ KEEP = ('config.show', 'config.set', 'inventory', 'skill.where-used', 'skill.val
         'launch', 'workspace.forget', 'link.adopt', 'recover', 'tap.transport', 'lock', 'self.status', 'self.install', 'self.uninstall')
 
 HELP = {
+    'rpc': ('Read one bounded signed MASK RPC request on stdin and respond on stdout.', 'mask rpc --stdio'),
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
     'fleet.device.init': ('Bind a stable device identity to a distinct local OpenSSH signing key.', None),
     'fleet.device.authorize': ('Review a local policy granting a controller access to registered scopes and approved sources.', 'mask fleet device authorize --policy FILE --dry-run --json'),
@@ -184,6 +186,8 @@ def normalize(argv):
 
 
 def validate(args):
+    if args.command == 'rpc' and (not getattr(args, 'stdio', False) or getattr(args, 'json', False)):
+        c.fail('invocation.invalid', 'Use mask rpc --stdio with binary framed input and output.', 2)
     if args.command == 'upgrade' and getattr(args, 'commit', False) and getattr(args, 'user', False):
         c.fail('invocation.invalid', '--commit requires a project scope; personal controls are never committed.', 2)
     if args.command in ('upgrade', 'update.report') and getattr(args, 'independent', False) and not getattr(args, 'all', False):
