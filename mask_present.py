@@ -1861,7 +1861,7 @@ def compact_help(version, groups):
               '  mask inventory --all             List skills across registered scopes',
               '  mask upgrade --help              Understand upgrade scope before fetching',
               '',
-              'Options:', '  --dry-run   Preview changes without applying or fetching (mutating commands)',
+              'Options:', '  --dry-run   Preview without applying (fleet previews may contact enrolled devices or Git)',
               '  --yes       Accept ordinary confirmation; never authorizes package setup',
               '  --json      Emit structured output for scripts; never prompt',
               '  --home DIR  Use a different MASK state directory',

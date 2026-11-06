@@ -96,7 +96,8 @@ def intent_shape(intent):
     if not isinstance(action, str) or action not in PAYLOADS:
         invalid('Unsupported RPC action.')
     payload = intent['payload']
-    optional = {'prepare': ('acquire', 'artifacts', 'profile'), 'apply': ('profile',), 'inspect': ('rollout',)}.get(action, ())
+    optional = {'prepare': ('acquire', 'artifacts', 'profile'), 'apply': ('profile',), 'inspect': ('rollout',),
+                'upgrade-apply': ('profile', 'desired')}.get(action, ())
     c.fields(payload, PAYLOADS[action], optional, family='rpc')
     if action == 'prepare' and payload.get('acquire', 'exact') not in ('cached', 'exact'):
         invalid('Unsupported exact artifact acquisition policy.')
@@ -428,9 +429,11 @@ def validate_journal(pending):
     fleet.number(before['sequence'], minimum=1)
     fleet.token(before['scope'])
     c.fields(after, before.keys(), family='recovery')
-    if any(pending.get(key) for key in ('git', 'controls', 'launcher', 'setup', 'retired_files', 'development', 'manifests', 'files')):
+    combined = pending['operation'] == 'upgrade'
+    forbidden = ('git', 'controls', 'launcher', 'setup', 'retired_files', 'development', 'manifests')
+    if any(pending.get(key) for key in forbidden) or not combined and pending.get('files'):
         c.fail('recovery.conflict', 'A fleet apply journal cannot change local controls or run setup.', 8)
-    if pending['operation'] != 'apply' or len(pending['selected']) != 1 or before['action'] != 'apply' or before['status'] != 'accepted' or before['result'] is not None or before['generation'] != pending['base_generation']:
+    if pending['operation'] not in ('apply', 'upgrade') or len(pending['selected']) != 1 or before['action'] != 'apply' or before['status'] != 'accepted' or before['result'] is not None or before['generation'] != pending['base_generation']:
         c.fail('recovery.conflict', 'Fleet journal requires one accepted pinned apply.', 8)
     result = after['result']
     rollout = 'contribution' in before
@@ -440,6 +443,9 @@ def validate_journal(pending):
     old = c.consumer_records(pending['before_state'])[root].get('profiles', {})
     new = c.consumer_records(pending['after_state'])[root].get('profiles', {})
     changed = {name for name in old.keys() | new.keys() if old.get(name) != new.get(name)}
+    if combined and (not rollout or contribution_name(before) not in old.keys() & new.keys()
+                     or any(row['role'] not in ('project_lock', 'user_lock') for row in pending['files'])):
+        c.fail('recovery.conflict', 'A combined fleet upgrade changes only an existing contribution and its local lock.', 8)
     if rollout:
         name = contribution_name(before)
         desired = new.get(name)

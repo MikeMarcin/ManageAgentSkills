@@ -38,6 +38,14 @@ def validate_payload(action, value):
         rpc.digest(value['observed'])
     if action == 'upgrade-apply':
         c.fields(value['candidate'], ('declaration', 'lock'), family='rpc', versions=())
+        if ('profile' in value) != ('desired' in value):
+            rpc.invalid('An upgrade contribution must bind its exact published desired revision.')
+        if 'profile' in value:
+            if value['profile'] is None:
+                rpc.invalid('Fleet upgrade cannot remove a contribution.')
+            c.fields(value['desired'], ('sequence', 'revision'), family='rpc', versions=())
+            fleet.number(value['desired']['sequence'], minimum=1)
+            rpc.digest(value['desired']['revision'])
         commit = value['commit']
         if commit is None:
             return
@@ -76,7 +84,7 @@ def network_options(root, endpoint):
 
 
 def advertised(root, endpoint, timeout):
-    answer = c.git(root, *network_options(root, endpoint), 'ls-remote', '--refs', '--exit-code', 'origin', REF,
+    answer = c.git(root, *network_options(root, endpoint), 'ls-remote', '--refs', '--exit-code', endpoint, REF,
                    timeout=timeout, max_output=1024)
     oid, _, ref = answer.partition('\t')
     if ref != REF or not OID.fullmatch(oid):
@@ -114,7 +122,7 @@ def fleet_protocol(root, revision):
     return constants[0] if len(constants) == 1 else None
 
 
-def program_observation(home, payload, policy, *, acquire=False):
+def program_origin(home, payload, policy):
     root = program_root()
     config = config_at(home)
     timeout = min((config or {}).get('git_timeout_seconds', 30), 20)
@@ -124,28 +132,26 @@ def program_observation(home, payload, policy, *, acquire=False):
     actual, endpoint = origin(root, timeout)
     if actual != approved:
         c.fail('fleet.program_origin_denied', 'The program checkout origin differs from its device grant.', 4)
+    return root, approved, endpoint, config, timeout
+
+
+def program_observation(payload, context, objects):
+    root, approved, endpoint, _, timeout = context
     observed = git.checkout_preconditions(root, 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
     before, candidate = observed['revision'], payload['candidate']
-    if advertised(root, endpoint, timeout) != candidate:
-        c.fail('plan.stale', 'The program origin no longer advertises the reviewed commit.', 4)
-    if acquire and c.peeled_commit(root, candidate) != candidate:
-        git.fetch(root, 'origin', 'main', timeout, {'data': {}})
-        if c.peeled_commit(root, 'refs/remotes/origin/main') != candidate:
-            c.fail('plan.stale', 'The program origin changed during fetch.', 4)
     local = git.local_changes(root, timeout) if observed['dirty'] else []
-    with program_objects(root, endpoint, candidate, timeout) as objects:
-        if before != candidate and c.git(objects, 'merge-base', '--is-ancestor', before, candidate, optional=True, timeout=timeout) is None:
-            code = 'source.ahead' if c.git(objects, 'merge-base', '--is-ancestor', candidate, before, optional=True, timeout=timeout) is not None else 'source.diverged'
-            c.fail(code, 'The program cannot fast-forward to the exact fleet candidate.', 4)
-        blocked = git.blocking_paths(root, candidate, local, timeout, objects=objects, before=before) if before != candidate else []
-        if blocked:
-            c.fail('source.dirty', 'Local changes touch the exact fleet program candidate.', 4, blocking_paths=blocked)
-        migration = install.program_migration(objects, before, candidate) if before != candidate else None
-        if migration and (migration['breaking'] or fleet_protocol(objects, candidate) != fleet.PROTOCOL):
-            c.fail('fleet.program_incompatible', 'The candidate changes an incompatible program schema or fleet protocol.', 4)
+    if before != candidate and c.git(objects, 'merge-base', '--is-ancestor', before, candidate, optional=True, timeout=timeout) is None:
+        code = 'source.ahead' if c.git(objects, 'merge-base', '--is-ancestor', candidate, before, optional=True, timeout=timeout) is not None else 'source.diverged'
+        c.fail(code, 'The program cannot fast-forward to the exact fleet candidate.', 4)
+    blocked = git.blocking_paths(root, candidate, local, timeout, objects=objects, before=before) if before != candidate else []
+    if blocked:
+        c.fail('source.dirty', 'Local changes touch the exact fleet program candidate.', 4, blocking_paths=blocked)
+    migration = install.program_migration(objects, before, candidate) if before != candidate else None
+    if migration and (migration['breaking'] or fleet_protocol(objects, candidate) != fleet.PROTOCOL):
+        c.fail('fleet.program_incompatible', 'The candidate changes an incompatible program schema or fleet protocol.', 4)
     detail = dict(before=before, candidate=candidate, origin=approved, preserved=local, migration=migration)
     detail['observation'] = c.digest(dict(detail, checkout=c.identity(root), endpoint=endpoint))
-    return detail, config, timeout
+    return detail
 
 
 def durable_path(home, name, value):
@@ -156,17 +162,44 @@ def observation_facts(intent):
     return {name: intent[name] for name in ('device', 'controller', 'epoch', 'revision', 'action', 'payload')}
 
 
-def program_action(home, intent, policy):
+def program_action(home, intent, device, policy):
+    from contextlib import nullcontext
+
     payload = intent['payload']
-    if intent['action'] == 'program-inspect':
-        detail, _, _ = program_observation(home, payload, policy)
-        return detail
     key = c.digest(observation_facts(intent))
     path = durable_path(home, 'program-results', key)
-    receipt = fleet.data(path, missing=True)
-    if receipt and receipt.get('status') == 'applied_verified':
-        return receipt
-    detail, config, timeout = program_observation(home, payload, policy, acquire=True)
+    inspecting = intent['action'] == PROGRAM[0]
+    with nullcontext() if inspecting else c.writer_lock(home):
+        rpc.recheck_authority(home, intent, device, policy)
+        rpc.pending_guard(home)
+        receipt = fleet.data(path, missing=True) if not inspecting else None
+        if receipt and receipt.get('status') == 'applied_verified':
+            return receipt
+        if receipt:
+            context = program_origin(home, payload, policy)
+            root, _, _, _, timeout = context
+            if c.git(root, 'rev-parse', 'HEAD', timeout=timeout) == payload['candidate']:
+                detail = program_observation(payload, context, root)
+                return apply_program(home, payload, context, root, key, path, receipt, detail)
+    context = program_origin(home, payload, policy)
+    root, _, endpoint, _, timeout = context
+    candidate = payload['candidate']
+    if advertised(root, endpoint, timeout) != candidate:
+        c.fail('plan.stale', 'The program origin no longer advertises the reviewed commit.', 4)
+    with program_objects(root, endpoint, candidate, timeout) as objects:
+        if inspecting:
+            return program_observation(payload, context, objects)
+        with c.writer_lock(home):
+            rpc.recheck_authority(home, intent, device, policy)
+            rpc.pending_guard(home)
+            if program_origin(home, payload, policy) != context:
+                c.fail('plan.stale', 'Program authority changed during exact preparation.', 4)
+            detail = program_observation(payload, context, objects)
+            return apply_program(home, payload, context, objects, key, path, receipt, detail)
+
+
+def apply_program(home, payload, context, objects, key, path, receipt, detail):
+    root, _, _, config, timeout = context
     if receipt is None and detail['observation'] != payload['observed']:
         c.fail('plan.stale', 'Program observation changed since the controller reviewed it.', 4)
     if receipt is not None and detail['before'] != payload['candidate'] and receipt['observation'] != detail['observation']:
@@ -176,10 +209,14 @@ def program_action(home, intent, policy):
     if receipt is None:
         fleet.put(path, result, None)
     if detail['before'] != payload['candidate']:
-        current = git.checkout_preconditions(program_root(), 'origin', 'main', 'ManageAgentSkills', timeout, clean=False)
-        if current['revision'] != detail['before'] or origin(program_root(), timeout)[0] != payload['origin']:
+        if objects != root:
+            sources.endpoint(root, str(objects), objects.as_uri())
+            c.git(root, '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always', 'fetch',
+                  '--no-tags', '--no-write-fetch-head', '--no-recurse-submodules', str(objects), 'refs/mask/program',
+                  timeout=timeout, mutating=True)
+        if program_observation(payload, context, root) != detail:
             c.fail('plan.stale', 'Program checkout changed before application.', 4)
-        install.advance_program(home, program_root(), config, rpc.state_at(home), detail['before'],
+        install.advance_program(home, root, config, rpc.state_at(home), detail['before'],
                                 payload['candidate'], detail['migration'], {'data': {}, 'actions': []}, timeout)
     finished = dict(result, status='applied_verified', after=payload['candidate'], host_load='not_verified')
     fleet.put(path, finished, result)
@@ -190,11 +227,22 @@ def perform(home, intent, device, policy):
     action = intent['action']
     if action.endswith('-inspect'):
         rpc.pending_guard(home)
-        return program_action(home, intent, policy) if action in PROGRAM else upgrade_action(home, intent, policy)
-    with c.writer_lock(home, name='lifecycle.lock'), c.writer_lock(home):
-        rpc.recheck_authority(home, intent, device, policy)
-        rpc.pending_guard(home)
-        return program_action(home, intent, policy) if action in PROGRAM else upgrade_action(home, intent, policy)
+        return program_action(home, intent, device, policy) if action in PROGRAM else upgrade_action(home, intent, policy)
+    with c.writer_lock(home, name='lifecycle.lock'):
+        if action in PROGRAM:
+            return program_action(home, intent, device, policy)
+        with c.writer_lock(home):
+            rpc.recheck_authority(home, intent, device, policy)
+            rpc.pending_guard(home)
+            path = durable_path(home, 'upgrade-results', c.digest(observation_facts(intent)))
+            receipt = fleet.data(path, missing=True)
+            if receipt and receipt['status'] == 'applied_verified':
+                return receipt
+        upgrade_prepare(home, intent, policy, receipt)
+        with c.writer_lock(home):
+            rpc.recheck_authority(home, intent, device, policy)
+            rpc.pending_guard(home)
+            return upgrade_action(home, intent, policy)
 
 
 def exchange(peer, signer, action, payload, revision, timeout):
@@ -303,7 +351,11 @@ def dispatch(args, output, home):
         plan = dict(builder(peers, signer, timeout), selection=selection(args))
     digest = c.digest(plan)
     output['data'].update(plan_hash=digest, kind=kind, plan=plan, host_load='not_verified')
-    output['would_change'] = bool(plan.get('contributions')) or any(row['status'] == 'planned' for row in plan['targets'])
+    if kind == 'program':
+        output['would_change'] = any(row['status'] == 'planned' and
+                                     row['observation']['before'] != row['observation']['candidate'] for row in plan['targets'])
+    else:
+        output['would_change'] = bool(plan.get('contributions')) or any(row['status'] == 'planned' for row in plan['targets'])
     if output['dry_run']:
         return
     if approval != digest:
@@ -367,7 +419,9 @@ def scope_observation(home, alias, policy):
         links.append((path, fs.link_value(root / path)))
     observation = c.digest(dict(scope=scope, controls=(declaration, locked), record=record,
                                 git=git_before, links=links, config=config, policy=selection_policy.read_policy(home)[0]))
+    contribution = record.get('profiles', {}).get('fleet-' + policy['controller']['id'])
     data = dict(observation=observation, declaration=declaration, lock=locked,
+                contribution=contribution['revision'] if contribution else None,
                 scope_type=scope['scope'], git=description)
     if len(fleet.signed_bytes(data)) > fleet.RECORD_BYTES // 3:
         c.fail('fleet.scope_limit', 'The exact upgrade controls exceed the bounded fleet observation size.', 4)
@@ -407,18 +461,48 @@ def git_fingerprint(observed):
     return c.digest({key: observed[key] for key in ('head', 'top', 'branch', 'git_dir', 'index', 'index_fingerprint')})
 
 
-def activate_upgrade(home, state, root, scope, config, declaration, locked, before):
+def proposed_profiles(intent, scope, config, record):
+    payload = intent['payload']
+    profiles = record.get('profiles', {})
+    if 'profile' not in payload:
+        return None, []
+    name = rpc.contribution_name(intent)
+    previous = profiles.get(name)
+    if not scope.get('rollout') or not previous or previous.get('fleet_controller') != intent['controller']:
+        c.fail('fleet.rollout_denied', 'A combined upgrade requires the controller’s existing locally authorized contribution.', 4)
+    profile = payload['profile']
+    verify_upgrade_pair(previous, {key: profile[key] for key in ('declaration', 'lock')})
+    scope_sources(scope, config, profile['lock'])
+    return dict(profiles, **{name: dict(profile, fleet_controller=intent['controller'])}), [previous, profile]
+
+
+def upgrade_prepare(home, intent, policy, receipt):
+    payload = intent['payload']
+    before, root, scope, state, config, _, _ = scope_observation(home, payload['scope'], policy)
+    declaration, locked = verify_upgrade_pair(before, payload['candidate'])
+    scope_sources(scope, config, locked)
+    if before['observation'] != payload['observed'] and (
+            not receipt or (declaration, locked) != (before['declaration'], before['lock'])):
+        c.fail('plan.stale', 'Skill scope changed since the controller reviewed it.', 4)
+    record = c.consumer_records(state)[str(root)]
+    layers = [dict(declaration=declaration, lock=locked),
+              dict(declaration=before['declaration'], lock=before['lock'])]
+    _, contribution_layers = proposed_profiles(intent, scope, config, record)
+    layers.extend(contribution_layers)
+    # Acquire only the individually granted local choices. Other profile layers stay owned.
+    rpc.prepare_artifacts(home, {'payload': {}, 'expires': int(time.time()) + 120},
+                          (state, config, root, scope, layers, record.get('profiles', {})))
+
+
+def activate_upgrade(home, intent, state, root, scope, config, declaration, locked, before):
     import mask_fs as fs
     import mask_setup as setup
 
     record = c.consumer_records(state)[str(root)]
-    layers = [dict(declaration=declaration, lock=locked),
-              dict(declaration=before['declaration'], lock=before['lock'])]
-    # Acquire only the individually granted local choices. Other profile layers stay owned.
-    rpc.prepare_artifacts(home, {'payload': {}, 'expires': int(time.time()) + 120},
-                          (state, config, root, scope, layers, record.get('profiles', {})))
+    subscriptions, contribution_layers = proposed_profiles(intent, scope, config, record)
     planned = fs.plan(config, state, [root], home=home, proposals={str(root): declaration},
-                      lock_proposals={str(root): locked}, operation='upgrade', retire_files=False)
+                      lock_proposals={str(root): locked}, operation='upgrade', retire_files=False,
+                      profile_proposals={str(root): subscriptions} if subscriptions is not None else None)
     fs.ensure_applicable(planned)
     if (setup.proposals(planned, repair=True) or any(item['state'] in ('missing', 'invalid')
             for report in planned.get('workflow_readiness', []) for skill in report['skills'] for item in skill['inputs'])
@@ -427,16 +511,38 @@ def activate_upgrade(home, state, root, scope, config, declaration, locked, befo
     before_links = record['links']
     after_links = c.consumer_records(planned['intent']['after_state'])[str(root)]['links']
     import mask_resolve as resolve
-    allowed = {resolve.coordinate(row) for layer in layers for row in layer['lock']['packages']}
+    locks = [before['lock'], locked, *(layer['lock'] for layer in contribution_layers)]
+    allowed = {resolve.coordinate(row) for control in locks for row in control['packages']}
     if any(resolve.coordinate(link['resolution']) not in allowed for effect in planned['intent']['links']
            for link in (before_links.get(effect['relative']), after_links.get(effect['relative'])) if link):
         c.fail('fleet.local_drift', 'Reconcile unrelated links before applying the reviewed fleet upgrade.', 4)
     return planned
 
 
+def execute_scope(home, planned, desired_intent, key):
+    import mask_fs as fs
+
+    if desired_intent is None:
+        fs.execute(planned, home, {'data': {}, 'actions': planned['actions']})
+        return
+    if not planned['would_change']:
+        return
+    # The ordinary fleet journal owns the profile and the ordinary pinned
+    # journal owns its matching local lock. Both publish in one transaction.
+    payload = {name: desired_intent['payload'][name] for name in ('scope', 'profile')}
+    journal_intent = dict(desired_intent, action='apply', id=key[7:39], payload=dict(payload, plan=planned['plan_hash']),
+                          generation=planned['intent']['before_state']['generation'])
+    record = rpc.operation_record(journal_intent)
+    path = rpc.operation_path(home, record['id'])
+    previous = fleet.data(path, missing=True)
+    if previous and previous['status'] != 'accepted':
+        c.fail('fleet.operation_conflict', 'The combined profile and local lock transition already has a recorded outcome.', 4)
+    fleet.put(path, record, previous)
+    rpc.commit_plan(home, journal_intent, record, planned)
+
+
 def upgrade_action(home, intent, policy):
     import mask_fleet_commit as transfer
-    import mask_fs as fs
     import mask_upgrade_commit as commits
 
     payload = intent['payload']
@@ -462,6 +568,10 @@ def upgrade_action(home, intent, policy):
             c.fail('fleet.commit_denied', 'The scope has no eligible explicit project commit grant.', 4)
         if receipt is None and not before['git']['clean']:
             c.fail('fleet.controls_modified', 'Project controls or their staging differ from HEAD.', 4)
+        if receipt is None and before['git']['controls'] != commit['controls']:
+            c.fail('plan.stale', 'The reviewed commit starts from different controls.', 4)
+        if commit['role'] == 'canonical' and not git_before['branch']:
+            c.fail('fleet.commit_ineligible', 'A canonical project commit requires an attached branch.', 4)
         expected_head = receipt['before_head'] if receipt else git_before['head']
         final = commits.controls(root)
         if locked != before['lock']:
@@ -489,7 +599,14 @@ def upgrade_action(home, intent, policy):
             c.fail('fleet.commit_outcome_unknown', 'Project Git state changed after the upgrade was accepted.', 4)
     elif scope['scope'] == 'project' and locked != before['lock']:
         c.fail('fleet.commit_denied', 'Changed project controls require a reviewed canonical commit or propagation.', 4)
-    planned = activate_upgrade(home, state, root, scope, config, declaration, locked, before)
+    desired_intent = None
+    if 'desired' in payload:
+        desired = payload['desired']
+        if desired['sequence'] < policy['minimum_sequence']:
+            c.fail('fleet.sequence_stale', 'The published contribution is below the enrolled sequence floor.', 4)
+        desired_intent = dict(intent, sequence=desired['sequence'], revision=desired['revision'])
+        rpc.sequence_guard(home, desired_intent)
+    planned = activate_upgrade(home, intent, state, root, scope, config, declaration, locked, before)
     if scope_observation(home, alias, policy)[0]['observation'] != before['observation']:
         c.fail('plan.stale', 'Skill scope changed during exact artifact preparation.', 4)
     if receipt is None:
@@ -497,7 +614,9 @@ def upgrade_action(home, intent, policy):
                        before_head=git_before['head'] if git_before else None,
                        git_before=git_fingerprint(git_before) if git_before else None)
         fleet.put(path, receipt, None)
-    fs.execute(planned, home, {'data': {}, 'actions': planned['actions']})
+    if desired_intent is not None:
+        rpc.sequence_guard(home, desired_intent, advance=True)
+    execute_scope(home, planned, desired_intent, key)
     if git_row and git_row['status'] == 'planned':
         if received is None:
             commits.execute(git_row, git_before, final, timeout)
@@ -558,7 +677,9 @@ def upgrade_plan(home, args, peers, signer, timeout):
         peer, alias = job
         row = target(peer, alias)
         grant = peer['authority']['scopes'].get(alias, {})
-        if not alias or not grant.get('upgrade') or not set(UPGRADE) <= set(peer['authority']['actions']):
+        if not alias and not getattr(args, 'scope', None):
+            return dict(row, status='not_applicable', reason='fleet.no_upgrade_scopes')
+        if not grant.get('upgrade') or not set(UPGRADE) <= set(peer['authority']['actions']):
             return dict(row, **failure_row('fleet.upgrade_denied'))
         if getattr(args, 'project_alias', None) and grant['scope'] != 'project':
             return dict(row, **failure_row('fleet.scope_unmapped'))
@@ -650,7 +771,7 @@ def upgrade_plan(home, args, peers, signer, timeout):
             row.update(failure_row(error))
     settings = control.settings(home, missing=True)
     with control.snapshot(home, settings, signer) if settings else nullcontext(None) as history:
-        contributions = contribution_plan(home, history, rows, by_peer, candidate_for)
+        contributions = contribution_plan(history, rows, by_peer, signer, candidate_for)
     for row in rows:
         if 'observation' in row:
             row['observation'].pop('declaration')
@@ -662,13 +783,14 @@ def target_ref(row):
     return [row['device'], row['scope']]
 
 
-def contribution_plan(home, history, rows, peers, candidate_for):
+def contribution_plan(history, rows, peers, signer, candidate_for):
     if history is None:
         return None
     import mask_control as control
 
     effective = history.effective()
     updated = []
+    actions = set(UPGRADE) | {'inspect', 'prepare', 'apply', 'receipt'}
     for row in rows:
         peer = peers[row['name']]
         previous = effective.get(tuple(target_ref(row)))
@@ -676,17 +798,22 @@ def contribution_plan(home, history, rows, peers, candidate_for):
             continue
         target = previous[1]
         scope = peer['authority']['scopes'].get(row['scope'], {})
-        if not scope.get('upgrade') or not scope.get('rollout') or target.get('binding') != row['binding']:
+        if (not scope.get('upgrade') or not scope.get('rollout') or
+                not actions <= set(peer['authority']['actions']) or fleet.public(signer) != peer['authority']['controller']):
             continue
         profile = target['profile']
         try:
             candidate = candidate_for(profile)
             if candidate['lock'] == profile['lock']:
                 continue
-            proposed = dict(target, profile=control.desired_profile(candidate['declaration'], candidate['lock']))
+            proposed = dict(target, name=peer['name'], identity=peer['device'], binding=row['binding'],
+                            device_epoch=peer['authority']['epoch'],
+                            profile=control.desired_profile(candidate['declaration'], candidate['lock']))
             rollout.validate_sources(proposed, peer, False)
             if 'blocked' in proposed:
                 raise c.MaskError(proposed['blocked'], 'Fleet profile upgrade is outside its current scope grant.', 4)
+            if row['status'] == 'planned' and row['observation']['contribution'] == profile['revision']:
+                row['request']['profile'] = proposed['profile']
             updated.append(proposed)
         except c.MaskError as error:
             row['contribution_error'] = error.code
@@ -702,6 +829,40 @@ def contribution_plan(home, history, rows, peers, candidate_for):
 
 
 def deliver_upgrade(home, signer, digest, plan, timeout):
+    from contextlib import nullcontext
+    import mask_control as control
+
+    proposal = plan['contributions']
+    settings = control.settings(home, missing=True) if proposal else None
+    history_context = (control.snapshot(home, settings, signer)
+                       if settings and control.channel(settings) == proposal['channel'] else nullcontext(None))
+    with history_context as history:
+        published, failures = publish_contributions(home, signer, digest, history, proposal)
+        results = deliver_upgrade_scopes(home, signer, digest, plan, published, timeout)
+        if history:
+            pairs = list(published.values())
+            contribution_rows = rollout.fanout(home, signer, history, pairs, timeout=timeout)
+            results.extend(dict(row, contribution=True, operation=entry['operation'])
+                           for row, (entry, _) in zip(contribution_rows, pairs))
+        return results + failures
+
+
+def deliver_upgrade_scopes(home, signer, digest, plan, published, timeout):
+    import mask_control as control
+
+    def apply(row, key, *, proof=None):
+        request = dict(row['request'])
+        if 'profile' in request:
+            entry_target = published.get(key)
+            if not entry_target or entry_target[1]['profile'] != request['profile']:
+                return dict(row, **failure_row('fleet.control_conflict'))
+            entry, _ = entry_target
+            request['desired'] = dict(sequence=entry['sequence'], revision=control.intent_digest(entry))
+        if proof is not None:
+            request['commit'] = dict(request['commit'], proof=proof)
+        result = send_update(home, signer, digest, dict(row, request=request), UPGRADE[1], timeout)
+        return dict(result, request=row['request'])
+
     completed = {}
     deferred = []
     for row in plan['targets']:
@@ -711,7 +872,7 @@ def deliver_upgrade(home, signer, digest, plan, timeout):
         if commit and commit['role'] == 'member':
             deferred.append((key, row, commit))
         elif row['status'] == 'planned':
-            completed[key] = send_update(home, signer, digest, row, UPGRADE[1], timeout)
+            completed[key] = apply(row, key)
         else:
             completed[key] = row
     for key, row, commit in deferred:
@@ -720,46 +881,51 @@ def deliver_upgrade(home, signer, digest, plan, timeout):
         if not proof:
             completed[key] = dict(row, **failure_row('upgrade.canonical_commit_missing'))
             continue
-        request = dict(row['request'], commit=dict(commit, proof=proof))
-        result = send_update(home, signer, digest, dict(row, request=request), UPGRADE[1], timeout)
-        completed[key] = dict(result, request=row['request'])
+        completed[key] = apply(row, key, proof=proof)
     rows = [completed[tuple(target_ref(row))] for row in plan['targets']]
     for row in list(rows):
         if row.get('contribution_error'):
             rows.append(dict(name=row['name'], scope=row['scope'], contribution=True,
                              **failure_row(row['contribution_error'])))
-    return rows + deliver_contributions(home, signer, digest, plan['contributions'], timeout)
+    return rows
 
 
-def deliver_contributions(home, signer, digest, proposal, timeout):
+def publish_contributions(home, signer, digest, history, proposal):
     if proposal is None:
-        return []
+        return {}, []
     import mask_control as control
 
-    settings = control.settings(home, missing=True)
     batches = proposal['batches']
-    rows = []
-    if settings is None or control.channel(settings) != proposal['channel']:
-        return [dict(rollout.base_result(target), **failure_row('fleet.control_changed'))
-                for batch in batches for target in batch]
-    with control.snapshot(home, settings, signer) as history:
-        operations = [c.digest((digest, index)).split(':')[1][:32] for index in range(len(batches))]
-        for index, (operation, batch) in enumerate(zip(operations, batches)):
-            entry = history.operation(operation)
-            if entry is None:
-                expected_prefix = history.events[-index:] if index else []
-                if ((not index and history.head != proposal['head']) or
-                        (index and [item['operation'] for item in expected_prefix] != operations[:index])):
-                    rows.extend(dict(rollout.base_result(target), **failure_row('fleet.control_conflict')) for target in batch)
-                    continue
-                entry = control.event(settings, signer, history.events, 'update', operation, batch,
-                                      {'kind': 'fleet.upgrade', 'plan': digest, 'forward': False})
-                try:
-                    control.publish(history, entry, signer)
-                    control.remember(home, history)
-                except c.MaskError as error:
-                    rows.extend(dict(rollout.base_result(target), **failure_row(error, dispatch=True)) for target in batch)
-                    continue
-            rows.extend(dict(row, contribution=True, operation=operation)
-                        for row in rollout.fanout(home, signer, history, [(entry, target) for target in entry['targets']], timeout=timeout))
-    return rows
+    def failed(batch, code):
+        return [dict(rollout.base_result(target), contribution=True, **failure_row(code, dispatch=True)) for target in batch]
+
+    if history is None:
+        return {}, [row for batch in batches for row in failed(batch, 'fleet.control_changed')]
+    published, rows = {}, []
+    operations = [c.digest((digest, index)).split(':')[1][:32] for index in range(len(batches))]
+    for index, (operation, batch) in enumerate(zip(operations, batches)):
+        entry = history.operation(operation)
+        if entry is None:
+            prefix = history.events[-index:] if index else []
+            if ((not index and history.head != proposal['head']) or
+                    (index and [item['operation'] for item in prefix] != operations[:index])):
+                rows.extend(failed(batch, 'fleet.control_conflict'))
+                continue
+            entry = control.event(history.control, signer, history.events, 'update', operation, batch,
+                                  {'kind': 'fleet.upgrade', 'plan': digest, 'forward': False})
+            try:
+                control.publish(history, entry, signer)
+                control.remember(home, history)
+            except c.MaskError as error:
+                rows.extend(failed(batch, error.code))
+                continue
+        if entry['targets'] != sorted(batch, key=control.target_key) or entry['input'].get('plan') != digest:
+            rows.extend(failed(batch, 'fleet.operation_conflict'))
+            continue
+        for target in entry['targets']:
+            key = control.target_key(target)
+            if history.effective().get(key) != (entry, target):
+                rows.extend(failed([target], 'fleet.operation_superseded'))
+            else:
+                published[key] = (entry, target)
+    return published, rows

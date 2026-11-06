@@ -81,6 +81,8 @@ class FleetMaintenanceTests(FleetRpcFixture):
     def test_bare_install_and_legacy_skill_update(self):
         self.policy['epoch'] += 1
         self.policy['scopes']['personal']['rollout'] = True
+        self.policy['scopes']['personal']['upgrade'] = True
+        self.policy['actions'] += ['upgrade-inspect', 'upgrade-apply']
         self.authorize(self.policy)
         self.set_peer('laptop', self.device, self.policy, self.device_home, ENTRY)
         bare = self.base / 'desired.git'
@@ -97,6 +99,28 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertEqual(legacy['data']['action'], 'update')
         refused = self.public('install', 'https://github.com/fixture/skills/tree/main/alpha', '--dry-run', code=4)
         self.assertEqual(refused['error']['code'], 'fleet.mode_required')
+        # Both the local selection and the controller contribution own alpha.
+        # One approved upgrade must move both locks together or composition refuses.
+        skill = self.source / 'skills/alpha/SKILL.md'
+        skill.write_bytes(skill.read_bytes() + b'\nCo-owned update.\n')
+        self.git(self.source, 'commit', '-qam', 'update co-owned skill')
+        self.git(self.source, 'push', '-q', str(self.remote), 'main')
+        candidate = self.git(self.source, 'rev-parse', 'HEAD')
+        self.cli(self.controller_home, 'tap', 'fetch', 'fixture', env=self.env)
+        review = self.public('upgrade', '--dry-run')['data']
+        applied = self.public('upgrade', '--approve-plan', review['plan_hash'])['data']
+        self.assertTrue(applied['complete'])
+        direct, contribution = applied['device_results']
+        self.assertEqual((direct['status'], contribution['status']), ('applied_verified', 'applied_verified'))
+        self.assertTrue(contribution['contribution'])
+        state = json.loads((self.device_home / 'state.json').read_text())
+        self.assertEqual(state['user']['last_lock']['packages'][0]['commit'], candidate)
+        [owned] = state['user']['profiles'].values()
+        self.assertEqual(owned['lock']['packages'][0]['commit'], candidate)
+        current = self.public('upgrade', '--dry-run')['data']
+        self.assertIsNone(current['plan']['contributions'])
+        replay = self.public('upgrade', '--approve-plan', review['plan_hash'])['data']
+        self.assertEqual(replay['device_results'][1]['operation'], contribution['operation'])
 
     def test_program_exact_checkout_and_lost_ack_recovery(self):
         author = self.base / 'program-source'
