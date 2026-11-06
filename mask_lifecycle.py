@@ -184,7 +184,7 @@ def restore(args, output, home, *, registering=False):
     def candidate():
         return fs.plan(config, state, roots, home=home, operation='ensure', proposals=declarations,
                        lock_proposals=locks, register=register, user_root=user_root, payload_views=views,
-                       repair_roles=True, retire_files=False)
+                       repair_roles=True, repair_links=not registering, retire_files=False)
     acquisitions = output['data'].get('acquisitions', [])
     def prepare():
         effects = output['data']['preparation'] = []

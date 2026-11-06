@@ -12,9 +12,21 @@ import mask_resolve as resolve
 import mask_workflow as workflow
 
 
+WINERROR_UNTRUSTED_MOUNT_POINT = 448
+
+
 def link_value(path):
     observed = c.kind(path)
     return dict(type=observed, link_text=os.readlink(path) if observed == 'symlink' else None)
+
+
+def link_traversal_error(leaf):
+    # Probe through the link. Its directory entry and readlink value can still be readable.
+    try:
+        (leaf / 'SKILL.md').stat()
+    except OSError as error:
+        return error
+    return None
 
 
 def normalized_link(path, raw):
@@ -33,7 +45,7 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None, retire_files=None, profile_proposals=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, repair_links=False, workflow_profiles=None, retire_files=None, profile_proposals=None):
     """One observational plan; every owned link text names a store payload or an explicit dev link.
 
     """
@@ -145,10 +157,16 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                     next_record['links'][relative] = dict(wanted, link_text=after_raw)
                 else:
                     after_raw = None
-                if before != after_raw:
+                recreate = (repair_links and before is not None and before == after_raw
+                            and getattr(link_traversal_error(leaf), 'winerror', None) == WINERROR_UNTRUSTED_MOUNT_POINT)
+                if before != after_raw or recreate:
                     entry = dict(root=key, relative=relative, skill=(wanted or old)['skill'], target=(wanted or old)['target'], before=before, after=after_raw)
+                    kind = 'link.create' if after_raw else 'link.remove'
+                    if recreate:
+                        entry['recreate'] = True
+                        kind = 'link.replace'
                     links.append(entry)
-                    actions.append(dict(kind='link.create' if after_raw else 'link.remove', status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
+                    actions.append(dict(kind=kind, status='planned', path=str(leaf), skill=entry['skill'], target=entry['target'], source=after_raw))
             # Declared native roles follow the selected bindings; observation never touches the destinations.
             bindings, targets, coordinates = {}, {}, {}
             for link in next_record['links'].values():
@@ -458,7 +476,11 @@ def validate_pending(pending, home):
         c.fail('recovery.conflict', 'Unsafe pending directory intent.', 8)
     link_keys = set()
     for entry in pending['links']:
-        c.fields(entry, ('root', 'relative', 'skill', 'target', 'before', 'after'), family='recovery')
+        c.fields(entry, ('root', 'relative', 'skill', 'target', 'before', 'after'), ('recreate',), family='recovery')
+        if 'recreate' in entry and (entry['recreate'] is not True or entry['before'] is None or
+                                    entry['before'] != entry['after'] or pending['operation'] != 'ensure' or
+                                    'pinned' not in pending):
+            c.fail('recovery.conflict', 'Invalid owned link recreation intent.', 8)
         c.skill_id(entry['skill'])
         if entry['root'] not in selected or entry['target'] not in c.ADAPTERS or entry['relative'] != adapters.relative(entry['target'], c.consumer_scope(before if entry['root'] in before_records else after, entry['root']), entry['skill']):
             c.fail('recovery.conflict', 'Unsafe pending link path.', 8)
@@ -475,6 +497,8 @@ def validate_pending(pending, home):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
             if raw is not None and normalized_link(leaf, raw) != pinned.target(record, pending['config'], home):
                 c.fail('recovery.conflict', 'Pending link disagrees with ownership state.', 8)
+            if entry.get('recreate') and (not record.get('resolution') or 'dev' in record):
+                c.fail('recovery.conflict', 'Link recreation requires an owned pinned payload.', 8)
             if side == 'after' and raw != (record['link_text'] if record else None):
                 c.fail('recovery.conflict', 'Pending link omits its desired ownership target.', 8)
     for root in selected:
@@ -561,7 +585,7 @@ def recoverable_link(actual, entry):
     # A scheduled replacement may stop after unlink and before symlink creation.
     return (actual['type'] in ('missing', 'symlink')
             and (actual['link_text'] in (entry['before'], entry['after'])
-                 or actual['type'] == 'missing' and entry['before'] != entry['after']))
+                 or actual['type'] == 'missing' and (entry['before'] != entry['after'] or entry.get('recreate'))))
 
 
 def set_link(entry, side, *, inject=False):
@@ -572,8 +596,13 @@ def set_link(entry, side, *, inject=False):
     wanted = entry[side]
     if not recoverable_link(actual, entry):
         c.fail('recovery.conflict', 'Link precondition changed immediately before effect.', 8, path=str(leaf))
+    recreate = side == 'after' and entry.get('recreate')
     if actual['link_text'] == wanted:
-        return
+        error = link_traversal_error(leaf) if recreate else None
+        if error is None:
+            return
+        if getattr(error, 'winerror', None) != WINERROR_UNTRUSTED_MOUNT_POINT:
+            raise error
     if actual['type'] == 'symlink':
         leaf.unlink()
         if inject:
@@ -589,6 +618,23 @@ def set_link(entry, side, *, inject=False):
             if getattr(error, 'winerror', None) == 1314:
                 c.fail('target.symlink_unsupported', 'Native Windows directory symlink privileges are required.', 5)
             raise
+        if recreate:
+            error = link_traversal_error(leaf)
+            if getattr(error, 'winerror', None) == WINERROR_UNTRUSTED_MOUNT_POINT:
+                c.fail('target.untrusted_mount_point', 'Windows still refuses to follow the recreated skill link.', 5, path=str(leaf))
+            if error is not None:
+                raise error
+
+
+def retained_link_repairs(pending):
+    """Rollback restores the recorded target, so successful same-target repairs can remain readable."""
+    retained = []
+    for entry in pending['links']:
+        if entry.get('recreate'):
+            leaf = Path(entry['root']) / entry['relative']
+            if link_traversal_error(leaf) is None:
+                retained.append(str(leaf))
+    return retained
 
 
 def restore(pending, home, side, *, inject=False):
@@ -769,10 +815,13 @@ def execute(planned, home, output, *, pending=None):
             restore(pending, home, 'before')
             clear_pending(home, pending, 'before')
             residual = [path for path in pending['directories'] if c.kind(Path(path)) != 'missing']
-            output.update(changed=bool(residual), transaction='rolled_back')
+            repaired = retained_link_repairs(pending)
+            output.update(changed=bool(residual or repaired), transaction='rolled_back')
             output['data']['retained_directories'] = residual
+            if repaired:
+                output['data']['retained_link_repairs'] = repaired
             for action in output['actions']:
-                action['status'] = 'rolled_back'
+                action['status'] = 'applied' if action.get('path') in repaired else 'rolled_back'
         except (Exception, KeyboardInterrupt) as rollback_error:
             output.update(changed=True, transaction='partial')
             for action in output['actions']:
@@ -818,6 +867,10 @@ def recover(home, output, mode):
     residual = [path for path in pending['directories'] if c.kind(Path(path)) != 'missing']
     output.update(changed=True, transaction='committed' if mode == 'complete' else 'rolled_back')
     output['data']['retained_directories'] = residual
+    if mode == 'rollback':
+        repaired = retained_link_repairs(pending)
+        if repaired:
+            output['data']['retained_link_repairs'] = repaired
 
 
 def adopt(config, state, root, identifier, target, expected_source, output, home, guard=None):

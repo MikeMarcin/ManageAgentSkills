@@ -68,6 +68,101 @@ class ApplyTests(Fixture):
         self.call('apply'); self.assertTrue(leaf.is_symlink())
         self.assertEqual(os.readlink(leaf), raw)
 
+    def repair_blocked_link(self, *args, winerror=448, fault='', code=0):
+        # Inject only the Windows traversal error. The public CLI still creates and
+        # removes real directory symlinks and uses its real journal and lockfiles.
+        script = """
+import os
+from pathlib import Path
+import sys
+from unittest.mock import patch
+
+import mask
+import mask_fs
+
+leaf = Path(sys.argv[1]) / '.agents/skills/alpha'
+winerror, fault = int(sys.argv[2]), sys.argv[3]
+stat, symlink_to = Path.stat, Path.symlink_to
+blocked = winerror != 0
+
+def probe(path, *args, **kwargs):
+    if blocked and path == leaf / 'SKILL.md':
+        error = OSError('injected Windows link traversal failure')
+        error.winerror = winerror
+        raise error
+    return stat(path, *args, **kwargs)
+
+def recreate(path, *args, **kwargs):
+    global blocked
+    symlink_to(path, *args, **kwargs)
+    if path == leaf and fault != 'still_blocked':
+        blocked = False
+
+def checkpoint(label):
+    if label == 'link_unlinked' and fault == 'crash':
+        os._exit(99)
+    if label == 'link' and fault == 'late_failure':
+        raise OSError('injected late failure')
+
+with patch.object(Path, 'stat', probe), patch.object(Path, 'symlink_to', recreate):
+    mask_fs.checkpoint = checkpoint
+    raise SystemExit(mask.main(['repair', '--project', sys.argv[1], '--offline', '--json', *sys.argv[4:]]))
+"""
+        run = subprocess.run([sys.executable, '-B', '-c', script, str(self.project), str(winerror), fault, *args],
+                             cwd=ENTRY.parent, capture_output=True, encoding='utf-8', env=self.environment())
+        self.assertEqual(run.returncode, code, (run.stdout, run.stderr))
+        self.assertEqual(run.stderr, '')
+        if code != 99:
+            return json.loads(run.stdout)
+
+    def test_repair_replaces_only_the_owned_link_blocked_by_winerror_448(self):
+        self.call('apply')
+        leaf = self.project / '.agents/skills/alpha'
+        other = self.project / '.claude/skills/alpha'
+        other_identity = other.lstat()
+        before = self.snapshot()
+        preview = self.repair_blocked_link('--dry-run')
+        self.assertEqual([(a['kind'], a['path']) for a in preview['actions']], [('link.replace', str(leaf))])
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse(self.repair_blocked_link('--dry-run', winerror=5)['would_change'])
+        approval = ('--approve-plan', preview['data']['plan_hash'])
+        self.assertEqual(self.repair_blocked_link(*approval, winerror=0, code=4)['error']['code'], 'plan.stale')
+        applied = self.repair_blocked_link(*approval)
+        self.assertEqual((applied['transaction'], applied['actions'][0]['status']), ('committed', 'applied'))
+        self.assertEqual(os.readlink(leaf), before[str(leaf.relative_to(self.base))][1])
+        self.assertTrue((leaf / 'SKILL.md').is_file())
+        other_after = other.lstat()
+        self.assertEqual((other_after.st_ino, other_after.st_mtime_ns), (other_identity.st_ino, other_identity.st_mtime_ns))
+        self.assertFalse(self.repair_blocked_link(winerror=0)['would_change'])
+
+    def test_winerror_448_repair_recovers_from_an_interrupted_replacement(self):
+        self.call('apply')
+        leaf = self.project / '.agents/skills/alpha'
+        for mode in ('--complete', '--rollback'):
+            with self.subTest(mode=mode):
+                self.repair_blocked_link(fault='crash', code=99)
+                self.assertFalse(leaf.is_symlink())
+                leaf.mkdir()
+                self.assertEqual(self.call('recover', mode, code=8)['error']['code'], 'recovery.conflict')
+                self.assertTrue(leaf.is_dir())
+                leaf.rmdir()
+                recovered = self.call('recover', mode)
+                self.assertTrue((leaf / 'SKILL.md').is_file())
+                if mode == '--rollback':
+                    self.assertEqual(recovered['data']['retained_link_repairs'], [str(leaf)])
+                self.assertFalse((self.home / 'pending.json').exists())
+
+    def test_winerror_448_repair_reports_failed_and_retained_replacements(self):
+        self.call('apply')
+        failed = self.repair_blocked_link(fault='still_blocked', code=5)
+        self.assertEqual(failed['error']['code'], 'target.untrusted_mount_point')
+        self.assertFalse(failed['changed'])
+        retained = self.repair_blocked_link(fault='late_failure', code=5)
+        self.assertEqual(retained['transaction'], 'rolled_back')
+        self.assertTrue(retained['changed'])
+        self.assertEqual(retained['data']['retained_link_repairs'], [str(self.project / '.agents/skills/alpha')])
+        self.assertFalse((self.home / 'pending.json').exists())
+
     def test_dangling_owned_link_is_removed(self):
         self.call('apply'); leaf = self.project / '.agents/skills/alpha'
         # The owned link dangles once its store artifact is gone.
