@@ -268,7 +268,13 @@ def authority(value, *, local=False):
 def current_authority(home, *, missing=False):
     value = data(path(home, 'authority'), missing=True)
     if value is not None:
-        return authority(value, local=True)
+        authority(value, local=True)
+        for scope in value['scopes'].values():
+            observed = scope.get('root_identity')
+            c.fields(observed, ('device', 'inode'), family='fleet')
+            if any(type(part) is not int or not 0 <= part < 2 ** 128 for part in observed.values()):
+                invalid('Invalid enrolled physical scope identity.')
+        return value
     if not missing:
         c.fail('fleet.controller_unknown', 'No local controller authority is enrolled.', 4)
 

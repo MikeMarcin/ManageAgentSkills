@@ -28,6 +28,10 @@ FIELDS = ('schema_version', 'protocol', 'id', 'device', 'controller', 'epoch', '
           'expires', 'revision', 'generation', 'action', 'payload')
 RESPONSE_FIELDS = ('schema_version', 'protocol', 'id', 'device', 'controller', 'request_digest',
                    'status', 'data', 'error')
+OPERATION_FIELDS = ('schema_version', 'id', 'device', 'controller', 'epoch', 'sequence', 'revision',
+                    'generation', 'action', 'digest', 'scope', 'status', 'result')
+OPERATION_STATES = {'prepare': {'prepared', 'canceled'}, 'apply': {'applied_verified', 'rolled_back', 'canceled'},
+                    'cancel-request': {'cancel_recorded'}}
 PAYLOADS = {'capabilities': (), 'inspect': ('scope',), 'prepare': ('scope',),
             'apply': ('scope', 'plan'), 'receipt': ('operation', 'digest'),
             'cancel-request': ('operation', 'digest')}
@@ -134,9 +138,39 @@ def checked_response(raw, intent, device):
         c.fields(value['error'], ('code',), family='rpc')
         if not isinstance(value['error']['code'], str) or not re.fullmatch(r'[a-z0-9_.]{1,96}', value['error']['code']):
             invalid('Invalid signed refusal.')
-    elif value['error'] is not None:
-        invalid('Unexpected error on a successful signed response.')
+    else:
+        if value['error'] is not None:
+            invalid('Unexpected error on a successful signed response.')
+        check_operation_response(value['data'], intent)
     return value
+
+
+def check_operation_response(data, intent):
+    action = intent['action']
+    if action == 'receipt':
+        expected_id, expected_digest = intent['payload']['operation'], intent['payload']['digest']
+        if data == dict(operation=expected_id, status='unknown'):
+            return
+    elif action in OPERATION_STATES:
+        expected_id, expected_digest = intent['id'], request_digest(intent)
+    else:
+        return
+    c.fields(data, OPERATION_FIELDS, family='rpc')
+    if (data['id'], data['digest'], data['device'], data['controller']) != (
+            expected_id, expected_digest, intent['device'], intent['controller']):
+        c.fail('rpc.receipt_mismatch', 'Signed operation data does not bind to the requested receipt.', 4)
+    recorded_action = data['action']
+    status = data['status']
+    if (not isinstance(recorded_action, str) or recorded_action not in OPERATION_STATES or
+            not isinstance(status, str) or status not in OPERATION_STATES[recorded_action] | {'accepted'}):
+        invalid('Unsupported durable operation state.')
+    if action != 'receipt':
+        if (recorded_action, data['epoch'], data['sequence'], data['revision'], data['generation']) != (
+                action, intent['epoch'], intent['sequence'], intent['revision'], intent['generation']) or status == 'accepted':
+            c.fail('rpc.receipt_mismatch', 'Signed operation revision, generation or status differs from the request.', 4)
+        if status == 'applied_verified' and (not isinstance(data['result'], dict) or
+                                             data['result'].get('plan') != intent['payload']['plan']):
+            c.fail('rpc.receipt_mismatch', 'Signed application does not bind to the requested plan.', 4)
 
 
 def current(intent, device, policy):
@@ -246,6 +280,8 @@ def finish_receipt(home, intent, policy):
         if (marker.get('id'), marker.get('digest'), marker.get('controller'), marker.get('device')) != (
                 target['operation'], target['digest'], intent['controller'], intent['device']):
             pending_guard(home)
+        if marker.get('scope') not in policy['scopes']:
+            c.fail('fleet.scope_denied', 'The recorded operation scope is no longer authorized.', 4)
         fs.check_current(pending, home)
         root, = map(Path, pending['selected'])
         after = c.consumer_records(pending['after_state'])[str(root)]
@@ -273,6 +309,8 @@ def receipt(home, intent, policy=None):
         return dict(operation=payload['operation'], status='unknown')
     if target['digest'] != payload['digest'] or target['controller'] != intent['controller'] or target['device'] != intent['device']:
         c.fail('fleet.receipt_mismatch', 'The durable receipt does not bind to the requested operation.', 4)
+    if policy is not None and target['scope'] not in policy['scopes']:
+        c.fail('fleet.scope_denied', 'The recorded operation scope is no longer authorized.', 4)
     pending_guard(home)
     return target
 
@@ -314,8 +352,7 @@ def validate_journal(pending):
     entry = pending['fleet']
     c.fields(entry, ('before', 'after'), family='recovery')
     before, after = entry['before'], entry['after']
-    c.fields(before, ('schema_version', 'id', 'device', 'controller', 'epoch', 'sequence', 'revision',
-                      'generation', 'action', 'digest', 'scope', 'status', 'result'), family='recovery')
+    c.fields(before, OPERATION_FIELDS, family='recovery')
     for key in ('id', 'device', 'controller'):
         fleet.identifier(before[key])
     for key in ('digest', 'revision'):
@@ -397,7 +434,8 @@ def mutate(home, intent, device, policy):
         if action == 'cancel-request':
             # An unrelated cancellation cannot consume authorization sequence.
             target = receipt(home, intent)
-            if target['status'] == 'unknown' or target['epoch'] != intent['epoch']:
+            if (target['status'] == 'unknown' or target['epoch'] != intent['epoch'] or
+                    target['action'] not in ('prepare', 'apply') or target['scope'] not in policy['scopes']):
                 c.fail('fleet.operation_unknown', 'No authorized operation exists at the supplied ID.', 4)
         else:
             scope_data = authorized_scope(home, intent, policy)
@@ -410,6 +448,8 @@ def mutate(home, intent, device, policy):
             sequence_guard(home, intent, advance=True)
         record = previous or operation_record(intent)
         if previous is None:
+            if action == 'cancel-request':
+                record['scope'] = target['scope']
             fleet.put(operation_path(home, intent['id']), record, None)
         if action == 'cancel-request':
             return set_result(home, record, 'cancel_recorded', cancel(home, intent))

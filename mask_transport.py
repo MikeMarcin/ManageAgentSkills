@@ -33,7 +33,8 @@ def validated_path(value, windows):
     path = PureWindowsPath(value) if windows else PurePosixPath(value)
     if (not path.is_absolute() or '..' in path.parts or len(path.parts) < 2 or
             (windows and not re.fullmatch(r'[A-Za-z]:', path.drive)) or
-            (windows and any(ch in part for part in path.parts[1:] for ch in '<>:"|?*')) or
+            (windows and any(part.endswith((' ', '.')) or any(ch in part for ch in '<>:"|?*')
+                             for part in path.parts[1:])) or
             (not windows and path.root != '/')):
         fleet.invalid('Fleet launcher paths must be absolute native paths on a local volume.')
     return path
@@ -163,6 +164,16 @@ def exchange(peer, packet, *, timeout=30):
     except c.MaskError as error:
         c.fail('fleet.response_unverified', 'The device response could not be verified. Query the durable operation.',
                4, outcome='unknown', refusal=error.code, **context)
+
+
+def deliver(home, name, packet, *, timeout=30):
+    """Deliver a frozen signed packet only through a currently enrolled binding."""
+    peer = peer_at(home, name)
+    intent = rpc.intent_shape(packet['intent'])
+    if (intent['device'], intent['controller'], intent['epoch']) != (
+            peer['device']['id'], peer['authority']['controller']['id'], peer['authority']['epoch']):
+        c.fail('fleet.binding_changed', 'The frozen request no longer matches the enrolled binding.', 4)
+    return exchange(peer, packet, timeout=timeout)
 
 
 def probe(peer, controller, *, timeout=30):

@@ -25,7 +25,7 @@ COMMANDS = {
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
     'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag'), ('limit', 'int'), ('offset', 'int'), ('output', 'value')]),
-    'rpc': (False, False, [('stdio', 'flag')]),
+    'rpc': (False, True, [('stdio', 'flag')]),
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
     'fleet.device.enroll': (True, True, [('name', 'pos'), ('ssh-config-alias', 'required'), ('ssh-config', 'value'), ('binding', 'required')]),
@@ -391,19 +391,24 @@ def dispatch(args, output, leaves):
 
 
 def capabilities(output, leaves, mask):
+    import mask_fleet
+    import mask_fleet_artifacts
+    import mask_rpc
     descriptors = []
     for name, (mutates, network, _) in definitions(mask.COMMANDS).items():
         arguments = [dict(name=a.dest, flags=a.option_strings, required=a.required,
                           repeatable=isinstance(a, argparse._AppendAction) or a.nargs in ('+', '*'), nargs=a.nargs,
                           type='integer' if a.type is int else 'boolean' if isinstance(a, argparse._StoreTrueAction) else 'string')
                      for a in leaves[name]._actions]
-        descriptors.append(dict(name=name, implemented=True, arguments=arguments, effect='managed_mutation' if mutates else 'observational',
+        descriptors.append(dict(name=name, implemented=True, arguments=arguments, effect='bounded_rpc' if name == 'rpc' else 'managed_mutation' if mutates else 'observational',
                                 network=network, dry_run=mutates, plan_guard=guarded(name, mask)))
     output['data'] = dict(commands=descriptors, schemas=dict(result=2, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                          readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1,2,3], pending=[1,2,3]),
                          scopes=['project', 'user'], default_scope='current_checkout', aggregate_scope='all_registered',
                          deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap --autocrlf'), pinned_deployment=True, per_binding_targeting=True, targets=mask.ADAPTERS,
                          bundles=dict(flat=True, source_index=1, contributions='explicit_local', upgrade='definition_and_unheld_versions', ordinary_upgrade='installed_receipts', uninstall='named_local_contribution', recursive=False),
+                         fleet=dict(protocol=mask_fleet.PROTOCOL, actions=list(mask_fleet.ACTIONS), max_frame=mask_rpc.MAX_FRAME,
+                                    max_transfer=mask_fleet_artifacts.MAX_TRANSFER, signing='openssh-sshsig-ed25519'),
                          adapter_contracts=mask.adapters.capabilities(), python_minimum='3.11', program_root=str(mask.PROGRAM_ROOT),
                          workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1',
                                        profile_selection='status --check --workflow-profile SKILL=PROFILE', scope_contracts=['project','user'],

@@ -140,6 +140,12 @@ class FleetRpcTests(FleetRpcFixture):
         self.assertEqual(first, self.send(packet))
         self.assertEqual(first, self.query(packet))
         self.assertEqual(first['result']['bindings'][0]['coordinate'], 'fixture/alpha')
+        local = fleet.get_identity(self.device_home, 'device')
+        signed_wrong = rpc.reply(self.device_home, packet)['response']
+        signed_wrong['data']['revision'] = core.digest(b'unrelated revision')
+        envelope = dict(response=signed_wrong, signature=fleet.sign(signed_wrong, local, fleet.RECEIPT))
+        with self.assertRaisesRegex(core.MaskError, 'differs from the request'):
+            rpc.checked_response(rpc.frame(envelope), packet['intent'], self.device)
         self.assertNotIn(str(self.personal), json.dumps(first))
         self.send(self.retarget(packet, revision=core.digest(b'changed bytes')), error='fleet.operation_conflict')
         self.send(self.retarget(packet, id='2' * 32, sequence=1), error='fleet.sequence_stale')
@@ -185,3 +191,7 @@ class FleetRpcTests(FleetRpcFixture):
         self.assertEqual(canceled['result']['status'], 'canceled')
         self.assertEqual(canceled, self.send(cancellation))
         self.assertEqual(self.send(packet)['status'], 'canceled')
+        self.assertEqual(self.query(cancellation), canceled)
+        self.policy = dict(self.policy, epoch=2, scopes={})
+        self.authorize(self.policy)
+        self.query(cancellation, error='fleet.scope_denied')

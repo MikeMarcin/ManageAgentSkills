@@ -79,6 +79,7 @@ class FleetIdentityTests(FleetFixture):
         self.assertIn('authorize', missing['error']['details']['subcommands'])
         capabilities = self.cli(self.device_home, 'capabilities')
         self.assertIn('fleet.device.authorize', [row['name'] for row in capabilities['data']['commands']])
+        self.assertEqual(capabilities['data']['fleet']['protocol'], 'mask.rpc.v1')
         revoke = self.cli(self.device_home, 'fleet', 'device', 'revoke-controller', '--dry-run')
         self.cli(self.device_home, 'fleet', 'device', 'revoke-controller', '--approve-plan', revoke['data']['plan_hash'])
         self.assertEqual(self.cli(self.device_home, 'fleet', 'device', 'descriptor', code=4)['error']['code'],
