@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0051"
 title: "Implement signed desired state and conflict-safe control publication"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0071", "MASK-0073"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-control","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0013-AC02","outcome":"pass","revision":"d61ee635660729b104bc9af39dbc2ba9c6329fd6","evidence":{"kind":"command","detail":"tests.test_fleet_control and tests.test_fleet_identity verify frozen target/scope identities and explicit enrolled source/physical scope authority. Delivery and contribution composition remain assigned to MASK-0052."}},{"criterion":"RFC-MASK-0013-AC03","outcome":"pass","revision":"d61ee635660729b104bc9af39dbc2ba9c6329fd6","evidence":{"kind":"command","detail":"tests.test_fleet_control uses real OpenSSH signatures and a disposable bare Git remote to exercise same-parent competing publications, later signed rollback intent, suppression only of the current desired revision, and refusal of a head missing an already observed sequence."}}]
 ---
 
 # MASK-0051: Implement signed desired state and conflict-safe control publication
