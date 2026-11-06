@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0151"
 title: "Report already-current fleet project scopes without a Git upgrade"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0025"]
 depends_on: ["MASK-0149"]
 ---
