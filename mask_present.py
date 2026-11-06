@@ -1310,6 +1310,8 @@ def fleet_rollout_lines(data):
         lines.append(f"  Runner{name} {clean(runner['status'])}")
         if runner.get('interval'):
             lines.append(f"  Interval {runner['interval']} seconds")
+        if runner.get('signing_provider'):
+            lines.append(f"  Signing provider {clean(runner['signing_provider'])}")
     if data.get('operation_id'):
         lines.append(f"  Operation {clean(data['operation_id'])}")
     request = data.get('input') or {}

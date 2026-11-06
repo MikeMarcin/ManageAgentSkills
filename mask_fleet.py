@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 from contextlib import nullcontext
+from contextvars import ContextVar
 import hashlib
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ import mask_sources as sources
 
 INTENT = 'mask-intent@mask.invalid'
 RECEIPT = 'mask-receipt@mask.invalid'
+SIGNING_PROVIDER = ContextVar('fleet_signing_provider', default=None)
 PROTOCOL = 'mask.rpc.v1'
 ACTIONS = ('capabilities', 'inspect', 'prepare', 'apply', 'receipt', 'cancel-request')
 RECORD_BYTES = 256 * 1024
@@ -132,7 +134,8 @@ def signing_command(*args, input_file=None):
     env = dict(os.environ, SSH_ASKPASS_REQUIRE='never')
     env.pop('SSH_AUTH_SOCK', None)
     try:
-        return c.contained_run([tool('ssh-keygen'), *args], env, timeout=8, max_output=4096,
+        provider = SIGNING_PROVIDER.get() or tool('ssh-keygen')
+        return c.contained_run([provider, *args], env, timeout=8, max_output=4096,
                                max_error=8192, family='fleet.signing', name='OpenSSH signing',
                                input_file=input_file)
     except OSError:

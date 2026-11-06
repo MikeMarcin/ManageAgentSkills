@@ -36,16 +36,20 @@ def windows_text(raw):
     return raw.decode('utf-8-sig', errors='replace')
 
 
+def windows_identity():
+    fields = next(csv.reader([windows_text(require('whoami.exe', '/user', '/fo', 'csv', '/nh')).strip()]), [])
+    if len(fields) != 2 or not re.fullmatch(r'S-1-[0-9-]+', fields[1]) or fields[1] == 'S-1-5-18':
+        c.fail('fleet.scheduler_scope', 'Could not determine the ordinary Windows user SID.', 4)
+    return fields
+
+
 def user_id(platform):
     if platform == 'macos':
         if os.getuid() == 0:
             c.fail('fleet.scheduler_scope', 'Schedule fleet convergence as your ordinary user.', 4)
         return str(os.getuid())
     if platform == 'windows':
-        answer = next(csv.reader([windows_text(require('whoami.exe', '/user', '/fo', 'csv', '/nh')).strip()]), [])
-        if len(answer) != 2 or not re.fullmatch(r'S-1-[0-9-]+', answer[1]) or answer[1] == 'S-1-5-18':
-            c.fail('fleet.scheduler_scope', 'Could not determine the ordinary Windows user SID.', 4)
-        return answer[1]
+        return windows_identity()[1]
     c.fail('fleet.scheduler_unsupported', 'Use foreground fleet sync --local on this platform.', 4)
 
 
@@ -192,8 +196,15 @@ def win_observe(record):
     for field in fields:
         query = '/'.join('t:' + item for item in field.split('/'))
         default = 'LeastPrivilege' if field.endswith('/RunLevel') else None
-        if observed.findtext(query, default, namespace) != expected.findtext(query, namespaces=namespace):
-            c.fail('fleet.scheduler_collision', 'The existing Windows task differs from the owned execution definition.', 4)
+        actual = observed.findtext(query, default, namespace)
+        if actual == expected.findtext(query, namespaces=namespace):
+            continue
+        if actual and field.endswith('/UserId'):
+            account, sid = windows_identity()
+            if sid == record['user'] and actual.casefold() == account.casefold():
+                continue
+        c.fail('fleet.scheduler_collision', 'The existing Windows task differs from the owned execution definition.', 4,
+               field=field)
     if len(observed.findall('t:Actions/*', namespace)) != 1 or len(observed.findall('t:Triggers/*', namespace)) != 2:
         c.fail('fleet.scheduler_collision', 'The existing Windows task contains foreign actions or triggers.', 4)
     if not windows_schedule_matches(observed, record, namespace):

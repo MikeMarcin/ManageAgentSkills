@@ -151,7 +151,11 @@ class FleetRunnerTests(FleetRpcFixture):
                     command.assert_called_once_with('schtasks.exe', '/Query', '/TN', binding['name'], '/XML', '/HRESULT')
         normalized = schedule.win_definition(binding).decode('utf-16').replace('PT300S', 'PT5M').replace(
             '2030-01-01T00:00:00+00:00', '2030-01-01T00:00:00Z').replace('<RunLevel>LeastPrivilege</RunLevel>', '')
-        with patch.object(schedule, 'command', return_value=(0, normalized.encode('utf-8'), b'')):
+        account = 'fixture\\operator'
+        normalized = normalized.replace('<LogonTrigger><UserId>' + binding['user'],
+                                        '<LogonTrigger><UserId>' + account)
+        with patch.object(schedule, 'command', return_value=(0, normalized.encode('utf-8'), b'')), patch.object(
+                schedule, 'windows_identity', return_value=(account, binding['user'])):
             self.assertEqual(schedule.win_observe(binding), (True, True))
 
     def test_mac_scheduler_observes_exact_label_without_listing_gui_domain(self):
@@ -183,10 +187,17 @@ class FleetRunnerTests(FleetRpcFixture):
             preview = dict(data={}, dry_run=True)
             runner.scheduler_command(args, preview, self.device_home)
             self.assertNotIn('start_boundary', preview['data']['runner']['scheduler'])
+            self.assertTrue(Path(preview['data']['runner']['signing_provider']).is_file())
             self.assertIsNone(runner.read_record(self.device_home))
             args.approve_plan = preview['data']['plan_hash']
             runner.scheduler_command(args, dict(data={}, dry_run=False), self.device_home)
             self.assertTrue(installed['start_boundary'].endswith('+00:00'))
+            with patch.object(runner, 'converge') as converge:
+                converge.side_effect = lambda *_: self.assertEqual(
+                    fleet.SIGNING_PROVIDER.get(), preview['data']['runner']['signing_provider'])
+                runner.tick(self.device_home, dict(data={}))
+                converge.assert_called_once()
+            self.assertIsNone(fleet.SIGNING_PROVIDER.get())
             repeated = dict(data={}, dry_run=True)
             runner.scheduler_command(args, repeated, self.device_home)
             self.assertFalse(repeated['would_change'])

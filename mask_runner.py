@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from pathlib import Path
 
 import mask_control as control
 import mask_core as c
@@ -115,7 +116,6 @@ def record_path(home):
 
 
 def runner_argv(home):
-    from pathlib import Path
     import sys
     return [str(Path(sys.executable).resolve()), '-B', str(Path(__file__).resolve().with_name('mask.py')),
             '--home', str(home), 'fleet', 'runner', 'tick', '--json']
@@ -126,11 +126,14 @@ def read_record(home):
     if record is None:
         return None
     c.fields(record, ('schema_version', 'platform', 'user', 'name', 'path', 'interval', 'argv', 'enabled', 'control'),
-             ('start_boundary',), family='fleet')
+             ('start_boundary', 'signing_provider'), family='fleet')
     if type(record['enabled']) is not bool or not 60 <= fleet.number(record['interval']) <= 3600:
         c.fail('fleet.runner_invalid', 'Invalid saved runner ownership or interval.', 4)
     if 'start_boundary' in record and (record['platform'] != 'windows' or not isinstance(record['start_boundary'], str)):
         c.fail('fleet.runner_invalid', 'Invalid saved Windows task start boundary.', 4)
+    if 'signing_provider' in record and (record['platform'] != 'windows' or
+            not isinstance(record['signing_provider'], str) or not Path(record['signing_provider']).is_absolute()):
+        c.fail('fleet.runner_invalid', 'Invalid saved Windows signing provider.', 4)
     return record
 
 
@@ -154,6 +157,8 @@ def scheduler_command(args, output, home):
             output['data']['runner'] = dict(enabled=previous['enabled'], status='active' if active else 'inactive',
                                             scheduler_present=present, interval=previous['interval'],
                                             name=previous['name'], next=fleet.data(fleet.path(home, 'runner-clock'), missing=True))
+            if 'signing_provider' in previous:
+                output['data']['runner']['signing_provider'] = previous['signing_provider']
         return
     if action == 'disable' and (previous is None or not previous['enabled']):
         if previous is None or not scheduler.observe(scheduler_binding(previous))[0]:
@@ -168,6 +173,8 @@ def scheduler_command(args, output, home):
         if saved_boundary is not None:
             binding['start_boundary'] = saved_boundary
         candidate = dict(binding, enabled=True, control=c.digest(settings))
+        if binding['platform'] == 'windows':
+            candidate['signing_provider'] = str(Path(fleet.tool('ssh-keygen')).resolve(strict=True))
         if previous and previous['enabled'] and previous != candidate:
             c.fail('fleet.runner_active', 'Disable the existing runner before changing its schedule.', 4)
     else:
@@ -178,6 +185,8 @@ def scheduler_command(args, output, home):
         c.fail('fleet.scheduler_collision', 'A scheduler entry exists without this MASK home owning it.', 4)
     output['data']['runner'] = dict(enabled=candidate['enabled'], name=binding['name'], interval=binding['interval'],
                                     status='planned', scheduler=scheduler_binding(candidate))
+    if 'signing_provider' in candidate:
+        output['data']['runner']['signing_provider'] = candidate['signing_provider']
     # Include current native existence, so an explicit preview cannot authorize
     # deleting or replacing an entry created after that preview.
     old_facts = dict(record=previous, present=present, active=active)
@@ -210,7 +219,7 @@ def scheduler_command(args, output, home):
 
 
 def scheduler_binding(record):
-    return {key: value for key, value in record.items() if key not in ('enabled', 'control')}
+    return {key: value for key, value in record.items() if key not in ('enabled', 'control', 'signing_provider')}
 
 
 def next_tick(now, interval, failures, jitter):
@@ -234,7 +243,14 @@ def tick(home, output):
         return
     failed = True
     failure = None
+    provider = record.get('signing_provider')
+    token = fleet.SIGNING_PROVIDER.set(provider)
     try:
+        if provider:
+            path = Path(provider)
+            c.parents_safe(Path(path.anchor), path)
+            if c.kind(path) != 'file':
+                c.fail('fleet.provider_required', 'The reviewed runner signing provider is unavailable.', 4)
         converge(home, output)
         failed = False
     except c.MaskError as error:
@@ -244,6 +260,7 @@ def tick(home, output):
         ])
         raise
     finally:
+        fleet.SIGNING_PROVIDER.reset(token)
         interval = record['interval']
         failures = min(6, (before or {}).get('failures', 0) + 1) if failed else 0
         after = dict(failures=failures, next_at=next_tick(int(time.time()), interval, failures, secrets.randbelow(max(1, interval // 8))))
