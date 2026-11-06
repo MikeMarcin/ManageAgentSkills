@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0054"
 title: "Add opt-in native scheduled convergence and offline catch-up"
-status: "In Progress"
+status: "Blocked"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0053"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-runner","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+blocked_by: "native-scheduler-authorization"
 ---
 
 # MASK-0054: Add opt-in native scheduled convergence and offline catch-up
@@ -33,4 +34,19 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+Foreground pull and scheduler adapters are implemented in
+`d1d87be996cd240d3cd23e11a82468b0a9b56adb`. The scheduler ownership recheck is
+in `c7680f8f1b1c1a2c774f8b1baac40fe8bee519fc`.
+
+`tests.test_fleet_runner` passed on macOS and on native Windows through the
+exact disposable Windows archive. Foreground pull selected only the latest
+approved content, left an unapproved newer upstream version unapplied and
+published the signed receipt to a separate bare Git repository. Injected
+scheduler checks exercised ownership, disable and bounded retry. Controller
+push and native offline catch-up are recorded in the
+[native rollout report](../../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up).
+
+AC05 remains open for an actual current-user launchd and Windows Task Scheduler
+registration, invocation and removal. Existing native authority covers
+disposable checkout fixtures and excludes host scheduler changes. The private
+rollout checkpoint records a scoped temporary procedure for later authorization.

@@ -50,12 +50,12 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0013-AC01 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC02 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC03 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC04 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC05 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC06 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0013-AC07 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0013-AC01 | Native tap name and GitHub tree-URL curated copy with signed exact receipts | Pass | `d1d87be` |
+| RFC-MASK-0013-AC02 | Frozen target proof, project mapping fixture, native local pins and unchanged authoring index | Pass | `c7680f8` |
+| RFC-MASK-0013-AC03 | Disposable Git CAS, signed replay and exact rollback via public command | Pass | `c7680f8` |
+| RFC-MASK-0013-AC04 | Native independent collision/offline results and supersession, fixture cancel/lost-ack/recovery | Pass | `d1d87be` |
+| RFC-MASK-0013-AC05 | Foreground native pull and injected scheduler ownership/backoff passed. Native scheduler registration, invocation and removal need explicit authorization | Open | `c7680f8` |
+| RFC-MASK-0013-AC06 | Actual distinct native macOS and Windows over pinned SSH, two offline revisions and exact newest catch-up | Pass | `d1d87be` |
+| RFC-MASK-0013-AC07 | Deterministic source-only resume, signed reply loss recovery and separate host-load status | Pass | `2895f43` |
 
-Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
+Closeout review runtime: implementer self-review. Native scheduler qualification remains open. See the [native rollout report](../../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up).

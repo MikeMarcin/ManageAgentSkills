@@ -33,4 +33,11 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 
 ## Run record
 
-Not started. No implementation revision, native result, host-load observation or acceptance is asserted.
+The [native rollout report](../../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up)
+records two-device evidence for `d1d87be996cd240d3cd23e11a82468b0a9b56adb`.
+The disposable macOS and native Windows rollout included a tap install, GitHub
+tree-URL curated copy, two controller updates while the Mac listener was
+offline, matching receipt for the latest approved revision after sync,
+withdrawal and an isolated destination collision. The device fixtures were
+removed. This card remains dependency-gated on native runner qualification
+under MASK-0054.
