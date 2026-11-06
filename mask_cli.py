@@ -24,6 +24,8 @@ COMMANDS = {
     'tap': (True, False, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
+    'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag')]),
+    'diff': (False, False, [('id', 'pos'), ('from', 'required'), ('to', 'required'), ('patch', 'flag')]),
     'cleanup': (True, False, []),
     'search': (False, False, [('query', 'optional')]),
     'info': (False, False, [('id', 'pos'), ('content', 'flag')]),
@@ -57,6 +59,8 @@ KEEP = ('config.show', 'config.set', 'skill.where-used', 'skill.validate', 'skil
         'launch', 'workspace.forget', 'link.adopt', 'recover', 'tap.transport', 'lock', 'self.status', 'self.install', 'self.uninstall')
 
 HELP = {
+    'update.report': ('Explain the guarded upgrade candidate from cached taps without fetching or applying it.', 'mask update report --all --json'),
+    'diff': ('Compare raw files at two full cached or locked commit IDs. Text patches are opt-in and bounded.', 'mask diff TAP/ID --from OLD_COMMIT --to NEW_COMMIT'),
     'user.export': ('Export portable personal selections and exact locks to a new directory.', 'mask user export --output /path/to/profile'),
     'user.import': ('Merge and deploy a portable profile using exact locks. --replace replaces the local contribution.', 'mask user import /path/to/profile --apply'),
     'profile.subscribe': ('Approve and deploy a frozen local profile revision in personal scope. Repeat with the same name to update it explicitly.', 'mask profile subscribe /path/to/personal --user'),
@@ -112,7 +116,7 @@ def parser(engine, common, parser_type, add_argument, help_entries):
     for command, (mutates, _, arguments) in definitions(engine).items():
         parts = command.split('.')
         # tap also has a useful bare form; normalize its advanced subcommands before parsing.
-        if len(parts) == 2 and parts[0] != 'tap':
+        if len(parts) == 2 and parts[0] not in ('tap', 'update'):
             if parts[0] not in groups:
                 group = sub.add_parser(parts[0], add_help=False, allow_abbrev=False)
                 for name, shape in common:
@@ -130,6 +134,8 @@ def parser(engine, common, parser_type, add_argument, help_entries):
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
         for name, shape in common + arguments:
             add_argument(leaf, name, shape)
+        if command == 'update.report':
+            next(action for action in leaf._actions if action.dest == 'independent').help = 'Report independent checkout upgrades when using --all'
         if command == 'upgrade':
             next(action for action in leaf._actions if action.dest == 'commit').help = 'Commit changed project controls after readiness, including existing MASK changes'
             next(action for action in leaf._actions if action.dest == 'independent').help = 'With --all, upgrade every checkout separately instead of once per repository'
@@ -149,6 +155,11 @@ def normalize(argv):
     for index, word in enumerate(words):
         if word == '--':
             break
+        if word == 'update' and index + 1 < len(words) and words[index + 1] == 'report':
+            words[index:index + 2] = ['update.report']
+            break
+        if word == 'update.report':
+            c.fail('invocation.invalid', 'Use mask update report.', 2)
         if word.startswith('tap.'):
             c.fail('invocation.invalid', 'Use mask tap SUBCOMMAND.', 2)
         if word == 'tap' and index + 1 < len(words) and words[index + 1] in ('fetch', 'show', 'inspect', 'repair-cache', 'publish', 'transport', 'migrate'):
@@ -160,7 +171,7 @@ def normalize(argv):
 def validate(args):
     if args.command == 'upgrade' and getattr(args, 'commit', False) and getattr(args, 'user', False):
         c.fail('invocation.invalid', '--commit requires a project scope; personal controls are never committed.', 2)
-    if args.command == 'upgrade' and getattr(args, 'independent', False) and not getattr(args, 'all', False):
+    if args.command in ('upgrade', 'update.report') and getattr(args, 'independent', False) and not getattr(args, 'all', False):
         c.fail('invocation.invalid', '--independent applies only to --all; a single checkout is always upgraded on its own.', 2)
     if args.command == 'recover' and not any(getattr(args, mode, False) for mode in ('inspect', 'complete', 'rollback')):
         args.inspect = True
@@ -275,6 +286,9 @@ def dispatch(args, output, leaves):
                 return mask_cleanup.dispatch(args, output, home)
             if public == 'capabilities':
                 return capabilities(output, leaves, mask)
+            if public in ('update.report', 'diff'):
+                import mask_report
+                return mask_report.inspect_exact(args, output, home)
             if public in ('user.export', 'user.import') or public.startswith('profile.'):
                 import mask_profiles
                 return mask_profiles.dispatch(args, output, home)
@@ -368,7 +382,7 @@ def help_text(parser, leaves, argv, mask):
     words = [word for word in argv if not word.startswith('-')]
     key = '.'.join(words[:2])
     if key in leaves:
-        return leaves[key].format_help().replace('mask tap.', 'mask tap ')
+        return leaves[key].format_help().replace('mask tap.', 'mask tap ').replace('mask update.', 'mask update ')
     if words and words[0] in leaves:
         return leaves[words[0]].format_help().replace('mask tap.', 'mask tap ')
     commands = definitions(mask.COMMANDS)

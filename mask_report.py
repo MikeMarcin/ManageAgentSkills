@@ -212,3 +212,193 @@ def dispatch(args, output, home):
                           complete=all(item['error'] is None and not item.get('discovery_errors') for item in consumers),
                           work=counts, limitations=['Compatibility is unspecified for development links and wherever locked store metadata is not observable.',
                                                   'Profile, fleet receipt and actual host-loading data are unavailable.'])
+
+
+PATCH_BYTES = 64 * 1024
+PATCH_FILE_BYTES = 16 * 1024
+
+
+def text_lines(data):
+    """Return bounded passive UTF-8 lines, or None for binary data."""
+    import unicodedata
+    try:
+        value = data.decode('utf-8')
+    except UnicodeDecodeError:
+        return None
+    if '\x00' in value:
+        return None
+    return ''.join(ch if ch in '\t\n\r' or unicodedata.category(ch) not in ('Cc', 'Cf') else '?' for ch in value).splitlines()
+
+
+def package_diff(before, after, *, patch=False):
+    import difflib
+    old = {file.path: file for file in before.files} if before else {}
+    new = {file.path: file for file in after.files} if after else {}
+    files, patches = [], []
+    budget, truncated = PATCH_BYTES, False
+    for path in sorted(old.keys() | new.keys()):
+        left, right = old.get(path), new.get(path)
+        if left == right:
+            continue
+        summaries = {}
+        lines = []
+        for side, file in (('before', left), ('after', right)):
+            summaries[side] = dict(size=len(file.data), sha256=c.digest(file.data), mode=file.mode) if file else None
+            lines.append(text_lines(file.data) if file else [])
+        binary = any(value is None for value in lines)
+        files.append(dict(path=path, change='added' if left is None else 'removed' if right is None else 'modified',
+                          binary=binary, **summaries))
+        if not patch or binary:
+            continue
+        if budget == 0 or any(item and len(item.data) > PATCH_FILE_BYTES for item in (left, right)) or any(len(value) > 1000 for value in lines):
+            truncated = True
+            continue
+        label = ''.join(ch if ch.isprintable() else '?' for ch in path)
+        diff = '\n'.join(difflib.unified_diff(*lines, fromfile='a/' + label, tofile='b/' + label, lineterm=''))
+        size = len(diff.encode('utf-8')) + 1
+        if size > budget:
+            truncated = True
+            continue
+        if diff:
+            patches.append(diff)
+            budget -= size
+    result = dict(files=files)
+    if patch:
+        result.update(patch='\n'.join(patches), patch_truncated=truncated)
+    return result
+
+
+def exact_payload(home, row, config, views):
+    key = r.payload_key(row)
+    if key not in views:
+        root, _ = store.location(home, row['payload_digest'], row['id'])
+        if c.kind(root) != 'missing':
+            views[key] = store.verify(home, row, as_payload=True)
+        else:
+            import mask_sources as sources
+            views[key] = r.verify_resolution(home, row['source'], sources.selected(config, row['source']), row)
+    return views[key]
+
+
+def impact_kind(old, new, files):
+    if old is None or new is None:
+        return 'selection'
+    paths = {item['path'] for item in files}
+    if not paths and old == new:
+        return 'identical'
+    if not paths or paths == {'.mask-provenance.json'}:
+        return 'provenance'
+    return 'metadata' if paths == {'mask-skill.json'} else 'content'
+
+
+def update_impact(home, config, consumers, planned, locks, views, refs):
+    """Explain candidate resolutions and observed links without replanning or fetching."""
+    before = c.consumer_records(planned['intent']['before_state'])
+    after = c.consumer_records(planned['intent']['after_state'])
+    comparisons, deployments = {}, []
+    for item in consumers:
+        key = str(item['root'])
+        scope = item['scope']
+        current, desired = before[key], after[key]
+        if current.get('mode') == 'dev-link':
+            deployments.append(dict(root=key, scope=scope, status='development_link',
+                                    warning='Edits to the shared authoring checkout are visible through its links. Running agents may cache instructions.'))
+            continue
+        previous = item.get('previous_lock')
+        proposed = locks.get(key)
+        if previous is None or proposed is None:
+            deployments.append(dict(root=key, scope=scope, status=item['row']['status'], error=item['row']['error']))
+            continue
+        old_rows = {r.coordinate(row): row for row in previous['packages']}
+        new_rows = {r.coordinate(row): row for row in proposed['packages']}
+        held = {r.coordinate(row) for row in item['declaration']['skills'] if row.get('pinned') or 'commit' in row.get('version', {})}
+        selected = set(item['skills']) or old_rows.keys() | new_rows.keys()
+        for coordinate in sorted(selected):
+            old, new = old_rows.get(coordinate), new_rows.get(coordinate)
+            old_agents = sorted({link['target'] for link in current['links'].values() if r.coordinate(link['resolution']) == coordinate})
+            new_agents = sorted({link['target'] for link in desired['links'].values() if r.coordinate(link['resolution']) == coordinate})
+            content_changed = (old or {}).get('payload_digest') != (new or {}).get('payload_digest')
+            kind = None
+            if old != new:
+                pair = tuple(r.payload_key(row) if row else '' for row in (old, new))
+                if pair not in comparisons:
+                    try:
+                        compared = package_diff(*(exact_payload(home, row, config, views) if row else None for row in (old, new)))
+                        compared['kind'] = impact_kind(old, new, compared['files'])
+                    except c.MaskError as error:
+                        compared = dict(kind='unavailable', files=[], error=error.as_dict())
+                    comparisons[pair] = dict(id=c.digest(list(pair)), skill=coordinate,
+                                             before_commit=old['commit'] if old else None, after_commit=new['commit'] if new else None,
+                                             **compared)
+                change = comparisons[pair]['id']
+                kind = comparisons[pair]['kind']
+                status = 'blocked' if planned['blockers'] else 'affected'
+            else:
+                change = None
+                status = 'pinned_unaffected' if coordinate in held else 'unchanged'
+                if old_agents != new_agents:
+                    status = 'affected'
+                elif old and old['selector'].get('ref', '').startswith('refs/heads/') and (old['source'], old['selector']['ref']) in refs and refs[old['source'], old['selector']['ref']] != old['commit'] and status == 'unchanged':
+                    status = 'ref_advanced_identical_payload'
+            deployments.append(dict(root=key, scope=scope, skill=coordinate, status=status, comparison=change,
+                                    before_agents=old_agents, after_agents=new_agents, targets_changed=old_agents != new_agents,
+                                    host_refresh_required=status == 'affected' and (old_agents != new_agents or content_changed and bool(new_agents) and kind != 'provenance'),
+                                    host_load='not_verified'))
+        for name, receipt in current.get('profiles', {}).items():
+            for row in receipt['lock']['packages']:
+                coordinate = r.coordinate(row)
+                if item['skills'] and coordinate not in item['skills']:
+                    continue
+                agents = sorted({link['target'] for link in current['links'].values() if r.payload_key(link['resolution']) == r.payload_key(row)})
+                deployments.append(dict(root=key, scope=scope, skill=coordinate, status='profile_frozen_unaffected',
+                                        profile=name, profile_revision=receipt['revision'], before_agents=agents, after_agents=agents,
+                                        targets_changed=False, host_refresh_required=False, host_load='not_verified'))
+    return dict(comparisons=list(comparisons.values()), deployments=deployments)
+
+
+def compare_commits(args, output, home):
+    import mask_sources as sources
+    coordinate = r.qualified(args.id, 'diff')
+    name, identifier = coordinate.split('/')
+    config = c.config(c.read_json(home / 'config.json'))
+    entry = sources.selected(config, name)
+    resolved = []
+    for commit in (getattr(args, 'from'), args.to):
+        if not r.OID.fullmatch(commit):
+            c.fail('invocation.invalid', 'Compare two full lowercase commit IDs from a lock or update report.', 2)
+        declaration = dict(schema_version=2, sources={name: dict(repository=entry['repository'], packages=entry['packages'])}, skills=[])
+        binding = dict(source=name, id=identifier, version=dict(commit=commit))
+        views = {}
+        try:
+            row = r.resolve_binding(home, declaration, binding, entry, views)
+        except c.MaskError as error:
+            if error.code != 'lock.resolution_required':
+                raise
+            state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+            recorded = {}
+            for record in c.consumer_records(state).values():
+                for lock in [record['last_lock'], *(item['lock'] for item in record.get('profiles', {}).values())]:
+                    for candidate in lock['packages']:
+                        if r.coordinate(candidate) == coordinate and candidate['commit'] == commit and sources.same(candidate['repository'], entry['repository']):
+                            key = (candidate['path'], candidate['payload_digest'], candidate['metadata_digest'], candidate.get('provenance_digest'))
+                            recorded[key] = candidate
+            if len(recorded) != 1:
+                raise
+            row = next(iter(recorded.values()))
+        resolved.append((row, exact_payload(home, row, config, views)))
+    old, new = resolved
+    result = package_diff(old[1], new[1], patch=getattr(args, 'patch', False))
+    output['data'] = dict(skill=coordinate, before=old[0], after=new[0], network='none',
+                          kind=impact_kind(old[0], new[0], result['files']), **result)
+
+
+def inspect_exact(args, output, home):
+    if args.command == 'diff':
+        return compare_commits(args, output, home)
+    import argparse
+    import mask_update
+    upgrade = argparse.Namespace(**vars(args))
+    upgrade.command = upgrade.public_command = 'upgrade'
+    # The identical upgrade engine and approval namespace generate the executable hash.
+    output['dry_run'] = True
+    mask_update.dispatch(upgrade, output, home, impact=True)

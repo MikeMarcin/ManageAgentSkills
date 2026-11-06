@@ -164,7 +164,7 @@ def invoking(state):
     return None
 
 
-def dispatch(args, output, home):
+def dispatch(args, output, home, *, impact=False):
     import mask
     import mask_selection as selection
     import mask_store as store
@@ -253,6 +253,7 @@ def dispatch(args, output, home):
     progress.phase('Resolving selected skills')  # The fetch is over; this work must not run under its label.
     import mask_bundles as bundles
     locks, proposals, descriptors, bundle_updates, payload_views, planned_consumers = {}, {}, {}, [], {}, []
+    ref_facts = {}
     blocked = [item['row']['root'] for item in consumers if item['row']['status'] == 'blocked']
     def resolve(item):
         row = item['row']
@@ -285,7 +286,7 @@ def dispatch(args, output, home):
                         if error:
                             raise error
             proposal = r.resolve_candidate(declaration, config, home, previous, refresh=bool(chosen), skills=chosen,
-                                           allow_ref_rebind=getattr(args, 'allow_ref_rebind', False), payload_views=payload_views)
+                                           allow_ref_rebind=getattr(args, 'allow_ref_rebind', False), payload_views=payload_views, ref_facts=ref_facts)
         except c.MaskError as error:
             bundle_failure = bool(item['declaration'].get('bundle_state', {}).get('bundles')) and error.code.startswith(('bundle.', 'source.', 'skill.', 'lock.resolution_required'))
             if (bundle_failure and scoped) or (not bundle_failure and (error.code != 'lock.resolution_required' or fetching)):
@@ -393,12 +394,20 @@ def dispatch(args, output, home):
     selected = [item['root'] for item in planned_consumers]
 
     def candidate_plan():
+        advertisements = {}
+        for (source, ref), oid in sorted(ref_facts.items()):
+            if source not in advertisements:
+                entry = config['sources'][source]
+                advertisements[source] = sources.cached_refs(r.cached(home, source, entry), entry) or {}
+            if advertisements[source].get(ref) != oid:
+                c.fail('plan.stale', 'A cached source ref changed during review; preview the task again.', 4, source=source, ref=ref)
         for item in consumers:
             bundles.guard_definitions(home, config, descriptors.get(str(item['root']), {}), args, output, item['root'] if item['scope'] == 'project' else None)
         planned = fs.plan(config, state, selected, home=home, proposals=proposals, lock_proposals=locks,
                           operation='upgrade', payload_views=payload_views, repair_roles=True, retire_files=False)
         planned['plan_hash'] = c.digest(dict(plan=planned['plan_hash'], blocked=[row for row in rows if row['status'] == 'blocked'],
                                              bundles=descriptors, groups=groups,
+                                             refs=[(source, ref, oid) for (source, ref), oid in sorted(ref_facts.items())],
                                              skipped=[row['root'] for row in rows if row['status'] == 'skipped'],
                                              commit=dict(enabled=commit_requested, rows=commit_rows,
                                                          observations={key: commits.fresh_observation(item['root'], commit_observations[key], config['git_timeout_seconds'])
@@ -409,6 +418,9 @@ def dispatch(args, output, home):
             if scoped:
                 planned['blockers'].extend(row['error'] for row in commit_rows if row['status'] == 'blocked')
         planned['bundle_updates'] = bundle_updates
+        if impact:
+            from mask_report import update_impact
+            planned['impact'] = update_impact(home, config, consumers, planned, locks, payload_views, ref_facts)
         return planned
 
     # Only selected consumers participate in the activation; the snapshot still
@@ -418,7 +430,9 @@ def dispatch(args, output, home):
         if pinned.snapshot(home, observed) != before:
             c.fail('plan.stale', 'Consumer controls changed during update preparation.', 4)
         effects = output['data']['preparation'] = []
+        from mask_profiles import prepare_layers
         for item in planned_consumers:
+            prepare_layers(home, records[str(item['root'])].get('profiles', {}), config, effects, root=item['root'])
             observation = dict(root=item['row']['root'], effects={})
             effects.append(observation)
             declaration = proposals[item['row']['root']]

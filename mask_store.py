@@ -136,7 +136,7 @@ def source_inventory(found, expected, prefix):
     return {key: value for key, value in found.items() if key not in incidental}
 
 
-def verify_tree(root, row):
+def verify_tree(root, row, *, as_payload=False):
     r.lock(dict(schema_version=1, resolver='mask-lock-v1', selection_digest='sha256:' + '0' * 64, packages=[row]))
     if c.kind(root) != 'directory':
         c.fail('artifact.corrupt', 'Existing artifact root must be a real directory.', 4)
@@ -180,14 +180,14 @@ def verify_tree(root, row):
     checked_payload(payload, row)
     if regular_bytes(root / 'manifest.json', MANIFEST_BYTES) != raw:
         c.fail('artifact.corrupt', 'Manifest changed during verification.', 4)
-    return root / prefix
+    return payload if as_payload else root / prefix
 
 
-def verify(home, row, *, frozen_recovery=False):
+def verify(home, row, *, frozen_recovery=False, as_payload=False):
     root, target = location(home, row['payload_digest'], row['id'])
     if c.kind(root) == 'missing':
         c.fail('artifact.unavailable', 'Exact artifact is absent from the local store.', 4, payload_digest=row['payload_digest'])
-    return verify_tree(root, row)
+    return verify_tree(root, row, as_payload=as_payload)
 
 
 def cleanup(stage, identity):

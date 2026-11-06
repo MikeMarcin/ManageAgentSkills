@@ -1231,7 +1231,24 @@ def render_profile(data, output):
     return render_lifecycle(data, output)
 
 
+def render_exact(data, output):
+    if output['command'] == 'diff':
+        lines = [f"Exact diff · {clean(data.get('skill'))}"]
+        lines.extend(f"  {clean(row['change'])} {clean(row['path'])}" + (' (binary)' if row['binary'] else '') for row in data.get('files', []))
+        if data.get('patch'):
+            lines.append(data['patch'])
+        if data.get('patch_truncated'):
+            lines.append('  Some text patches exceed the size limit.')
+        return lines
+    impact = data.get('impact', {})
+    lines = ['Update impact from cached taps']
+    for row in impact.get('deployments', []):
+        lines.append(f"  {clean(row.get('skill'))} · {clean(row.get('status'))} · {clean(row.get('root'))}")
+    return lines + plan_guard(data, output)
+
+
 RENDERERS = {
+    'diff': render_exact, 'update.report': render_exact,
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,
     'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.install': render_bundles, 'bundle.uninstall': render_bundles, 'bundle.upgrade': render_bundles,
@@ -1794,6 +1811,9 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'from': 'Full commit ID for the older package bytes.',
+    'to': 'Full commit ID for the newer package bytes.',
+    'patch': 'Include bounded text patches; binary files are summarized.',
     'location': 'Directory containing a portable selection and exact lock.',
     'output': 'Explicit destination for the generated files.',
     'effective': 'Flatten the effective selection into a standalone declaration.',

@@ -373,7 +373,7 @@ def machine_selector(root, entry):
     return {'ref': ref(candidates[0], 'lock')}
 
 
-def resolve_binding(home, declaration, binding, entry, payload_views=None):
+def resolve_binding(home, declaration, binding, entry, payload_views=None, *, ref_facts=None):
     root = cached(home, binding['source'], entry)
     chosen = declared_selector(declaration, binding) or machine_selector(root, entry)
     commit = chosen.get('commit')
@@ -382,6 +382,10 @@ def resolve_binding(home, declaration, binding, entry, payload_views=None):
         if chosen['ref'] not in refs:
             c.fail('lock.resolution_required', 'Selected ref has no cached advertisement; fetch explicitly first.', 4, ref=chosen['ref'])
         commit = refs[chosen['ref']]
+        if ref_facts is not None:
+            key = binding['source'], chosen['ref']
+            if ref_facts.setdefault(key, commit) != commit:
+                c.fail('plan.stale', 'A cached ref changed during resolution; review the task again.', 4, source=key[0], ref=key[1])
     observed = c.peeled_commit(root, commit)
     if observed is None or 'commit' in chosen and observed != commit:
         c.fail('lock.resolution_required', 'Selected Git object cannot resolve to the required commit in the approved cache; explicitly inspect/fetch that selector first.', 4, object=commit, selector=chosen)
@@ -399,7 +403,7 @@ def resolve_binding(home, declaration, binding, entry, payload_views=None):
     return row
 
 
-def resolve_candidate(declaration, config, home, previous=None, *, refresh=False, skills=(), allow_ref_rebind=False, payload_views=None):
+def resolve_candidate(declaration, config, home, previous=None, *, refresh=False, skills=(), allow_ref_rebind=False, payload_views=None, ref_facts=None):
     declaration = selection(declaration)
     entries = approved(declaration, config)
     old = lock(previous) if previous is not None else None
@@ -426,7 +430,7 @@ def resolve_candidate(declaration, config, home, previous=None, *, refresh=False
                     payload_views[payload_key(prior)] = payload
             rows.append(prior)
             continue
-        row = resolve_binding(home, declaration, binding, entry, payload_views)
+        row = resolve_binding(home, declaration, binding, entry, payload_views, ref_facts=ref_facts)
         if prior is not None and s.same(prior['repository'], row['repository']) and dict(prior, repository=row['repository']) == row:
             row = prior  # The same resolution under an older spelling: a spelling alone never rewrites a committed lock.
         if prior is not None and s.same(prior['repository'], row['repository']) and prior['selector'] == row['selector'] and prior['commit'] != row['commit']:
