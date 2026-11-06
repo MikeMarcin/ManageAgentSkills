@@ -589,6 +589,9 @@ def references(home, config, state, name):
         if not root.is_dir():
             c.fail('source.references_unavailable', 'Cannot prove a source is unused while a consumer is unavailable.', 4)
         declaration = home / 'user.json' if c.consumer_scope(state, root) == 'user' else root / '.mask.json'
+        for profile, receipt in record.get('profiles', {}).items():
+            if name in receipt['declaration']['sources']:
+                result.append('profile:' + profile)
         raw = c.read_json(declaration, 'manifest')
         if name in raw.get('sources', {}) or any(isinstance(item, dict) and item.get('source') == name for item in raw.get('skills', [])):
             result.append(str(declaration))

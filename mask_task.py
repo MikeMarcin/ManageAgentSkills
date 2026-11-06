@@ -281,16 +281,40 @@ def listing(args, output, home):
     expected = c.consumer_records(planned['intent']['after_state']).get(key, {}).get('links', {}) if not planned['blockers'] else {}
     leaves = {leaf['relative']: leaf for entry in planned['projects'] + planned['users'] if entry['root'] == key for leaf in entry['leaves']}
     lock_value = r.read_model(r.lock_path(root, scope, home), 'lock', missing=True)[0]
-    rows = {r.coordinate(row): row for row in (lock_value or {}).get('packages', [])} if isinstance(lock_value, dict) else {}
-    data['source'] = dict(mode='pinned', sources=sorted(declaration['sources']))
-    bindings = [(r.coordinate(binding), binding['id'], binding['source'], rows.get(r.coordinate(binding))) for binding in declaration['skills']]
+    from mask_profiles import freshness, layers
+    profiles = (record or {}).get('profiles', {})
+    if profiles:
+        data['profiles'] = freshness(profiles)
+    contributions = layers(declaration, lock_value or dict(packages=[]), profiles)
+    bindings, rows, origins, taps = {}, {}, {}, set()
+    for contribution in contributions:
+        selected = contribution['declaration']
+        taps.update(selected['sources'])
+        for binding in selected['skills']:
+            coordinate = r.coordinate(binding)
+            bindings.setdefault(coordinate, []).append(binding)
+            origins.setdefault(coordinate, set()).add(contribution['origin'])
+        for row in contribution['lock']['packages']:
+            rows.setdefault(r.coordinate(row), row)
+    data['source'] = dict(mode='pinned', sources=sorted(taps))
     linked = 0
-    for coordinate, identifier, alias, row in bindings:
+    for coordinate, candidates in sorted(bindings.items()):
+        alias, identifier = coordinate.split('/')
         states = {}
+        row = rows.get(coordinate)
         for agent in data['agents']:
-            states[agent] = link_state(adapters.relative(agent, scope, identifier), expected, leaves, record is not None)
+            relative = adapters.relative(agent, scope, identifier)
+            wanted = expected.get(relative)
+            if wanted is not None and r.coordinate(wanted['resolution']) == coordinate:
+                row = wanted['resolution']
+                states[agent] = link_state(relative, expected, leaves, record is not None)
+            else:
+                states[agent] = 'excluded'
             linked += states[agent] == 'linked'
-        entry = dict(skill=coordinate, id=identifier, source=alias, states=states, pinned=next(binding.get('pinned', False) for binding in declaration['skills'] if r.coordinate(binding) == coordinate))
+        entry = dict(skill=coordinate, id=identifier, source=alias, states=states,
+                     pinned=any(binding.get('pinned', False) for binding in candidates))
+        if profiles:
+            entry['origins'] = sorted(origins[coordinate])
         if row is not None:
             entry.update(commit=row.get('commit'), version=row.get('selector'))
         data['skills'].append(entry)

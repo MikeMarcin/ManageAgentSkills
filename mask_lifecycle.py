@@ -188,7 +188,10 @@ def restore(args, output, home, *, registering=False):
     acquisitions = output['data'].get('acquisitions', [])
     def prepare():
         effects = output['data']['preparation'] = []
+        from mask_profiles import prepare_layers
         for root, _ in consumers:
+            prepare_layers(home, c.consumer_records(state).get(str(root), {}).get('profiles', {}), config, effects,
+                           root=root, offline=getattr(args, 'offline', False) or bool(getattr(args, 'expect_plan_hash', None)))
             observation = dict(root=str(root), effects={})
             effects.append(observation)
             store.ensure(home, declarations[str(root)], locks[str(root)], config, offline=True,

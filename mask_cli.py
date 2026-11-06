@@ -18,6 +18,8 @@ COMMANDS = {
     'capabilities': (False, False, []),
     'user.export': (True, False, [('output', 'required'), ('effective', 'flag'), ('freeze-agents', 'flag')]),
     'user.import': (True, True, [('location', 'pos'), ('replace', 'flag'), ('apply', 'flag'), ('user-home', 'value')] + OFFLINE),
+    'profile.subscribe': (True, True, [('location', 'pos'), ('name', 'value'), ('user', 'flag')] + OFFLINE),
+    'profile.unsubscribe': (True, False, [('name', 'pos'), ('user', 'flag')]),
     'profile.inspect': (False, False, [('location', 'pos')]),
     'tap': (True, False, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
     'untap': (True, False, [('name', 'pos')]),
@@ -57,6 +59,8 @@ KEEP = ('config.show', 'config.set', 'skill.where-used', 'skill.validate', 'skil
 HELP = {
     'user.export': ('Export portable personal selections and exact locks to a new directory.', 'mask user export --output /path/to/profile'),
     'user.import': ('Merge and deploy a portable profile using exact locks. --replace replaces the local contribution.', 'mask user import /path/to/profile --apply'),
+    'profile.subscribe': ('Approve and deploy a frozen local profile revision in personal scope. Repeat with the same name to update it explicitly.', 'mask profile subscribe /path/to/personal --user'),
+    'profile.unsubscribe': ('Remove one frozen profile contribution from personal scope.', 'mask profile unsubscribe personal --user'),
     'profile.inspect': ('Inspect a portable declaration and exact lock without consulting local source approval.', 'mask profile inspect /path/to/profile'),
     'tap': ('Advanced tap commands: fetch, show, inspect, transport, repair-cache, migrate and publish. List taps, or approve NAME URL as a shared skill source. The current checkout does not affect taps. A tap keeps exact bytes unless --autocrlf opts in to core.autocrlf=true.', 'mask tap\nmask tap agentskills https://github.com/MikeMarcin/AgentSkills.git'),
     'untap': ('Remove an unused tap. Cached files remain until cleanup.', 'mask untap NAME'),
@@ -95,7 +99,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('user.export', 'user.import', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -271,7 +275,7 @@ def dispatch(args, output, leaves):
                 return mask_cleanup.dispatch(args, output, home)
             if public == 'capabilities':
                 return capabilities(output, leaves, mask)
-            if public in ('user.export', 'user.import', 'profile.inspect'):
+            if public in ('user.export', 'user.import') or public.startswith('profile.'):
                 import mask_profiles
                 return mask_profiles.dispatch(args, output, home)
             if public.startswith('bundle.'):

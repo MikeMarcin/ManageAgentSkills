@@ -8,6 +8,7 @@ from pathlib import Path
 import mask_core as c
 import mask_resolve as r
 import mask_adapters as adapters
+import mask_sources as sources
 
 POLICY_BYTES = 1024 * 1024
 
@@ -121,7 +122,8 @@ def evaluate(contributions, metadata, *, facts, enabled_agents, scope, root, ide
             if not applies(binding, facts):
                 outcomes.append(dict(common, agent=None, status='not_applicable', reason='when_false', compatibility='not_evaluated'))
                 continue
-            metadata_key = rows[key]['payload_digest'] if rows[key]['payload_digest'] in metadata else key
+            exact = r.payload_key(rows[key])
+            metadata_key = exact if exact in metadata else rows[key]['payload_digest'] if rows[key]['payload_digest'] in metadata else key
             if metadata_key not in metadata:
                 c.fail('metadata.unavailable', 'Applicable binding needs verified metadata or explicit absence.', 4, skill=key)
             advertised = metadata[metadata_key]
@@ -178,7 +180,7 @@ def merge_edges(outcomes, deployments, scope):
     conflicts, refused = [], set()
     representatives = {}
     for coordinate, rows in sorted(by_coordinate.items()):
-        claims = {tuple(row['resolution'].get(field) for field in ('repository', 'payload_digest', 'metadata_digest', 'provenance_digest')) for row in rows}
+        claims = {(sources.repository(row['resolution']['repository']), *(row['resolution'].get(field) for field in ('payload_digest', 'metadata_digest', 'provenance_digest'))) for row in rows}
         if len(claims) > 1:
             conflicts.append(dict(kind='artifact_authority', coordinate=coordinate, resolutions=attribution(rows)))
             refused.update((coordinate, row['agent']) for row in rows)
@@ -297,7 +299,7 @@ def validate_after_links(pending, home, after_policy):
         root = Path(key)
         expected = pinned.expected_links(home, record['last_manifest'], record['last_lock'], config,
                                          root=root, scope=c.consumer_scope(pending['after_state'], root),
-                                         policy_value=after_policy, devs=record.get('dev_links', {}))
+                                         policy_value=after_policy, devs=record.get('dev_links', {}), profiles=record.get('profiles', {}))
         for link in expected.values():
             dev = record.get('dev_links', {}).get(r.coordinate(link['resolution']))
             if dev is not None:

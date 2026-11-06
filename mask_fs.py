@@ -33,13 +33,14 @@ def creation_link_text(source):
     return raw
 
 
-def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None, retire_files=None):
+def plan(config, state, roots, *, proposals=None, register=(), unregister=(), keep_links=False, operation='apply', home=None, user_root=None, register_only=False, inactive=(), lock_proposals=None, dev_proposals=None, payload_views=None, selection_policy=None, staged_roles=None, repair_roles=False, workflow_profiles=None, retire_files=None, profile_proposals=None):
     """One observational plan; every owned link text names a store payload or an explicit dev link.
 
     """
     proposals = proposals or {}
     lock_proposals = lock_proposals or {}
     dev_proposals = dev_proposals or {}
+    profile_proposals = profile_proposals or {}
     after = copy.deepcopy(state)
     links, actions, blockers, observations = [], [], [], []
     import mask_selection as selection
@@ -85,11 +86,16 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 lock_value, lock_raw = resolve.read_model(resolve.lock_path(root, scope, home), 'lock', missing=key in lock_proposals)
                 locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
                 lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
+            profiles = profile_proposals.get(key, (record or {}).get('profiles', {}))
+            if profiles and scope != 'user':
+                c.fail('profile.invalid', 'Subscriptions require personal scope.', 4)
             devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
+            if devs and profiles:
+                c.fail('dev_link.active', 'Return to pins before composing profile subscriptions.', 4)
             if devs and operation in ('apply', 'upgrade', 'ensure'):
                 c.fail('dev_link.active', 'Explicit dev-link is unpinned; use skill dev-link --to-pinned before ordinary reconciliation.', 4)
             if key not in unregister and key not in inactive:
-                expected = pinned.expected_links(home, desired, locked, config, payload_views, root=root, scope=scope, policy_value=policy_value, devs=devs, outcomes=outcomes)
+                expected = pinned.expected_links(home, desired, locked, config, payload_views, root=root, scope=scope, policy_value=policy_value, devs=devs, outcomes=outcomes, profiles=profiles)
                 for link in expected.values():
                     dev = devs.get(resolve.coordinate(link['resolution']))
                     if dev is not None:
@@ -100,6 +106,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
             next_record = dict(root=key, root_identity=c.identity(root), mode='pinned', last_manifest=desired,
                                last_manifest_digest=resolve.selection_digest(desired), last_source_revision=None,
                                last_lock=locked, links={})
+            if profiles:
+                next_record['profiles'] = profiles
             if devs:
                 next_record.update(mode='dev-link', dev_links=devs)
             if key not in inactive:
@@ -200,6 +208,8 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
     development = pinned.development_observations(state, after, [str(root) for root in roots], config) if uses_pinned else []
     if development:
         payload['development'] = development
+    if profile_proposals:
+        payload['profile_proposals'] = profile_proposals
     payload['selection_policy'] = policy_value
     shadowing = scope_shadowing(after, config, home, {str(root) for root in roots})
     result = dict(outcomes=outcomes, shadowing=shadowing, applicable=not blockers, blockers=blockers, plan_hash=c.digest(payload), source=source_data,
@@ -335,7 +345,7 @@ def validate_pending(pending, home):
     c.fields(pending, ('schema_version', 'transaction_id', 'phase', 'operation', 'base_generation', 'selected',
                       'links', 'manifests', 'before_state', 'after_state', 'config', 'before_state_text', 'after_state_text', 'directories'),
              ('git', 'launcher', 'controls', 'files', 'pinned', 'development', 'selection_change', 'native_roles', 'setup', 'retired_files'), 'recovery', versions=(1, 2, 3))
-    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set-targets', 'user.register', 'user.unregister', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove'}:
+    if pending['operation'] not in {'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear', 'project.set-agents', 'user.set-agents', 'source.dev-link', 'ensure', 'ensure.deactivate', 'apply', 'project.register', 'project.unregister', 'project.set-targets', 'user.register', 'user.unregister', 'user.set-targets', 'upgrade', 'update', 'self.install', 'self.uninstall', 'install', 'remove', 'profile.subscribe', 'profile.unsubscribe'}:
         c.fail('recovery.conflict', 'Unknown pending operation.', 8)
     if pending['operation'].startswith('ensure') and pending['schema_version'] != 3:
         c.fail('recovery.conflict', 'Readiness requires v3 control observations.', 8)
@@ -420,6 +430,18 @@ def validate_pending(pending, home):
             c.fail('recovery.conflict', 'A journal cannot change a consumer scope.', 8)
         if root not in selected and before_records.get(root) != after_records.get(root):
             c.fail('recovery.conflict', 'Pending state changes an unselected project.', 8)
+    previous_user, next_user = before.get('user') or {}, after.get('user') or {}
+    old_profiles, new_profiles = previous_user.get('profiles', {}), next_user.get('profiles', {})
+    if pending['operation'] in ('profile.subscribe', 'profile.unsubscribe'):
+        changed_profiles = {name for name in old_profiles.keys() | new_profiles.keys() if old_profiles.get(name) != new_profiles.get(name)}
+        subscribing = pending['operation'] == 'profile.subscribe'
+        if selected != {next_user.get('root')} or len(changed_profiles) != 1 or any((name in new_profiles) != subscribing for name in changed_profiles):
+            c.fail('recovery.conflict', 'Profile policy transitions must affect one named personal subscription.', 8)
+        if previous_user and pending['files']:
+            c.fail('recovery.conflict', 'Profile subscriptions cannot change existing local selection controls.', 8)
+        selection.validate_after_links(pending, home, selection.read_policy(home)[0])
+    elif old_profiles != new_profiles and not (pending['operation'] == 'user.unregister' and not next_user):
+        c.fail('recovery.conflict', 'Unrelated operations cannot change personal subscription policy.', 8)
     allowed_directories = {str(Path(pending['launcher']['path']).parent)} if 'launcher' in pending else set()
     for key in selected:
         record = before_records.get(key) or after_records[key]

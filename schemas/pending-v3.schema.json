@@ -54,7 +54,9 @@
         "compatibility.override",
         "compatibility.clear",
         "install",
-        "remove"
+        "remove",
+        "profile.subscribe",
+        "profile.unsubscribe"
       ]
     },
     "base_generation": {

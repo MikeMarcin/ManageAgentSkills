@@ -90,7 +90,8 @@ def plan(home):
         scope = c.consumer_scope(state, root)
         c.registered_root(root, record, scope)
         roots.append(root)
-        for lock in (record.get('last_lock'), c.read_json(r.lock_path(root, scope, home), 'lock', default={})):
+        profile_locks = [receipt['lock'] for receipt in record.get('profiles', {}).values()]
+        for lock in (record.get('last_lock'), c.read_json(r.lock_path(root, scope, home), 'lock', default={}), *profile_locks):
             if lock:
                 for row in r.lock(lock)['packages']:
                     referenced.add(row['payload_digest'])

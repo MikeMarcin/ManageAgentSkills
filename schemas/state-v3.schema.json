@@ -241,6 +241,20 @@
                   }
                 }
               },
+              "profiles": {
+                "type": "object",
+                "maxProperties": 63,
+                "additionalProperties": {
+                  "type": "object",
+                  "required": ["revision", "declaration", "lock"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                    "declaration": {"$ref": "project-v2.schema.json"},
+                    "lock": {"$ref": "lock-v1.schema.json"}
+                  }
+                }
+              },
               "mode": {
                 "enum": [
                   "pinned",
@@ -369,5 +383,5 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:state:v3",
-  "$comment": "Runtime additionally checks canonical roots, manifest digests, source revisions and recomputed ownership paths."
+  "$comment": "Runtime additionally checks canonical roots, manifest digests, source revisions and recomputed ownership paths, and restricts frozen subscriptions to personal scope."
 }

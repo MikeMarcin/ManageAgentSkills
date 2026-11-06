@@ -656,6 +656,8 @@ def state(value):
         if value['schema_version'] != 3:
             fail('state.invalid', 'Pinned ownership requires state v3.')
         validate_record(record)
+        if 'profiles' in record and (consumer_scope(value, key) != 'user' or record['mode'] != 'pinned'):
+            fail('state.invalid', 'Profiles require a pinned personal consumer.')
         if not isinstance(key, str) or not Path(key).is_absolute() or key != record['root'] or os.path.normpath(key) != key:
             fail('state.invalid', 'Noncanonical registry root.')
         fields(record['root_identity'], ('device', 'inode'), family='state')

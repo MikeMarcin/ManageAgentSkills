@@ -14,7 +14,7 @@ def is_pinned(record):
 
 
 def validate_record(record):
-    c.fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links', 'mode', 'last_lock'), ('dev_links', 'native_roles'), family='state')
+    c.fields(record, ('root', 'root_identity', 'last_manifest', 'last_manifest_digest', 'last_source_revision', 'links', 'mode', 'last_lock'), ('dev_links', 'native_roles', 'profiles'), family='state')
     if record['last_source_revision'] is not None:
         c.fail('state.invalid', 'Pinned records require exact lock identities, not a shared revision.')
     declaration = r.selection(record['last_manifest'])
@@ -29,6 +29,11 @@ def validate_record(record):
         validate_dev(value)
         if key not in rows or key != value['source'] + '/' + value['id']:
             c.fail('state.invalid', 'Development override is outside the cached selection.')
+    layers = [rows]
+    if 'profiles' in record:
+        from mask_profiles import subscriptions
+        for receipt in subscriptions(record['profiles']).values():
+            layers.append({r.coordinate(row): row for row in receipt['lock']['packages']})
     if not isinstance(record['links'], dict):
         c.fail('state.invalid', 'Invalid pinned ownership map.')
     for link in record['links'].values():
@@ -38,7 +43,7 @@ def validate_record(record):
             c.fail('state.invalid', 'Pinned link resolution needs a source and ID.')
         c.skill_id(row['source'])
         c.skill_id(row['id'])
-        if rows.get(r.coordinate(row)) != row or link['skill'] != row['id']:
+        if not any(layer.get(r.coordinate(row)) == row for layer in layers) or link['skill'] != row['id']:
             c.fail('state.invalid', 'Pinned link resolution differs from its cached lock.')
         if link.get('dev') != devs.get(r.coordinate(row)):
             c.fail('state.invalid', 'Development link differs from its scope override.')
@@ -101,37 +106,41 @@ def metadata_supported(home, row, payload=None, *, config=None, verified=None):
     return value
 
 
-def effective_selection(home, declaration, resolved, config, *, root, scope, payload_views=None, policy_value=None, devs=None):
+def effective_selection(home, declaration, resolved, config, *, root, scope, payload_views=None, policy_value=None, devs=None, profiles=None):
     import mask_selection as selection
+    from mask_profiles import layers
     policy_value = selection.read_policy(home)[0] if policy_value is None else selection.policy(policy_value)
     facts = selection.device()
-    applicable = set(selection.applicable_coordinates(declaration, facts))
+    contributions = layers(declaration, resolved, profiles or {})
     metadata, verified = {}, {}
-    for row in resolved['packages']:
-        key = r.coordinate(row)
-        if key not in applicable:
-            continue
-        if (devs or {}).get(key) is not None:
-            observation, payload = observe_dev(devs[key], config, with_payload=True)
-            raw = next((item.data for item in payload.files if item.path == 'mask-skill.json'), None)
-            metadata[key] = r.metadata(raw)
-            verified[key] = True
-        else:
-            metadata[key] = metadata_supported(home, row, (payload_views or {}).get(r.payload_key(row)), config=config, verified=verified)
-    evaluated = selection.evaluate([dict(origin='local', declaration=declaration, lock=resolved)], metadata,
-                              facts=facts, enabled_agents=policy_value['enabled_agents'], scope=scope,
-                              root=str(root), identity=c.identity(root), overrides=policy_value['overrides'])
+    for contribution in contributions:
+        applicable = set(selection.applicable_coordinates(contribution['declaration'], facts))
+        for row in contribution['lock']['packages']:
+            key, exact = r.coordinate(row), r.payload_key(row)
+            if key not in applicable or exact in metadata:
+                continue
+            if contribution['origin'] == 'local' and (devs or {}).get(key) is not None:
+                _, payload = observe_dev(devs[key], config, with_payload=True)
+                raw = next((item.data for item in payload.files if item.path == 'mask-skill.json'), None)
+                metadata[exact] = r.metadata(raw)
+                verified[key] = True
+            else:
+                metadata[exact] = metadata_supported(home, row, (payload_views or {}).get(exact), config=config, verified=verified)
+    evaluated = selection.evaluate(contributions, metadata, facts=facts, enabled_agents=policy_value['enabled_agents'], scope=scope,
+                                   root=str(root), identity=c.identity(root), overrides=policy_value['overrides'])
     for outcome in evaluated['outcomes']:
         outcome['target_verified'] = verified.get(outcome['coordinate'], False)
     return evaluated
 
 
-def expected_links(home, declaration, resolved, config, payload_views=None, *, root=None, scope='project', policy_value=None, devs=None, outcomes=None):
+def expected_links(home, declaration, resolved, config, payload_views=None, *, root=None, scope='project', policy_value=None, devs=None, outcomes=None, profiles=None):
     import mask_store as store
     import mask_fs as fs
     r.approved(declaration, config)
+    for receipt in (profiles or {}).values():
+        r.approved(receipt['declaration'], config)
     evaluated = effective_selection(home, declaration, resolved, config, root=root or home, scope=scope,
-                                    payload_views=payload_views, policy_value=policy_value, devs=devs)
+                                    payload_views=payload_views, policy_value=policy_value, devs=devs, profiles=profiles)
     if outcomes is not None:
         outcomes.extend(evaluated['outcomes'])
     import mask_selection as selection
@@ -357,17 +366,19 @@ def validate_observations(pending, home):
             for root, record in c.consumer_records(pending[side + '_state']).items():
                 if root in pending['selected'] and is_pinned(record):
                     r.approved(record['last_manifest'], pending['config'])
+                    for receipt in record.get('profiles', {}).values():
+                        r.approved(receipt['declaration'], pending['config'])
         for item in value['workspaces']:
             if item['manifest'] is None:
                 creation = any(entry['root'] == item['root'] and entry['role'].endswith('_declaration') and entry['before'] is None and entry['after'] is not None for entry in pending.get('files', []))
-                if pending['operation'] != 'ensure.deactivate' and not (creation and pending['operation'] in ('install', 'ensure') and item['root'] not in c.consumer_records(pending['before_state'])):
+                if pending['operation'] != 'ensure.deactivate' and not (creation and pending['operation'] in ('install', 'ensure', 'profile.subscribe') and item['root'] not in c.consumer_records(pending['before_state'])):
                     c.fail('recovery.conflict', 'Absent declaration requires typed enrollment or proven inactive readiness.', 8)
                 continue
             declaration = c.selection_manifest(r.parse(item['manifest'], 'manifest'))
             if declaration['schema_version'] == 2:
                 if item.get('lock') is None:
                     creation = any(entry['root'] == item['root'] and entry['role'].endswith('_lock') and entry['before'] is None and entry['after'] is not None for entry in pending.get('files', []))
-                    if not creation or pending['operation'] not in ('install', 'ensure'):
+                    if not creation or pending['operation'] not in ('install', 'ensure', 'profile.subscribe'):
                         c.fail('recovery.conflict', 'An absent lock requires a typed installation transition.', 8)
                 else:
                     validate_live_lock(r.parse(item['lock'], 'lock'), declaration, pending)
@@ -461,7 +472,10 @@ def prepare_dispatch(args, output, home):
             item = dict(root=str(root), scope=scope, skill=r.coordinate(row), effects={})
             effects.append(item)
             store.ensure(home, declaration, resolved, config, offline=row['source'] not in allowed, coordinates=[r.coordinate(row)], effects=item['effects'])
-        evaluated = effective_selection(home, declaration, resolved, config, root=root, scope=scope)
+        from mask_profiles import prepare_layers
+        profiles = (record or {}).get('profiles', {})
+        prepare_layers(home, profiles, config, effects, root=root)
+        evaluated = effective_selection(home, declaration, resolved, config, root=root, scope=scope, profiles=profiles)
         selection.require_compatible(evaluated)
     return dict(before=before, consumers=consumers, effects=effects)
 

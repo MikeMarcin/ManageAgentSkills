@@ -1233,6 +1233,7 @@ def render_profile(data, output):
 
 RENDERERS = {
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
+    'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,
     'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.install': render_bundles, 'bundle.uninstall': render_bundles, 'bundle.upgrade': render_bundles,
     'tap': render_sources, 'untap': render_sources, 'search': render_catalog, 'info': render_skill,
     'uninstall': render_task, 'register': render_lifecycle, 'unregister': render_forget,

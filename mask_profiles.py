@@ -152,25 +152,89 @@ def merge(local, incoming):
     return pair(proposal, rows.values())
 
 
+def subscriptions(value):
+    if not isinstance(value, dict) or len(value) > 63:
+        c.fail('profile.invalid', 'Expected at most 63 personal subscriptions.', 4)
+    size = 0
+    for name, receipt in value.items():
+        c.skill_id(name)
+        c.fields(receipt, ('revision', 'declaration', 'lock'), family='profile')
+        if not isinstance(receipt['revision'], str) or not r.SHA.fullmatch(receipt['revision']):
+            c.fail('profile.invalid', 'Subscription requires an exact profile revision.', 4)
+        declaration = r.selection(receipt['declaration'])
+        locked = r.lock(receipt['lock'], declaration)
+        size += len(r.canonical(receipt, 'profile'))
+        if size > r.MODEL_BYTES:
+            c.fail('profile.limit', 'Frozen subscriptions exceed 4 MiB.', 4)
+        if portable(declaration, locked) != (receipt['declaration'], receipt['lock']):
+            c.fail('profile.invalid', 'Subscription controls must contain normalized portable data.', 4)
+    return value
+
+
+def layers(declaration, locked, profiles):
+    return [dict(origin='local', declaration=declaration, lock=locked)] + [
+        dict(origin='profile:' + name, declaration=receipt['declaration'], lock=receipt['lock'])
+        for name, receipt in sorted(profiles.items())
+    ]
+
+
+def freshness(profiles):
+    return [dict(profile=name, revision=receipt['revision'], freshness='last_approved_offline')
+            for name, receipt in sorted(profiles.items())]
+
+
+def prepare_layers(home, profiles, config, effects, *, root, offline=True):
+    for receipt in profiles.values():
+        declaration = receipt['declaration']
+        observation = dict(root=str(root), effects={})
+        effects.append(observation)
+        store.ensure(home, declaration, receipt['lock'], config, offline=offline,
+                     coordinates=selection.applicable_coordinates(declaration), effects=observation['effects'])
+
+
+def freeze(home, declaration, locked):
+    state, config = task.machine(home)
+    root = Path((state.get('user') or {}).get('root', str(Path.home())))
+    policy = selection.read_policy(home)[0]
+    evaluated = pinned.effective_selection(home, declaration, locked, config, root=root, scope='user', policy_value=policy)
+    selection.require_compatible(evaluated)
+    supported = policy['enabled_agents']
+    for binding in declaration['skills']:
+        if targets(binding, declaration) != 'all':
+            continue
+        resolved = sorted({row['agent'] for row in evaluated['deployable'] if row['coordinate'] == r.coordinate(binding)})
+        if not selection.applies(binding, selection.device()):
+            resolved = supported
+        if not resolved:
+            c.fail('profile.targets_unrepresentable', 'An empty set of effective targets cannot be frozen as a portable binding.', 4,
+                   skill=r.coordinate(binding))
+        binding['agents'] = resolved
+    if declaration['default_agents'] == 'all':
+        if not supported:
+            c.fail('profile.targets_unrepresentable', 'An empty default target set cannot be frozen.', 4)
+        declaration['default_agents'] = supported
+    for receipt in declaration.get('bundle_state', {}).get('bundles', {}).values():
+        for binding in receipt['bindings']:
+            if binding.get('agents') == 'all' and supported:
+                binding['agents'] = supported
+    return pair(declaration, locked['packages'])
+
+
 def export(args, output, home):
-    declaration, locked = portable(*local_pair(home))
-    if getattr(args, 'freeze_agents', False):
-        if declaration['default_agents'] == 'all':
-            declaration['default_agents'] = sorted(c.ADAPTERS)
-        for binding in declaration['skills']:
-            if binding.get('agents') == 'all':
-                binding['agents'] = sorted(c.ADAPTERS)
-        for receipt in declaration.get('bundle_state', {}).get('bundles', {}).values():
-            for binding in receipt['bindings']:
-                if binding.get('agents') == 'all':
-                    binding['agents'] = sorted(c.ADAPTERS)
-        declaration, locked = pair(declaration, locked['packages'])
+    effective = getattr(args, 'effective', False)
+    frozen = getattr(args, 'freeze_agents', False)
+    declaration, locked = local_pair(home)
+    if effective:
+        state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
+        for receipt in (state.get('user') or {}).get('profiles', {}).values():
+            declaration, locked = merge((declaration, locked), (receipt['declaration'], receipt['lock']))
+    declaration, locked = portable(declaration, locked)
+    if frozen:
+        declaration, locked = freeze(home, declaration, locked)
     destination = location(args.output)
     c.parents_safe(Path(destination.anchor), destination)
     if c.kind(destination) != 'missing' or c.kind(destination.parent) != 'directory':
         c.fail('profile.output', 'Export requires an absent output directory under an existing unlinked parent.', 4)
-    frozen = getattr(args, 'freeze_agents', False)
-    effective = getattr(args, 'effective', False)
     action = dict(kind='profile.export', path=str(destination), status='planned')
     data = dict(output=str(destination), skills=len(locked['packages']), scope='user', network='none',
                 effective=effective, frozen_agents=frozen, revision=c.digest(locked),
@@ -261,6 +325,56 @@ def import_profile(args, output, home):
                       details=dict(root=key, scope='user', profile_revision=revision, replace=replace))
 
 
+def change_subscription(args, output, home):
+    if not getattr(args, 'user', False):
+        c.fail('invocation.invalid', 'Use --user to select personal subscription policy.', 2)
+    if c.kind(home / 'pending.json') != 'missing':
+        c.fail('recovery.required', 'Recover the pending operation first.', 8)
+    state, config = task.machine(home)
+    root = personal_root(args, state)
+    record = state.get('user') or {}
+    if record.get('mode') == 'dev-link':
+        c.fail('dev_link.active', 'Return to pins before changing a subscription.', 4)
+    profiles = copy.deepcopy(record.get('profiles', {}))
+    before = pinned.snapshot(home, [(root, 'user')])
+    declaration, locked = local_pair(home, missing=True)
+    subscribing = args.command == 'profile.subscribe'
+    views, revision = {}, None
+    if subscribing:
+        name = getattr(args, 'name', None) or location(args.location).name
+        c.skill_id(name)
+        incoming, exact, revision = read_profile(args.location)
+        receipt = dict(revision=revision, declaration=incoming, lock=exact)
+        if profiles.get(name) == receipt:
+            output['data'] = dict(profile=name, profiles=freshness(profiles), network='none')
+            return
+        profiles[name] = receipt
+        subscriptions(profiles)
+        views = prepare_exact(args, output, home, incoming, exact, config, root)
+    else:
+        name = c.skill_id(args.name)
+        if name not in profiles:
+            output['data'] = dict(profile=name, profiles=freshness(profiles), network='none')
+            return
+        del profiles[name]
+    if declaration is None:
+        if record:
+            c.fail('selection.missing', 'Restore the registered personal controls before changing subscriptions.', 4)
+        declaration, locked = pair(task.fresh_declaration(config), [])
+    key = str(root)
+    def candidate():
+        if subscribing and read_profile(args.location)[2] != revision:
+            c.fail('plan.stale', 'The portable profile changed during review.', 4)
+        return fs.plan(config, state, [root], home=home, operation=args.command, user_root=root,
+                       register=[] if record else [key], proposals={key: declaration}, lock_proposals={key: locked},
+                       profile_proposals={key: profiles}, payload_views=views, repair_roles=True, retire_files=False)
+    def prepare():
+        effects = output['data'].setdefault('preparation', [])
+        prepare_layers(home, profiles, config, effects, root=root)
+    lifecycle.execute(args, output, home, config, [root], before, candidate, prepare,
+                      details=dict(root=key, scope='user', profile=name, profiles=freshness(profiles)))
+
+
 def dispatch(args, output, home):
     if args.command == 'profile.inspect':
         declaration, locked, revision = read_profile(args.location)
@@ -269,6 +383,9 @@ def dispatch(args, output, home):
         export(args, output, home)
     else:
         try:
-            import_profile(args, output, home)
+            if args.command == 'user.import':
+                import_profile(args, output, home)
+            else:
+                change_subscription(args, output, home)
         finally:
             pinned.merge_preparation(output, completed=sys.exc_info()[0] is None)
