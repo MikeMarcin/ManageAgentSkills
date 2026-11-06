@@ -1,14 +1,15 @@
 ---
 id: "RFC-MASK-0012"
 title: "Explicit fleet enrollment, device identity and bounded remote transport"
-status: "Accepted"
+status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
+metadata: {"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0012: Explicit fleet enrollment, device identity and bounded remote transport
 
-**Delivery stage:** D — enrolled fleet foundation. **Packet status:** proposed implementation contract; no implementation or acceptance is claimed.
+**Delivery stage:** D — enrolled fleet foundation. **Implementation plan:** [enrolled fleet foundation](plans/fleet-enrolled-transport/milestone-plan.json).
 
 **Predecessors:** RFC-MASK-0008, RFC-MASK-0009.
 

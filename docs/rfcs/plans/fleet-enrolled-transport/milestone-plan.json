@@ -1,0 +1,49 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "fleet-enrolled-transport",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0012"
+    ],
+    "issues": [
+      "MASK-0047",
+      "MASK-0048",
+      "MASK-0049",
+      "MASK-0050",
+      "MASK-0073"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "enrolled-fleet-foundation",
+      "outcome": "Bind an explicitly authorized device and controller, use the fixed authenticated MASK remote entrypoint, and deliver exact locked content with durable and queryable outcomes.",
+      "work": [
+        {
+          "issue": "MASK-0047"
+        },
+        {
+          "issue": "MASK-0048"
+        },
+        {
+          "issue": "MASK-0049"
+        },
+        {
+          "issue": "MASK-0050"
+        },
+        {
+          "issue": "MASK-0073"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "Explicit enrollment and revocation bind stable device and controller identities, allowed roots and sources, and a pinned SSH endpoint and host key.",
+        "The fixed bounded RPC validates signed intents, scope and monotonic authority, then prepares and applies exact locally planned effects with queryable idempotent outcomes and signed receipts.",
+        "Exact-commit retrieval and explicitly permitted package forwarding stay bounded, verify bytes and preserve source credentials and local authority.",
+        "Native Windows and macOS SSH and launcher evidence distinguishes live transport from fixture tests, and the RFC closeout and structure gate record the actual results."
+      ],
+      "boundary": "The RFC-MASK-0012 enrolled foundation within Stage D of the retained fleet roadmap. RFC-MASK-0013 owns rollouts and optional catch-up. Owner-authorized native fixtures do not enroll production machines."
+    }
+  ]
+}

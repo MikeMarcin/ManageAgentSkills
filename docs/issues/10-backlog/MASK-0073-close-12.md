@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0047", "MASK-0048", "MASK-0049", "MASK-0050"]
 closeout_for: ["RFC-MASK-0012"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-12", "stage": "D — enrolled fleet foundation", "provisional_id": false, "closeout": true}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"close-12","stage":"D — enrolled fleet foundation","provisional_id":false,"closeout":true,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
 ---
 
 # MASK-0073: Verify and close RFC-MASK-0012
@@ -38,6 +38,8 @@ Read the live RFC/card and current source before edits. Use temporary fixture ro
 ## Durable closeout anchor
 
 RFC_BASE_SHA: 9dc90df45febf2a6e048ace60a4ac959807aaaf6
+
+Surviving pre-implementation baseline: c0ff45c882efd52b744fa3fb4e9c0d6d22d79eed. The original imported anchor above predates the privacy rewrite.
 
 Planned cards: MASK-0047, MASK-0048, MASK-0049, MASK-0050.
 

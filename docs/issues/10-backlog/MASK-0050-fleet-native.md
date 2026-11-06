@@ -5,7 +5,7 @@ title: "Verify native remote invocation and enrollment boundaries"
 status: "Backlog"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0049"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "fleet-native", "stage": "D — enrolled fleet foundation", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-native","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
 ---
 
 # MASK-0050: Verify native remote invocation and enrollment boundaries
