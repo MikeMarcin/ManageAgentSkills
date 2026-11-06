@@ -1869,6 +1869,15 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'signing-key': 'Existing local OpenSSH ED25519 private signing key',
+    'policy': 'Reviewed local controller policy JSON file',
+    'binding': 'Reviewed device descriptor and SSH binding JSON file',
+    'ssh-config-alias': 'Direct device alias in the local OpenSSH configuration',
+    'ssh-config': 'Read this local OpenSSH alias configuration',
+    'device': 'Select one enrolled fleet device by name',
+    'parallel': 'Maximum concurrent SSH probes, from 1 to 16',
+    'timeout': 'SSH delivery timeout in seconds, from 1 to 180',
+    'stdio': 'Read one binary RPC frame and write one binary response frame',
     'operation': 'Saved receipt file, or an operation ID in the local reports directory.',
     'format': 'Render report as text, JSON or offline HTML.',
     'fleet': 'Include only dated recorded fleet observations.',

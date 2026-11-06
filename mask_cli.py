@@ -75,6 +75,7 @@ KEEP = ('config.show', 'config.set', 'inventory', 'skill.where-used', 'skill.val
 HELP = {
     'rpc': ('Read one bounded signed MASK RPC request on stdin and respond on stdout.', 'mask rpc --stdio'),
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
+    'fleet.controller.show': ('Show the public local controller signing identity.', None),
     'fleet.device.enroll': ('Review and authenticate an explicit device binding over pinned SSH.', 'mask fleet device enroll laptop --ssh-config-alias laptop --binding FILE --dry-run'),
     'fleet.device.show': ('Show one enrolled device or revocation.', None),
     'fleet.device.list': ('List enrolled devices and revocations without connecting.', None),
@@ -163,6 +164,12 @@ def parser(engine, common, parser_type, add_argument, help_entries):
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
         for name, shape in common + arguments:
             add_argument(leaf, name, shape)
+        if command.startswith('fleet.'):
+            for action in leaf._actions:
+                if action.dest == 'name':
+                    action.help = 'Local fleet name'
+                elif action.dest == 'all':
+                    action.help = 'Select every active enrolled device'
         if command == 'update.report':
             next(action for action in leaf._actions if action.dest == 'independent').help = 'Report independent checkout upgrades when using --all'
         if command == 'upgrade':
@@ -459,6 +466,10 @@ This checkout:
   upgrade [SKILL ...]     Upgrade this checkout and make it ready
   repair                  Recover interrupted setup, or restore pinned readiness
   status                  Explain readiness and problems (also bare mask)
+
+Fleet transport:
+  fleet device / controller  Review enrolled devices and local signing identities
+  fleet ping --all           Probe active enrolled devices
 
 Interrupted setup: repair first reviews recovery at its recorded location.
 

@@ -131,7 +131,10 @@ def ssh_args(peer, config, pins, auth):
 
 
 def exchange(peer, packet, *, timeout=30):
-    intent = packet['intent']
+    intent = rpc.intent_shape(packet['intent'])
+    if peer.get('revoked') or (intent['device'], intent['controller'], intent['epoch']) != (
+            peer['device']['id'], peer['authority']['controller']['id'], peer['authority']['epoch']):
+        c.fail('fleet.binding_changed', 'The request does not match the active enrolled binding.', 4)
     context = dict(operation=intent['id'], intent_digest=rpc.request_digest(intent))
     address, auth = config_for(peer['alias'], peer['ssh_config'])
     if address != peer['endpoint']:
@@ -164,16 +167,6 @@ def exchange(peer, packet, *, timeout=30):
     except c.MaskError as error:
         c.fail('fleet.response_unverified', 'The device response could not be verified. Query the durable operation.',
                4, outcome='unknown', refusal=error.code, **context)
-
-
-def deliver(home, name, packet, *, timeout=30):
-    """Deliver a frozen signed packet only through a currently enrolled binding."""
-    peer = peer_at(home, name)
-    intent = rpc.intent_shape(packet['intent'])
-    if (intent['device'], intent['controller'], intent['epoch']) != (
-            peer['device']['id'], peer['authority']['controller']['id'], peer['authority']['epoch']):
-        c.fail('fleet.binding_changed', 'The frozen request no longer matches the enrolled binding.', 4)
-    return exchange(peer, packet, timeout=timeout)
 
 
 def probe(peer, controller, *, timeout=30):
