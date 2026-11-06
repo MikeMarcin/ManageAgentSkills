@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0011"
 title: "Where-used inventory, update diffs and deployment impact reports"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
@@ -9,7 +9,7 @@ metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs
 
 # RFC-MASK-0011: Where-used inventory, update diffs and deployment impact reports
 
-**Delivery stage:** C — explainability. **Packet status:** proposed implementation contract; no implementation or acceptance is claimed.
+**Delivery stage:** C — explainability. **Live delivery:** layered exact inventory, guarded update previews, exact diffs and offline report rendering are verified.
 
 **Predecessors:** RFC-MASK-0008, RFC-MASK-0009, RFC-MASK-0010.
 
@@ -28,10 +28,10 @@ mask skill where-used SOURCE/ID [--agent AGENT] [--scope user|project] [--fleet]
 mask inventory [--project PATH | --user | --all] [--include-unmanaged]
 mask update report [--project PATH | --user | --all] [--skill SOURCE/ID ...]
 mask diff SOURCE/ID --from RESOLUTION --to RESOLUTION [--patch]
-mask report OPERATION_ID [--format text|json|html]
+mask report OPERATION_ID_OR_RECEIPT [--format text|json|html]
 ```
 
-Reports are observational unless an explicit output file is selected. `--fleet` reads recorded fleet receipts unless a separate live-refresh option is requested and advertised as network-capable. Normal where-used does not SSH to every machine, search every filesystem, or fetch upstream refs. Results identify their selection boundary and completeness.
+Reports are observational unless an explicit output file is selected. `update report --output FILE` saves a redacted local receipt. Reports use the cached-tap upgrade candidate and the same scope, selectors and approval hash as `upgrade`. `--fleet` reads recorded fleet receipts unless a separate live-refresh option is requested and advertised as network-capable. Normal where-used does not SSH to every machine, search every filesystem, or fetch upstream refs. Results identify their selection boundary and completeness.
 
 ## Inventory model
 
@@ -39,13 +39,13 @@ Each row identifies repository/source alias, package path/id, artifact digest/re
 
 Show `declared_not_deployed`, `managed_converged`, `managed_drifted`, `unmanaged_present`, `unavailable_consumer`, `inapplicable`, `legacy_unpinned`, and `host_load_unknown` separately. Inspect unmanaged neighbors only in selected supported discovery directories; never recursively traverse linked neighbors or treat inventory as adoption authority. Cached manifests of unavailable consumers are diagnostic only.
 
-The inverse view uses the existing registration/declaration/ownership model. It does not need a resident indexer or database. Optional fleet receipts extend scope with explicitly dated remote observations; they do not transform local inspection into current remote truth.
+The inverse view uses the existing registration/declaration/ownership model. It does not need a resident indexer or database. The optional receipt projection labels dates and stale intent separately from local filesystem observations. Its absent state is unavailable. Production of signed remote observations and proof of device coverage belong to RFC-MASK-0013.
 
 ## Diff and impact
 
 Compare exact old/new package manifests and bytes, including SKILL.md, supporting scripts, references, assets, machine-readable compatibility and provenance. Summarize added/removed/modified files; show binary-size/hash changes without dumping binary content. Text patches are opt-in and size-bounded. Disable external Git diff/textconv/filter commands and terminal escape sequences; output is untrusted content to be displayed, never instructions to execute.
 
-For every content change, derive affected consumers and effective agent deployments even if link membership is unchanged. Pinned updates identify only consumers whose planned lock/artifact changes; consumers pinned to old versions are explicitly unaffected. Legacy live-source updates warn that all linked consumers observe shared content changes and running agents may cache instructions.
+For every content change, derive affected consumers and effective agent deployments even if link membership is unchanged. Pinned updates identify only consumers whose planned lock/artifact changes; consumers pinned to old versions are explicitly unaffected. Aggregate impact reports identify development links and explain that edits to their shared authoring checkout are visible through existing links. Running agents may cache instructions.
 
 Distinguish selection change, content change, target/applicability change, provenance-only change and host discovery refresh requirement. A metadata restriction that makes a previously deployed agent incompatible must appear before activation. A source ref advance that resolves to identical selected payload bytes can be reported as provenance/ref movement without pretending the code changed.
 

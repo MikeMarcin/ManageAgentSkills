@@ -79,6 +79,7 @@ checkout without upgrading versions.
 | Show personal skills | `mask list --user` |
 | Move personal skills to another machine | `mask user export --output DIRECTORY`, then `mask user import DIRECTORY --apply` |
 | Inspect this checkout's readiness | `mask status` |
+| Preview exact upgrade impact | `mask update report --all` |
 | Inspect a named bundle | `mask bundle show TAP/BUNDLE` |
 | Install a named bundle here | `mask bundle install TAP/BUNDLE` |
 | Review bundle membership and member versions | `mask bundle upgrade TAP/BUNDLE --dry-run` |
