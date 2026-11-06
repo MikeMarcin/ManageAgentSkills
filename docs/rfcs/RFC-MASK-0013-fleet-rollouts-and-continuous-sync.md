@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0013"
 title: "Declarative fleet rollouts, optional continuous convergence and completion reports"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
