@@ -2,11 +2,10 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0054"
 title: "Add opt-in native scheduled convergence and offline catch-up"
-status: "Blocked"
+status: "Ready"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0053"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-runner","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
-blocked_by: "native-scheduler-authorization"
 ---
 
 # MASK-0054: Add opt-in native scheduled convergence and offline catch-up
