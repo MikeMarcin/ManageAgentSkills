@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0040"
 title: "Verify native scope-specific pinned targeting"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0039", "MASK-0037"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"target-native","stage":"B — selection semantics","provisional_id":false,"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0009-AC01","outcome":"pass","revision":"74f341a36791887f747373a0db37addd03b9c47e","evidence":{"kind":"observation","detail":"Native Windows test_targeting and test_user_scope plus direct macOS public install/set-agents/upgrade: real store links, independent scopes, default both agents, preserved personal lock. Windows result is the recorded 7b6c6db full suite (MASK-0136)."}},{"criterion":"RFC-MASK-0009-AC02","outcome":"pass","revision":"74f341a36791887f747373a0db37addd03b9c47e","evidence":{"kind":"observation","detail":"Native guarded setters, stale plan and collision/no-op cases. Historical migration preserved exact v1 targets in MASK-0037; the owner retired pre-tap migration at 7ccf671. Windows result is the recorded 7b6c6db full suite (MASK-0136)."}},{"criterion":"RFC-MASK-0009-AC03","outcome":"pass","revision":"74f341a36791887f747373a0db37addd03b9c47e","evidence":{"kind":"observation","detail":"Native compatibility and targeting cases distinguish absent/generic/specific metadata, explicit blocking, and inapplicable selection. Windows result is the recorded 7b6c6db full suite (MASK-0136)."}},{"criterion":"RFC-MASK-0009-AC04","outcome":"pass","revision":"74f341a36791887f747373a0db37addd03b9c47e","evidence":{"kind":"observation","detail":"Native selection-conflict cases prove disjoint agent choices, multi-source collisions without writes and observed scope shadowing; pure contribution conflict cases reject ambiguous versions. Windows result is the recorded 7b6c6db full suite (MASK-0136)."}},{"criterion":"RFC-MASK-0009-AC05","outcome":"pass","revision":"74f341a36791887f747373a0db37addd03b9c47e","evidence":{"kind":"observation","detail":"Native adapter path/capability/schema/package checks plus existing Claude/Codex prelaunch observations. First-prompt loading remains unverified. Windows result is the recorded 7b6c6db full suite (MASK-0136)."}}]
 ---
 
 # MASK-0040: Verify native scope-specific pinned targeting
@@ -47,3 +48,19 @@ The Windows run uses existing example-win-host SSH, explicit noninteractive Powe
 The first full Windows attempt completed, but the local harness could not decode its CP1252 unittest stderr as UTF-8, so its test verdict was lost and no pass count is claimed. A subsequent read-only check found no remaining mask-fixture-* roots in the Windows temporary directory. The harness now saves raw SSH bytes plus UTF-8 per-test/final result files on the remote owned root. A too-long inline PowerShell launch was rejected before testing; staging the owned runner as a file keeps the launch command short. The same candidate is being rerun with durable results.
 
 The durable rerun identified two recovery-tampering fixture failures. A bounded two-test reproduction (29.515s; three failing assertions and one consequent error) confirmed that Path.write_text used Windows CP1252 for manually injected journals containing the Unicode project path. MASK correctly refused those invalid UTF-8 bytes before the intended semantic tampering check. The correction writes explicit UTF-8 journal bytes in the affected new recovery/migration/update/compatibility test fixtures. No production behavior is weakened. The two reproduction roots, C:/Users/example/AppData/Local/Temp/mask-fixture-e8qz3dgs and mask-fixture-3su_2w52 under the same parent, were confirmed removed. Native rerun results remain pending.
+
+## Execution record
+
+The earlier candidate and incomplete run above are historical. The accepted
+Windows evidence is the later native full-suite run at `7b6c6db` in
+[MASK-0136](MASK-0136-windows-test-failures.md). That run includes
+the UTF-8 fixture fix and the applicable independent project/personal,
+compatibility, collision, adapter and recovery cases. The scope-selection
+tests and engine inputs are unchanged at the macOS-tested `74f341a`.
+
+The direct public macOS fixture installed one skill into both scopes,
+deployed it to Codex in the project and Claude in the personal scope, and
+confirmed the links resolve to exact store bytes. A scoped upgrade left
+the personal lock and link unchanged. The verification note lists the
+focused test commands, native evidence and host-loading limits.
+[Native pinning and agent targeting](../../development/targeting-acceptance.md)
