@@ -1344,7 +1344,7 @@ def render_fleet_rollout(data, output):
 
 RENDERERS = {
     **dict.fromkeys(('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync',
-                     'fleet.operation.show', 'fleet.operation.wait', 'fleet.operation.cancel',
+                     'fleet.operation.show', 'fleet.operation.wait', 'fleet.operation.cancel', 'fleet.operation.rollback',
                      'fleet.runner.enable', 'fleet.runner.disable', 'fleet.runner.status',
                      'fleet.runner.tick'), render_fleet_rollout),
     'fleet.controller.init': render_fleet, 'fleet.controller.show': render_fleet,
@@ -1680,7 +1680,8 @@ def render_error(output):
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
     if error['code'] == 'fleet.probe_incomplete':
         lines.extend(fleet_device_lines(data))
-    if output['command'] in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync', 'fleet.operation.cancel',
+    if output['command'] in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync',
+                             'fleet.operation.cancel', 'fleet.operation.rollback',
                              'fleet.runner.enable', 'fleet.runner.disable'):
         lines.extend(fleet_rollout_lines(data))
         lines.extend(plan_guard(data, output))

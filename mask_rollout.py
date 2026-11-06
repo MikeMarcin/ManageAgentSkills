@@ -51,7 +51,7 @@ def frozen_target(peer, args, signer):
         fleet.token(alias)
         scope_type = 'project'
     else:
-        users = [name for name, scope in granted.items() if scope['scope'] == 'user']
+        users = [name for name, scope in granted.items() if scope['scope'] == 'user' and scope.get('rollout')]
         alias = 'user' if 'user' in users or len(users) != 1 else users[0]
     target = dict(name=peer['name'], device=peer['device']['id'], device_epoch=peer['authority']['epoch'],
                   scope=alias, scope_type=scope_type, profile=None, identity=peer['device'], binding=binding_digest(peer))
@@ -507,6 +507,8 @@ def rollout(home, signer, history, args, output, stack):
     proposal = dict(head=history.head, control=c.digest(history.control), action=action,
                     targets=sorted(targets, key=control.target_key), input=details, source_effect=source_effect)
     if copy is not None:
+        if c.config(c.read_json(home / 'config.json')) != config:
+            c.fail('plan.stale', 'The approved tap configuration changed during preparation.', 4)
         proposal['source_authority'] = c.digest(dict(endpoint=endpoint, observed=observed))
     plan_hash = c.digest(proposal)
     operation = plan_hash.split(':')[1][:32]
@@ -531,6 +533,10 @@ def rollout(home, signer, history, args, output, stack):
         output['data']['source_publication']['status'] = phase
         output.update(changed=phase == 'published', transaction='committed' if phase == 'published' else 'not_started')
     entry = control.event(history.control, signer, history.events, action, operation, targets, details, source_effect)
+    publish_and_deliver(home, signer, history, entry, args, output)
+
+
+def publish_and_deliver(home, signer, history, entry, args, output):
     output['data'].update(control_commit=control.publish(history, entry, signer), control_publication='published')
     output.update(changed=True, transaction='committed')
     control.remember(home, history)
@@ -639,6 +645,36 @@ def operation_cancel(home, signer, history, entry, args, output):
     operation_status(home, history, entry, output)
 
 
+def operation_rollback(home, signer, history, original, args, output):
+    timeout_option(args)
+    targets = []
+    details = dict(original['input'], rollback_of=original['operation'])
+    for frozen in original['targets']:
+        target = dict(frozen)
+        if 'blocked' not in target:
+            try:
+                peer = peer_for(home, target, signer)
+                validate_sources(target, peer, details.get('forward', False))
+            except c.MaskError as error:
+                target['blocked'] = error.code
+        targets.append(target)
+    proposal = dict(head=history.head, control=c.digest(history.control), targets=targets, input=details)
+    plan_hash = c.digest(proposal)
+    operation = plan_hash.split(':')[1][:32]
+    output['data'].update(plan_hash=plan_hash, operation_id=operation, action='rollback', input=details,
+                          targets=targets, control_publication='planned')
+    output['would_change'] = any('blocked' not in target for target in targets)
+    if output['dry_run']:
+        return
+    if getattr(args, 'approve_plan', None) != plan_hash:
+        c.fail('confirmation.required', 'Preview and approve the exact recorded profiles before rollback.', 4)
+    entry = control.event(history.control, signer, history.events, original['action'], operation, targets, details)
+    if not output['would_change']:
+        set_report(output, entry, [dict(base_result(target), status='blocked', reason=target['blocked']) for target in targets])
+        require_complete(output)
+    publish_and_deliver(home, signer, history, entry, args, output)
+
+
 def dispatch(args, output, home):
     signer = fleet.get_identity(home, 'controller')
     settings = control.settings(home, missing=True)
@@ -657,5 +693,7 @@ def dispatch(args, output, home):
                 return operation_wait(home, signer, history, entry, args, output)
             if command.endswith('.cancel'):
                 return operation_cancel(home, signer, history, entry, args, output)
+            if command.endswith('.rollback'):
+                return operation_rollback(home, signer, history, entry, args, output)
             return operation_status(home, history, entry, output)
         return rollout(home, signer, history, args, output, stack)

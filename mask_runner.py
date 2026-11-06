@@ -137,6 +137,11 @@ def scheduler_command(args, output, home):
 
     action = args.command.rsplit('.', 1)[-1]
     previous = read_record(home)
+    if previous:
+        device = fleet.get_identity(home, 'device')
+        expected = scheduler.schedule_record(home, device, previous['interval'], previous['argv'])
+        if expected != scheduler_binding(previous):
+            c.fail('fleet.scheduler_scope', 'The saved scheduler entry does not belong to this MASK home and native user.', 4)
     if action == 'status':
         output['data']['runner'] = dict(enabled=False, status='disabled')
         if previous:

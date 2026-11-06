@@ -1,6 +1,5 @@
 """Controller status is based on exact signed device receipts."""
 import argparse
-import json
 from unittest.mock import patch
 
 import mask_control as control
@@ -96,3 +95,21 @@ class FleetReceiptTests(FleetRpcFixture):
         previous = self.cli(self.controller_home, 'fleet', 'operation', 'show', 'b' * 32)['data']
         self.assertEqual(previous['device_results'][0]['status'], 'superseded')
         self.assertFalse(previous['complete'])
+
+    def test_rollback_approves_prior_exact_profile_as_a_new_signed_revision(self):
+        with control.snapshot(self.controller_home, self.settings, self.signer) as history:
+            original = control.event(self.settings, self.signer, history.events, 'install', 'a' * 32,
+                                     [self.target], self.details)
+            control.publish(history, original, self.signer)
+            removal = control.event(self.settings, self.signer, history.events, 'remove', 'b' * 32,
+                                    [dict(self.target, profile=None)], dict(self.details, resolution=None))
+            control.publish(history, removal, self.signer)
+        args = ('fleet', 'operation', 'rollback', original['operation'], '--timeout', '1')
+        preview = self.cli(self.controller_home, *args, '--dry-run')['data']
+        result = self.cli(self.controller_home, *args, '--approve-plan', preview['plan_hash'], code=9)['data']
+        with control.snapshot(self.controller_home, self.settings, self.signer) as history:
+            restored = history.operation(result['operation_id'])
+            self.assertEqual(restored['sequence'], 3)
+            self.assertEqual(restored['parent'], control.intent_digest(removal))
+            self.assertEqual(restored['targets'], original['targets'])
+            self.assertIsNone(restored['source_effect'])

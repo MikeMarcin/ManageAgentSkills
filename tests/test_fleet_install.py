@@ -32,9 +32,9 @@ class FleetInstallTests(FleetRpcFixture):
         self.git(self.source, 'push', '-q', str(self.remote), 'main')
         self.cli(self.controller_home, 'tap', 'fetch', 'fixture', env=self.env)
 
-    def apply_profile(self, profile, sequence):
+    def apply_profile(self, profile, sequence, *, alias='personal'):
         self.generation = rpc.state_at(self.device_home)['generation']
-        payload = dict(scope='personal', profile=profile)
+        payload = dict(scope=alias, profile=profile)
         revision = core.digest(dict(sequence=sequence))
         make = lambda action, data: rpc.request(self.signer, self.device, self.policy, action, data,
                                                revision=revision, sequence=sequence, generation=self.generation)
@@ -68,3 +68,22 @@ class FleetInstallTests(FleetRpcFixture):
         self.send(self.packet('prepare', dict(scope='personal', profile=self.profile())), error='selection.conflict')
         self.assertEqual(self.link.resolve(), before)
         self.assertFalse((self.device_home / 'pending.json').exists())
+
+    def test_mapped_project_profile_leaves_personal_controls_unchanged(self):
+        self.add_package('beta')
+        project = self.base / 'mapped project'
+        project.mkdir()
+        self.git(project, 'init', '-q')
+        self.cli(self.device_home, 'register', project, '--offline', env=self.env)
+        self.policy['epoch'] = 2
+        grant = self.policy['scopes']['personal']['sources']
+        self.policy['scopes']['work'] = dict(scope='project', root=str(project), sources=grant, rollout=True)
+        self.authorize(self.policy)
+        personal = (self.device_home / 'user.json').read_bytes()
+        declaration = (project / '.mask.json').read_bytes()
+        result = self.apply_profile(self.profile('fixture/beta'), 2, alias='work')
+        self.assertEqual(result['result']['scope_type'], 'project')
+        self.assertTrue((project / '.agents/skills/beta').is_symlink())
+        self.assertFalse((self.personal / '.agents/skills/beta').exists())
+        self.assertEqual((project / '.mask.json').read_bytes(), declaration)
+        self.assertEqual((self.device_home / 'user.json').read_bytes(), personal)

@@ -39,6 +39,7 @@ COMMANDS = {
     'fleet.operation.show': (False, True, [('operation', 'pos')]),
     'fleet.operation.wait': (True, True, [('operation', 'pos'), ('timeout', 'int')]),
     'fleet.operation.cancel': (True, True, [('operation', 'pos')]),
+    'fleet.operation.rollback': (True, True, [('operation', 'pos'), ('timeout', 'int')]),
     'fleet.runner.enable': (True, False, [('interval', 'int')]),
     'fleet.runner.disable': (True, False, []),
     'fleet.runner.status': (False, False, []),
@@ -99,6 +100,7 @@ HELP = {
     'fleet.operation.show': ('Show signed rollout results from the recorded operation.', 'mask fleet operation show OPERATION_ID'),
     'fleet.operation.wait': ('Poll for signed receipts for a bounded time without dispatching new effects.', 'mask fleet operation wait OPERATION_ID --timeout 30'),
     'fleet.operation.cancel': ('Withdraw future delivery of an approved rollout and preserve applied effects.', 'mask fleet operation cancel OPERATION_ID --dry-run'),
+    'fleet.operation.rollback': ('Approve a new desired revision using a prior operation’s exact profiles.', 'mask fleet operation rollback OPERATION_ID --dry-run'),
     'fleet.runner.enable': ('Review opt-in convergence in the current user’s native scheduler.', 'mask fleet runner enable --dry-run'),
     'fleet.runner.disable': ('Review removal of the exact owned scheduler entry.', 'mask fleet runner disable --dry-run'),
     'fleet.runner.status': ('Inspect the owned local schedule and next polling time.', None),
@@ -158,7 +160,8 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove', 'fleet.operation.cancel',
+    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove',
+                   'fleet.operation.cancel', 'fleet.operation.rollback',
                    'fleet.runner.enable', 'fleet.runner.disable'):
         return True
     return command in ('fleet.device.enroll', 'fleet.device.revoke', 'fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
@@ -200,6 +203,8 @@ def parser(engine, common, parser_type, add_argument, help_entries):
                     action.help = 'Local fleet name'
                 elif action.dest == 'all':
                     action.help = 'Select every active enrolled device'
+                elif action.dest == 'operation':
+                    action.help = 'Fleet operation ID from a previous result'
         if command == 'update.report':
             next(action for action in leaf._actions if action.dest == 'independent').help = 'Report independent checkout upgrades when using --all'
         if command == 'upgrade':
