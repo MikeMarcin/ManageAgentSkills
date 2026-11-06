@@ -355,5 +355,8 @@ def dispatch(args, output, home):
         return authorize(args, output, home)
     if command == 'fleet.device.descriptor':
         output['data'] = descriptor(home)
-    if command == 'fleet.controller.show':
+    elif command == 'fleet.controller.show':
         output['data'] = dict(identity=public(get_identity(home, 'controller')))
+    else:
+        import mask_transport
+        return mask_transport.dispatch(args, output, home)

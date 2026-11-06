@@ -1264,6 +1264,17 @@ def render_fleet(data, output):
     identity = data.get('identity') or data.get('device')
     if identity:
         lines.append(f"  {clean(identity['name'])} ({clean(identity['id'])}), {clean(identity['fingerprint'])}")
+    if data.get('host_fingerprint'):
+        endpoint = data['endpoint']
+        lines.append(f"  SSH {clean(data['alias'])} ({clean(endpoint['hostname'])}:{endpoint['port']}), {clean(data['host_fingerprint'])}")
+        if data['revoked']:
+            lines.append('  Device binding revoked.')
+    for row in data.get('devices', []):
+        identity = row.get('device') or {}
+        status = row.get('status') or ('revoked' if row.get('revoked') else 'enrolled')
+        lines.append(f"  {clean(row['name'])}: {status}, {clean(row.get('device_id') or identity.get('id'))}")
+        if row.get('capabilities'):
+            lines.append('    Agents: ' + ', '.join(row['capabilities']['adapters']))
     policy = data.get('authority')
     if policy:
         lines.append(f"  Controller {clean(policy['controller']['name'])}, epoch {policy['epoch']}")
@@ -1282,6 +1293,9 @@ RENDERERS = {
     'fleet.controller.init': render_fleet, 'fleet.controller.show': render_fleet,
     'fleet.device.init': render_fleet, 'fleet.device.descriptor': render_fleet,
     'fleet.device.authorize': render_fleet, 'fleet.device.revoke-controller': render_fleet,
+    'fleet.device.enroll': render_fleet, 'fleet.device.revoke': render_fleet,
+    'fleet.device.show': render_fleet, 'fleet.device.list': render_fleet,
+    'fleet.ping': render_fleet, 'fleet.capability': render_fleet,
     'diff': render_exact, 'update.report': render_exact, 'report': render_exact,
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,

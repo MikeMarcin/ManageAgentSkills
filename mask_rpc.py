@@ -12,6 +12,7 @@ import uuid
 
 import mask_core as c
 import mask_fleet as fleet
+import mask_fleet_artifacts as artifacts
 import mask_fs as fs
 import mask_profiles as profiles
 import mask_resolve as resolve
@@ -88,7 +89,10 @@ def intent_shape(intent):
     if not isinstance(action, str) or action not in PAYLOADS:
         invalid('Unsupported RPC action.')
     payload = intent['payload']
-    c.fields(payload, PAYLOADS[action], family='rpc')
+    optional = ('acquire', 'artifacts') if action == 'prepare' else ()
+    c.fields(payload, PAYLOADS[action], optional, family='rpc')
+    if action == 'prepare' and payload.get('acquire', 'exact') not in ('cached', 'exact'):
+        invalid('Unsupported exact artifact acquisition policy.')
     if 'scope' in payload:
         fleet.token(payload['scope'])
     if 'plan' in payload:
@@ -354,15 +358,77 @@ def restore_journal(home, pending, side):
     fleet.put(operation_path(home, wanted['id']), wanted, current_record)
 
 
-def prepare(home, intent, policy, scope_data):
-    state, config, root, _, layers = scope_data
+def prepare_artifacts(home, intent, scope_data):
+    _, config, root, scope, layers = scope_data
+    if intent['payload'].get('acquire', 'exact') == 'exact':
+        for row in artifacts.applicable_rows(layers):
+            store_root, _ = store.location(home, row['payload_digest'], row['id'])
+            entry = sources.selected(config, row['source'])
+            if c.kind(store_root) != 'missing' or store.exact_cached(home, row, entry):
+                continue
+            remaining = intent['expires'] - int(time.time())
+            if remaining < 1:
+                c.fail('fleet.intent_expired', 'Intent expired before exact acquisition.', 4)
+            sources.acquire_exact(home, row['source'], entry, row['commit'],
+                                  min(config['git_timeout_seconds'], remaining, 10), {},
+                                  consumer=root if scope['scope'] == 'project' else None)
     for layer in layers:
         declaration = layer['declaration']
         store.ensure(home, declaration, layer['lock'], config,
                      coordinates=selection.applicable_coordinates(declaration), offline=True)
-    planned = plan_scope(home, state, config, root)
-    return dict(scope=intent['payload']['scope'], generation=state['generation'],
-                plan=planned['plan_hash'], would_change=planned['would_change'])
+
+
+def recheck_authority(home, intent, device, policy):
+    actual = fleet.current_authority(home)
+    current(intent, device, actual)
+    if actual != policy or fleet.get_identity(home, 'device') != device:
+        c.fail('fleet.authority_changed', 'Fleet authority changed while verifying the request.', 4)
+
+
+def mutate(home, intent, device, policy):
+    action = intent['action']
+    with c.writer_lock(home):
+        pending_guard(home)
+        recheck_authority(home, intent, device, policy)
+        previous = existing_operation(home, intent)
+        if previous and previous['status'] != 'accepted':
+            return previous
+        sequence_guard(home, intent)
+        if action == 'cancel-request':
+            # An unrelated cancellation cannot consume authorization sequence.
+            target = receipt(home, intent)
+            if target['status'] == 'unknown' or target['epoch'] != intent['epoch']:
+                c.fail('fleet.operation_unknown', 'No authorized operation exists at the supplied ID.', 4)
+        else:
+            scope_data = authorized_scope(home, intent, policy)
+            state, config, root, scope, layers = scope_data
+            if state['generation'] != intent['generation']:
+                c.fail('fleet.generation_stale', 'Device generation changed since inspection.', 4)
+        if action == 'prepare':
+            incoming = artifacts.transfers(intent['payload'].get('artifacts', []), scope, layers)
+        else:
+            sequence_guard(home, intent, advance=True)
+        record = previous or operation_record(intent)
+        if previous is None:
+            fleet.put(operation_path(home, intent['id']), record, None)
+        if action == 'cancel-request':
+            return set_result(home, record, 'cancel_recorded', cancel(home, intent))
+        if action == 'apply':
+            return commit_plan(home, intent, record, plan_scope(home, state, config, root))
+        for row, payload in incoming:
+            store.materialize(home, row, payload)
+    # Ordinary lifecycle ownership protects retained artifacts from cleanup, but
+    # no deployment writer lock is held while the approved Git transport waits.
+    prepare_artifacts(home, intent, scope_data)
+    with c.writer_lock(home):
+        pending_guard(home)
+        recheck_authority(home, intent, device, policy)
+        if authorized_scope(home, intent, policy) != scope_data:
+            c.fail('fleet.generation_stale', 'Device selection or source authority changed during exact preparation.', 4)
+        planned = plan_scope(home, state, config, root)
+        result = dict(scope=intent['payload']['scope'], generation=state['generation'],
+                      plan=planned['plan_hash'], would_change=planned['would_change'])
+        return set_result(home, record, 'prepared', result)
 
 
 def perform(home, intent, device, policy):
@@ -370,45 +436,15 @@ def perform(home, intent, device, policy):
     if action == 'capabilities':
         return dict(device=fleet.public(device), authority=fleet.public_authority(policy), generation=state_at(home)['generation'],
                     adapters=selection.read_policy(home)[0]['enabled_agents'], max_frame=MAX_FRAME,
-                    signing_provider='openssh-sshsig-ed25519')
+                    max_transfer=artifacts.MAX_TRANSFER, signing_provider='openssh-sshsig-ed25519')
     if action == 'receipt':
         return receipt(home, intent, policy)
     if action == 'inspect':
         state, _, root, _, _ = authorized_scope(home, intent, policy)
         return dict(state_view(state, root), scope=intent['payload']['scope'],
                     recovery_required=c.kind(home / 'pending.json') != 'missing')
-    with c.writer_lock(home, name='lifecycle.lock'), c.writer_lock(home):
-        pending_guard(home)
-        actual = fleet.current_authority(home)
-        current(intent, device, actual)
-        if actual != policy or fleet.get_identity(home, 'device') != device:
-            c.fail('fleet.authority_changed', 'Fleet authority changed while verifying the request.', 4)
-        previous = existing_operation(home, intent)
-        if previous and previous['status'] != 'accepted':
-            return previous
-        sequence_guard(home, intent)
-        if action != 'cancel-request':
-            scope_data = authorized_scope(home, intent, policy)
-            state, config, root, _, _ = scope_data
-            if state['generation'] != intent['generation']:
-                c.fail('fleet.generation_stale', 'Device generation changed since inspection.', 4)
-        else:
-            # A failed or unrelated cancellation must not consume authorization sequence.
-            target = receipt(home, intent)
-            if target['status'] == 'unknown' or target['epoch'] != intent['epoch']:
-                c.fail('fleet.operation_unknown', 'No authorized operation exists at the supplied ID.', 4)
-        if action != 'prepare':
-            sequence_guard(home, intent, advance=True)
-        record = previous or operation_record(intent)
-        if previous is None:
-            fleet.put(operation_path(home, intent['id']), record, None)
-        if action == 'prepare':
-            result = prepare(home, intent, policy, scope_data)
-            return set_result(home, record, 'prepared', result)
-        if action == 'cancel-request':
-            result = cancel(home, intent)
-            return set_result(home, record, 'cancel_recorded', result)
-        return commit_plan(home, intent, record, plan_scope(home, state, config, root))
+    with c.writer_lock(home, name='lifecycle.lock'):
+        return mutate(home, intent, device, policy)
 
 
 def reply(home, packet):

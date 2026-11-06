@@ -28,6 +28,12 @@ COMMANDS = {
     'rpc': (False, False, [('stdio', 'flag')]),
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
+    'fleet.device.enroll': (True, True, [('name', 'pos'), ('ssh-config-alias', 'required'), ('ssh-config', 'value'), ('binding', 'required')]),
+    'fleet.device.show': (False, False, [('name', 'pos')]),
+    'fleet.device.list': (False, False, []),
+    'fleet.device.revoke': (True, False, [('name', 'pos')]),
+    'fleet.ping': (False, True, [('device', 'value'), ('all', 'flag'), ('parallel', 'int'), ('timeout', 'int')]),
+    'fleet.capability': (False, True, [('device', 'value'), ('all', 'flag'), ('parallel', 'int'), ('timeout', 'int')]),
     'fleet.device.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.device.authorize': (True, False, [('policy', 'required')]),
     'fleet.device.revoke-controller': (True, False, []),
@@ -69,6 +75,12 @@ KEEP = ('config.show', 'config.set', 'inventory', 'skill.where-used', 'skill.val
 HELP = {
     'rpc': ('Read one bounded signed MASK RPC request on stdin and respond on stdout.', 'mask rpc --stdio'),
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
+    'fleet.device.enroll': ('Review and authenticate an explicit device binding over pinned SSH.', 'mask fleet device enroll laptop --ssh-config-alias laptop --binding FILE --dry-run'),
+    'fleet.device.show': ('Show one enrolled device or revocation.', None),
+    'fleet.device.list': ('List enrolled devices and revocations without connecting.', None),
+    'fleet.device.revoke': ('Revoke the named controller-side binding.', None),
+    'fleet.ping': ('Verify enrolled peers over the fixed signed SSH transport.', 'mask fleet ping --all'),
+    'fleet.capability': ('Show current signed capabilities for enrolled devices.', 'mask fleet capability --device laptop'),
     'fleet.device.init': ('Bind a stable device identity to a distinct local OpenSSH signing key.', None),
     'fleet.device.authorize': ('Review a local policy granting a controller access to registered scopes and approved sources.', 'mask fleet device authorize --policy FILE --dry-run --json'),
     'fleet.device.revoke-controller': ('Withdraw the local device grant for the enrolled controller.', None),
@@ -118,7 +130,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('fleet.device.enroll', 'fleet.device.revoke', 'fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
