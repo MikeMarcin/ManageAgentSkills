@@ -251,7 +251,8 @@
                   "properties": {
                     "revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
                     "declaration": {"$ref": "project-v2.schema.json"},
-                    "lock": {"$ref": "lock-v1.schema.json"}
+                    "lock": {"$ref": "lock-v1.schema.json"},
+                    "fleet_controller": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
                   }
                 }
               },
@@ -383,5 +384,5 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mask:state:v3",
-  "$comment": "Runtime additionally checks canonical roots, manifest digests, source revisions and recomputed ownership paths, and restricts frozen subscriptions to personal scope."
+  "$comment": "Runtime checks canonical roots, manifest digests, exact source revisions and recomputed ownership paths. Local subscriptions require personal scope. A project contribution requires enrolled fleet ownership."
 }

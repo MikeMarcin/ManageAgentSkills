@@ -1297,7 +1297,56 @@ def render_fleet(data, output):
     return lines + plan_guard(data, output)
 
 
+def fleet_rollout_lines(data):
+    lines = []
+    if data.get('control'):
+        control = data['control']
+        lines.append(f"  Desired Git repository {clean(control['repository'])}, epoch {control['epoch']}")
+        if control.get('receipts'):
+            lines.append(f"  Separate receipt repository {clean(control['receipts'])}")
+    if data.get('runner'):
+        runner = data['runner']
+        name = ' ' + clean(runner['name']) if runner.get('name') else ''
+        lines.append(f"  Runner{name} {clean(runner['status'])}")
+        if runner.get('interval'):
+            lines.append(f"  Interval {runner['interval']} seconds")
+    if data.get('operation_id'):
+        lines.append(f"  Operation {clean(data['operation_id'])}")
+    request = data.get('input') or {}
+    if request.get('coordinate'):
+        resolution = request.get('resolution') or {}
+        lines.append(f"  {clean(request['coordinate'])}" +
+                     (f" at {clean(resolution['commit'])}" if resolution else '') +
+                     (f" ({clean(request['mode'])})" if request.get('mode') else ''))
+    if data.get('source_publication'):
+        source = data['source_publication']
+        lines.append(f"  Curated source {clean(source['source'])} {clean(source['status'])} at {clean(source['commit'])}")
+    if data.get('control_publication'):
+        lines.append(f"  Control publication {clean(data['control_publication'])}")
+    for target in data.get('targets', []) if not data.get('device_results') else []:
+        blocked = f", blocked ({clean(target['blocked'])})" if 'blocked' in target else ''
+        lines.append(f"  {clean(target['name'])} ({clean(target['scope_type'])}/{clean(target['scope'])}){blocked}")
+    for row in data.get('device_results', []):
+        reason = f" ({clean(row['reason'])})" if row.get('reason') else ''
+        agents = sorted({binding['agent'] for binding in row.get('outcomes', [])
+                         if binding['status'] in ('selected', 'overridden', 'deployed')})
+        lines.append(f"  {clean(row['name'])} ({clean(row['scope_type'])}/{clean(row['scope'])}): {clean(row['status'])}{reason}" +
+                     (f", {', '.join(agents)}" if agents else ''))
+    if 'complete' in data:
+        lines.append('  All requested effects verified.' if data['complete'] else '  Some requested effects remain incomplete.')
+        lines.append('  Agent host loading has not been verified.')
+    return lines
+
+
+def render_fleet_rollout(data, output):
+    return [headline(output)] + fleet_rollout_lines(data) + plan_guard(data, output)
+
+
 RENDERERS = {
+    **dict.fromkeys(('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync',
+                     'fleet.operation.show', 'fleet.operation.wait', 'fleet.operation.cancel',
+                     'fleet.runner.enable', 'fleet.runner.disable', 'fleet.runner.status',
+                     'fleet.runner.tick'), render_fleet_rollout),
     'fleet.controller.init': render_fleet, 'fleet.controller.show': render_fleet,
     'fleet.device.init': render_fleet, 'fleet.device.descriptor': render_fleet,
     'fleet.device.authorize': render_fleet, 'fleet.device.revoke-controller': render_fleet,
@@ -1631,6 +1680,10 @@ def render_error(output):
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
     if error['code'] == 'fleet.probe_incomplete':
         lines.extend(fleet_device_lines(data))
+    if output['command'] in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync', 'fleet.operation.cancel',
+                             'fleet.runner.enable', 'fleet.runner.disable'):
+        lines.extend(fleet_rollout_lines(data))
+        lines.extend(plan_guard(data, output))
     if data.get('repair'):
         lines.extend(repair_lines(data, output)[1:])
     if (data.get('pending') or {}).get('setup'):

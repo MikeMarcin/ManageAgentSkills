@@ -503,6 +503,8 @@ def validate_pending(pending, home):
         import mask_rpc
         try:
             mask_rpc.validate_journal(pending)
+            if 'contribution' in pending['fleet']['before']:
+                selection.validate_after_links(pending, home, selection.read_policy(home)[0])
         except c.MaskError as error:
             c.fail('recovery.conflict', 'Invalid fleet receipt journal binding.', 8, cause=error.as_dict())
     return pending

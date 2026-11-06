@@ -37,23 +37,32 @@ def endpoint(value):
 def settings(home, *, missing=False):
     value = fleet.data(fleet.path(home, 'control'), missing=missing)
     if value is not None:
-        c.fields(value, ('schema_version', 'repository', 'epoch'), ('import_mode',), family='fleet')
+        c.fields(value, ('schema_version', 'repository', 'epoch'), ('import_mode', 'receipts'), family='fleet')
         if endpoint(value['repository']) != value['repository'] or value.get('import_mode') not in (None, 'copy', 'tap'):
             invalid('Invalid local control configuration.')
         fleet.number(value['epoch'], minimum=1)
+        validate_receipt_repository(value)
     return value
 
 
 def configure(args, output, home):
-    value = dict(schema_version=1, repository=endpoint(args.repository),
-                 epoch=fleet.number(getattr(args, 'epoch', 1), minimum=1))
+    value = dict(schema_version=1, repository=endpoint(args.repository))
+    if hasattr(args, 'epoch'):
+        value['epoch'] = fleet.number(args.epoch, minimum=1)
     if hasattr(args, 'import_mode'):
         if args.import_mode not in ('copy', 'tap'):
             c.fail('invocation.invalid', 'Choose copy or tap for --import-mode.', 2)
         value['import_mode'] = args.import_mode
+    if hasattr(args, 'receipts'):
+        value['receipts'] = endpoint(args.receipts)
+    validate_receipt_repository(value)
     path = fleet.path(home, 'control')
     with (nullcontext() if output['dry_run'] else c.writer_lock(home)):
         previous = settings(home, missing=True)
+        if previous:
+            value = dict(previous, **value)
+            validate_receipt_repository(value)
+        value.setdefault('epoch', 1)
         if previous and (value['repository'] != previous['repository'] or value['epoch'] < previous['epoch']):
             invalid('A control history cannot be replaced or lowered in place.')
         output['data']['control'] = value
@@ -62,6 +71,12 @@ def configure(args, output, home):
             output['changed'] = fleet.put(path, value, previous)
             if output['changed']:
                 output['transaction'] = 'committed'
+
+
+def validate_receipt_repository(value):
+    if 'receipts' in value and (endpoint(value['receipts']) != value['receipts'] or
+                                sources.same(value['receipts'], value['repository'])):
+        invalid('Device receipts require a separate approved repository.')
 
 
 def desired_profile(declaration, lock):
@@ -126,7 +141,7 @@ def validate(value, control, signer):
         fleet.token(target['scope'])
         if 'identity' in target and fleet.identity(target['identity'], 'device')['id'] != target['device']:
             invalid('Frozen target device identity differs from its enrolled ID.')
-        if 'binding' in target and not re.fullmatch(r'sha256:[a-f0-9]{64}', target['binding']):
+        if 'binding' in target and (not isinstance(target['binding'], str) or not re.fullmatch(r'sha256:[a-f0-9]{64}', target['binding'])):
             invalid('Frozen target binding requires an exact fingerprint.')
         if 'blocked' in target and (not isinstance(target['blocked'], str) or not re.fullmatch(r'[a-z0-9_.]{1,96}', target['blocked'])):
             invalid('Invalid target preflight blocker.')
@@ -203,12 +218,12 @@ def network(root, control, *args, **kwargs):
     return c.git(root, *options, *args, **kwargs)
 
 
-def remote_head(root, control):
-    raw = network(root, control, 'ls-remote', '--refs', control['repository'], REF, max_output=1024)
+def remote_head(root, control, ref=REF):
+    raw = network(root, control, 'ls-remote', '--refs', control['repository'], ref, max_output=1024)
     if not raw:
         return None
     commit, sep, name = raw.partition('\t')
-    if not sep or name != REF or not GIT_OID.fullmatch(commit):
+    if not sep or name != ref or not GIT_OID.fullmatch(commit):
         invalid('Control Git ref did not return one SHA-1 commit.')
     return commit
 
@@ -278,8 +293,12 @@ def snapshot(home, control, signer):
         c.git(root, '-c', 'init.templateDir=', 'init', '--bare', '--object-format=sha1', mutating=True)
         head = remote_head(root, control)
         if head is not None:
+            def bound_fetch():
+                if sources.cache_bytes(root) > sources.FETCH_BYTES:
+                    c.fail('fleet.control_limit', 'Control fetch exceeded the local object storage budget.', 4)
             network(root, control, 'fetch', '--no-tags', '--no-recurse-submodules', '--no-auto-maintenance',
-                    '--depth=' + str(MAX_HISTORY + 1), control['repository'], REF, mutating=True)
+                    '--depth=' + str(MAX_HISTORY + 1), control['repository'], REF, mutating=True, monitor=bound_fetch)
+            bound_fetch()
             if c.git(root, 'rev-parse', 'FETCH_HEAD^{commit}') != head:
                 c.fail('fleet.control_conflict', 'Control ref moved during fetch. Read the new head and retry.', 4)
         history = History(control, root, head, read_history(root, head, control, signer))

@@ -30,13 +30,19 @@ COMMANDS = {
     'rpc': (False, True, [('stdio', 'flag')]),
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
-    'fleet.control.configure': (True, False, [('repository', 'pos'), ('epoch', 'int'), ('import-mode', 'value')]),
+    'fleet.control.configure': (True, False, [('repository', 'pos'), ('epoch', 'int'), ('import-mode', 'value'), ('receipts', 'value')]),
     'fleet.install': (True, True, [('input', 'pos'), ('mode', 'value'), ('into', 'value'),
                                    ('ref', 'value'), ('path', 'value')] + FLEET_TARGET),
     'fleet.update': (True, True, [('input', 'pos')] + FLEET_TARGET),
     'fleet.remove': (True, True, [('input', 'pos')] + FLEET_TARGET),
-    'fleet.sync': (False, True, [('device', 'repeat'), ('all', 'flag'), ('timeout', 'int')]),
+    'fleet.sync': (True, True, [('device', 'repeat'), ('all', 'flag'), ('local', 'flag'), ('timeout', 'int')]),
     'fleet.operation.show': (False, True, [('operation', 'pos')]),
+    'fleet.operation.wait': (True, True, [('operation', 'pos'), ('timeout', 'int')]),
+    'fleet.operation.cancel': (True, True, [('operation', 'pos')]),
+    'fleet.runner.enable': (True, False, [('interval', 'int')]),
+    'fleet.runner.disable': (True, False, []),
+    'fleet.runner.status': (False, False, []),
+    'fleet.runner.tick': (True, True, []),
     'fleet.device.enroll': (True, True, [('name', 'pos'), ('ssh-config-alias', 'required'), ('ssh-config', 'value'), ('binding', 'required')]),
     'fleet.device.show': (False, False, [('name', 'pos')]),
     'fleet.device.list': (False, False, []),
@@ -89,8 +95,14 @@ HELP = {
     'fleet.install': ('Install one exact skill contribution on authorized enrolled devices.', 'mask fleet install TAP/SKILL --mode tap --all-devices --scope user --dry-run'),
     'fleet.update': ('Update a fleet-selected skill to the exact candidate from the cached tap.', 'mask fleet update TAP/SKILL --all-devices --scope user --dry-run'),
     'fleet.remove': ('Withdraw a fleet-owned contribution and preserve independent local selections.', 'mask fleet remove TAP/SKILL --all-devices --scope user --dry-run'),
-    'fleet.sync': ('Deliver the latest approved desired state to active enrolled devices.', 'mask fleet sync --all'),
+    'fleet.sync': ('Deliver the latest approved desired state to enrolled devices, or pull it on this device.', 'mask fleet sync --all\nmask fleet sync --local'),
     'fleet.operation.show': ('Show signed rollout results from the recorded operation.', 'mask fleet operation show OPERATION_ID'),
+    'fleet.operation.wait': ('Poll for signed receipts for a bounded time without dispatching new effects.', 'mask fleet operation wait OPERATION_ID --timeout 30'),
+    'fleet.operation.cancel': ('Withdraw future delivery of an approved rollout and preserve applied effects.', 'mask fleet operation cancel OPERATION_ID --dry-run'),
+    'fleet.runner.enable': ('Review opt-in convergence in the current user’s native scheduler.', 'mask fleet runner enable --dry-run'),
+    'fleet.runner.disable': ('Review removal of the exact owned scheduler entry.', 'mask fleet runner disable --dry-run'),
+    'fleet.runner.status': ('Inspect the owned local schedule and next polling time.', None),
+    'fleet.runner.tick': ('Run one scheduled convergence check when the reviewed runner is enabled.', None),
     'fleet.device.enroll': ('Review and authenticate an explicit device binding over pinned SSH.', 'mask fleet device enroll laptop --ssh-config-alias laptop --binding FILE --dry-run'),
     'fleet.device.show': ('Show one enrolled device or revocation.', None),
     'fleet.device.list': ('List enrolled devices and revocations without connecting.', None),
@@ -146,7 +158,8 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove'):
+    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove', 'fleet.operation.cancel',
+                   'fleet.runner.enable', 'fleet.runner.disable'):
         return True
     return command in ('fleet.device.enroll', 'fleet.device.revoke', 'fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
@@ -194,13 +207,17 @@ def parser(engine, common, parser_type, add_argument, help_entries):
             next(action for action in leaf._actions if action.dest == 'independent').help = 'With --all, upgrade every checkout separately instead of once per repository'
         if command in ('pin', 'unpin'):
             next(action for action in leaf._actions if action.dest == 'all').help = 'Select every skill in the chosen checkout or personal scope'
-        if mutates:
+        if dry_run_supported(command, mutates):
             add_argument(leaf, 'dry-run', 'flag')
         if guarded(command, mask):
             add_argument(leaf, 'approve-plan', 'value')
         leaf.set_defaults(command=command)
         leaves[command] = leaf
     return root, leaves
+
+
+def dry_run_supported(command, mutates):
+    return mutates and command not in ('fleet.sync', 'fleet.operation.wait', 'fleet.runner.tick')
 
 
 def normalize(argv):
@@ -425,7 +442,7 @@ def capabilities(output, leaves, mask):
                           type='integer' if a.type is int else 'boolean' if isinstance(a, argparse._StoreTrueAction) else 'string')
                      for a in leaves[name]._actions]
         descriptors.append(dict(name=name, implemented=True, arguments=arguments, effect='bounded_rpc' if name == 'rpc' else 'managed_mutation' if mutates else 'observational',
-                                network=network, dry_run=mutates, plan_guard=guarded(name, mask)))
+                                network=network, dry_run=dry_run_supported(name, mutates), plan_guard=guarded(name, mask)))
     output['data'] = dict(commands=descriptors, schemas=dict(result=2, project=2, user=2, lock=1, machine=3, state=3, pending=3),
                          readable_versions=dict(project=[2], user=[2], lock=[1], machine=[3], state=[1,2,3], pending=[1,2,3]),
                          scopes=['project', 'user'], default_scope='current_checkout', aggregate_scope='all_registered',

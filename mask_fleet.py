@@ -304,11 +304,15 @@ def bind_authority(home, proposed):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config = c.config(c.read_json(home / 'config.json')) if any(
         scope['sources'] for scope in proposed['scopes'].values()) else None
-    scopes = {}
+    scopes, rollout_roots = {}, set()
     for alias, scope in proposed['scopes'].items():
         if 'root_identity' in scope:
             invalid('MASK observes the physical scope identity during authorization.')
         root, record = local_scope(scope, state)
+        if scope.get('rollout'):
+            if root in rollout_roots:
+                invalid('Each physical consumer may have only one rollout scope alias.')
+            rollout_roots.add(root)
         for name, grant in scope['sources'].items():
             approved = sources.selected(config, name)
             if sources.repository(approved['repository']) != grant['repository']:
@@ -360,6 +364,9 @@ def dispatch(args, output, home):
     if command == 'fleet.control.configure':
         import mask_control
         return mask_control.configure(args, output, home)
+    if command.startswith('fleet.runner.') or command == 'fleet.sync' and getattr(args, 'local', False):
+        import mask_runner
+        return mask_runner.dispatch(args, output, home)
     if command in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync') or command.startswith('fleet.operation.'):
         import mask_rollout
         return mask_rollout.dispatch(args, output, home)

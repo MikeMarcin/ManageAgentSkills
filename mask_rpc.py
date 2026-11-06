@@ -443,6 +443,11 @@ def validate_journal(pending):
                 or any(record and record.get('fleet_controller') != before['controller']
                        for record in (old.get(name), desired))):
             c.fail('recovery.conflict', 'Fleet journal changes another contribution or disagrees with the requested revision.', 8)
+        if revision is not None:
+            digest(revision)
+        fleet.number(result['observed_at'], minimum=1)
+        if not isinstance(result['outcomes'], list) or len(result['outcomes']) > MAX_SCOPE_PACKAGES * len(c.ADAPTERS):
+            c.fail('recovery.conflict', 'Fleet outcomes exceed the journal bound.', 8)
     elif changed:
         c.fail('recovery.conflict', 'An ordinary fleet apply cannot change profile ownership.', 8)
     digest(result['plan'])
@@ -565,12 +570,16 @@ def perform(home, intent, device, policy):
         return mutate(home, intent, device, policy)
 
 
+def response_value(intent, device, data):
+    return dict(schema_version=1, protocol=fleet.PROTOCOL, id=intent['id'], device=device['id'],
+                controller=intent['controller'], request_digest=request_digest(intent), status='ok', data=data, error=None)
+
+
 def reply(home, packet):
     c.fields(packet, ('intent', 'signature'), family='rpc')
     intent = intent_shape(packet['intent'])
     device = fleet.get_identity(home, 'device')
-    result = dict(schema_version=1, protocol=fleet.PROTOCOL, id=intent['id'], device=device['id'],
-                  controller=intent['controller'], request_digest=request_digest(intent), status='ok', data={}, error=None)
+    result = response_value(intent, device, {})
     try:
         policy = fleet.current_authority(home)
         current(intent, device, policy)

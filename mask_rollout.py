@@ -21,6 +21,7 @@ import mask_transport as transport
 
 TERMINAL = {'applied_verified', 'not_applicable', 'canceled', 'superseded'}
 CONVERGED = {'applied_verified', 'not_applicable'}
+PRESENT = {'selected', 'overridden', 'deployed'}
 DISCONNECTED = {'fleet.transport_unknown', 'fleet.response_unverified'}
 
 
@@ -186,19 +187,28 @@ def outcome_path(home, entry, target):
     return fleet.path(home, 'deliveries/' + entry['operation'] + '-' + target['device'])
 
 
+def observation_path(home, entry, target):
+    return fleet.path(home, 'observations/' + entry['operation'] + '-' + target['device'])
+
+
 def base_result(target):
     return dict(name=target['name'], device_id=target['device'], scope=target['scope'], scope_type=target['scope_type'],
                 status='queued_offline', host_load='not_verified', bindings=[], outcomes=[])
 
 
 def proof_result(record, entry, target):
+    c.fields(record, ('apply', 'proof'), family='fleet', versions=())
     proof = record.get('proof')
     if not proof:
         return None
-    original = record['apply']['intent']
+    c.fields(record['apply'], ('intent',), ('signature',), family='fleet', versions=())
+    c.fields(proof, ('intent', 'packet'), family='fleet', versions=())
+    original = rpc.intent_shape(record['apply']['intent'])
     wanted = target['profile']['revision'] if target['profile'] else None
-    if (original['device'], original['epoch'], original['sequence'], original['revision'], original['payload']['scope']) != (
-            target['device'], target['device_epoch'], entry['sequence'], control.intent_digest(entry), target['scope']):
+    if (original['device'], original['controller'], original['epoch'], original['sequence'], original['revision'],
+            original['payload']['scope']) != (
+            target['device'], entry['controller'], target['device_epoch'], entry['sequence'], control.intent_digest(entry),
+            target['scope']):
         c.fail('fleet.receipt_mismatch', 'Recorded apply request does not match the approved desired revision.', 4)
     if original['payload'].get('profile') != target['profile']:
         c.fail('fleet.receipt_mismatch', 'Recorded apply request does not match the approved exact profile.', 4)
@@ -216,15 +226,17 @@ def proof_result(record, entry, target):
             original['revision'], entry['sequence'], target['device_epoch'], target['scope'], wanted, wanted,
             target['scope_type'], original['payload']['plan']):
         c.fail('fleet.receipt_mismatch', 'Signed outcome does not match the exact approved revision, scope or plan.', 4)
+    selected = {resolve.coordinate(row): row for row in target['profile']['lock']['packages']} if target['profile'] else {}
+    if {row['coordinate'] for row in result['outcomes']} != selected.keys():
+        c.fail('fleet.receipt_mismatch', 'Signed outcome does not account for every requested package.', 4)
     for row in result['outcomes']:
-        if row['status'] not in ('selected', 'overridden'):
+        if row['status'] not in PRESENT:
             continue
-        package = next((item for item in target['profile']['lock']['packages']
-                        if resolve.coordinate(item) == row['coordinate']), None)
+        package = selected.get(row['coordinate'])
         if package is None or not any((edge['coordinate'], edge['agent'], edge['payload_digest']) ==
                                       (row['coordinate'], row['agent'], package['payload_digest']) for edge in result['bindings']):
             c.fail('fleet.receipt_mismatch', 'Signed filesystem projection lacks a requested exact binding.', 4)
-    skipped = bool(result['outcomes']) and not any(row['status'] in ('selected', 'overridden') for row in result['outcomes'])
+    skipped = bool(result['outcomes']) and not any(row['status'] in PRESENT for row in result['outcomes'])
     return dict(base_result(target), status='not_applicable' if skipped else 'applied_verified',
                 bindings=result['bindings'], outcomes=result['outcomes'], changed=result['changed'],
                 observed_at=result['observed_at'], generation=result['generation'], intent_digest=data['revision'],
@@ -245,6 +257,16 @@ def response(home, signer, target, entry, action, payload, *, timeout, generatio
         code = observed['error']['code']
         c.fail(code, 'The device refused the signed rollout request.', 4)
     return observed['data'], dict(intent=packet['intent'], packet=envelope)
+
+
+def external_receipt(history, entry, target):
+    if 'receipts' not in history.control:
+        return None
+    import mask_fleet_receipts
+    try:
+        return mask_fleet_receipts.read(history.control, entry, target)
+    except (OSError, c.MaskError):
+        return None  # Missing or unverified external evidence cannot satisfy coverage.
 
 
 def forward_packages(home, target):
@@ -279,6 +301,7 @@ def save_proof(path, record, proof, entry, target):
     result = proof_result(candidate, entry, target)
     if result:
         fleet.put(path, candidate, record)
+        result['newly_observed'] = True
     return result
 
 
@@ -296,9 +319,13 @@ def deliver(home, signer, history, entry, target, *, timeout=15, observe_only=Fa
                 verified = proof_result(record, entry, target)
                 if verified:
                     return verified
+            external = external_receipt(history, entry, target)
+            if external:
+                return external
+            if record:
                 original = record['apply']['intent']
                 query = dict(operation=original['id'], digest=rpc.request_digest(original))
-                _, proof = response(home, signer, target, entry, 'receipt', query, timeout=timeout)
+                status, proof = response(home, signer, target, entry, 'receipt', query, timeout=timeout)
                 verified = save_proof(path, record, proof, entry, target)
                 if verified:
                     return verified
@@ -307,12 +334,30 @@ def deliver(home, signer, history, entry, target, *, timeout=15, observe_only=Fa
                 status = 'canceled' if latest[0]['action'] == 'cancel' and latest[0]['input']['operation'] == entry['operation'] else 'superseded'
                 return dict(base, status=status, superseding_operation=latest[0]['operation'])
             if observe_only:
+                if record and status['status'] == 'accepted':
+                    return dict(base, status='preparing')
+                if record and status['status'] in ('canceled', 'rolled_back'):
+                    return dict(base, status='canceled' if status['status'] == 'canceled' else 'blocked',
+                                reason='fleet.' + status['status'])
                 return dict(base, status='unknown' if record else 'queued_offline')
             if entry['expires'] <= int(time.time()):
                 return dict(base, status='blocked', reason='fleet.intent_expired')
             peer = peer_for(home, target, signer)
             if entry['sequence'] < peer['authority']['minimum_sequence']:
                 c.fail('fleet.sequence_stale', 'Desired revision predates the enrolled sequence floor.', 4)
+            if record and status['status'] in ('accepted', 'unknown') and original['expires'] > int(time.time()):
+                if control.remote_head(history.root, history.control) != history.head:
+                    c.fail('fleet.control_conflict', 'Desired head advanced before retry. Run fleet sync for its latest state.', 4)
+                try:
+                    _, proof = response(home, signer, target, entry, 'apply', original['payload'],
+                                        timeout=timeout, packet=record['apply'])
+                except c.MaskError as error:
+                    if error.code not in ('fleet.generation_stale', 'fleet.intent_expired'):
+                        raise
+                else:
+                    verified = save_proof(path, record, proof, entry, target)
+                    if verified:
+                        return verified
             observed, _ = response(home, signer, target, entry, 'inspect',
                                    dict(scope=target['scope'], rollout=True), timeout=timeout)
             if observed['recovery_required']:
@@ -338,7 +383,8 @@ def deliver(home, signer, history, entry, target, *, timeout=15, observe_only=Fa
             return result or dict(base, status='unknown', reason='fleet.receipt_unavailable')
     except c.MaskError as error:
         if error.code in DISCONNECTED:
-            return dict(base, status='unknown' if fleet.data(path, missing=True) else 'queued_offline', reason=error.code)
+            unknown = error.code == 'fleet.response_unverified' or fleet.data(path, missing=True) is not None
+            return dict(base, status='unknown' if unknown else 'queued_offline', reason=error.code)
         return dict(base, status='recovery_required' if error.code == 'recovery.required' else 'blocked', reason=error.code)
     except OSError:
         return dict(base, status='unknown', reason='filesystem.failed')
@@ -349,22 +395,58 @@ def set_report(output, entry, rows):
     installed = entry['action'] in ('install', 'update') and all(
         row['status'] == 'applied_verified' and any(item['coordinate'] == entry['input']['coordinate']
                                                   for item in row['bindings'])
-        and all(item['status'] in ('selected', 'overridden') or item['reason'] in ('agent_disabled_by_policy', 'advertised_agents')
+        and all(item['status'] in PRESENT
                 for item in row['outcomes'] if item['coordinate'] == entry['input']['coordinate'])
         for row in rows)
     output['data'].update(operation_id=entry['operation'], action=entry['action'], desired_revision=control.intent_digest(entry),
                           sequence=entry['sequence'], input=entry['input'], selected_devices=len(rows), device_results=rows,
-                          complete=complete, installed_everywhere=installed, host_load='not_verified')
+                          complete=complete, installed_everywhere=installed, host_load='not_verified',
+                          created_at=entry['created_at'], authorization_expires=entry['expires'],
+                          report=dict(selected_devices=len(rows), status_counts={status: sum(row['status'] == status for row in rows)
+                                                                                for status in sorted({row['status'] for row in rows})}))
 
 
-def fanout(home, signer, history, pairs, *, timeout):
+def fanout(home, signer, history, pairs, *, timeout, observe_only=False, deadline=None):
+    def one(pair):
+        entry, target = pair
+        if deadline is not None and time.monotonic() >= deadline:
+            return observed_row(home, history.effective(), entry, target)
+        limit = timeout if deadline is None else min(timeout, max(0.01, deadline - time.monotonic()))
+        row = deliver(home, signer, history, entry, target, timeout=limit, observe_only=observe_only)
+        if row['status'] not in TERMINAL and row.get('reason') != 'lock.busy':
+            pathname = observation_path(home, entry, target)
+            try:
+                previous = fleet.data(pathname, missing=True)
+                fleet.put(pathname, dict(status=row['status'], reason=row.get('reason'), observed_at=int(time.time())), previous)
+            except (OSError, c.MaskError):
+                pass  # A durable signed receipt is separate from these advisory observations.
+        return row
     with ThreadPoolExecutor(max_workers=min(4, max(1, len(pairs)))) as executor:
-        return list(executor.map(lambda pair: deliver(home, signer, history, *pair, timeout=timeout), pairs))
+        return list(executor.map(one, pairs))
 
 
 def require_complete(output):
     if not output['data']['complete']:
         c.fail('fleet.incomplete', 'Some devices have not verified the requested exact rollout.', 9)
+
+
+def previous_profile(home, history, previous, key):
+    if previous is None:
+        return None
+    entry, target = previous
+    if entry['action'] != 'cancel':
+        return target['profile']
+    original = history.operation(entry['input']['operation'])
+    canceled = next(target for target in original['targets'] if control.target_key(target) == key)
+    record = fleet.data(outcome_path(home, original, canceled), missing=True)
+    if record:
+        if proof_result(record, original, canceled):
+            return canceled['profile']
+        c.fail('fleet.canceled_delivery_unknown', 'An earlier canceled delivery may already have applied. Query its receipt before recomposing this scope.', 4,
+               operation=original['operation'], device=canceled['name'])
+    prior = control.History(history.control, history.root, history.head,
+                            history.events[:original['sequence'] - 1]).effective().get(key)
+    return previous_profile(home, history, prior, key)
 
 
 def rollout(home, signer, history, args, output, stack):
@@ -373,7 +455,8 @@ def rollout(home, signer, history, args, output, stack):
     peers = choose_devices(args, home)
     targets = [frozen_target(peer, args, signer) for peer in peers]
     effective = history.effective()
-    previous_profiles = {key: target['profile'] for key, (_, target) in effective.items()}
+    previous_profiles = {key: previous_profile(home, history, effective.get(key), key)
+                         for key in map(control.target_key, targets)}
     copy = None
     source_effect = upstream = None
     if action == 'install':
@@ -421,8 +504,10 @@ def rollout(home, signer, history, args, output, stack):
             target['blocked'] = blocker
         else:
             validate_sources(target, peer, forward)
-    proposal = dict(head=history.head, epoch=history.control['epoch'], action=action,
+    proposal = dict(head=history.head, control=c.digest(history.control), action=action,
                     targets=sorted(targets, key=control.target_key), input=details, source_effect=source_effect)
+    if copy is not None:
+        proposal['source_authority'] = c.digest(dict(endpoint=endpoint, observed=observed))
     plan_hash = c.digest(proposal)
     operation = plan_hash.split(':')[1][:32]
     output['data'].update(plan_hash=plan_hash, operation_id=operation, action=action, input=details,
@@ -433,7 +518,8 @@ def rollout(home, signer, history, args, output, stack):
     if output['dry_run']:
         return
     if getattr(args, 'approve_plan', None) != plan_hash:
-        c.fail('confirmation.required', 'Preview the exact fleet intent and pass its --approve-plan hash.', 4)
+        code = 'plan.stale' if hasattr(args, 'approve_plan') else 'confirmation.required'
+        c.fail(code, 'Preview the exact fleet intent and pass its --approve-plan hash.', 4)
     if not output['would_change']:
         output['data'].update(device_results=[dict(base_result(target), status='blocked', reason=target['blocked'])
                                               for target in targets], complete=False, installed_everywhere=False,
@@ -472,35 +558,85 @@ def sync(home, signer, history, args, output):
     output['data'].update(device_results=rows, complete=complete, selected_devices=len(selected),
                           installed_everywhere=False, host_load='not_verified',
                           operation_ids=sorted({entry['operation'] for entry, _ in pairs}))
-    output['changed'] = any(row.get('changed') for row in rows)
+    output['changed'] = any(row.get('newly_observed') for row in rows)
     if output['changed']:
         output['transaction'] = 'committed'
     require_complete(output)
 
 
-def operation_status(home, signer, history, args, output):
-    operation = fleet.identifier(args.operation)
-    entry = history.operation(operation)
+def operation_entry(history, operation):
+    entry = history.operation(fleet.identifier(operation))
     if entry is None or entry['action'] == 'cancel':
         c.fail('fleet.operation_unknown', 'The signed history does not contain that rollout operation.', 4)
-    rows = []
+    return entry
+
+
+def observed_row(home, latest, entry, target, history=None):
+    row = base_result(target)
+    replacement = latest.get(control.target_key(target))
+    record = fleet.data(outcome_path(home, entry, target), missing=True)
+    if record and (verified := proof_result(record, entry, target)):
+        return verified
+    if 'blocked' in target:
+        return dict(row, status='blocked', reason=target['blocked'])
+    if history is not None and (external := external_receipt(history, entry, target)):
+        return external
+    if replacement and replacement[0] != entry:
+        superseding = replacement[0]
+        canceled = superseding['action'] == 'cancel' and superseding['input']['operation'] == entry['operation']
+        return dict(row, status='canceled' if canceled else 'superseded', superseding_operation=superseding['operation'],
+                    prior_application='unknown' if record else 'not_dispatched_by_this_controller')
+    observed = fleet.data(observation_path(home, entry, target), missing=True)
+    if observed:
+        return dict(row, **observed)
+    if entry['expires'] <= int(time.time()):
+        return dict(row, status='blocked', reason='fleet.intent_expired')
+    return dict(row, status='unknown') if record else row
+
+
+def operation_status(home, history, entry, output):
     latest = history.effective()
-    for target in entry['targets']:
-        row = base_result(target)
-        replacement = latest.get(control.target_key(target))
-        record = fleet.data(outcome_path(home, entry, target), missing=True)
-        if record and (verified := proof_result(record, entry, target)):
-            row = verified
-        elif 'blocked' in target:
-            row.update(status='blocked', reason=target['blocked'])
-        elif replacement and replacement[0] != entry:
-            superseding = replacement[0]
-            canceled = superseding['action'] == 'cancel' and superseding['input']['operation'] == operation
-            row.update(status='canceled' if canceled else 'superseded', superseding_operation=superseding['operation'])
-        elif record:
-            row['status'] = 'unknown'
-        rows.append(row)
+    with ThreadPoolExecutor(max_workers=min(4, len(entry['targets']))) as executor:
+        rows = list(executor.map(lambda target: observed_row(home, latest, entry, target, history), entry['targets']))
     set_report(output, entry, rows)
+
+
+def operation_wait(home, signer, history, entry, args, output):
+    seconds = getattr(args, 'timeout', 30)
+    if not 1 <= seconds <= 180:
+        c.fail('invocation.invalid', 'Choose a wait bound from 1 through 180 seconds.', 2)
+    deadline = time.monotonic() + seconds
+    pairs = [(entry, target) for target in entry['targets']]
+    while True:
+        rows = fanout(home, signer, history, pairs, timeout=3, observe_only=True, deadline=deadline)
+        set_report(output, entry, rows)
+        if all(row['status'] in TERMINAL | {'blocked', 'recovery_required'} for row in rows):
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            output['data']['timed_out'] = True
+            return
+        time.sleep(min(0.5, remaining))
+
+
+def operation_cancel(home, signer, history, entry, args, output):
+    latest = history.effective()
+    targets = [dict(target, profile=None) for target in entry['targets']
+               if latest.get(control.target_key(target), (None,))[0] == entry]
+    proposal = dict(head=history.head, operation=entry['operation'], targets=targets)
+    plan_hash = c.digest(proposal)
+    output['data'].update(plan_hash=plan_hash, cancel_targets=[target['name'] for target in targets])
+    output['would_change'] = bool(targets)
+    if not output['dry_run'] and targets:
+        if getattr(args, 'approve_plan', None) != plan_hash:
+            c.fail('confirmation.required', 'Preview cancel and approve its exact future-delivery withdrawal.', 4)
+        canceled = control.event(history.control, signer, history.events, 'cancel', plan_hash.split(':')[1][:32],
+                                 targets, dict(operation=entry['operation']))
+        output['data'].update(control_commit=control.publish(history, canceled, signer),
+                              cancellation_id=canceled['operation'])
+        output.update(changed=True, transaction='committed')
+        control.remember(home, history)
+    operation_status(home, history, entry, output)
 
 
 def dispatch(args, output, home):
@@ -509,12 +645,17 @@ def dispatch(args, output, home):
     if settings is None:
         c.fail('fleet.control_required', 'Configure an explicitly approved private Git control repository first.', 4)
     command = args.command
-    if command != 'fleet.operation.show':
+    if not command.startswith('fleet.operation.'):
         timeout_option(args)
     with ExitStack() as stack:
         history = stack.enter_context(control.snapshot(home, settings, signer))
         if command == 'fleet.sync':
             return sync(home, signer, history, args, output)
-        if command == 'fleet.operation.show':
-            return operation_status(home, signer, history, args, output)
+        if command.startswith('fleet.operation.'):
+            entry = operation_entry(history, args.operation)
+            if command.endswith('.wait'):
+                return operation_wait(home, signer, history, entry, args, output)
+            if command.endswith('.cancel'):
+                return operation_cancel(home, signer, history, entry, args, output)
+            return operation_status(home, history, entry, output)
         return rollout(home, signer, history, args, output, stack)
