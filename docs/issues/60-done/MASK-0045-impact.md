@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0045"
 title: "Explain exact content diffs and selected consumer impact"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0044", "MASK-0069", "MASK-0070", "MASK-0071"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"impact","stage":"C — explainability","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0011-AC02","outcome":"pass","revision":"e16d2ae97e6741bf8ebe10d47e329c1e3d8728b0","evidence":{"kind":"command","detail":"Four public tests in tests.test_update_impact compare support files, binary digest/size, metadata and provenance-only changes. They observe a pinned unaffected personal consumer, a changed project on identical link membership, and a target restriction before activation. Development links have an explicit shared-authoring caveat."}},{"criterion":"RFC-MASK-0011-AC03","outcome":"pass","revision":"e16d2ae97e6741bf8ebe10d47e329c1e3d8728b0","evidence":{"kind":"command","detail":"The preview hash matches ordinary upgrade and guarded apply uses that hash. Moving a cached branch with identical selected bytes and editing a consumer control both stale the approval. No consumer bytes change on preview or stale refusal."}}]
 ---
 
 # MASK-0045: Explain exact content diffs and selected consumer impact
