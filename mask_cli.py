@@ -24,7 +24,8 @@ COMMANDS = {
     'tap': (True, False, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
-    'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag')]),
+    'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag'), ('limit', 'int'), ('offset', 'int'), ('output', 'value')]),
+    'report': (False, False, [('operation', 'pos'), ('format', 'value'), ('output', 'value'), ('limit', 'int'), ('offset', 'int')]),
     'diff': (False, False, [('id', 'pos'), ('from', 'required'), ('to', 'required'), ('patch', 'flag')]),
     'cleanup': (True, False, []),
     'search': (False, False, [('query', 'optional')]),
@@ -52,13 +53,14 @@ RENAMES = {'uninstall': 'remove', 'status': 'doctor', 'search': 'skill.list', 'i
            'tap.migrate': 'doctor'}
 for action in ('fetch', 'show', 'inspect', 'repair-cache', 'publish'):
     RENAMES['tap.' + action] = 'source.' + action
-KEEP = ('config.show', 'config.set', 'skill.where-used', 'skill.validate', 'skill.import', 'skill.provenance',
+KEEP = ('config.show', 'config.set', 'inventory', 'skill.where-used', 'skill.validate', 'skill.import', 'skill.provenance',
         'skill.record-adaptation', 'project.set-targets', 'project.set-agents', 'user.set-targets', 'user.set-agents',
         'selection-policy.set', 'selection-policy.clear', 'compatibility.override', 'compatibility.clear',
         'integration.approve', 'integration.revoke', 'integration.inspect', 'integration.enable', 'integration.disable',
         'launch', 'workspace.forget', 'link.adopt', 'recover', 'tap.transport', 'lock', 'self.status', 'self.install', 'self.uninstall')
 
 HELP = {
+    'report': ('Render a saved local update-impact receipt in text, JSON or offline HTML.', 'mask report RECEIPT.json --format html'),
     'update.report': ('Explain the guarded upgrade candidate from cached taps without fetching or applying it.', 'mask update report --all --json'),
     'diff': ('Compare raw files at two full cached or locked commit IDs. Text patches are opt-in and bounded.', 'mask diff TAP/ID --from OLD_COMMIT --to NEW_COMMIT'),
     'user.export': ('Export portable personal selections and exact locks to a new directory.', 'mask user export --output /path/to/profile'),
@@ -286,7 +288,7 @@ def dispatch(args, output, leaves):
                 return mask_cleanup.dispatch(args, output, home)
             if public == 'capabilities':
                 return capabilities(output, leaves, mask)
-            if public in ('update.report', 'diff'):
+            if public in ('update.report', 'diff', 'report'):
                 import mask_report
                 return mask_report.inspect_exact(args, output, home)
             if public in ('user.export', 'user.import') or public.startswith('profile.'):

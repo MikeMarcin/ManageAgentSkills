@@ -305,6 +305,12 @@ def render_where_used(data, output):
     shown, total = len(data.get('rows', [])), data.get('total_rows', 0)
     lines = [f"Where used: {plural(shown, 'link')}" + ('' if shown == total else f' shown of {total}')]
     lines.extend(table(data.get('rows', []), [('SKILL', 'name'), ('SCOPE', 'scope'), ('AGENT', 'agent'), ('STATE', 'status'), ('PATH', 'path')]))
+    if data.get('fleet'):
+        fleet = data['fleet']
+        lines.append('  ' + clean(fleet['basis']))
+        lines.extend(table(fleet['rows'], [('DEVICE', 'device'), ('DATE', 'observed_at'), ('STATE', 'status'), ('RESULT', 'outcome')]))
+        if fleet['next_offset'] is not None:
+            lines.append(f"  More fleet observations follow. Continue with --offset {fleet['next_offset']}.")
     if data.get('next_offset') is not None:
         lines.append(f"  More rows follow this page; continue with --offset {data['next_offset']}")
     return lines
@@ -1240,15 +1246,21 @@ def render_exact(data, output):
         if data.get('patch_truncated'):
             lines.append('  Some text patches exceed the size limit.')
         return lines
-    impact = data.get('impact', {})
-    lines = ['Update impact from cached taps']
-    for row in impact.get('deployments', []):
-        lines.append(f"  {clean(row.get('skill'))} · {clean(row.get('status'))} · {clean(row.get('root'))}")
-    return lines + plan_guard(data, output)
+    from mask_report import render_receipt, report_lines
+    if output['command'] == 'report':
+        if data.get('output'):
+            return ['Wrote report to ' + clean(data['output'])]
+        return render_receipt(data.get('view', {}), data.get('format', 'text')).rstrip('\n').split('\n')
+    lines = report_lines(data.get('impact', {}))
+    if data.get('receipt'):
+        lines.append('  Saved receipt ' + clean(data['receipt']))
+    if data.get('plan_hash'):
+        lines.append('  Approve the exact candidate with mask upgrade --approve-plan ' + clean(data['plan_hash']) + ' and the same scope.')
+    return lines
 
 
 RENDERERS = {
-    'diff': render_exact, 'update.report': render_exact,
+    'diff': render_exact, 'update.report': render_exact, 'report': render_exact,
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,
     'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.install': render_bundles, 'bundle.uninstall': render_bundles, 'bundle.upgrade': render_bundles,
@@ -1326,7 +1338,7 @@ def render(output):
         raise KeyError(f"no human renderer registered for {output['command']}")
     data = output['data']
     lines = renderer(data, output)
-    if output['dry_run'] and output['would_change'] and (data.get('review') or {}).get('kind') == 'task':
+    if output['command'] != 'update.report' and output['dry_run'] and output['would_change'] and (data.get('review') or {}).get('kind') == 'task':
         # Keep the command's outcome sentence, then the same review shown at the prompt.
         lines = lines[:1] + [''] + task_review(data['review'], output).splitlines()[2:] + plan_guard(data, output)
     lines += warnings(output)
@@ -1811,6 +1823,10 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'operation': 'Saved receipt file, or an operation ID in the local reports directory.',
+    'format': 'Render report as text, JSON or offline HTML.',
+    'fleet': 'Include only dated recorded fleet observations.',
+    'fleet-observations': 'Use this explicit recorded observation projection with --fleet.',
     'from': 'Full commit ID for the older package bytes.',
     'to': 'Full commit ID for the newer package bytes.',
     'patch': 'Include bounded text patches; binary files are summarized.',

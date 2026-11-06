@@ -201,8 +201,10 @@ class InventoryTests(Fixture):
         self.install('beta')
         declaration, lock = ((self.project / name).read_bytes() for name in ('.mask.json', '.mask.lock.json'))
         full = self.observe('inventory')
+        metadata_bytes = (self.source / 'skills/beta/mask-skill.json').stat().st_size
         self.assertEqual(full['work'], dict(declarations_read=1, declaration_bytes_read=2 * len(declaration), locks_read=1, lock_bytes_read=2 * len(lock),
-                                            payload_files_read=1, directories_enumerated=0, leaves_inspected=4))
+                                            payload_files_read=1, payload_bytes_read=metadata_bytes, git_scans=0,
+                                            directories_enumerated=0, leaves_inspected=4))
         excluded, selected = self.pick(full['rows'], 'claude', BETA), self.pick(full['rows'], 'codex', BETA)
         self.assertEqual((excluded['status'], excluded['compatibility'], excluded['owned']), ('inapplicable', 'excluded_by_metadata', False))
         self.assertEqual((selected['status'], selected['compatibility']), ('managed_converged', 'selected'))

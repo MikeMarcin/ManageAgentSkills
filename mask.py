@@ -60,7 +60,7 @@ COMMANDS = {
     'config.set': (True, False, [('target', 'repeat'), ('git-timeout', 'int'), ('forge-host', 'repeat'), ('clear-forge-hosts', 'flag')]),
     'skill.list': (False, False, []),
     'skill.show': (False, False, [('id', 'pos'), ('content', 'flag')]),
-    'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int')]),
+    'skill.where-used': (False, False, [('id', 'pos'), ('agent', 'value'), ('scope', 'value'), ('limit', 'int'), ('offset', 'int'), ('fleet', 'flag'), ('fleet-observations', 'value')]),
     'inventory': (False, False, [('project', 'value'), ('user', 'flag'), ('all', 'flag'), ('include-unmanaged', 'flag'), ('limit', 'int'), ('offset', 'int')]),
     'install': (True, True, [('ids', 'many'), ('project', 'value'), ('user', 'flag'), ('agent', 'repeat'), ('offline', 'flag')]),
     'remove': (True, False, [('ids', 'many'), ('project', 'value'), ('user', 'flag')]),

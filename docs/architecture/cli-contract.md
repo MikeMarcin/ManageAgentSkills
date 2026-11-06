@@ -271,3 +271,41 @@ in their existing per-consumer plan; upgrade ID remains package-only. `bundle_up
 reports root, definition identities, additions/removals, preserved origins and package
 revisions/digests. Source/constraint failures are blocked per consumer; unaffected
 consumers may apply with the existing upgrade.incomplete partial-report exit.
+
+## Inventory and exact update reports
+
+- `mask inventory [--project PATH | --user | --all] [--include-unmanaged]`
+  observes registered declarations, exact locks and current owned links.
+  `mask skill where-used TAP/ID [--agent AGENT] [--scope user|project]` filters the
+  same data. `--limit N` and `--offset N` page deployment rows. JSON includes
+  local, bundle and frozen profile origins, observation basis and measured work.
+- `mask update report [--project PATH | --user | --all] [--skill TAP/ID ...]`
+  previews the ordinary upgrade from the current tap cache. With matching scope
+  and selectors, its `plan_hash` can be used in `mask upgrade --approve-plan HASH`.
+  `--allow-ref-rebind` and `--independent` have the same meaning as on upgrade.
+  Fetch explicitly before reporting newer tap refs. The preview and guarded apply
+  perform no automatic fetch. Cached ref movement and consumer-control changes
+  stale the hash. Formatting, output destination and pagination do not.
+- `mask diff TAP/ID --from COMMIT --to COMMIT [--patch]` compares exact cached
+  or locally locked content using full lowercase Git commit IDs. Binary changes
+  show size, hash and mode. Text patches are opt-in, bounded and sanitized for
+  terminal display. The command reads Git objects or verified immutable artifacts.
+- `mask update report --output FILE` saves a shareable JSON receipt.
+  `mask report FILE --format text|json|html` renders it again without consulting
+  the tap cache. An operation ID can identify a receipt stored at
+  `MASK_HOME/reports/<hex digest>.json`. `mask report ... --output FILE`
+  writes the chosen format to an absent destination. The shareable view replaces
+  roots with numbered scope labels and omits endpoints and package contents.
+  HTML uses escaped text and no active links or external assets.
+
+Where-used `--fleet` reads an already recorded projection from
+`MASK_HOME/fleet/inventory-observations.json`, or an explicit
+`--fleet-observations FILE`. It never connects to devices. The projection
+has `schema_version: 1`, a SHA-256 `desired_revision`, and `observations`.
+Each observation has a device alias, UTC `observed_at`, its own
+`desired_revision`, `scope`, nullable `agent`, qualified `skill`,
+credential-free `repository`, nullable `payload_digest` and an `outcome`
+of `installed`, `not_applicable`, `blocked` or `unknown`. An observation
+for an earlier or different desired revision is `stale_receipt`. Missing
+projection data is `unavailable`. These views establish no device cohort
+coverage, receipt authenticity, live convergence or host loading.
