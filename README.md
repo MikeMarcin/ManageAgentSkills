@@ -141,6 +141,13 @@ contribution while preserving other selections and held or locally edited member
 - The same tap works over HTTPS or SSH, so one committed project file suits every machine. MASK uses whichever way you already sign in.
 - `mask COMMAND --help` has examples. Bare `mask` shows this checkout's status.
 
+## Enroll a fleet device
+
+Use `mask fleet device enroll` to bind an explicitly authorized device, then
+`mask fleet ping --all` to verify the enrolled SSH connections. The
+[enrollment guide](docs/guides/fleet-enrollment.md) covers the signing identities,
+per-device grants and host key review.
+
 ## Learn more
 
 - [Installation](docs/guides/installation.md) · [Sources, taps and upgrades](docs/guides/sources-and-updates.md) · [Readiness and setup](docs/guides/readiness-and-integrations.md)

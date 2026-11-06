@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0012"
 title: "Explicit fleet enrollment, device identity and bounded remote transport"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
@@ -13,13 +13,13 @@ metadata: {"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/p
 
 **Predecessors:** RFC-MASK-0008, RFC-MASK-0009.
 
-The new behavior below explicitly extends the historical v1 scope. Preserve settled RFCs 0001–0005; update current architecture/user documentation only when the relevant implementation ships. See [source reconciliation](../design/SOURCE-RECONCILIATION.md), [shared contracts](../design/CONTRACTS.md), and [references](../design/REFERENCES.md).
+The new behavior below explicitly extends the historical v1 scope. Preserve settled RFCs 0001–0005; update current architecture/user documentation only when the relevant implementation ships. See [source reconciliation](assets/mask-readiness-fleet-2026-09-05/docs/design/SOURCE-RECONCILIATION.md), [shared contracts](assets/mask-readiness-fleet-2026-09-05/docs/design/CONTRACTS.md), and [references](assets/mask-readiness-fleet-2026-09-05/docs/design/REFERENCES.md).
 
 ## Decision
 
 Permit MASK to manage the owner's enrolled machines using one local reconciler per device. Begin with on-demand SSH transport and local execution; add pull delivery in RFC-MASK-0013. Do not require a hosted account, new cloud bill, a proprietary central service, or a remotely executing LLM on every device.
 
-The supplied MASK station registry is empty. Existing hardware mentions and historical test hosts are not enrollment records. This RFC does not authorize this pack's author or an implementer to connect to or reconfigure real devices. Real enrollment is an explicit owner action with device-specific preconditions. [M1: docs/development/remote-stations.md]
+Production enrollment is an explicit owner action with device-specific preconditions. The owner authorized the native fixture connection used for implementation verification. See the [remote station scope](../development/remote-stations.md).
 
 ## Identities and permissions
 
@@ -34,7 +34,7 @@ Do not weaken StrictHostKeyChecking, automatically accept a changed host key, co
 ## Public operations
 
 ```text
-mask fleet device enroll NAME --ssh-config-alias ALIAS
+mask fleet device enroll NAME --ssh-config-alias ALIAS --binding FILE
 mask fleet device show NAME
 mask fleet device list
 mask fleet device revoke NAME
@@ -86,4 +86,14 @@ Test native Windows remote invocation, PowerShell/cmd quoting boundaries, path s
 
 ## Live authorization
 
-Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+Accepted for implementation by the owner’s 2026-09-05 import-and-implement request.
+
+## Integrated implementation
+
+The [enrollment guide](../guides/fleet-enrollment.md) documents both sides of
+the explicit grant, the [CLI contract](../architecture/cli-contract.md#fleet-rpc)
+records the shipped framing and limits, and the
+[native evidence](../development/fleet-native-acceptance.md) distinguishes the
+two SSH host runs from fixture transport and interruption checks. The
+[closeout](../issues/60-done/MASK-0073-close-12.md) records all six
+criteria. Desired-profile rollout and offline delivery continue in RFC-MASK-0013.

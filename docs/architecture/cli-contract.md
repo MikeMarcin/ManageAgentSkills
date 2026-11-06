@@ -14,6 +14,7 @@ Skills are passive data unless the user approves a declared setup action.
 | Enrollment | `register [PATH]`, `unregister [PATH]` | Current checkout |
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
+| Fleet device transport | `fleet controller`, `fleet device`, `fleet ping`, `fleet capability` | Explicit enrolled peer or the active local fleet |
 | Advanced recovery | `recover`, `recover --complete`, `recover --rollback` | The machine's one pending operation; bare `recover` only inspects |
 
 A checkout is the project root discovered within the current Git worktree.
@@ -163,8 +164,7 @@ that contributes no package. Repeat install retains the previous expansion; chan
 definitions require explicit upgrade. `--replace` replaces the named local bundle
 contribution, with only exclusive unchanged unheld removals; it preserves manual and
 overlapping contributions. `data.before`, `after`, `bundle`, `locked`, `added`,
-`removed`, `preserved` and `versions` make membership and package changes diffable. No recursive dependency,
-profile subscription or fleet behavior is advertised. `bundle uninstall` removes
+`removed`, `preserved` and `versions` make membership and package changes diffable. Bundle membership is flat. `bundle uninstall` removes
 only the named frozen receipt and exclusive unchanged unheld bindings. It preserves
 manual/overlapping/held/locally edited bindings, promotes last-origin survivors to
 manual selection and retains exact package rows. No current definition is read or
@@ -309,3 +309,62 @@ of `installed`, `not_applicable`, `blocked` or `unknown`. An observation
 for an earlier or different desired revision is `stale_receipt`. Missing
 projection data is `unavailable`. These views establish no device cohort
 coverage, receipt authenticity, live convergence or host loading.
+
+
+## Fleet RPC
+
+The [enrollment guide](../guides/fleet-enrollment.md) describes device/controller
+signing identities, local grants and the SSH binding. The controller pins the
+direct SSH endpoint and server ED25519 key and checks the signed device identity
+and policy. `fleet device enroll --dry-run` performs a signed observational
+probe before showing the plan hash. Fleet probes report each named device
+separately. An incomplete probe exits 4 and retains the individual outcomes.
+
+`mask rpc --stdio` runs one `mask.rpc.v1` request over a binary input/output
+stream. The wire format is a four-byte unsigned big-endian length followed by
+one UTF-8 JSON object. The frame limit is 8 MiB. Duplicate keys, trailing
+bytes and unknown fields fail. stdout carries only the response frame. A
+malformed frame or unavailable signing identity exits 4 with a bounded diagnostic.
+
+A request has `intent` and detached OpenSSH `signature`. The closed intent
+contains `schema_version` (1), `protocol` (`mask.rpc.v1`), `id` (the operation
+ID), `device`, `controller`, `epoch`, `sequence`, `expires` (Unix seconds),
+`revision` (SHA-256), `generation` (the expected local registry generation),
+`action`, and `payload`. MASK signs compact sorted-key UTF-8 JSON with no
+trailing newline. IDs and digests use their full canonical forms. New delivery
+requires a live expiry of at most five minutes.
+
+| Action | Payload |
+|---|---|
+| `capabilities` | Empty object |
+| `inspect` | Authorized `scope` alias |
+| `prepare` | `scope`, optional `acquire` (`exact` or `cached`), optional `artifacts` |
+| `apply` | `scope` and exact local `plan` digest from preparation |
+| `receipt` | Target `operation` ID and signed intent `digest` |
+| `cancel-request` | Target accepted `operation` ID and signed intent `digest` |
+
+Preparation can retrieve an exact approved commit using the device's own Git
+authentication. Forwarding uses a signed request with up to 32 selected
+package manifests and at most 5 MiB of total decoded file bytes. Each package
+names its coordinate, exact commit and payload digest. Each regular file
+supplies a portable package-relative path, logical Git mode, length, SHA-256
+and base64 bytes. The device checks its local lock and per-source forwarding
+grant before materializing verified files into the ordinary store.
+
+A response has `response` and `signature`. The signed response binds the
+request ID and digest, device and controller IDs, protocol/schema, status,
+data and a nullable refusal code. Valid signed replies can carry a refusal
+while the transport exits successfully. Intents and replies use
+`mask-intent@mask.invalid` and `mask-receipt@mask.invalid`, respectively.
+A completed apply receipt records its exact revision, generation, plan and
+observed deployed bindings with their commits and payload digests.
+
+The device advances its epoch and sequence high-water mark before accepting a
+new apply or cancellation. Preparation can use the intended next sequence.
+An operation ID retains its signed intent digest. An identical completed
+request returns the durable result. A different digest for that ID, a stale
+sequence for new work, or a mismatched generation refuses. A transport
+timeout leaves delivery unknown. A separate signed receipt query can publish
+the verified already-complete result after a disconnect. An unfinished
+filesystem journal requires ordinary local recovery. Receipts record
+`host_load: not_verified` because agent discovery is a separate observation.
