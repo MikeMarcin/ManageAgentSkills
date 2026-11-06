@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0046"
 title: "Add compact text JSON and offline HTML report renderers"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0045"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"report-render","stage":"C — explainability","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0011-AC04","outcome":"pass","revision":"67e0c8451368d4dd4338f8a02a8e643998b952ed","evidence":{"kind":"command","detail":"Public inventory and where-used preserved fixture state and unmanaged files, scoped linked leaves, and did not fetch. An explicit fixture projection retained the UTC date and labeled an older desired revision stale_receipt. Missing fleet projection was unavailable. Stage D owns production of actual signed receipt observations."}},{"criterion":"RFC-MASK-0011-AC05","outcome":"pass","revision":"67e0c8451368d4dd4338f8a02a8e643998b952ed","evidence":{"kind":"command","detail":"Public text and HTML report views, saved JSON, escaped filename, omitted package text and local paths, preserved destination collision and verified the same guard across output and pagination. First and repeated narrow queries each read 738 declaration and 1514 lock bytes, one leaf, zero package files/bytes and zero Git scans."}}]
 ---
 
 # MASK-0046: Add compact text JSON and offline HTML report renderers
