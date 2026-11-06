@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0150"
+  ],
+  "reserve_for": "fleet-taps",
+  "purpose": "",
+  "created": "2026-11-06T08:00:59.856780+00:00",
+  "base": "9c83fd3d4c2c2cac5d19b090150ddcb9d6c0a051"
+}
