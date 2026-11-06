@@ -101,6 +101,7 @@ class FleetRunnerTests(FleetRpcFixture):
                 with self.assertRaises(core.MaskError):
                     runner.tick(self.device_home, failed)
                 self.assertEqual(failed['data']['runner']['status'], 'backoff')
+                self.assertEqual(failed['data']['runner']['last_error']['code'], 'fleet.incomplete')
                 waiting = output(False)
                 runner.tick(self.device_home, waiting)
                 self.assertEqual(waiting['data']['runner']['status'], 'waiting')
@@ -149,9 +150,21 @@ class FleetRunnerTests(FleetRpcFixture):
                         schedule.remove(binding)
                     command.assert_called_once_with('schtasks.exe', '/Query', '/TN', binding['name'], '/XML', '/HRESULT')
         normalized = schedule.win_definition(binding).decode('utf-16').replace('PT300S', 'PT5M').replace(
-            '2030-01-01T00:00:00+00:00', '2030-01-01T00:00:00Z')
-        with patch.object(schedule, 'command', return_value=(0, normalized.encode('utf-16'), b'')):
+            '2030-01-01T00:00:00+00:00', '2030-01-01T00:00:00Z').replace('<RunLevel>LeastPrivilege</RunLevel>', '')
+        with patch.object(schedule, 'command', return_value=(0, normalized.encode('utf-8'), b'')):
             self.assertEqual(schedule.win_observe(binding), (True, True))
+
+    def test_mac_scheduler_observes_exact_label_without_listing_gui_domain(self):
+        path = self.base / 'Library' / 'LaunchAgents' / 'com.mask.fleet.test.plist'
+        path.parent.mkdir(parents=True)
+        record = dict(path=str(path), user='501', name='com.mask.fleet.test')
+        with patch.object(schedule.Path, 'home', return_value=self.base), patch.object(
+                schedule, 'command', return_value=(113, b'', b'Could not find service')) as query:
+            self.assertEqual(schedule.mac_observe(record), (False, False))
+            query.assert_called_once_with('/bin/launchctl', 'print', 'gui/501/com.mask.fleet.test')
+            query.return_value = (112, b'', b'Could not find domain')
+            with self.assertRaisesRegex(core.MaskError, 'could not be inspected'):
+                schedule.mac_observe(record)
 
     def test_windows_scheduler_approval_persists_the_registered_start_boundary(self):
         binding = dict(schema_version=1, platform='windows', user='S-1-5-21-1', name='com.mask.fleet.test',

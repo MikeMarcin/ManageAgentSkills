@@ -75,7 +75,6 @@ def mac_observe(record):
     if kind != 'missing' and (kind != 'file' or path.stat().st_size > 65536 or path.read_bytes() != mac_plist(record)):
         c.fail('fleet.scheduler_collision', 'The selected launchd file is not the exact owned definition.', 4)
     domain = 'gui/' + record['user']
-    require('/bin/launchctl', 'print', domain)
     code, raw, error = command('/bin/launchctl', 'print', domain + '/' + record['name'])
     if code:
         if b'Could not find service' not in error + raw:
@@ -177,9 +176,14 @@ def win_observe(record):
     if 'start_boundary' not in record:
         c.fail('fleet.scheduler_collision', 'The existing Windows task has no recorded owned start boundary.', 4)
     try:
-        observed = XML.fromstring(raw)
+        try:
+            observed = XML.fromstring(raw)
+        except XML.ParseError:
+            # schtasks may emit UTF-8 console bytes with its original UTF-16
+            # declaration. Decode the transport before parsing its XML.
+            observed = XML.fromstring(raw.decode('utf-8-sig'))
         expected = XML.fromstring(win_definition(record))
-    except XML.ParseError:
+    except (XML.ParseError, UnicodeError):
         c.fail('fleet.scheduler_collision', 'The existing Windows task could not be verified.', 4)
     namespace = {'t': TASK_NS}
     fields = ('RegistrationInfo/Description', 'Actions/Exec/Command', 'Actions/Exec/Arguments',
@@ -187,7 +191,8 @@ def win_observe(record):
               'Triggers/LogonTrigger/UserId')
     for field in fields:
         query = '/'.join('t:' + item for item in field.split('/'))
-        if observed.findtext(query, namespaces=namespace) != expected.findtext(query, namespaces=namespace):
+        default = 'LeastPrivilege' if field.endswith('/RunLevel') else None
+        if observed.findtext(query, default, namespace) != expected.findtext(query, namespaces=namespace):
             c.fail('fleet.scheduler_collision', 'The existing Windows task differs from the owned execution definition.', 4)
     if len(observed.findall('t:Actions/*', namespace)) != 1 or len(observed.findall('t:Triggers/*', namespace)) != 2:
         c.fail('fleet.scheduler_collision', 'The existing Windows task contains foreign actions or triggers.', 4)

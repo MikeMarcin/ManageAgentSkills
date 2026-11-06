@@ -233,13 +233,22 @@ def tick(home, output):
         output['data']['runner'] = dict(enabled=True, status='waiting', **before)
         return
     failed = True
+    failure = None
     try:
         converge(home, output)
         failed = False
+    except c.MaskError as error:
+        failure = dict(code=error.code, devices=[
+            dict(status=row['status'], reason=row['reason'])
+            for row in output['data'].get('device_results', []) if 'reason' in row
+        ])
+        raise
     finally:
         interval = record['interval']
         failures = min(6, (before or {}).get('failures', 0) + 1) if failed else 0
         after = dict(failures=failures, next_at=next_tick(int(time.time()), interval, failures, secrets.randbelow(max(1, interval // 8))))
+        if failure is not None:
+            after['last_error'] = failure
         with c.writer_lock(home, name='fleet-scheduler.lock'):
             if read_record(home) == record and fleet.data(pathname, missing=True) == before:
                 fleet.put(pathname, after, before)
