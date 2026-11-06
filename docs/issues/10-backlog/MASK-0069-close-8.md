@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0008"]
 depends_on: ["MASK-0034", "MASK-0035", "MASK-0036", "MASK-0037"]
 closeout_for: ["RFC-MASK-0008"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-8", "stage": "B — reproducible content", "provisional_id": false, "closeout": true}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"close-8","stage":"B — reproducible content","provisional_id":false,"closeout":true,"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
 ---
 
 # MASK-0069: Verify and close RFC-MASK-0008

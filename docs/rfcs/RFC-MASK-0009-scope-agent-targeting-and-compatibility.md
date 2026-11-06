@@ -4,6 +4,7 @@ title: "Per-skill scope-specific agent targeting and advertised compatibility"
 status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
+metadata: {"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0009: Per-skill scope-specific agent targeting and advertised compatibility

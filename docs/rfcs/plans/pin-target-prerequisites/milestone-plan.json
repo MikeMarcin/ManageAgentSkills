@@ -1,0 +1,41 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "pin-target-prerequisites",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0008",
+      "RFC-MASK-0009"
+    ],
+    "issues": [
+      "MASK-0040",
+      "MASK-0069",
+      "MASK-0070"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "pinned-targeting",
+      "outcome": "The existing exact artifact and scope-specific agent behavior is verified on supported native platforms and reconciled against the live Stage B acceptance criteria before fleet enrollment starts.",
+      "work": [
+        {
+          "issue": "MASK-0040"
+        },
+        {
+          "issue": "MASK-0069"
+        },
+        {
+          "issue": "MASK-0070"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "The composed pin, scope-targeting and selected-upgrade path preserves other consumers, demonstrated through the public CLI in a disposable local tap fixture.",
+        "Native macOS and Windows targeting evidence identifies tested revisions, project and personal link paths, compatibility and guarded ownership behavior; host-loading evidence retains its actual boundary.",
+        "Both RFC closeouts record every criterion against direct evidence and distinguish historically verified migration from current tap-only behavior. The structure gate passes, explicit paths are committed, and all task-owned commands are quiescent."
+      ],
+      "boundary": "Stage B only. Reuse directly applicable recorded evidence. No fleet identity, transport, real device enrollment, credential changes, live consumer changes or publication."
+    }
+  ]
+}

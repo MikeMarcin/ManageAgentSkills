@@ -4,6 +4,7 @@ title: "True version pinning, immutable deployment artifacts and recoverable mig
 status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
+metadata: {"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0008: True version pinning, immutable deployment artifacts and recoverable migration

@@ -5,7 +5,7 @@ title: "Verify native scope-specific pinned targeting"
 status: "In Progress"
 rfcs: ["RFC-MASK-0009"]
 depends_on: ["MASK-0039", "MASK-0037"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "target-native", "stage": "B — selection semantics", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"target-native","stage":"B — selection semantics","provisional_id":false,"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
 ---
 
 # MASK-0040: Verify native scope-specific pinned targeting
