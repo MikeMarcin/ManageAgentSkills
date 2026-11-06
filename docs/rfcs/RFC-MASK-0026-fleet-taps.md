@@ -30,4 +30,4 @@ remains historical.
   commands and is validated as a portable package. Existing fleet behavior retains
   its prior acceptance.
 
-Closeout: [MASK-0150](../issues/20-ready/MASK-0150-fleet-taps.md).
+Closeout: [MASK-0150](../issues/30-in-progress/MASK-0150-fleet-taps.md).

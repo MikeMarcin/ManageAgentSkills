@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0150"
 title: "Implement central fleet taps and publish their canonical guidance in source"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0026"]
 depends_on: ["MASK-0149"]
 closeout_for: ["RFC-MASK-0026"]
