@@ -117,6 +117,10 @@ The [rollout guide](../guides/fleet-rollouts.md) covers the shipped controller
 workflow. Disposable native macOS and Windows devices verified tap and curated
 copy installs, a controller update, newest-only offline catch-up, withdrawal
 and per-device collision reporting. The [native evidence](../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up)
-records the exact candidates and receipts. Foreground pull and scheduler
-ownership logic passed focused tests. Actual launchd and Windows Task Scheduler
-registration and removal remain open under MASK-0054.
+records the exact candidates and receipts. The owner's r2 authorization
+allowed [native current-user scheduler checks](../development/fleet-native-acceptance.md#current-user-native-scheduler-qualification).
+Both launchd and Windows Task Scheduler registered, applied only the latest
+approved exact bytes, produced a signed receipt and removed the owned entry.
+The scheduled Windows process read its managed link. A separate SSH session
+observed WinError 448 when following that same link. Agent host loading
+remains unobserved.

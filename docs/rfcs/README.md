@@ -30,7 +30,7 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC-MASK-0010 | Auto-Verified | Portable personal selections, reusable bundles and profile composition |
 | RFC-MASK-0011 | Auto-Verified | Where-used inventory, update diffs and deployment impact reports |
 | RFC-MASK-0012 | Auto-Verified | Explicit fleet enrollment, device identity and bounded remote transport |
-| RFC-MASK-0013 | Implementing | Declarative fleet rollouts, optional continuous convergence and completion reports |
+| RFC-MASK-0013 | Auto-Verified | Declarative fleet rollouts, optional continuous convergence and completion reports |
 | RFC-MASK-0014 | Proposed | Optional MCP facade over the MASK management API |
 | RFC-MASK-0015 | Proposed | Credential-provider references and an optional encrypted fleet vault |
 | RFC-MASK-0016 | Proposed | Public trust evidence and staged supply-chain hardening |

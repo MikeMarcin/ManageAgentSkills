@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0074"
 title: "Verify and close RFC-MASK-0013"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0051", "MASK-0052", "MASK-0053", "MASK-0054", "MASK-0055"]
 closeout_for: ["RFC-MASK-0013"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"close-13","stage":"D — personal fleet workflow","provisional_id":false,"closeout":true,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0013-AC01","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Native macOS and Windows verified exact tap and GitHub-shaped URL copy installation and signed receipts. Scoped source-only publication resumed after an injected interrupted phase."}},{"criterion":"RFC-MASK-0013-AC02","outcome":"pass","revision":"c7680f8f1b1c1a2c774f8b1baac40fe8bee519fc","evidence":{"kind":"observation","detail":"Frozen membership and mapped project scope were verified. Native fixture pins and unrelated curated staging survived rollout."}},{"criterion":"RFC-MASK-0013-AC03","outcome":"pass","revision":"c7680f8f1b1c1a2c774f8b1baac40fe8bee519fc","evidence":{"kind":"observation","detail":"Competing Git control proposals, replay, revocation, duplicate apply and exact rollback-as-new-intent were verified."}},{"criterion":"RFC-MASK-0013-AC04","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Native offline, superseded, collision and verified rows stayed separate. Focused cases verify recovery, lost ack and cancellation."}},{"criterion":"RFC-MASK-0013-AC05","outcome":"pass","revision":"d683fe0d9df2bcbf8d5987a5b47905dc6c80611d","evidence":{"kind":"observation","detail":"Actual current-user launchd and Windows Task Scheduler registration, scheduled convergence, signed exact receipt and guarded removal passed. A Windows fixture observer read the managed link in the scheduled user process. The separate SSH token reported WinError 448 for the same link."}},{"criterion":"RFC-MASK-0013-AC06","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Actual distinct Mac and Windows disposable enrolled devices completed native SSH rollout and newest-only offline catch-up."}},{"criterion":"RFC-MASK-0013-AC07","outcome":"pass","revision":"2895f43cc90a896076b913c3104a6f340fa9238d","evidence":{"kind":"observation","detail":"Separate source-publication resume and lost-ack fixtures verified exact idempotent evidence. Signed filesystem receipt status remains separate from host loading."}}]
 ---
 
 # MASK-0074: Verify and close RFC-MASK-0013
@@ -54,8 +55,13 @@ Cross-repository handoff: unrecorded; attach only an actual upstream ID/revision
 | RFC-MASK-0013-AC02 | Frozen target proof, project mapping fixture, native local pins and unchanged authoring index | Pass | `c7680f8` |
 | RFC-MASK-0013-AC03 | Disposable Git CAS, signed replay and exact rollback via public command | Pass | `c7680f8` |
 | RFC-MASK-0013-AC04 | Native independent collision/offline results and supersession, fixture cancel/lost-ack/recovery | Pass | `d1d87be` |
-| RFC-MASK-0013-AC05 | Foreground native pull and injected scheduler ownership/backoff passed. Native scheduler registration, invocation and removal need explicit authorization | Open | `c7680f8` |
+| RFC-MASK-0013-AC05 | Native current-user registration, newest exact convergence and receipt, guarded disable and independent absence on both platforms. Windows scheduled-context link traversal passed and independent SSH traversal reported WinError 448. | Pass | `213a506` (Mac), `d683fe0` (Windows) |
 | RFC-MASK-0013-AC06 | Actual distinct native macOS and Windows over pinned SSH, two offline revisions and exact newest catch-up | Pass | `d1d87be` |
 | RFC-MASK-0013-AC07 | Deterministic source-only resume, signed reply loss recovery and separate host-load status | Pass | `2895f43` |
 
-Closeout review runtime: implementer self-review. Native scheduler qualification remains open. See the [native rollout report](../../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up).
+Closeout review runtime: implementer self-review. See the
+[native rollout and scheduler evidence](../../development/fleet-native-acceptance.md).
+The r2 disposable scheduler checks used explicit owner authorization and left
+no active entries or fixture files. Windows independent SSH traversal remains
+distinct from the scheduled current-user proof. Agent host loading remains
+unobserved.
