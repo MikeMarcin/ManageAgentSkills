@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0052"
 title: "Compose one-request copy or tap installation and fan-out"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0051", "MASK-0068", "MASK-0072"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-install","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
