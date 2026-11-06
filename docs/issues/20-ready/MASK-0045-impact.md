@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0045"
 title: "Explain exact content diffs and selected consumer impact"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0044", "MASK-0069", "MASK-0070", "MASK-0071"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"impact","stage":"C — explainability","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
