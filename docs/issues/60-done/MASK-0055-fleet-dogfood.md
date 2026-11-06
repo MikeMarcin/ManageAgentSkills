@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0055"
 title: "Demonstrate real two-machine install and offline convergence"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0054", "MASK-0050"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-dogfood","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0013-AC01","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Actual Mac and Windows public CLI used a cached unique tap name and GitHub-shaped fixture URL. Curated publication isolated the reviewed package paths and preserved unrelated source staging. Both devices returned matching signed receipts."}},{"criterion":"RFC-MASK-0013-AC04","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Actual two-device operation recorded Windows as verified and offline macOS as queued. A newer revision superseded the older Mac outcome. The controlled Mac collision remained blocked while Windows verified."}},{"criterion":"RFC-MASK-0013-AC06","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"Native macOS and Windows fixture devices verified actual pinned SSH rollout, two controller updates, latest-only offline catch-up and exact independent receipts. Actual per-user scheduler convergence subsequently passed under r2."}},{"criterion":"RFC-MASK-0013-AC07","outcome":"pass","revision":"2895f43cc90a896076b913c3104a6f340fa9238d","evidence":{"kind":"observation","detail":"Exact source-only recovery and lost-ack tests, native signed receipts, independent collision reporting and explicit unobserved agent host load."}}]
 ---
 
 # MASK-0055: Demonstrate real two-machine install and offline convergence
@@ -39,5 +40,7 @@ The disposable macOS and native Windows rollout included a tap install, GitHub
 tree-URL curated copy, two controller updates while the Mac listener was
 offline, matching receipt for the latest approved revision after sync,
 withdrawal and an isolated destination collision. The device fixtures were
-removed. This card remains dependency-gated on native runner qualification
-under MASK-0054.
+removed. The
+[native scheduler qualification](../../development/fleet-native-acceptance.md#current-user-native-scheduler-qualification)
+under MASK-0054 subsequently verified current-user timed convergence on both
+platforms.
