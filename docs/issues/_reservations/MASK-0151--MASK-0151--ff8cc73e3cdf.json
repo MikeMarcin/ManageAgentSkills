@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0151"
+  ],
+  "reserve_for": "fleet-current-upgrade-scopes",
+  "purpose": "",
+  "created": "2026-11-06T09:24:48.564316+00:00",
+  "base": "95b5b8a87f8367e8811356dcf65f95a858b0576f"
+}
