@@ -144,3 +144,39 @@ receipts frozen. Aggregate JSON lists each consumer's definition/lock changes an
 blocked scopes. A conflicting/unavailable definition blocks that consumer before
 edits; valid consumers may apply, with `upgrade.incomplete` naming the partial result.
 Frozen journal recovery uses the approved declarations and package rows.
+
+
+## Portable personal profiles
+
+```sh
+mask user export --output my-profile
+mask profile inspect my-profile
+mask user import my-profile --apply --dry-run --json
+mask user import my-profile --apply --approve-plan HASH
+```
+
+The export creates a new directory with `selection.json`, `selection.lock.json`
+and a short README. Approve the same tap identities on the destination and fetch
+them before previewing an import. Import can also acquire exact commits online
+without a preview when no reviewed setup or replacement requires approval.
+`--offline` uses exact local bytes. An unavailable commit blocks deployment.
+Use `--user-home PATH` to select an existing personal home on its first import.
+
+Import adds to the local selection. `--replace` replaces that contribution and
+preserves subscriptions and unmanaged neighbors. Plain export copies the local
+contribution. `--effective` flattens local and subscribed bindings when the two
+control schemas can represent them without changing their meaning. Use
+`--freeze-agents` to record the current adapter choices explicitly. Ordinary
+exports preserve `all`, so another machine can resolve its own supported targets.
+A profile carries exact package locks and portable tap identities. File taps and
+account-specific SSH repository identities need a portable tap before export.
+
+```sh
+mask profile subscribe my-profile --user --name personal
+mask profile unsubscribe personal --user
+```
+
+Subscribe freezes the inspected revision as an independent personal contribution.
+Repeat the command with the same name to adopt a new revision deliberately.
+`mask list --user --json` shows each subscription's last approved revision and
+offline freshness. Repair and upgrade preserve those frozen revisions.

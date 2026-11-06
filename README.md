@@ -77,6 +77,7 @@ checkout without upgrading versions.
 | Remove a skill here | `mask uninstall ID` |
 | Show this checkout's skills | `mask list` |
 | Show personal skills | `mask list --user` |
+| Move personal skills to another machine | `mask user export --output DIRECTORY`, then `mask user import DIRECTORY --apply` |
 | Inspect this checkout's readiness | `mask status` |
 | Inspect a named bundle | `mask bundle show TAP/BUNDLE` |
 | Install a named bundle here | `mask bundle install TAP/BUNDLE` |

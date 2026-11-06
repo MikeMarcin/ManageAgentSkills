@@ -2,11 +2,12 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0071"
 title: "Verify and close RFC-MASK-0010"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0041", "MASK-0042", "MASK-0043"]
 closeout_for: ["RFC-MASK-0010"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"close-10","stage":"C — portable composition","provisional_id":false,"closeout":true,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0010-AC01","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Native macOS and Windows public fixtures used two independent source, machine and personal roots. The imported lock and native link bytes matched, and the export excluded local state and paths."}},{"criterion":"RFC-MASK-0010-AC02","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Public merge/replace preserved unrelated local and unmanaged entries. Default all-agent export and explicit freeze preserved exact lock package rows. Stale portable controls refused guarded import."}},{"criterion":"RFC-MASK-0010-AC03","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Three public named and aggregate upgrade, stale-plan and personal uninstall regression tests passed. Reuses the accepted named-bundle journey and actual canonical handoff recorded below."}},{"criterion":"RFC-MASK-0010-AC04","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Layered public CLI fixtures verified positive target union, frozen offline revision, unsubscription and local replace, plus unapproved source, missing exact commit and conflicting artifact refusals."}},{"criterion":"RFC-MASK-0010-AC05","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"One public user import --apply acquired the exact approved commit and registered a new personal home. Interrupted first import rolled back exact absence or completed its frozen controls through public recover. Seven tests passed on Windows and as part of 23 macOS checks."}}]
 ---
 
 # MASK-0071: Verify and close RFC-MASK-0010
@@ -43,17 +44,17 @@ Planned cards: MASK-0041, MASK-0042, MASK-0043; owner-authorized named-bundle fo
 Cross-repository named-bundle handoff: actual AgentSkills ASK-0095, source candidate
 `fb67261a5fd8a69231e963226189fd98458e4d82`, acceptance commit
 `b9e413673b7dc7b618487def3831049451010632`; canonical public install verified with
-MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. Broader profile handoffs remain open.
+MASK `bc4f9f9015ee2bd3495101e91d0077f35ebc1733`. The native profiles use disposable taps. They establish the portable engine boundary independently of canonical package content.
 
 ## Closeout checklist
 
 | Acceptance | Direct check / evidence | Outcome | Implementation revision |
 |---|---|---|---|
-| RFC-MASK-0010-AC01 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0010-AC02 | Bundle union/manual/overlap/replace ownership passes in [public evidence](../../development/named-bundles-evidence.json); export/all-agent freezing still belongs to open MASK-0041 | Partial; remains open | bc4f9f9 |
+| RFC-MASK-0010-AC01 | Public fixtures on macOS and Windows used independent machine/home/bare source paths, inspected the pair without a machine, and compared exact locks and linked bytes. | Pass | 52e725ed214d57630787fd1e1ad7ecae44058063 |
+| RFC-MASK-0010-AC02 | Native merge/replace and effective/local export preserved unrelated ownership. All-agent and frozen-agent exports retained exact package rows. Historical bundle overlap evidence retained. | Pass | 52e725ed214d57630787fd1e1ad7ecae44058063 |
 | RFC-MASK-0010-AC03 | 43 successful public bundle/renderer checks plus separate scoped regression; combined named/default/--all definitions and unheld versions, guards, ownership, conflicts, setup/recovery; actual canonical 22-command handoff | Pass for amended named-bundle boundary | b879f81 |
-| RFC-MASK-0010-AC04 | Not recorded | Not run | Unrecorded |
-| RFC-MASK-0010-AC05 | Not recorded | Not run | Unrecorded |
+| RFC-MASK-0010-AC04 | Native tests exercised offline revisions, positive agent union, explicit removal, preserved local replacements, unapproved source, unavailable exact bytes and artifact conflicts. | Pass | 52e725ed214d57630787fd1e1ad7ecae44058063 |
+| RFC-MASK-0010-AC05 | The public import acquired one exact commit and registered the selected existing home. Fault injection and public recovery verified completion and exact rollback of initial absence. | Pass | 52e725ed214d57630787fd1e1ad7ecae44058063 |
 
 Closeout review runtime: not run. A skipped required native/host/device check leaves the criterion open.
 
@@ -241,3 +242,23 @@ ASK-0096 acceptance/final upstream HEAD: `ff9d05a15c767422d00d4f815297bbb3c5a7d5
 Final [checkpoint](../../rfcs/plans/named-bundles/checkpoint.json) binds current
 Done cards and amended exits. Mechanical return checks continuation consistency;
 it does not substitute for the product evidence above.
+
+
+## Portable profile verification
+
+`52e725ed214d57630787fd1e1ad7ecae44058063` passed 23 macOS checks
+(`tests.test_profile_contributions tests.test_profiles tests.test_user_scope
+tests.test_human_output.RendererRegistry`). Native Windows 11 build 26200,
+Python 3.14.7 and Git 2.55.0.windows.3 passed all seven cases in
+`tests.test_profiles tests.test_profile_contributions` without skips, using a
+digest-verified archive and disposable local fixture roots. The native checkout,
+transport archive and fixture roots were removed. The earlier four-test Windows
+probe at `0e96e78` also passed, and its temporary checkout was removed separately
+after the cleanup command detected its current directory.
+
+The original prepublication RFC_BASE_SHA stays recorded above. The surviving
+pre-implementation boundary is `794cc2ac322135c940478dc6cab09f4465346b90`, the parent of `90a4f33`, the public-history
+import of the same pack. Three public named and aggregate upgrade, guarded-plan and personal uninstall
+regression tests passed on the same runtime. The scoped diff and named-bundle amendments were
+reviewed from that surviving baseline. Actual running-host loading and fleet
+enrollment belong to their separate acceptance boundaries.

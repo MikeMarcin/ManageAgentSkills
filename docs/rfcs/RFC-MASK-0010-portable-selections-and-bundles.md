@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0010"
 title: "Portable personal selections, reusable bundles and profile composition"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
@@ -9,7 +9,7 @@ metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs
 
 # RFC-MASK-0010: Portable personal selections, reusable bundles and profile composition
 
-**Delivery stage:** C — portable composition. **Live delivery:** named bundles are implemented; profile/export/subscription acceptance remains open.
+**Delivery stage:** C — portable composition. **Live delivery:** portable profiles, named bundles and personal subscriptions are verified through the tap-only CLI.
 
 **Predecessors:** RFC-MASK-0008, RFC-MASK-0009.
 
@@ -46,13 +46,13 @@ mask bundle upgrade SOURCE/NAME [--project PATH | --user]
 mask bundle uninstall SOURCE/NAME [--project PATH | --user]
 ```
 
-All mutations support dry-run/guards; export writes only an explicit output destination and refuses unrelated existing files. Default import is an incremental merge. `--replace` deliberately replaces only the selected local declaration contribution, not all subscribed profiles or unrelated unmanaged skills. Plain exports default to the local contribution; `--effective` produces a self-contained flattened view and labels the loss of live subscription semantics. Do not clone profile internal machine state.
+All mutations support dry-run/guards; export writes only an explicit output destination and refuses unrelated existing files. Default import is an incremental merge. `--replace` deliberately replaces only the selected local declaration contribution, not all subscribed profiles or unrelated unmanaged skills. Plain exports default to the local contribution; `--effective` produces a self-contained flattened view and labels the loss of live subscription semantics. A portable pair carries only the two closed control models. Machine-local file taps and account-specific SSH identities cannot be exported.
 
 ## All-agent defaults and portability
 
 The user selected an all-supported default. Export preserves `agents: "all"` by default and states that the adapter set can differ by machine/version. `--freeze-agents` concretizes the currently resolved agents for exact deployment-target reproduction; it does not change package locks. Content reproducibility and identical host coverage are different claims.
 
-V1 inherited machine defaults are concretized during migration/export unless the owner explicitly chooses all. A platform-conditional skill preserves its `when` condition so import on another OS is explainable. A source's SSH authentication alias remains local; the portable repository identity is credential-free.
+The earlier v1 migration retired with the tap-only transition. Existing explicit v2 defaults remain explicit. A platform-conditional skill preserves its `when` condition so import on another OS is explainable. A source's SSH authentication alias remains local; the portable repository identity is credential-free.
 
 ## Bundles
 
@@ -79,13 +79,13 @@ from `introduced_by` annotations. Normal guarded planning/journaling/recovery ap
 
 A subscription binds an approved profile identity/revision to one local consumer. The local base selection stays separately editable. Resolve each contribution to its exact lock; merge identical bindings and preserve all origin references. Conflict rules are RFC-MASK-0009. The subscription file is machine policy, not a mechanism for a downloaded profile to approve itself or create arbitrary projects.
 
-Profile updates are explicit locally or driven by the optional approved fleet policy in RFC-MASK-0013. Unsubscribing removes that contribution and reconciles only now-unrequired unchanged owned links. If a local binding still requires the skill, it remains. Offline evaluation uses the last approved profile revision and reports its freshness; it must not imply live fleet convergence.
+Repeat `profile subscribe LOCATION --user --name PROFILE` to explicitly adopt a different frozen revision for that name. An offline profile continues to use its last approved revision. Fleet-driven updates are scoped to RFC-MASK-0013. Unsubscribing removes that contribution and reconciles only now-unrequired unchanged owned links. If a local binding still requires the skill, it remains. Offline evaluation uses the last approved profile revision and reports its freshness; it must not imply live fleet convergence.
 
 ## Installation and new-machine bootstrap
 
-A new machine installs the known MASK program and enrolls source/profile trust once. Import resolves local source transports, obtains exact locked artifacts under explicit network policy, registers the selected existing home and applies through the normal journal. Return a short prerequisite report if the interpreter, symlink privilege, authentication or exact artifact is missing. Do not create secret-bearing setup scripts.
+A new machine installs the known MASK program and enrolls source/profile trust once. Import resolves approved local tap transports, obtains exact locked artifacts under explicit network policy, registers the selected existing home and applies through the normal journal. Return a short prerequisite report if the interpreter, symlink privilege, authentication or exact artifact is missing. Do not create secret-bearing setup scripts.
 
-The code path should support one durable command for import-and-apply; the agent should not need to manually edit JSON, relocate symlinks, copy plan hashes through several turns, or hand-merge internal registries. A dry run remains available for meaningful review. Unavailable native machines do not become a mandatory user checkpoint for all other work.
+The public import task applies by default and also accepts explicit `--apply`. It uses one guarded task; the agent should not need to manually edit JSON, relocate symlinks, copy plan hashes through several turns, or hand-merge internal registries. A dry run remains available for meaningful review. Unavailable native machines do not become a mandatory user checkpoint for all other work.
 
 ## Acceptance boundary
 
