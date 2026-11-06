@@ -1,0 +1,32 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "fleet-taps",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0026"
+    ],
+    "issues": [
+      "MASK-0150"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "fleet-taps",
+      "outcome": "A controller manages approved fleet tap bindings and can use them to resolve and roll out skills.",
+      "work": [
+        {
+          "issue": "MASK-0150"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "Public tap list, add, untap, approval and partial signed receipt handling work across selected disposable peers.",
+        "Bounded delegation preserves static authority, enrollment, local ownership and transport and supports non-forwarded install and upgrade.",
+        "Canonical fleet management guidance is portable, capability-gated and checked against the fixture runtime."
+      ],
+      "boundary": "Use disposable fixtures. Real enrollment, credentials, deployment and publication are outside this milestone."
+    }
+  ]
+}
