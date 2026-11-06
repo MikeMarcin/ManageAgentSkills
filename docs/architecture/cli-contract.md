@@ -15,7 +15,8 @@ Skills are passive data unless the user approves a declared setup action.
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
 | Fleet device transport | `fleet controller`, `fleet device`, `fleet ping`, `fleet capability` | Explicit enrolled peer or the active local fleet |
-| Fleet rollout | `fleet install`, `fleet update`, `fleet remove`, `fleet sync`, `fleet operation` | Frozen enrolled devices and an authorized personal or mapped project scope |
+| Fleet rollout | `fleet install`, `fleet update SOURCE/ID`, `fleet remove`, `fleet sync`, `fleet operation` | Frozen enrolled devices and an authorized personal or mapped project scope |
+| Fleet maintenance | `fleet upgrade [--all]`, `fleet update [--all]` | Explicitly authorized skill scopes or the separately granted MASK program origin |
 | Fleet convergence | `fleet control`, `fleet sync --local`, `fleet runner` | Explicit desired repository, optional separate receipt repository and current-user schedule |
 | Advanced recovery | `recover`, `recover --complete`, `recover --rollback` | The machine's one pending operation; bare `recover` only inspects |
 
@@ -259,7 +260,7 @@ program before switching executables; neither update nor recovery resets a check
 
 0 success; 2 invalid invocation; 3 invalid/missing configuration; 4 blocked task,
 stale plan or missing consent; 5 external/filesystem/setup failure; 6 busy lock;
-7 failed observational check; 8 pending/conflicting recovery; 9 incomplete fleet rollout; 10 internal invariant;
+7 failed observational check; 8 pending/conflicting recovery; 9 incomplete fleet rollout or maintenance; 10 internal invariant;
 130 interruption. Typed error codes refine these classes.
 
 The [accepted amendment](../rfcs/plans/upgrade-readiness/accepted-surface.md)
@@ -344,6 +345,10 @@ requires a live expiry of at most five minutes.
 | `apply` | `scope`, exact local `plan` digest from preparation, and the same `profile` if preparing a rollout |
 | `receipt` | Target `operation` ID and signed intent `digest` |
 | `cancel-request` | Target accepted `operation` ID and signed intent `digest` |
+| `program-inspect` | Canonical `origin` and exact Git `candidate` |
+| `program-update` | Same `origin` and `candidate`, with the reviewed `observed` digest |
+| `upgrade-inspect` | Granted `scope` alias |
+| `upgrade-apply` | Granted `scope`, reviewed `observed` digest, exact `candidate` controls and nullable `commit` authority. A co-owned contribution also binds the exact `profile` and its published `desired` sequence and revision. |
 
 Preparation can retrieve an exact approved commit using the device's own Git
 authentication. Forwarding uses a signed request with up to 32 selected
@@ -406,3 +411,22 @@ Receipts are written under
 recorded device signature against the frozen target. Removing a receipt can
 make evidence unavailable, and cannot establish a different device outcome.
 See the [rollout guide](../guides/fleet-rollouts.md).
+
+## Fleet maintenance
+
+Maintenance-capable devices advertise `maintenance: 1` in signed capabilities.
+Program and skill plans have distinct `data.kind` values, a `data.plan_hash` and
+frozen target observations. Approval records are local to the controller. A
+retry with the same command, target flags and approved hash uses the recorded
+plan and previously verified receipts for up to seven days.
+
+Each maintenance apply receipt binds the device, grant epoch, controller,
+action, exact request payload and controller plan hash. Project members verify
+the canonical commit ID, single parent and control-only Git tree difference
+before any propagation. The transferred raw Git objects are limited to 72 KiB.
+Program update acquires an exact commit from the approved origin and records the
+ordinary local recovery journal before fast-forward. Unreachable inspection
+reports `offline`, failed verification or delivery can report `unknown`, and
+incompatible or unauthorized scopes have their own reported reasons.
+
+See [fleet maintenance commands](../guides/fleet-rollouts.md#upgrade-skills-or-update-the-mask-program).

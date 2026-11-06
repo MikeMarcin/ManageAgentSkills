@@ -57,9 +57,9 @@ IN_YOUR_PROJECT = ('mask install code-simplifier', 'mask list', 'mask upgrade')
 MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
 FLEET_UPDATE = (
     'mask tap fetch agentskills',
-    'mask fleet update agentskills/code-simplifier --all-devices --scope user --dry-run',
-    'mask fleet update agentskills/code-simplifier --all-devices --scope user --approve-plan HASH',
-    'mask fleet sync --all',
+    'mask fleet install code-simplifier --dry-run',
+    'mask fleet upgrade --all --dry-run',
+    'mask fleet update --all --dry-run',
 )
 EVERYDAY = {
     'Add a skill here': 'mask install ID',

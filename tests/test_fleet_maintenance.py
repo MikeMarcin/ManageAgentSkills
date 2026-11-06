@@ -150,6 +150,11 @@ class FleetMaintenanceTests(FleetRpcFixture):
         (device / 'unrelated.txt').write_text('keep\n', encoding='utf-8')
         self.git(device, 'add', 'unrelated.txt')
         program = controller / 'mask.py'
+        (device / 'change.txt').write_text('local work\n', encoding='utf-8')
+        overlap = self.public('update', '--dry-run', program=program)['data']['plan']['targets'][0]
+        self.assertEqual((overlap['status'], overlap['reason']), ('blocked', 'source.dirty'))
+        self.assertEqual((device / 'change.txt').read_text(encoding='utf-8'), 'local work\n')
+        (device / 'change.txt').unlink()
         preview = self.public('update', '--all', '--dry-run', program=program)['data']
         self.assertEqual(preview['plan']['candidate']['candidate'], after)
         self.assertEqual(self.git(device, 'rev-parse', 'HEAD'), before)
@@ -163,6 +168,14 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertEqual(retried['device_results'][0]['receipt']['after'], after)
         self.assertEqual(self.git(device, 'diff', '--cached', '--name-only'), 'unrelated.txt')
         self.assertEqual(self.git(controller, 'rev-parse', 'HEAD'), before)
+        fleet_source = author / 'mask_fleet.py'
+        fleet_source.write_bytes(fleet_source.read_bytes().replace(b"PROTOCOL = 'mask.rpc.v1'", b"PROTOCOL = 'mask.rpc.v2'"))
+        self.git(author, 'commit', '-qam', 'incompatible fleet protocol')
+        self.git(author, 'push', '-q', str(bare), 'main')
+        incompatible = self.public('update', '--dry-run', program=program)['data']['plan']['targets'][0]
+        self.assertEqual((incompatible['status'], incompatible['reason']),
+                         ('incompatible', 'fleet.program_incompatible'))
+        self.assertEqual(self.git(device, 'rev-parse', 'HEAD'), after)
 
     def test_canonical_project_fast_forward_and_cherry_pick_preserve_staging(self):
         project = self.base / 'main-project'

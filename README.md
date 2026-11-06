@@ -144,19 +144,21 @@ contribution while preserving other selections and held or locally edited member
 ## Update skills across your computers
 
 Enroll each device you want the controller to manage and configure a private
-Git repository for the fleet’s approved selections. From the controller, fetch
-the tap and review the exact update for all enrolled devices.
+Git repository for fleet-owned selections. From the controller, fetch the
+approved tap before reviewing an install or skill upgrade.
 
 ```sh
 mask tap fetch agentskills
-mask fleet update agentskills/code-simplifier --all-devices --scope user --dry-run
-mask fleet update agentskills/code-simplifier --all-devices --scope user --approve-plan HASH
-mask fleet sync --all
+mask fleet install code-simplifier --dry-run
+mask fleet upgrade --all --dry-run
+mask fleet update --all --dry-run
 ```
 
-The update applies to skills already selected by the fleet. Use
-`mask fleet install` to add a selection. Offline devices remain pending until
-they verify the approved revision. See the [enrollment guide](docs/guides/fleet-enrollment.md)
+Run the same command with `--approve-plan HASH` to apply the reviewed effects.
+Bare fleet install targets authorized personal scopes. Fleet upgrade updates
+skills in granted scopes and propagates one canonical controls commit per
+eligible project repository. Fleet update advances the MASK program through a
+separate device grant. See the [enrollment guide](docs/guides/fleet-enrollment.md)
 and [rollout guide](docs/guides/fleet-rollouts.md).
 
 ## Learn more

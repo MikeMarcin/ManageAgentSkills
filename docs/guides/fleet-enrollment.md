@@ -47,6 +47,18 @@ change its fleet-owned profile. That grant also needs `inspect`, `prepare`,
 `apply`, and `receipt` in `actions`. Use one rollout alias per physical scope.
 The descriptor omits the physical consumer paths and key files.
 
+For `fleet upgrade`, grant the actions `upgrade-inspect` and
+`upgrade-apply`, and add `"upgrade": true` to each allowed scope. Give an
+eligible project scope `"commit": true` to allow a canonical controls commit
+or its propagation. Use one upgrade alias per physical scope. Updating a
+fleet-owned contribution also requires the rollout grant.
+
+For `fleet update`, grant `program-inspect` and `program-update` and set the
+top-level `program_origin` to the canonical repository identity of the device’s
+MASK checkout. The controller must use the same program origin. A program
+grant can use an empty `scopes` object. Change the epoch and review the device
+policy and controller binding again when adding maintenance grants.
+
 ## Review the SSH binding
 
 Create the controller's binding file from the device's verified

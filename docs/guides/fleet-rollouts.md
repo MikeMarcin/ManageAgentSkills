@@ -21,27 +21,27 @@ Plans bind the control head, exact skill resolution, scope and enrolled device
 identities. A competing publication or changed tap resolution requires a fresh
 preview. Devices added after approval are excluded from that operation.
 
-## Install or update
+## Install a skill
 
 Fetch the approved tap on the controller before reviewing an exact update.
 The preview uses the fetched catalog and the frozen enrollment grants.
 
 ```sh
 mask tap fetch agentskills
-mask fleet install agentskills/code-simplifier --mode tap --all-devices --scope user --dry-run --json
-mask fleet install agentskills/code-simplifier --mode tap --all-devices --scope user --approve-plan HASH
-mask fleet update agentskills/code-simplifier --all-devices --scope user --dry-run --json
-mask fleet update agentskills/code-simplifier --all-devices --scope user --approve-plan HASH
+mask fleet install code-simplifier --dry-run --json
+mask fleet install code-simplifier --approve-plan HASH
 ```
 
-Use repeated `--device NAME` options for a subset, or `--project-alias ALIAS`
+Bare install selects enrolled active devices and their authorized personal
+rollout aliases. Use repeated `--device NAME` options for a subset, or `--project-alias ALIAS`
 for preauthorized project mappings. Personal rollout leaves project scopes
 alone. The fleet owns a separate contribution. Identical local selections can
 share a deployment, and an incompatible locally held version blocks that
 device. Removing a fleet contribution preserves an independent local choice.
 
-Pass `--mode tap` to use an already approved tap directly. A name or GitHub
-tree URL must resolve to one package. In copy mode, supply
+An unambiguous name from approved taps uses tap mode when no mode was
+configured. A GitHub tree URL needs an explicit or configured mode and must
+resolve to one package. In copy mode, supply
 `--mode copy --into CURATED_TAP` to publish a provenance-bearing copy from an
 approved upstream into a separate curated tap with an approved authoring
 checkout. The preview shows the exact source ref, parent, package path and
@@ -54,6 +54,48 @@ Devices normally acquire the exact commit through their approved Git
 transport. Add `--forward` to the preview and approval to permit bounded
 package forwarding from the controller. Every source used by the requested
 profile must permit forwarding in the device grant.
+
+## Upgrade skills or update the MASK program
+
+```sh
+mask tap fetch agentskills
+mask fleet upgrade --all --dry-run
+mask fleet upgrade --all --approve-plan HASH
+
+mask fleet update --all --dry-run
+mask fleet update --all --approve-plan HASH
+```
+
+Both bare forms select active enrolled devices. Use repeated `--device NAME`
+to review a subset. `fleet upgrade` uses the controller's fetched tap catalogs
+and explicitly granted scopes. Add `--scope user` or `--project-alias ALIAS` to
+narrow the scope. It preserves held versions and existing selections, including
+the membership of installed bundles. Setup or role replacement that needs
+local review blocks the affected scope. Eligible fleet-owned contributions
+advance through the signed desired repository. When the same skill is selected
+both locally and by the fleet, the two matching locks can advance together.
+
+Across checkouts with matching starting controls, one eligible attached
+checkout commits per repository. Checkouts at its parent receive the exact
+commit. Checkouts on another parent receive a cherry-pick with the same control
+changes. The bounded transfer covers the control-only commit, and unrelated
+staging is preserved. Dirty or diverged controls block their scope. Personal
+scopes never commit.
+
+`fleet update` reviews the exact revision advertised by the controller's
+approved MASK origin. Each device needs its own program grant for that
+repository and an eligible program checkout. The device fast-forwards through
+ordinary MASK recovery and reports the exact Git revision in its signed
+receipt. Overlapping local changes, diverged history and incompatible program
+contracts block the update. `fleet update SOURCE/ID --all-devices --scope user`
+retains the existing single fleet-contribution update.
+
+The previews contact enrolled devices over signed SSH. Program previews read
+the approved Git origin and can use disposable Git storage to check an exact
+candidate. A maintenance retry with the same approved hash resumes the frozen
+scope and uses durable receipts. A device that was offline during inspection
+needs a fresh preview once it returns. Exit 9 means a requested effect remains
+incomplete. Resolve a device's ordinary MASK recovery before retrying.
 
 ## Read the results and catch up
 

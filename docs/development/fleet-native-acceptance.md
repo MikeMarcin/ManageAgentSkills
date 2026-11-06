@@ -110,3 +110,38 @@ required no changes to host permissions, credentials or PATH. An independent
 post-cleanup query verified the Mac service and plist and all four exact
 Windows task names were absent. All scheduler fixture roots and transfers
 were removed. Agent host discovery remains unobserved.
+
+## Fleet command maintenance
+
+Candidate `1d541fc8839202bd88123081ea67fb0b3552bc7b` qualified the
+[RFC-MASK-0025](../rfcs/RFC-MASK-0025-fleet-command-maintenance.md) paths.
+A controller used pinned OpenSSH to an unprivileged macOS loopback listener and
+to the authorized native Windows host. The archived runtime ran on macOS 26.6.2
+arm64 with Python 3.15.0 and Apple Git 2.50.1, and on Windows 11 build 26200 with
+Python 3.14.7 and Git 2.55.0.windows.3. Only disposable keys, MASK homes,
+repositories and checkouts were created. The device caches used fixture tap
+objects from disposable Git repositories.
+
+- Bare `fleet install beta` received verified personal rollout receipts from
+  both devices. The devices retained the independent personal pin.
+- `fleet upgrade --all` resolved skill revision
+  `82a457109ada6deeff47eb35cdb33387ed1ba31d` and verified every selected scope.
+  The canonical project on macOS created
+  `f3e641d6b00f1ab078572710a60dcf3ebb5371b6`. A Windows checkout at the same
+  parent fast-forwarded to that exact commit. Its feature checkout received
+  `4b2223ceddd40ce8421c4b6f26c7d7922f2a045d` by cherry-pick on
+  `e46202c4a1c360d2c78c3048cb4c111b970bb903`, with `keep.txt` still staged.
+  Both devices verified the single approved contribution revision.
+- On macOS and native Windows, separate public command fixtures used signed
+  subprocess RPC and a disposable bare program origin. `fleet update --all`
+  previewed an exact commit without changing the device checkout. The approved
+  device reached it and preserved unrelated staging. Dropping the reply
+  reported an unknown outcome, and retry returned its durable signed receipt.
+  This program fixture substitutes local subprocess delivery for SSH.
+- The focused fixtures also exercised co-owned profile and local lock changes,
+  signed legacy skill update parsing, dirty project controls, and a held
+  personal skill. Additional macOS checks blocked a locally overlapping
+  program change and an incompatible fleet protocol candidate.
+
+The loopback listener and its temporary root stopped. The native Windows
+archives, clones, keys and MASK homes were removed and checked for absence.
