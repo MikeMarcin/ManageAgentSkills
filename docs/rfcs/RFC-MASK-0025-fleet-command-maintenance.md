@@ -31,4 +31,4 @@ maintenance to `fleet upgrade`. Previous fleet acceptance remains historical.
   Record exact source, signed receipts, convergence or pending states, and
   cleanup. Production enrollment and publication are outside this milestone.
 
-Closeout: [MASK-0149](../issues/30-in-progress/MASK-0149-fleet-command-maintenance.md).
+Closeout: [MASK-0149](../issues/60-done/MASK-0149-fleet-command-maintenance.md).

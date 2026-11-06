@@ -145,3 +145,13 @@ objects from disposable Git repositories.
 
 The loopback listener and its temporary root stopped. The native Windows
 archives, clones, keys and MASK homes were removed and checked for absence.
+
+The reporting candidate `baa86711f80c6d28a837a3b3eb5b2868f214a99d` also ran
+`fleet update --all` over pinned SSH to both native devices. Disposable Git
+origins advertised the same exact fixture revision. Both devices advanced from
+`a879fa08dbacc514cdb0d0827cca7c5814a8dfaf` to
+`b9efb819e6f8c0ebfbb694dd8fbaa411ef71ea4a` and returned signed receipts.
+Independent Git reads confirmed both HEADs. The controller program checkout
+remained at its original revision. The native Windows archive tests on this
+candidate also passed the blocked overlapping edit and incompatible protocol
+checks. Both sets of fixtures were removed.
