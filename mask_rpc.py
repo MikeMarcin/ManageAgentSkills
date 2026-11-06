@@ -30,6 +30,7 @@ RESPONSE_FIELDS = ('schema_version', 'protocol', 'id', 'device', 'controller', '
                    'status', 'data', 'error')
 OPERATION_FIELDS = ('schema_version', 'id', 'device', 'controller', 'epoch', 'sequence', 'revision',
                     'generation', 'action', 'digest', 'scope', 'status', 'result')
+OPERATION_OPTIONAL = ('contribution',)
 OPERATION_STATES = {'prepare': {'prepared', 'canceled'}, 'apply': {'applied_verified', 'rolled_back', 'canceled'},
                     'cancel-request': {'cancel_recorded'}}
 PAYLOADS = {'capabilities': (), 'inspect': ('scope',), 'prepare': ('scope',),
@@ -93,7 +94,7 @@ def intent_shape(intent):
     if not isinstance(action, str) or action not in PAYLOADS:
         invalid('Unsupported RPC action.')
     payload = intent['payload']
-    optional = ('acquire', 'artifacts') if action == 'prepare' else ()
+    optional = {'prepare': ('acquire', 'artifacts', 'profile'), 'apply': ('profile',), 'inspect': ('rollout',)}.get(action, ())
     c.fields(payload, PAYLOADS[action], optional, family='rpc')
     if action == 'prepare' and payload.get('acquire', 'exact') not in ('cached', 'exact'):
         invalid('Unsupported exact artifact acquisition policy.')
@@ -101,6 +102,11 @@ def intent_shape(intent):
         fleet.token(payload['scope'])
     if 'plan' in payload:
         digest(payload['plan'])
+    if 'rollout' in payload and payload['rollout'] is not True:
+        invalid('Rollout inspection requires a true marker.')
+    if payload.get('profile') is not None:
+        from mask_control import validate_profile
+        validate_profile(payload['profile'])
     if 'operation' in payload:
         fleet.identifier(payload['operation'])
         digest(payload['digest'])
@@ -155,7 +161,7 @@ def check_operation_response(data, intent):
         expected_id, expected_digest = intent['id'], request_digest(intent)
     else:
         return
-    c.fields(data, OPERATION_FIELDS, family='rpc')
+    c.fields(data, OPERATION_FIELDS, OPERATION_OPTIONAL, family='rpc')
     if (data['id'], data['digest'], data['device'], data['controller']) != (
             expected_id, expected_digest, intent['device'], intent['controller']):
         c.fail('rpc.receipt_mismatch', 'Signed operation data does not bind to the requested receipt.', 4)
@@ -209,9 +215,33 @@ def authorized_scope(home, intent, policy):
         c.fail('dev_link.active', 'Fleet cannot act on authoring links.', 4)
     config = c.config(c.read_json(home / 'config.json'))
     declaration, locked = resolve.read_exact_lock(root, scope['scope'], home, config, verify=False)
-    layers = profiles.layers(declaration, locked, record.get('profiles', {}))
+    subscriptions = record.get('profiles', {})
+    layers = profiles.layers(declaration, locked, subscriptions)
     all_rows = [row for layer in layers for row in layer['lock']['packages']]
     old_rows = [link['resolution'] for link in record['links'].values()]
+    if 'profile' in intent['payload']:
+        if not scope.get('rollout'):
+            c.fail('fleet.rollout_denied', 'The device did not grant desired profile changes in this scope.', 4)
+        if declaration != record['last_manifest'] or locked != record['last_lock']:
+            c.fail('fleet.local_drift', 'Reconcile local declaration and lock edits before fleet rollout.', 4)
+        name = contribution_name(intent)
+        previous = subscriptions.get(name)
+        if previous and previous.get('fleet_controller') != intent['controller']:
+            c.fail('fleet.profile_collision', 'A local profile already uses this contribution name.', 4)
+        subscriptions = dict(subscriptions)
+        desired = intent['payload']['profile']
+        if desired is None:
+            subscriptions.pop(name, None)
+        else:
+            subscriptions[name] = dict(desired, fleet_controller=intent['controller'])
+        profiles.subscriptions(subscriptions)
+        all_rows = desired['lock']['packages'] if desired else []
+        old_rows = previous['lock']['packages'] if previous else []
+        layers = [dict(origin='profile:' + name, declaration=desired['declaration'], lock=desired['lock'])] if desired else []
+    elif intent['payload'].get('rollout'):
+        if not scope.get('rollout'):
+            c.fail('fleet.rollout_denied', 'The device did not grant desired profile changes in this scope.', 4)
+        all_rows, old_rows = [], []
     if len(all_rows) > MAX_SCOPE_PACKAGES:
         c.fail('fleet.scope_limit', 'Scope exceeds the bounded fleet package count.', 4)
     for row in all_rows + old_rows:
@@ -219,7 +249,11 @@ def authorized_scope(home, intent, policy):
         local = sources.selected(config, row['source'])
         if not grant or grant['repository'] != sources.repository(row['repository']) or grant['repository'] != sources.repository(local['repository']):
             c.fail('fleet.source_denied', 'The exact source is outside the locally authorized fleet policy.', 4)
-    return state, config, root, scope, layers
+    return state, config, root, scope, layers, subscriptions
+
+
+def contribution_name(intent):
+    return 'fleet-' + intent['controller']
 
 
 def state_view(state, root):
@@ -235,10 +269,14 @@ def operation_path(home, operation):
 
 
 def operation_record(intent):
-    return dict(schema_version=1, id=intent['id'], device=intent['device'], controller=intent['controller'],
+    record = dict(schema_version=1, id=intent['id'], device=intent['device'], controller=intent['controller'],
                 epoch=intent['epoch'], sequence=intent['sequence'], revision=intent['revision'],
                 generation=intent['generation'], action=intent['action'], digest=request_digest(intent),
                 scope=intent['payload'].get('scope'), status='accepted', result=None)
+    if 'profile' in intent['payload']:
+        profile = intent['payload']['profile']
+        record['contribution'] = profile['revision'] if profile else None
+    return record
 
 
 def existing_operation(home, intent):
@@ -252,6 +290,10 @@ def sequence_guard(home, intent, *, advance=False):
     path = fleet.path(home, 'high-water')
     previous = fleet.data(path, missing=True)
     value = dict(epoch=intent['epoch'], sequence=intent['sequence'], id=intent['id'], digest=request_digest(intent))
+    if 'profile' in intent['payload']:
+        path = fleet.path(home, 'scope-sequence-' + c.digest(intent['payload']['scope'].encode()).split(':')[1])
+        previous = fleet.data(path, missing=True)
+        value = dict(epoch=intent['epoch'], sequence=intent['sequence'], revision=intent['revision'])
     if previous is not None:
         order = (value['epoch'], value['sequence'])
         last = (previous['epoch'], previous['sequence'])
@@ -328,9 +370,21 @@ def cancel(home, intent):
     return target
 
 
-def plan_scope(home, state, config, root):
-    planned = fs.plan(config, state, [root], home=home)
+def plan_scope(home, state, config, root, intent, subscriptions):
+    updating_profile = 'profile' in intent['payload']
+    planned = fs.plan(config, state, [root], home=home,
+                      profile_proposals={str(root): subscriptions} if updating_profile else None)
     fs.ensure_applicable(planned)
+    if updating_profile:
+        before = c.consumer_records(state)[str(root)]
+        after = c.consumer_records(planned['intent']['after_state'])[str(root)]
+        name = contribution_name(intent)
+        allowed = {resolve.coordinate(row) for record in (before, after)
+                   for row in record.get('profiles', {}).get(name, {}).get('lock', {}).get('packages', [])}
+        if any(resolve.coordinate(link['resolution']) not in allowed
+               for action in planned['intent']['links']
+               for link in (before['links'].get(action['relative']), after['links'].get(action['relative'])) if link):
+            c.fail('fleet.local_drift', 'Reconcile unrelated local links before changing the fleet profile.', 4)
     return planned
 
 
@@ -341,6 +395,14 @@ def commit_plan(home, intent, record, planned):
     root, = pending['selected']
     result = dict(state_view(pending['after_state'], root), plan=planned['plan_hash'],
                   changed=planned['would_change'], host_load='not_verified')
+    if 'contribution' in record:
+        origin = 'profile:' + contribution_name(intent)
+        result['contribution'] = record['contribution']
+        result['outcomes'] = [dict(coordinate=row['coordinate'], agent=row['agent'], status=row['status'],
+                                   reason=row['reason']) for row in planned['outcomes'] if origin in row['origins']]
+        before = c.consumer_records(pending['before_state'])[root].get('profiles', {}).get(origin.removeprefix('profile:'))
+        result['changed'] = result['changed'] or (before['revision'] if before else None) != record['contribution']
+        result['observed_at'] = int(time.time())
     committed = dict(record, status='applied_verified', result=result)
     pending['fleet'] = dict(before=record, after=committed)
     output = dict(data={}, actions=planned['actions'])
@@ -352,7 +414,7 @@ def validate_journal(pending):
     entry = pending['fleet']
     c.fields(entry, ('before', 'after'), family='recovery')
     before, after = entry['before'], entry['after']
-    c.fields(before, OPERATION_FIELDS, family='recovery')
+    c.fields(before, OPERATION_FIELDS, OPERATION_OPTIONAL, family='recovery')
     for key in ('id', 'device', 'controller'):
         fleet.identifier(before[key])
     for key in ('digest', 'revision'):
@@ -366,7 +428,23 @@ def validate_journal(pending):
     if pending['operation'] != 'apply' or len(pending['selected']) != 1 or before['action'] != 'apply' or before['status'] != 'accepted' or before['result'] is not None or before['generation'] != pending['base_generation']:
         c.fail('recovery.conflict', 'Fleet journal requires one accepted pinned apply.', 8)
     result = after['result']
-    c.fields(result, ('generation', 'scope_type', 'bindings', 'plan', 'changed', 'host_load'), family='recovery')
+    rollout = 'contribution' in before
+    c.fields(result, ('generation', 'scope_type', 'bindings', 'plan', 'changed', 'host_load') +
+             (('contribution', 'outcomes', 'observed_at') if rollout else ()), family='recovery')
+    root, = pending['selected']
+    old = c.consumer_records(pending['before_state'])[root].get('profiles', {})
+    new = c.consumer_records(pending['after_state'])[root].get('profiles', {})
+    changed = {name for name in old.keys() | new.keys() if old.get(name) != new.get(name)}
+    if rollout:
+        name = contribution_name(before)
+        desired = new.get(name)
+        revision = desired['revision'] if desired else None
+        if (changed - {name} or revision != before['contribution'] or revision != result['contribution']
+                or any(record and record.get('fleet_controller') != before['controller']
+                       for record in (old.get(name), desired))):
+            c.fail('recovery.conflict', 'Fleet journal changes another contribution or disagrees with the requested revision.', 8)
+    elif changed:
+        c.fail('recovery.conflict', 'An ordinary fleet apply cannot change profile ownership.', 8)
     digest(result['plan'])
     observed = state_view(pending['after_state'], pending['selected'][0])
     if (after != dict(before, status='applied_verified', result=result) or result['host_load'] != 'not_verified' or
@@ -396,7 +474,7 @@ def restore_journal(home, pending, side):
 
 
 def prepare_artifacts(home, intent, scope_data):
-    _, config, root, scope, layers = scope_data
+    _, config, root, scope, layers, _ = scope_data
     if intent['payload'].get('acquire', 'exact') == 'exact':
         for row in artifacts.applicable_rows(layers):
             store_root, _ = store.location(home, row['payload_digest'], row['id'])
@@ -439,7 +517,7 @@ def mutate(home, intent, device, policy):
                 c.fail('fleet.operation_unknown', 'No authorized operation exists at the supplied ID.', 4)
         else:
             scope_data = authorized_scope(home, intent, policy)
-            state, config, root, scope, layers = scope_data
+            state, config, root, scope, layers, subscriptions = scope_data
             if state['generation'] != intent['generation']:
                 c.fail('fleet.generation_stale', 'Device generation changed since inspection.', 4)
         if action == 'prepare':
@@ -454,7 +532,7 @@ def mutate(home, intent, device, policy):
         if action == 'cancel-request':
             return set_result(home, record, 'cancel_recorded', cancel(home, intent))
         if action == 'apply':
-            return commit_plan(home, intent, record, plan_scope(home, state, config, root))
+            return commit_plan(home, intent, record, plan_scope(home, state, config, root, intent, subscriptions))
         for row, payload in incoming:
             store.materialize(home, row, payload)
     # Ordinary lifecycle ownership protects retained artifacts from cleanup, but
@@ -465,7 +543,7 @@ def mutate(home, intent, device, policy):
         recheck_authority(home, intent, device, policy)
         if authorized_scope(home, intent, policy) != scope_data:
             c.fail('fleet.generation_stale', 'Device selection or source authority changed during exact preparation.', 4)
-        planned = plan_scope(home, state, config, root)
+        planned = plan_scope(home, state, config, root, intent, subscriptions)
         result = dict(scope=intent['payload']['scope'], generation=state['generation'],
                       plan=planned['plan_hash'], would_change=planned['would_change'])
         return set_result(home, record, 'prepared', result)
@@ -480,7 +558,7 @@ def perform(home, intent, device, policy):
     if action == 'receipt':
         return receipt(home, intent, policy)
     if action == 'inspect':
-        state, _, root, _, _ = authorized_scope(home, intent, policy)
+        state, _, root, _, _, _ = authorized_scope(home, intent, policy)
         return dict(state_view(state, root), scope=intent['payload']['scope'],
                     recovery_required=c.kind(home / 'pending.json') != 'missing')
     with c.writer_lock(home, name='lifecycle.lock'):

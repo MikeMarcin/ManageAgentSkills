@@ -243,7 +243,9 @@ def authority(value, *, local=False):
     for alias, scope in scopes.items():
         token(alias)
         fields = ('scope', 'sources') + (('root',) if local else ())
-        c.fields(scope, fields, ('root_identity',) if local else (), 'fleet')
+        c.fields(scope, fields, ('rollout', 'root_identity') if local else ('rollout',), 'fleet')
+        if 'rollout' in scope and scope['rollout'] is not True:
+            invalid('Omit rollout unless explicitly granting desired profile changes.')
         if scope['scope'] not in ('project', 'user'):
             invalid('A fleet scope must be project or user.')
         if local and (not isinstance(scope['root'], str) or not 1 <= len(scope['root']) <= 4096 or
@@ -280,7 +282,7 @@ def current_authority(home, *, missing=False):
 
 
 def public_authority(value):
-    return dict(value, scopes={alias: {key: scope[key] for key in ('scope', 'sources')}
+    return dict(value, scopes={alias: {key: scope[key] for key in ('scope', 'sources', 'rollout') if key in scope}
                                for alias, scope in value['scopes'].items()})
 
 
@@ -358,6 +360,9 @@ def dispatch(args, output, home):
     if command == 'fleet.control.configure':
         import mask_control
         return mask_control.configure(args, output, home)
+    if command in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync') or command.startswith('fleet.operation.'):
+        import mask_rollout
+        return mask_rollout.dispatch(args, output, home)
     if command in ('fleet.device.init', 'fleet.controller.init'):
         return init(args, output, home, command.split('.')[1])
     if command in ('fleet.device.authorize', 'fleet.device.revoke-controller'):

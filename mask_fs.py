@@ -87,7 +87,7 @@ def plan(config, state, roots, *, proposals=None, register=(), unregister=(), ke
                 locked = resolve.lock(lock_proposals.get(key, lock_value), desired)
                 lock_before = lock_raw.decode('utf-8') if lock_raw is not None else None
             profiles = profile_proposals.get(key, (record or {}).get('profiles', {}))
-            if profiles and scope != 'user':
+            if scope != 'user' and any('fleet_controller' not in receipt for receipt in profiles.values()):
                 c.fail('profile.invalid', 'Subscriptions require personal scope.', 4)
             devs = dev_proposals.get(key, (record or {}).get('dev_links', {}))
             if devs and profiles:
@@ -440,7 +440,7 @@ def validate_pending(pending, home):
         if previous_user and pending['files']:
             c.fail('recovery.conflict', 'Profile subscriptions cannot change existing local selection controls.', 8)
         selection.validate_after_links(pending, home, selection.read_policy(home)[0])
-    elif old_profiles != new_profiles and not (pending['operation'] == 'user.unregister' and not next_user):
+    elif old_profiles != new_profiles and 'fleet' not in pending and not (pending['operation'] == 'user.unregister' and not next_user):
         c.fail('recovery.conflict', 'Unrelated operations cannot change personal subscription policy.', 8)
     allowed_directories = {str(Path(pending['launcher']['path']).parent)} if 'launcher' in pending else set()
     for key in selected:

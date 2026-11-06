@@ -21,9 +21,9 @@ def exact_key(row):
     return resolve.coordinate(row), row['commit'], row['payload_digest']
 
 
-def packet(home, row):
+def packet(home, row, *, payload=None):
     """Build an exact package packet from a controller's verified local store."""
-    payload = store.verify(home, row, as_payload=True)
+    payload = store.verify(home, row, as_payload=True) if payload is None else store.checked_payload(payload, row)
     if payload.total_bytes > MAX_TRANSFER:
         c.fail('fleet.artifact_limit', 'This package exceeds the fleet forwarding limit. Use exact Git retrieval.', 4)
     return dict(coordinate=resolve.coordinate(row), commit=row['commit'], payload_digest=row['payload_digest'],

@@ -158,7 +158,11 @@ def subscriptions(value):
     size = 0
     for name, receipt in value.items():
         c.skill_id(name)
-        c.fields(receipt, ('revision', 'declaration', 'lock'), family='profile')
+        c.fields(receipt, ('revision', 'declaration', 'lock'), ('fleet_controller',), family='profile')
+        if 'fleet_controller' in receipt:
+            controller = receipt['fleet_controller']
+            if not isinstance(controller, str) or not re.fullmatch(r'[a-f0-9]{32}', controller) or name != 'fleet-' + controller:
+                c.fail('profile.invalid', 'Invalid fleet contribution ownership.', 4)
         if not isinstance(receipt['revision'], str) or not r.SHA.fullmatch(receipt['revision']):
             c.fail('profile.invalid', 'Subscription requires an exact profile revision.', 4)
         declaration = r.selection(receipt['declaration'])
@@ -343,6 +347,8 @@ def change_subscription(args, output, home):
     if subscribing:
         name = getattr(args, 'name', None) or location(args.location).name
         c.skill_id(name)
+        if re.fullmatch(r'fleet-[a-f0-9]{32}', name):
+            c.fail('profile.reserved', 'This subscription name is reserved for an enrolled fleet controller.', 4)
         incoming, exact, revision = read_profile(args.location)
         receipt = dict(revision=revision, declaration=incoming, lock=exact)
         if profiles.get(name) == receipt:
@@ -356,6 +362,8 @@ def change_subscription(args, output, home):
         if name not in profiles:
             output['data'] = dict(profile=name, profiles=freshness(profiles), network='none')
             return
+        if 'fleet_controller' in profiles[name]:
+            c.fail('profile.reserved', 'Use a reviewed fleet removal to withdraw the fleet contribution.', 4)
         del profiles[name]
     if declaration is None:
         if record:

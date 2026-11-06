@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 from concurrent.futures import ThreadPoolExecutor
+import io
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
@@ -130,7 +131,7 @@ def ssh_args(peer, config, pins, auth):
             command(peer['launcher'], peer['device']['platform'])]
 
 
-def exchange(peer, packet, *, timeout=30):
+def exchange(peer, packet, *, timeout=30, signed=False):
     intent = rpc.intent_shape(packet['intent'])
     if peer.get('revoked') or (intent['device'], intent['controller'], intent['epoch']) != (
             peer['device']['id'], peer['authority']['controller']['id'], peer['authority']['epoch']):
@@ -163,7 +164,8 @@ def exchange(peer, packet, *, timeout=30):
         c.fail('fleet.transport_unknown', 'SSH ended before a signed response was available. Query the durable operation.',
                4, outcome='unknown', **context)
     try:
-        return rpc.checked_response(raw, intent, peer['device'])
+        response = rpc.checked_response(raw, intent, peer['device'])
+        return rpc.read_frame(io.BytesIO(raw)) if signed else response
     except c.MaskError as error:
         c.fail('fleet.response_unverified', 'The device response could not be verified. Query the durable operation.',
                4, outcome='unknown', refusal=error.code, **context)

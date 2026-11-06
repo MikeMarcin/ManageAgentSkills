@@ -14,6 +14,8 @@ SCOPES = [('project', 'value'), ('user', 'flag'), ('all', 'flag')]
 SINGLE = SCOPES[:2]
 OFFLINE = [('offline', 'flag')]
 REFRESH = OFFLINE + [('no-update', 'flag')]
+FLEET_TARGET = [('device', 'repeat'), ('all-devices', 'flag'), ('scope', 'value'),
+                ('project-alias', 'value'), ('forward', 'flag'), ('timeout', 'int')]
 COMMANDS = {
     'capabilities': (False, False, []),
     'user.export': (True, False, [('output', 'required'), ('effective', 'flag'), ('freeze-agents', 'flag')]),
@@ -29,6 +31,12 @@ COMMANDS = {
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
     'fleet.control.configure': (True, False, [('repository', 'pos'), ('epoch', 'int'), ('import-mode', 'value')]),
+    'fleet.install': (True, True, [('input', 'pos'), ('mode', 'value'), ('into', 'value'),
+                                   ('ref', 'value'), ('path', 'value')] + FLEET_TARGET),
+    'fleet.update': (True, True, [('input', 'pos')] + FLEET_TARGET),
+    'fleet.remove': (True, True, [('input', 'pos')] + FLEET_TARGET),
+    'fleet.sync': (False, True, [('device', 'repeat'), ('all', 'flag'), ('timeout', 'int')]),
+    'fleet.operation.show': (False, True, [('operation', 'pos')]),
     'fleet.device.enroll': (True, True, [('name', 'pos'), ('ssh-config-alias', 'required'), ('ssh-config', 'value'), ('binding', 'required')]),
     'fleet.device.show': (False, False, [('name', 'pos')]),
     'fleet.device.list': (False, False, []),
@@ -78,6 +86,11 @@ HELP = {
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
     'fleet.controller.show': ('Show the public local controller signing identity.', None),
     'fleet.control.configure': ('Review the private Git repository and epoch for signed fleet desired state.', 'mask fleet control configure REPOSITORY --dry-run --json'),
+    'fleet.install': ('Install one exact skill contribution on authorized enrolled devices.', 'mask fleet install TAP/SKILL --mode tap --all-devices --scope user --dry-run'),
+    'fleet.update': ('Update a fleet-selected skill to the exact candidate from the cached tap.', 'mask fleet update TAP/SKILL --all-devices --scope user --dry-run'),
+    'fleet.remove': ('Withdraw a fleet-owned contribution and preserve independent local selections.', 'mask fleet remove TAP/SKILL --all-devices --scope user --dry-run'),
+    'fleet.sync': ('Deliver the latest approved desired state to active enrolled devices.', 'mask fleet sync --all'),
+    'fleet.operation.show': ('Show signed rollout results from the recorded operation.', 'mask fleet operation show OPERATION_ID'),
     'fleet.device.enroll': ('Review and authenticate an explicit device binding over pinned SSH.', 'mask fleet device enroll laptop --ssh-config-alias laptop --binding FILE --dry-run'),
     'fleet.device.show': ('Show one enrolled device or revocation.', None),
     'fleet.device.list': ('List enrolled devices and revocations without connecting.', None),
@@ -133,7 +146,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    if command == 'fleet.control.configure':
+    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove'):
         return True
     return command in ('fleet.device.enroll', 'fleet.device.revoke', 'fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 

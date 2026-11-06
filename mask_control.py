@@ -116,13 +116,20 @@ def validate(value, control, signer):
         invalid('Desired revisions require a bounded, nonempty target set.')
     keys = []
     for target in targets:
-        c.fields(target, ('name', 'device', 'device_epoch', 'scope', 'scope_type', 'profile'), family='fleet')
+        c.fields(target, ('name', 'device', 'device_epoch', 'scope', 'scope_type', 'profile'),
+                 ('identity', 'binding', 'blocked'), family='fleet')
         fleet.token(target['name'])
         fleet.identifier(target['device'])
         fleet.number(target['device_epoch'], minimum=1)
         if target['scope_type'] not in ('user', 'project'):
             invalid('Unsupported desired scope type.')
         fleet.token(target['scope'])
+        if 'identity' in target and fleet.identity(target['identity'], 'device')['id'] != target['device']:
+            invalid('Frozen target device identity differs from its enrolled ID.')
+        if 'binding' in target and not re.fullmatch(r'sha256:[a-f0-9]{64}', target['binding']):
+            invalid('Frozen target binding requires an exact fingerprint.')
+        if 'blocked' in target and (not isinstance(target['blocked'], str) or not re.fullmatch(r'[a-z0-9_.]{1,96}', target['blocked'])):
+            invalid('Invalid target preflight blocker.')
         keys.append(target_key(target))
         if value['action'] == 'cancel':
             if target['profile'] is not None:
@@ -166,6 +173,8 @@ class History:
         result = {}
         for entry in self.events:
             for target in entry['targets']:
+                if 'blocked' in target:
+                    continue
                 key = target_key(target)
                 if entry['action'] == 'cancel':
                     previous = result.get(key)
