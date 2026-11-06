@@ -1305,6 +1305,8 @@ def fleet_rollout_lines(data):
             lines.append('  MASK program revision ' + clean(plan['candidate']['candidate']))
         for group in plan.get('groups', []):
             lines.append(f"  Repository {clean(group['repository'])} ({clean(group['reason'])})")
+        for publication in data.get('control_publications', []):
+            lines.append(f"  Published contribution operation {clean(publication['operation'])}")
         for row in data.get('device_results', plan['targets']):
             scope = '/' + clean(row['scope']) if row.get('scope') else ''
             reason = f" ({clean(row['reason'])})" if row.get('reason') else ''

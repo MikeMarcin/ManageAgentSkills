@@ -113,6 +113,7 @@ class FleetMaintenanceTests(FleetRpcFixture):
         direct, contribution = applied['device_results']
         self.assertEqual((direct['status'], contribution['status']), ('applied_verified', 'applied_verified'))
         self.assertTrue(contribution['contribution'])
+        self.assertEqual(applied['control_publications'][0]['operation'], contribution['operation'])
         state = json.loads((self.device_home / 'state.json').read_text())
         self.assertEqual(state['user']['last_lock']['packages'][0]['commit'], candidate)
         [owned] = state['user']['profiles'].values()
@@ -121,6 +122,7 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertIsNone(current['plan']['contributions'])
         replay = self.public('upgrade', '--approve-plan', review['plan_hash'])['data']
         self.assertEqual(replay['device_results'][1]['operation'], contribution['operation'])
+        self.assertEqual(replay['control_publications'], [])
 
     def test_program_exact_checkout_and_lost_ack_recovery(self):
         author = self.base / 'program-source'

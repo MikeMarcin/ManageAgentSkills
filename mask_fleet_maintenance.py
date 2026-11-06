@@ -146,7 +146,12 @@ def program_observation(payload, context, objects):
     blocked = git.blocking_paths(root, candidate, local, timeout, objects=objects, before=before) if before != candidate else []
     if blocked:
         c.fail('source.dirty', 'Local changes touch the exact fleet program candidate.', 4, blocking_paths=blocked)
-    migration = install.program_migration(objects, before, candidate) if before != candidate else None
+    try:
+        migration = install.program_migration(objects, before, candidate) if before != candidate else None
+    except c.MaskError as error:
+        if error.code != 'source.candidate_invalid':
+            raise
+        c.fail('fleet.program_incompatible', 'The candidate does not contain a readable compatible MASK program.', 4)
     if migration and (migration['breaking'] or fleet_protocol(objects, candidate) != fleet.PROTOCOL):
         c.fail('fleet.program_incompatible', 'The candidate changes an incompatible program schema or fleet protocol.', 4)
     detail = dict(before=before, candidate=candidate, origin=approved, preserved=local, migration=migration)
@@ -253,7 +258,7 @@ def exchange(peer, signer, action, payload, revision, timeout):
 
 def failure_row(error, *, dispatch=False):
     code = error if isinstance(error, str) else error.code
-    if code == 'fleet.response_unverified':
+    if code in ('fleet.response_unverified', 'fleet.commit_outcome_unknown', 'fleet.commit_proof_limit'):
         status = 'unknown'
     elif code in rollout.DISCONNECTED:
         status = 'unknown' if dispatch else 'offline'
@@ -363,11 +368,16 @@ def dispatch(args, output, home):
     if not saved:
         fleet.put(path, dict(plan=plan, expires=int(time.time()) + TTL), None, limit=PLAN_LIMIT)
     action = PROGRAM[1] if kind == 'program' else UPGRADE[1]
-    rows = [send_update(home, signer, digest, row, action, timeout) if row['status'] == 'planned' else row
-            for row in plan['targets']] if kind == 'program' else deliver_upgrade(home, signer, digest, plan, timeout)
+    if kind == 'program':
+        rows = [send_update(home, signer, digest, row, action, timeout) if row['status'] == 'planned' else row
+                for row in plan['targets']]
+        publications = []
+    else:
+        rows, publications = deliver_upgrade(home, signer, digest, plan, timeout)
+        output['data']['control_publications'] = publications
     complete = all(row['status'] in ('applied_verified', 'not_applicable') for row in rows)
     output['data'].update(device_results=rows, complete=complete)
-    output['changed'] = any(row.get('receipt', {}).get('before') != row.get('receipt', {}).get('after')
+    output['changed'] = bool(publications) or any(row.get('receipt', {}).get('before') != row.get('receipt', {}).get('after')
                             or row.get('receipt', {}).get('changed') or row.get('newly_observed') for row in rows)
     if output['changed']:
         output['transaction'] = 'committed'
@@ -837,14 +847,14 @@ def deliver_upgrade(home, signer, digest, plan, timeout):
     history_context = (control.snapshot(home, settings, signer)
                        if settings and control.channel(settings) == proposal['channel'] else nullcontext(None))
     with history_context as history:
-        published, failures = publish_contributions(home, signer, digest, history, proposal)
+        published, failures, publications = publish_contributions(home, signer, digest, history, proposal)
         results = deliver_upgrade_scopes(home, signer, digest, plan, published, timeout)
         if history:
             pairs = list(published.values())
             contribution_rows = rollout.fanout(home, signer, history, pairs, timeout=timeout)
             results.extend(dict(row, contribution=True, operation=entry['operation'])
                            for row, (entry, _) in zip(contribution_rows, pairs))
-        return results + failures
+        return results + failures, publications
 
 
 def deliver_upgrade_scopes(home, signer, digest, plan, published, timeout):
@@ -892,7 +902,7 @@ def deliver_upgrade_scopes(home, signer, digest, plan, published, timeout):
 
 def publish_contributions(home, signer, digest, history, proposal):
     if proposal is None:
-        return {}, []
+        return {}, [], []
     import mask_control as control
 
     batches = proposal['batches']
@@ -900,8 +910,8 @@ def publish_contributions(home, signer, digest, history, proposal):
         return [dict(rollout.base_result(target), contribution=True, **failure_row(code, dispatch=True)) for target in batch]
 
     if history is None:
-        return {}, [row for batch in batches for row in failed(batch, 'fleet.control_changed')]
-    published, rows = {}, []
+        return {}, [row for batch in batches for row in failed(batch, 'fleet.control_changed')], []
+    published, rows, publications = {}, [], []
     operations = [c.digest((digest, index)).split(':')[1][:32] for index in range(len(batches))]
     for index, (operation, batch) in enumerate(zip(operations, batches)):
         entry = history.operation(operation)
@@ -914,7 +924,8 @@ def publish_contributions(home, signer, digest, history, proposal):
             entry = control.event(history.control, signer, history.events, 'update', operation, batch,
                                   {'kind': 'fleet.upgrade', 'plan': digest, 'forward': False})
             try:
-                control.publish(history, entry, signer)
+                revision = control.publish(history, entry, signer)
+                publications.append(dict(operation=operation, commit=revision))
                 control.remember(home, history)
             except c.MaskError as error:
                 rows.extend(failed(batch, error.code))
@@ -928,4 +939,4 @@ def publish_contributions(home, signer, digest, history, proposal):
                 rows.extend(failed([target], 'fleet.operation_superseded'))
             else:
                 published[key] = (entry, target)
-    return published, rows
+    return published, rows, publications
