@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0047"
 title: "Implement local device enrollment and authorization records"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0069", "MASK-0070"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-identity","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0012-AC01","outcome":"pass","revision":"efd03818d1cea94365519040e680e178b0e22e61","evidence":{"kind":"command","detail":"python3 -B -m unittest -v tests.test_fleet_identity: public nested CLI, stable distinct local identities, reviewed mapped roots and controller revocation. SSH endpoint enrollment belongs to MASK-0049."}},{"criterion":"RFC-MASK-0012-AC06","outcome":"pass","revision":"efd03818d1cea94365519040e680e178b0e22e61","evidence":{"kind":"command","detail":"python3 -B -m unittest -v tests.test_fleet_identity: native macOS OpenSSH file signing, separate namespaces, wrong key and tampered bytes refused. Signed wire and remote receipt binding belong to MASK-0048/0049."}}]
 ---
 
 # MASK-0047: Implement local device enrollment and authorization records
