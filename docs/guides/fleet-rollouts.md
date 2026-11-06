@@ -117,8 +117,11 @@ Across checkouts with matching starting controls, one eligible attached
 checkout commits per repository. Checkouts at its parent receive the exact
 commit. Checkouts on another parent receive a cherry-pick with the same control
 changes. The bounded transfer covers the control-only commit, and unrelated
-staging is preserved. Dirty or diverged controls block their scope. Personal
-scopes never commit.
+staging is preserved. A scope that needs a lock change is blocked if its
+controls are dirty or diverged or if it cannot use a canonical commit. When
+one of those scopes already matches its own exact candidate, the plan reports
+`not_applicable` with reason `fleet.scope_current` and skips the local upgrade,
+including repair and any Git changes. Personal scopes never commit.
 
 `fleet update` reviews the exact revision advertised by the controller's
 approved MASK origin. Each device needs its own program grant for that

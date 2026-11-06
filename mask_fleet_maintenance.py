@@ -732,13 +732,29 @@ def upgrade_plan(home, args, peers, signer, timeout):
                 declaration, config, home, locked, refresh=True))
         return memo[key]
 
-    def plan_row(row, candidate, commit=None):
+    def authorize_candidate(row, candidate):
         scope = fleet.effective_scope(by_peer[row['name']]['authority'], row['scope'],
                                       row['observation'].get('tap_sources', {}))
         scope_sources(scope, config, candidate['lock'])
+
+    def plan_row(row, candidate, commit=None):
+        authorize_candidate(row, candidate)
         row['changes'] = mask_update.changes(row['observation']['lock'], candidate['lock'])
         row.update(status='planned', request=dict(scope=row['scope'], observed=row['observation']['observation'],
                                                   candidate=candidate, commit=commit))
+
+    def project_blocker(row, reason):
+        # A Git blocker matters only when this scope needs a change to its own controls.
+        observation = row['observation']
+        try:
+            candidate = candidate_for(observation)
+            if candidate['lock'] == observation['lock']:
+                authorize_candidate(row, candidate)
+                row.update(status='not_applicable', reason='fleet.scope_current')
+                return
+        except c.MaskError as error:
+            reason = error
+        row.update(failure_row(reason))
 
     for group in grouped:
         eligible = [fact for fact in group if fact['clean'] and fact['eligible']
@@ -750,7 +766,7 @@ def upgrade_plan(home, args, peers, signer, timeout):
         if not canonical:
             for fact in group:
                 row = rows[int(fact['root'])]
-                row.update(failure_row('upgrade.group_ambiguous' if eligible else 'fleet.commit_ineligible'))
+                project_blocker(row, 'upgrade.group_ambiguous' if eligible else 'fleet.commit_ineligible')
             continue
         main = rows[int(canonical['root'])]
         try:
@@ -768,13 +784,13 @@ def upgrade_plan(home, args, peers, signer, timeout):
             if fact is canonical:
                 continue
             if not fact['clean'] or not fact['eligible']:
-                row.update(failure_row('fleet.controls_modified'))
+                project_blocker(row, 'fleet.controls_modified')
             elif main['status'] != 'planned':
-                row.update(failure_row('upgrade.canonical_blocked'))
+                project_blocker(row, 'upgrade.canonical_blocked')
             elif fact['controls'] != canonical['controls']:
-                row.update(failure_row('fleet.controls_diverged'))
+                project_blocker(row, 'fleet.controls_diverged')
             elif changed and fact not in eligible:
-                row.update(failure_row('fleet.commit_denied'))
+                project_blocker(row, 'fleet.commit_denied')
             else:
                 try:
                     plan_row(row, candidate, dict(commit, role='member', source=target_ref(main)) if changed else None)

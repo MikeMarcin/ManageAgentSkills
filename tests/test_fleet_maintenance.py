@@ -278,3 +278,97 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertNotIn('commit', outcomes['personal']['receipt'])
         for root in (project, peer_project, fast_project):
             self.assertEqual(json.loads((root / '.mask.lock.json').read_text())['packages'][0]['commit'], selected)
+
+    def test_blocked_project_scopes_use_their_own_exact_candidate(self):
+        project = self.base / 'primary'
+        self.init_git(project)
+        self.cli(self.device_home, 'install', 'fixture/alpha', '--project', project, '--no-update', env=self.env)
+        controls = ('.mask.json', '.mask.lock.json')
+        self.git(project, 'add', '-f', *controls)
+        self.git(project, 'commit', '-qm', 'base controls')
+        projects = {'primary': project}
+        for name in ('current-dirty', 'current-diverged', 'stale-dirty', 'stale-diverged', 'local-drift'):
+            root = self.base / name
+            self.git(self.base, 'clone', '-q', str(project), str(root))
+            self.identity(root)
+            self.git(root, 'checkout', '-qb', name)
+            self.cli(self.device_home, 'register', '--project', root, env=self.env)
+            projects[name] = root
+        grants = self.policy['scopes']
+        for name, root in projects.items():
+            self.git(root, 'remote', 'set-url' if root != project else 'add', 'origin',
+                     'ssh://git@fixture.invalid/one-project.git')
+            grants[name] = dict(scope='project', root=str(root), upgrade=True, commit=True,
+                                sources=grants['personal']['sources'])
+        self.policy['epoch'] += 1
+        self.policy['actions'] += ['upgrade-inspect', 'upgrade-apply']
+        self.authorize(self.policy)
+        self.set_peer('laptop', self.device, self.policy, self.device_home, ENTRY)
+
+        skill = self.source / 'skills/alpha/SKILL.md'
+        skill.write_bytes(skill.read_bytes() + b'\nUpdated fixture content.\n')
+        self.git(self.source, 'commit', '-qam', 'update skill')
+        self.git(self.source, 'push', '-q', str(self.remote), 'main')
+        selected = self.git(self.source, 'rev-parse', 'HEAD')
+        for home in (self.controller_home, self.device_home):
+            self.cli(home, 'tap', 'fetch', 'fixture', env=self.env)
+        for name in ('current-dirty', 'current-diverged'):
+            self.cli(self.device_home, 'upgrade', '--project', projects[name], '--no-update', env=self.env)
+        self.git(projects['current-dirty'], 'add', '.mask.lock.json')
+        for name in ('stale-dirty', 'stale-diverged'):
+            path = projects[name] / '.mask.lock.json'
+            path.write_bytes(path.read_bytes() + b'\n')
+        for name in ('current-diverged', 'stale-diverged'):
+            self.git(projects[name], 'commit', '-qam', 'different controls on this branch')
+        for control in controls:
+            shutil.copyfile(projects['current-diverged'] / control, projects['local-drift'] / control)
+        missing_link = projects['current-dirty'] / '.agents/skills/alpha'
+        missing_link.unlink()
+
+        def project_state(root):
+            return (self.git(root, 'rev-parse', 'HEAD'), self.git(root, 'symbolic-ref', 'HEAD'),
+                    self.git(root, 'diff', '--cached', '--', *controls),
+                    tuple((root / control).read_bytes() for control in controls))
+
+        before = {name: project_state(root) for name, root in projects.items()}
+        state_path = self.device_home / 'state.json'
+        device_before = state_path.read_bytes()
+        preview = self.public('upgrade', '--all', '--dry-run')['data']
+        [group] = preview['plan']['groups']
+        self.assertEqual(group['canonical'][1], 'primary')
+        rows = {row['scope']: row for row in preview['plan']['targets']}
+        self.assertEqual(rows['primary']['status'], 'planned')
+        self.assertEqual(rows['primary']['request']['candidate']['lock']['packages'][0]['commit'], selected)
+        for name in ('current-dirty', 'current-diverged'):
+            self.assertEqual((rows[name]['status'], rows[name]['reason']), ('not_applicable', 'fleet.scope_current'))
+            self.assertNotIn('request', rows[name])
+        for name, reason in (('stale-dirty', 'fleet.controls_modified'), ('stale-diverged', 'fleet.controls_diverged'),
+                             ('local-drift', 'fleet.local_drift')):
+            self.assertEqual((rows[name]['status'], rows[name]['reason']), ('blocked', reason))
+
+        args = ('upgrade', '--project-alias', 'current-dirty')
+        no_work = self.public(*args, '--dry-run')
+        self.assertFalse(no_work['would_change'])
+        [standalone] = no_work['data']['plan']['groups']
+        self.assertIsNone(standalone['canonical'])
+        result = self.public(*args, '--approve-plan', no_work['data']['plan_hash'], drop='upgrade-apply')
+        [row] = result['data']['device_results']
+        self.assertEqual((row['status'], row['reason']), ('not_applicable', 'fleet.scope_current'))
+        self.assertTrue(result['data']['complete'])
+        self.assertFalse(result['changed'])
+        self.assertFalse(missing_link.is_symlink())
+        self.assertEqual(state_path.read_bytes(), device_before)
+        self.assertEqual({name: project_state(root) for name, root in projects.items()}, before)
+
+        stale = self.public('upgrade', '--project-alias', 'stale-dirty', '--dry-run')
+        [row] = stale['data']['plan']['targets']
+        self.assertEqual((row['status'], row['reason']), ('blocked', 'fleet.commit_ineligible'))
+        applied = self.public('upgrade', '--all', '--approve-plan', preview['plan_hash'], code=9)['data']
+        results = {row['scope']: row for row in applied['device_results']}
+        self.assertEqual(results['primary']['status'], 'applied_verified')
+        self.assertFalse(missing_link.is_symlink())
+        for name, root in projects.items():
+            if name != 'primary':
+                self.assertEqual(project_state(root), before[name])
+                self.assertEqual(results[name]['status'], rows[name]['status'])
+                self.assertNotIn('receipt', results[name])
