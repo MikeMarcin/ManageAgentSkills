@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0148"
 title: "Recreate owned skill links blocked by Windows error 448"
-status: "Ready"
+status: "In Progress"
 rfcs: []
 depends_on: []
 ---
