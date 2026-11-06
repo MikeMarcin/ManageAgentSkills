@@ -5,7 +5,7 @@ title: "Demonstrate real two-machine install and offline convergence"
 status: "Backlog"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0054", "MASK-0050"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "fleet-dogfood", "stage": "D — personal fleet workflow", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-dogfood","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
 ---
 
 # MASK-0055: Demonstrate real two-machine install and offline convergence

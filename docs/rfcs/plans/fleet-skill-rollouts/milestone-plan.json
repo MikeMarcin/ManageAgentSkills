@@ -1,0 +1,53 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "fleet-skill-rollouts",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0013"
+    ],
+    "issues": [
+      "MASK-0051",
+      "MASK-0052",
+      "MASK-0053",
+      "MASK-0054",
+      "MASK-0055",
+      "MASK-0074"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "controller-skill-rollout",
+      "outcome": "One controller rolls out exact skill selections to explicitly enrolled devices, and each device reports what applied or remains pending.",
+      "work": [
+        {
+          "issue": "MASK-0051"
+        },
+        {
+          "issue": "MASK-0052"
+        },
+        {
+          "issue": "MASK-0053"
+        },
+        {
+          "issue": "MASK-0054"
+        },
+        {
+          "issue": "MASK-0055"
+        },
+        {
+          "issue": "MASK-0074"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "Guarded signed Git publication serializes exact frozen desired state and refuses stale or competing proposals.",
+        "The public install, update and remove paths preserve independent contributions and report each device through verified receipts, including incomplete, canceled and superseded requests.",
+        "Foreground sync and an explicitly enabled owned runner reconcile latest approved revisions with bounded work and report catch-up independently of host loading.",
+        "Disposable enrolled macOS and native Windows devices demonstrate a real SSH rollout, update and offline catch-up. Native scheduler evidence and any missing authority or environment gates remain explicit."
+      ],
+      "boundary": "Stage D rollout of skills. No production enrollment, program or operating system updates, live repository publication, credentials or access changes."
+    }
+  ]
+}

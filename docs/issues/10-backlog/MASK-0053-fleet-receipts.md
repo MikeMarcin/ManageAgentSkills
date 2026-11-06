@@ -5,7 +5,7 @@ title: "Track per-device completion failure and supersession"
 status: "Backlog"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0052"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "fleet-receipts", "stage": "D — personal fleet workflow", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-receipts","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
 ---
 
 # MASK-0053: Track per-device completion failure and supersession
