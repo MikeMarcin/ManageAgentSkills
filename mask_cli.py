@@ -16,6 +16,9 @@ OFFLINE = [('offline', 'flag')]
 REFRESH = OFFLINE + [('no-update', 'flag')]
 COMMANDS = {
     'capabilities': (False, False, []),
+    'user.export': (True, False, [('output', 'required'), ('effective', 'flag'), ('freeze-agents', 'flag')]),
+    'user.import': (True, True, [('location', 'pos'), ('replace', 'flag'), ('apply', 'flag'), ('user-home', 'value')] + OFFLINE),
+    'profile.inspect': (False, False, [('location', 'pos')]),
     'tap': (True, False, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'), ('checkout', 'value'), ('autocrlf', 'flag'), ('pin-transport', 'flag')]),
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
@@ -52,6 +55,9 @@ KEEP = ('config.show', 'config.set', 'skill.where-used', 'skill.validate', 'skil
         'launch', 'workspace.forget', 'link.adopt', 'recover', 'tap.transport', 'lock', 'self.status', 'self.install', 'self.uninstall')
 
 HELP = {
+    'user.export': ('Export portable personal selections and exact locks to a new directory.', 'mask user export --output /path/to/profile'),
+    'user.import': ('Merge and deploy a portable profile using exact locks. --replace replaces the local contribution.', 'mask user import /path/to/profile --apply'),
+    'profile.inspect': ('Inspect a portable declaration and exact lock without consulting local source approval.', 'mask profile inspect /path/to/profile'),
     'tap': ('Advanced tap commands: fetch, show, inspect, transport, repair-cache, migrate and publish. List taps, or approve NAME URL as a shared skill source. The current checkout does not affect taps. A tap keeps exact bytes unless --autocrlf opts in to core.autocrlf=true.', 'mask tap\nmask tap agentskills https://github.com/MikeMarcin/AgentSkills.git'),
     'untap': ('Remove an unused tap. Cached files remain until cleanup.', 'mask untap NAME'),
     'register': ('Register this checkout and prepare its declared skills, preserving locked versions. PATH selects another checkout; --user selects personal skills. --rebind reviews a device-number change for an existing canonical directory with the same inode, preserves its approvals and ends without running setup. Preview with --dry-run --json, then use --approve-plan HASH.', 'mask register\nmask register /path/to/worktree\nmask register --rebind --dry-run --json\nmask register --user --rebind --dry-run --json'),
@@ -89,7 +95,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('user.export', 'user.import', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -265,6 +271,9 @@ def dispatch(args, output, leaves):
                 return mask_cleanup.dispatch(args, output, home)
             if public == 'capabilities':
                 return capabilities(output, leaves, mask)
+            if public in ('user.export', 'user.import', 'profile.inspect'):
+                import mask_profiles
+                return mask_profiles.dispatch(args, output, home)
             if public.startswith('bundle.'):
                 import mask_bundles
                 return mask_bundles.dispatch(args, output, home)

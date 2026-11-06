@@ -1221,7 +1221,18 @@ def render_all_list(data, output):
     return render_inventory(data, output) if 'consumers' in data or 'deployments' in data else render_list(data, output)
 
 
+def render_profile(data, output):
+    command = output['command']
+    if command == 'profile.inspect':
+        return [f"Portable profile · {data.get('skills', 0)} skills", '  revision ' + clean(data.get('revision'))]
+    if command == 'user.export':
+        verb = 'Would export' if output['dry_run'] else 'Exported'
+        return [f"{verb} {data.get('skills', 0)} skills to {clean(data.get('output'))}"] + plan_guard(data, output)
+    return render_lifecycle(data, output)
+
+
 RENDERERS = {
+    'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'bundle.list': render_bundles, 'bundle.show': render_bundles, 'bundle.install': render_bundles, 'bundle.uninstall': render_bundles, 'bundle.upgrade': render_bundles,
     'tap': render_sources, 'untap': render_sources, 'search': render_catalog, 'info': render_skill,
     'uninstall': render_task, 'register': render_lifecycle, 'unregister': render_forget,
@@ -1782,6 +1793,10 @@ COMMAND_HELP = {
     'workspace.forget': ('Forget an absent workspace only when its recorded identity matches.', None),
 }
 OPTION_HELP = {
+    'location': 'Directory containing a portable selection and exact lock.',
+    'output': 'Explicit destination for the generated files.',
+    'effective': 'Flatten the effective selection into a standalone declaration.',
+    'freeze-agents': 'Resolve all-agent values to the currently supported adapter IDs.',
     'rebind': 'Review device-number recovery for an existing canonical directory with the same inode; preserves existing approvals and ends before setup',
     'bundle': 'Source-qualified bundle name: SOURCE/NAME',
     'source': 'Filter bundles to one approved source alias',
