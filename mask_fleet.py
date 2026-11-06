@@ -355,6 +355,9 @@ def descriptor(home):
 
 def dispatch(args, output, home):
     command = args.command
+    if command == 'fleet.control.configure':
+        import mask_control
+        return mask_control.configure(args, output, home)
     if command in ('fleet.device.init', 'fleet.controller.init'):
         return init(args, output, home, command.split('.')[1])
     if command in ('fleet.device.authorize', 'fleet.device.revoke-controller'):

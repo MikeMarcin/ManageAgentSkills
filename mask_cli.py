@@ -28,6 +28,7 @@ COMMANDS = {
     'rpc': (False, True, [('stdio', 'flag')]),
     'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
     'fleet.controller.show': (False, False, []),
+    'fleet.control.configure': (True, False, [('repository', 'pos'), ('epoch', 'int'), ('import-mode', 'value')]),
     'fleet.device.enroll': (True, True, [('name', 'pos'), ('ssh-config-alias', 'required'), ('ssh-config', 'value'), ('binding', 'required')]),
     'fleet.device.show': (False, False, [('name', 'pos')]),
     'fleet.device.list': (False, False, []),
@@ -76,6 +77,7 @@ HELP = {
     'rpc': ('Read one bounded signed MASK RPC request on stdin and respond on stdout.', 'mask rpc --stdio'),
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
     'fleet.controller.show': ('Show the public local controller signing identity.', None),
+    'fleet.control.configure': ('Review the private Git repository and epoch for signed fleet desired state.', 'mask fleet control configure REPOSITORY --dry-run --json'),
     'fleet.device.enroll': ('Review and authenticate an explicit device binding over pinned SSH.', 'mask fleet device enroll laptop --ssh-config-alias laptop --binding FILE --dry-run'),
     'fleet.device.show': ('Show one enrolled device or revocation.', None),
     'fleet.device.list': ('List enrolled devices and revocations without connecting.', None),
@@ -131,6 +133,8 @@ def definitions(engine):
 
 
 def guarded(command, engine):
+    if command == 'fleet.control.configure':
+        return True
     return command in ('fleet.device.enroll', 'fleet.device.revoke', 'fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
