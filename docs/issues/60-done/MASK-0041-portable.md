@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0041"
 title: "Implement portable personal profile export and import"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0069", "MASK-0070"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"portable","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0010-AC01","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Native macOS and Windows public fixtures used two independent source, machine and personal roots. The imported lock and native link bytes matched, and the export excluded local state and paths."}},{"criterion":"RFC-MASK-0010-AC02","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Public merge/replace preserved unrelated local and unmanaged entries. Default all-agent export and explicit freeze preserved exact lock package rows. Stale portable controls refused guarded import."}},{"criterion":"RFC-MASK-0010-AC05","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"One public user import --apply acquired the exact approved commit and registered a new personal home. Interrupted first import rolled back exact absence or completed its frozen controls through public recover. Seven tests passed on Windows and as part of 23 macOS checks."}}]
 ---
 
 # MASK-0041: Implement portable personal profile export and import
