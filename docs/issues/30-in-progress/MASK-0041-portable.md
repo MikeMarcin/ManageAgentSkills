@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0041"
 title: "Implement portable personal profile export and import"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0069", "MASK-0070"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"portable","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
