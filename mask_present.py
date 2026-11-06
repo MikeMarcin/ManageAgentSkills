@@ -1259,6 +1259,19 @@ def render_exact(data, output):
     return lines
 
 
+def fleet_device_lines(data):
+    lines = []
+    for row in data.get('devices', []):
+        identity = row.get('device') or {}
+        status = row.get('status') or ('revoked' if row.get('revoked') else 'enrolled')
+        lines.append(f"  {clean(row['name'])}: {status}, {clean(row.get('device_id') or identity.get('id'))}")
+        if row.get('error'):
+            lines.append(f"    {clean(row['error']['message'])} ({clean(row['error']['code'])})")
+        if row.get('capabilities'):
+            lines.append('    Agents: ' + ', '.join(row['capabilities']['adapters']))
+    return lines
+
+
 def render_fleet(data, output):
     lines = [headline(output)]
     identity = data.get('identity') or data.get('device')
@@ -1269,12 +1282,7 @@ def render_fleet(data, output):
         lines.append(f"  SSH {clean(data['alias'])} ({clean(endpoint['hostname'])}:{endpoint['port']}), {clean(data['host_fingerprint'])}")
         if data['revoked']:
             lines.append('  Device binding revoked.')
-    for row in data.get('devices', []):
-        identity = row.get('device') or {}
-        status = row.get('status') or ('revoked' if row.get('revoked') else 'enrolled')
-        lines.append(f"  {clean(row['name'])}: {status}, {clean(row.get('device_id') or identity.get('id'))}")
-        if row.get('capabilities'):
-            lines.append('    Agents: ' + ', '.join(row['capabilities']['adapters']))
+    lines.extend(fleet_device_lines(data))
     policy = data.get('authority')
     if policy:
         lines.append(f"  Controller {clean(policy['controller']['name'])}, epoch {policy['epoch']}")
@@ -1621,6 +1629,8 @@ def render_error(output):
         count = sum(not entry.get('complete') for entry in data['workflow_readiness'])
         message = f'Skill setup is incomplete in {count} scope(s). Existing files were preserved.'
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
+    if error['code'] == 'fleet.probe_incomplete':
+        lines.extend(fleet_device_lines(data))
     if data.get('repair'):
         lines.extend(repair_lines(data, output)[1:])
     if (data.get('pending') or {}).get('setup'):

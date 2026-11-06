@@ -1,4 +1,5 @@
 """Fixture transport negatives and exact selected package delivery."""
+import argparse
 import base64
 import io
 import os
@@ -7,11 +8,13 @@ import shutil
 import subprocess
 import sys
 from unittest.mock import patch
+from threading import Barrier
 
 import mask_core as core
 import mask_fleet as fleet
 import mask_fleet_artifacts as artifacts
 import mask_rpc as rpc
+import mask_present as present
 import mask_sources as sources
 import mask_store as store
 import mask_transport as transport
@@ -88,6 +91,28 @@ class FleetTransportTests(FleetRpcFixture):
         with patch.object(transport, 'config_for', return_value=(dict(peer['endpoint'], port=22), auth)):
             with self.assertRaisesRegex(core.MaskError, 'no longer resolves'):
                 transport.exchange(peer, packet)
+
+    def test_parallel_probe_preserves_each_result_and_human_refusal(self):
+        peers = [dict(self.peer(), name=name) for name in ('reachable', 'unavailable')]
+        barrier = Barrier(2, timeout=4)
+
+        def probe(peer, controller, *, timeout):
+            barrier.wait()
+            if peer['name'] == 'unavailable':
+                core.fail('fleet.ssh_auth_required', 'Fixture SSH auth refused.', 4)
+            return {'adapters': ['codex']}
+
+        args = argparse.Namespace(command='fleet.capability', parallel=2, timeout=2)
+        output = dict(command=args.command, data={}, transaction='not_started')
+        with patch.object(transport, 'peers', return_value=peers), patch.object(transport, 'probe', side_effect=probe):
+            with self.assertRaises(core.MaskError) as result:
+                transport.probe_all(self.controller_home, args, output)
+        output['error'] = result.exception.as_dict()
+        self.assertEqual([row['status'] for row in output['data']['devices']], ['reachable', 'unavailable'])
+        rendered = present.render_error(output)
+        self.assertIn('reachable: reachable', rendered)
+        self.assertIn('unavailable: unavailable', rendered)
+        self.assertIn('fleet.ssh_auth_required', rendered)
 
     def take_artifact_and_cache(self):
         row = fleet.data(self.device_home / 'user.lock.json')['packages'][0]

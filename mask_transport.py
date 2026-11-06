@@ -307,13 +307,13 @@ def enrollment(home, args, output):
 
 def probe_all(home, args, output):
     name = getattr(args, 'device', None)
-    if name and getattr(args, 'all', False):
+    if name is not None and getattr(args, 'all', False):
         c.fail('invocation.invalid', 'Select --device NAME or --all.', 2)
     parallel = getattr(args, 'parallel', 4)
     timeout = getattr(args, 'timeout', 30)
     if not 1 <= parallel <= 16 or not 1 <= timeout <= 180:
         c.fail('invocation.invalid', 'Choose parallelism 1–16 and timeout 1–180 seconds.', 2)
-    selected = [peer_at(home, name)] if name else peers(home)
+    selected = [peer_at(home, name)] if name is not None else peers(home)
     if not selected:
         c.fail('fleet.no_devices', 'Enroll a device before using fleet probes.', 4)
     controller = fleet.get_identity(home, 'controller')
@@ -325,6 +325,9 @@ def probe_all(home, args, output):
             result['status'] = 'reachable'
             if args.command == 'fleet.capability':
                 result['capabilities'] = observed
+        except OSError:
+            error = c.MaskError('fleet.probe_io_failed', 'A local SSH probe resource could not be read or created.', 4)
+            result.update(status='unavailable', error=error.as_dict())
         except c.MaskError as error:
             result.update(status='unavailable', error=error.as_dict())
         return result
