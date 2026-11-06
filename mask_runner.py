@@ -126,9 +126,11 @@ def read_record(home):
     if record is None:
         return None
     c.fields(record, ('schema_version', 'platform', 'user', 'name', 'path', 'interval', 'argv', 'enabled', 'control'),
-             family='fleet')
+             ('start_boundary',), family='fleet')
     if type(record['enabled']) is not bool or not 60 <= fleet.number(record['interval']) <= 3600:
         c.fail('fleet.runner_invalid', 'Invalid saved runner ownership or interval.', 4)
+    if 'start_boundary' in record and (record['platform'] != 'windows' or not isinstance(record['start_boundary'], str)):
+        c.fail('fleet.runner_invalid', 'Invalid saved Windows task start boundary.', 4)
     return record
 
 
@@ -137,10 +139,13 @@ def scheduler_command(args, output, home):
 
     action = args.command.rsplit('.', 1)[-1]
     previous = read_record(home)
+    saved_boundary = None
     if previous:
         device = fleet.get_identity(home, 'device')
         expected = scheduler.schedule_record(home, device, previous['interval'], previous['argv'])
-        if expected != scheduler_binding(previous):
+        saved_binding = scheduler_binding(previous)
+        saved_boundary = saved_binding.pop('start_boundary', None)
+        if expected != saved_binding:
             c.fail('fleet.scheduler_scope', 'The saved scheduler entry does not belong to this MASK home and native user.', 4)
     if action == 'status':
         output['data']['runner'] = dict(enabled=False, status='disabled')
@@ -160,6 +165,8 @@ def scheduler_command(args, output, home):
             c.fail('invocation.invalid', 'Choose a runner interval from 60 through 3600 seconds.', 2)
         device, _, settings = prerequisites(home)
         binding = scheduler.schedule_record(home, device, interval, runner_argv(home))
+        if saved_boundary is not None:
+            binding['start_boundary'] = saved_boundary
         candidate = dict(binding, enabled=True, control=c.digest(settings))
         if previous and previous['enabled'] and previous != candidate:
             c.fail('fleet.runner_active', 'Disable the existing runner before changing its schedule.', 4)
@@ -186,6 +193,12 @@ def scheduler_command(args, output, home):
             c.fail('plan.stale', 'Runner ownership changed after preview.', 4)
         # Persist ownership before installation; disable the tick gate before
         # removal. An interruption can safely retry the reviewed operation.
+        if action == 'enable' and binding['platform'] == 'windows' and not present:
+            # Approval fixes the schedule policy. Bind its actual installation
+            # time durably before registering the native definition.
+            binding = dict(binding, start_boundary=scheduler.windows_start_boundary())
+            candidate['start_boundary'] = binding['start_boundary']
+            output['data']['runner']['scheduler'] = binding
         fleet.put(record_path(home), candidate, previous)
         output.update(changed=True, transaction='committed')
         if action == 'enable':

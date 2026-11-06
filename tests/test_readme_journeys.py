@@ -1,9 +1,12 @@
 """README recipes replayed verbatim through the public CLI (RFC-MASK-0021 AC06; MASK-0105; case D02).
 
 ``ReadmeText`` pins the replayed strings to README.md: it fails when a fenced command block or an Everyday command
-changes and this file does not follow. ``ReadmeRecipes`` runs exactly those strings on a fresh machine, with no
-``--json``, no plan hash and no preparation. ``shell`` splits each line with POSIX shell quoting and makes only these
-substitutions:
+changes and this file does not follow. ``ReadmeRecipes`` replays the local recipes on a fresh machine, with no
+``--json``, no plan hash and no preparation. The fleet example starts from an enrolled controller and uses the
+approval hash from its preview. Its behavior is covered by the fleet fixture tests and the native rollout record
+in docs/development/fleet-native-acceptance.md. The portable profile row uses the separate repository-identity
+fixture in tests.test_profiles. ``shell`` splits each local recipe line with POSIX shell quoting and makes only
+these substitutions:
 
 - ``python3`` is this test's interpreter.
 - The ManageAgentSkills GitHub URL is a local bare remote holding this working tree's runtime, so
@@ -52,6 +55,12 @@ WINDOWS_INSTALLER = ("$install = (Invoke-WebRequest -Uri 'https://raw.githubuser
 APPROVE_TAP = (f'mask tap agentskills {TAP_URL}',)
 IN_YOUR_PROJECT = ('mask install code-simplifier', 'mask list', 'mask upgrade')
 MAKE_EVERYTHING_WORK = ('mask upgrade --all',)
+FLEET_UPDATE = (
+    'mask tap fetch agentskills',
+    'mask fleet update agentskills/code-simplifier --all-devices --scope user --dry-run',
+    'mask fleet update agentskills/code-simplifier --all-devices --scope user --approve-plan HASH',
+    'mask fleet sync --all',
+)
 EVERYDAY = {
     'Add a skill here': 'mask install ID',
     'Add a personal skill': 'mask install ID --user',
@@ -59,6 +68,7 @@ EVERYDAY = {
     "Show this checkout's skills": 'mask list',
     'Show personal skills': 'mask list --user',
     "Inspect this checkout's readiness": 'mask status',
+    'Preview exact upgrade impact': 'mask update report --all',
     'Inspect a named bundle': 'mask bundle show TAP/BUNDLE',
     'Install a named bundle here': 'mask bundle install TAP/BUNDLE',
     'Review bundle membership and member versions': 'mask bundle upgrade TAP/BUNDLE --dry-run',
@@ -75,6 +85,9 @@ EVERYDAY = {
     'Preview unused storage and backups': 'mask cleanup --dry-run',
 }
 
+PORTABLE_PROFILE_ROW = ['Move personal skills to another machine',
+                        '`mask user export --output DIRECTORY`, then `mask user import DIRECTORY --apply`']
+
 FENCE = re.compile(r'^```[^\n]*\n(.*?)^```$', re.M | re.S)
 
 
@@ -88,10 +101,17 @@ class ReadmeText(unittest.TestCase):
     def test_replayed_text_is_the_readme_text(self):
         found = sections(README.read_text(encoding='utf-8'))
         blocks = {name: [tuple(block.splitlines()) for block in FENCE.findall(body)] for name, body in found.items()}
-        self.assertEqual({name: rows for name, rows in blocks.items() if rows},
-                         {'Install once': [INSTALLER, WINDOWS_INSTALLER, APPROVE_TAP, INSTALL_ONCE], 'In your project': [IN_YOUR_PROJECT], 'Make everything work': [MAKE_EVERYTHING_WORK]})
+        self.assertEqual({name: rows for name, rows in blocks.items() if rows}, {
+            'Install once': [INSTALLER, WINDOWS_INSTALLER, APPROVE_TAP, INSTALL_ONCE],
+            'In your project': [IN_YOUR_PROJECT],
+            'Make everything work': [MAKE_EVERYTHING_WORK],
+            'Update skills across your computers': [FLEET_UPDATE],
+        })
         table = [[cell.strip() for cell in line.strip('|').split('|')] for line in found['Everyday commands'].splitlines() if line.startswith('|')]
-        self.assertEqual(table, [['Task', 'Command'], ['---', '---'], *([task, f'`{command}`'] for task, command in EVERYDAY.items())])
+        expected = [['Task', 'Command'], ['---', '---'], *([task, f'`{command}`'] for task, command in EVERYDAY.items())]
+        after_personal = expected.index(['Show personal skills', '`mask list --user`']) + 1
+        expected.insert(after_personal, PORTABLE_PROFILE_ROW)
+        self.assertEqual(table, expected)
 
 
 class ReadmeRecipes(PublicFixture):
@@ -246,6 +266,7 @@ class ReadmeRecipes(PublicFixture):
         self.assertEqual(self.links(self.personal), alpha)
         self.assertIn('beta', run("Show this checkout's skills").stdout)
         self.assertIn('alpha', run('Show personal skills').stdout)
+        run('Preview exact upgrade impact')
         self.assertIn(f'- {TAP}/beta', run('Remove a skill here', ID='beta').stdout)
         self.assertEqual(self.links(self.project), alpha)
         run('Restore pinned setup, or review an interrupted setup')

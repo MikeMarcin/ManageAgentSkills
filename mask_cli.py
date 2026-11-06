@@ -198,13 +198,18 @@ def parser(engine, common, parser_type, add_argument, help_entries):
         for name, shape in common + arguments:
             add_argument(leaf, name, shape)
         if command.startswith('fleet.'):
+            fleet_help = {
+                'name': 'Local fleet name',
+                'all': 'Select every active enrolled device',
+                'operation': 'Fleet operation ID from a previous result',
+                'scope': 'Use user for personal skills, or select a mapped project alias',
+                'input': 'Skill name or GitHub skill URL' if command == 'fleet.install' else 'Fleet-selected skill as SOURCE/ID',
+                'into': 'Approved curated tap for copy mode',
+            }
+            if command == 'fleet.operation.wait':
+                fleet_help['timeout'] = 'Maximum time to poll for receipts in seconds, from 1 to 180'
             for action in leaf._actions:
-                if action.dest == 'name':
-                    action.help = 'Local fleet name'
-                elif action.dest == 'all':
-                    action.help = 'Select every active enrolled device'
-                elif action.dest == 'operation':
-                    action.help = 'Fleet operation ID from a previous result'
+                action.help = fleet_help.get(action.dest, action.help)
         if command == 'update.report':
             next(action for action in leaf._actions if action.dest == 'independent').help = 'Report independent checkout upgrades when using --all'
         if command == 'upgrade':
@@ -214,6 +219,8 @@ def parser(engine, common, parser_type, add_argument, help_entries):
             next(action for action in leaf._actions if action.dest == 'all').help = 'Select every skill in the chosen checkout or personal scope'
         if dry_run_supported(command, mutates):
             add_argument(leaf, 'dry-run', 'flag')
+            if command.startswith('fleet.'):
+                leaf._actions[-1].help = 'Preview the reviewed fleet effects without applying them'
         if guarded(command, mask):
             add_argument(leaf, 'approve-plan', 'value')
         leaf.set_defaults(command=command)

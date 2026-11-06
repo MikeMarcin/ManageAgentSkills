@@ -209,7 +209,7 @@ class BundleTests(PublicFixture):
         self.assertFalse(commands['bundle.uninstall']['network'])
         self.assertNotIn('bundle.apply', commands)
         self.assertNotIn('bundle.remove', commands)
-        self.assertNotIn('profile.subscribe', commands)
+        self.assertTrue(commands['profile.subscribe']['plan_guard'])
 
     def test_install_keeps_frozen_rows_but_upgrade_advances_unheld_member_versions(self):
         self.install_bundle()

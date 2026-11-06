@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import plistlib
@@ -87,6 +87,10 @@ def mac_observe(record):
     return True, True
 
 
+def windows_start_boundary():
+    return (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat(timespec='seconds')
+
+
 def win_definition(record):
     root = XML.Element('Task', version='1.4', xmlns=TASK_NS)
 
@@ -100,9 +104,9 @@ def win_definition(record):
     node(info, 'URI', '\\' + record['name'])
     triggers = node(root, 'Triggers')
     schedule = node(triggers, 'TimeTrigger')
+    node(schedule, 'StartBoundary', record['start_boundary'])
     repetition = node(schedule, 'Repetition')
     node(repetition, 'Interval', f"PT{record['interval']}S")
-    node(schedule, 'StartBoundary', (datetime.now() + timedelta(minutes=1)).isoformat(timespec='seconds'))
     login = node(triggers, 'LogonTrigger')
     node(login, 'UserId', record['user'])
     principal = node(node(root, 'Principals'), 'Principal', id='CurrentUser')
@@ -121,12 +125,57 @@ def win_definition(record):
     return XML.tostring(root, encoding='utf-16', xml_declaration=True)
 
 
+def duration_seconds(value):
+    match = re.fullmatch(r'P(?:(\d{1,5})D)?(?:T(?:(\d{1,5})H)?(?:(\d{1,5})M)?(?:(\d{1,5})S)?)?', value)
+    if match is None or not any(match.groups()):
+        return None
+    return sum(int(number or 0) * scale for number, scale in zip(match.groups(), (86400, 3600, 60, 1)))
+
+
+def windows_schedule_matches(task, record, namespace):
+    def setting(path, default=None):
+        qualified = '/'.join('t:' + item for item in path.split('/'))
+        return task.findtext(qualified, default, namespace)
+
+    timer = 'Triggers/TimeTrigger/'
+    login = 'Triggers/LogonTrigger/'
+    try:
+        starts = datetime.fromisoformat(setting(timer + 'StartBoundary')).astimezone(timezone.utc)
+        expected = datetime.fromisoformat(record['start_boundary']).astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if starts != expected or duration_seconds(setting(timer + 'Repetition/Interval', '')) != record['interval']:
+        return False
+    if any(setting(prefix + 'Enabled', 'true') not in ('true', '1') for prefix in (timer, login, 'Settings/')):
+        return False
+    if any(duration_seconds(setting(prefix + 'ExecutionTimeLimit', 'PT72H')) != 72 * 3600 for prefix in (timer, login)):
+        return False
+    if any(setting('Settings/' + name, 'false') not in ('false', '0')
+           for name in ('RunOnlyIfIdle', 'RunOnlyIfNetworkAvailable', 'WakeToRun')):
+        return False
+    if any(setting(path) is not None for path in (timer + 'EndBoundary', timer + 'Repetition/Duration',
+                                                  login + 'StartBoundary', login + 'EndBoundary', login + 'Repetition')):
+        return False
+    if any(duration_seconds(setting(path, 'PT0S')) != 0 for path in (timer + 'RandomDelay', login + 'Delay')):
+        return False
+    if setting(timer + 'Repetition/StopAtDurationEnd', 'false') not in ('false', '0'):
+        return False
+    return (setting('Settings/MultipleInstancesPolicy', 'IgnoreNew') == 'IgnoreNew'
+            and setting('Settings/StartWhenAvailable') in ('true', '1')
+            and setting('Settings/DisallowStartIfOnBatteries') in ('false', '0')
+            and setting('Settings/StopIfGoingOnBatteries') in ('false', '0')
+            and duration_seconds(setting('Settings/ExecutionTimeLimit', '')) == 600
+            and not setting('Actions/Exec/WorkingDirectory'))
+
+
 def win_observe(record):
     code, raw, err = command('schtasks.exe', '/Query', '/TN', record['name'], '/XML', '/HRESULT')
     if code:
         if code & 0xffffffff not in (2, 0x80070002) and 'cannot find the file specified' not in windows_text(err).lower():
             c.fail('fleet.scheduler_failed', 'Could not inspect the Windows scheduled task.', 4)
         return False, False
+    if 'start_boundary' not in record:
+        c.fail('fleet.scheduler_collision', 'The existing Windows task has no recorded owned start boundary.', 4)
     try:
         observed = XML.fromstring(raw)
         expected = XML.fromstring(win_definition(record))
@@ -142,6 +191,8 @@ def win_observe(record):
             c.fail('fleet.scheduler_collision', 'The existing Windows task differs from the owned execution definition.', 4)
     if len(observed.findall('t:Actions/*', namespace)) != 1 or len(observed.findall('t:Triggers/*', namespace)) != 2:
         c.fail('fleet.scheduler_collision', 'The existing Windows task contains foreign actions or triggers.', 4)
+    if not windows_schedule_matches(observed, record, namespace):
+        c.fail('fleet.scheduler_collision', 'The existing Windows task schedule differs from the owned definition.', 4)
     return True, True
 
 

@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 from unittest.mock import patch
+from xml.etree import ElementTree as XML
 
 import mask_control as control
 import mask_core as core
@@ -113,7 +114,8 @@ class FleetRunnerTests(FleetRpcFixture):
 
     def test_windows_scheduler_refuses_unowned_action(self):
         binding = dict(platform='windows', user='S-1-5-21-1', name='com.mask.fleet.test',
-                       path=None, interval=300, argv=['C:/Program Files/Python/python.exe', 'mask.py', 'fleet'])
+                       path=None, interval=300, start_boundary='2030-01-01T00:00:00+00:00',
+                       argv=['C:/Program Files/Python/python.exe', 'mask.py', 'fleet'])
         raw = schedule.win_definition(binding)
         with patch.object(schedule, 'command', return_value=(0, raw, b'')):
             self.assertEqual(schedule.win_observe(binding), (True, True))
@@ -121,3 +123,57 @@ class FleetRunnerTests(FleetRpcFixture):
         with patch.object(schedule, 'command', return_value=(0, substituted, b'')):
             with self.assertRaisesRegex(core.MaskError, 'differs'):
                 schedule.win_observe(binding)
+
+
+    def test_windows_scheduler_refuses_changed_trigger_without_deleting_task(self):
+        binding = dict(platform='windows', user='S-1-5-21-1', name='com.mask.fleet.test',
+                       path=None, interval=300, start_boundary='2030-01-01T00:00:00+00:00',
+                       argv=['C:/Program Files/Python/python.exe', 'mask.py', 'fleet'])
+        namespace = {'t': schedule.TASK_NS}
+        for parent, field, value in (
+                ('Triggers/TimeTrigger/Repetition', 'Interval', 'PT1H'),
+                ('Triggers/TimeTrigger', 'StartBoundary', '2031-01-01T00:00:00Z'),
+                ('Triggers/TimeTrigger', 'EndBoundary', '2031-01-01T00:00:00Z'),
+                ('Triggers/LogonTrigger', 'Enabled', 'false'),
+                ('Settings', 'RunOnlyIfIdle', 'true')):
+            with self.subTest(field=field):
+                task = XML.fromstring(schedule.win_definition(binding))
+                parent_node = task.find('/'.join('t:' + part for part in parent.split('/')), namespace)
+                node = parent_node.find('t:' + field, namespace)
+                if node is None:
+                    node = XML.SubElement(parent_node, '{' + schedule.TASK_NS + '}' + field)
+                node.text = value
+                with patch.object(schedule, 'user_id', return_value=binding['user']), patch.object(
+                        schedule, 'command', return_value=(0, XML.tostring(task), b'')) as command:
+                    with self.assertRaisesRegex(core.MaskError, 'schedule differs'):
+                        schedule.remove(binding)
+                    command.assert_called_once_with('schtasks.exe', '/Query', '/TN', binding['name'], '/XML', '/HRESULT')
+        normalized = schedule.win_definition(binding).decode('utf-16').replace('PT300S', 'PT5M').replace(
+            '2030-01-01T00:00:00+00:00', '2030-01-01T00:00:00Z')
+        with patch.object(schedule, 'command', return_value=(0, normalized.encode('utf-16'), b'')):
+            self.assertEqual(schedule.win_observe(binding), (True, True))
+
+    def test_windows_scheduler_approval_persists_the_registered_start_boundary(self):
+        binding = dict(schema_version=1, platform='windows', user='S-1-5-21-1', name='com.mask.fleet.test',
+                       path=None, interval=300, argv=runner.runner_argv(self.device_home))
+        installed = None
+
+        def install(record):
+            nonlocal installed
+            installed = record
+            self.assertEqual(runner.scheduler_binding(runner.read_record(self.device_home)), record)
+
+        args = argparse.Namespace(command='fleet.runner.enable')
+        with patch.object(schedule, 'schedule_record', side_effect=lambda *_: dict(binding)), patch.object(
+                schedule, 'observe', side_effect=lambda record: (record == installed, record == installed)), patch.object(
+                schedule, 'install', side_effect=install):
+            preview = dict(data={}, dry_run=True)
+            runner.scheduler_command(args, preview, self.device_home)
+            self.assertNotIn('start_boundary', preview['data']['runner']['scheduler'])
+            self.assertIsNone(runner.read_record(self.device_home))
+            args.approve_plan = preview['data']['plan_hash']
+            runner.scheduler_command(args, dict(data={}, dry_run=False), self.device_home)
+            self.assertTrue(installed['start_boundary'].endswith('+00:00'))
+            repeated = dict(data={}, dry_run=True)
+            runner.scheduler_command(args, repeated, self.device_home)
+            self.assertFalse(repeated['would_change'])
