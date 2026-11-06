@@ -110,3 +110,13 @@ Required dogfood: at least two genuinely distinct enrolled machines, including t
 ## Live authorization
 
 Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+
+## Live implementation
+
+The [rollout guide](../guides/fleet-rollouts.md) covers the shipped controller
+workflow. Disposable native macOS and Windows devices verified tap and curated
+copy installs, a controller update, newest-only offline catch-up, withdrawal
+and per-device collision reporting. The [native evidence](../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up)
+records the exact candidates and receipts. Foreground pull and scheduler
+ownership logic passed focused tests. Actual launchd and Windows Task Scheduler
+registration and removal remain open under MASK-0054.

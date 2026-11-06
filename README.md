@@ -141,12 +141,23 @@ contribution while preserving other selections and held or locally edited member
 - The same tap works over HTTPS or SSH, so one committed project file suits every machine. MASK uses whichever way you already sign in.
 - `mask COMMAND --help` has examples. Bare `mask` shows this checkout's status.
 
-## Enroll a fleet device
+## Update skills across your computers
 
-Use `mask fleet device enroll` to bind an explicitly authorized device, then
-`mask fleet ping --all` to verify the enrolled SSH connections. The
-[enrollment guide](docs/guides/fleet-enrollment.md) covers the signing identities,
-per-device grants and host key review.
+Enroll each device you want the controller to manage and configure a private
+Git repository for the fleet’s approved selections. From the controller, fetch
+the tap and review the exact update for all enrolled devices.
+
+```sh
+mask tap fetch agentskills
+mask fleet update agentskills/code-simplifier --all-devices --scope user --dry-run
+mask fleet update agentskills/code-simplifier --all-devices --scope user --approve-plan HASH
+mask fleet sync --all
+```
+
+The update applies to skills already selected by the fleet. Use
+`mask fleet install` to add a selection. Offline devices remain pending until
+they verify the approved revision. See the [enrollment guide](docs/guides/fleet-enrollment.md)
+and [rollout guide](docs/guides/fleet-rollouts.md).
 
 ## Learn more
 

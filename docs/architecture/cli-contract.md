@@ -15,6 +15,8 @@ Skills are passive data unless the user approves a declared setup action.
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
 | Fleet device transport | `fleet controller`, `fleet device`, `fleet ping`, `fleet capability` | Explicit enrolled peer or the active local fleet |
+| Fleet rollout | `fleet install`, `fleet update`, `fleet remove`, `fleet sync`, `fleet operation` | Frozen enrolled devices and an authorized personal or mapped project scope |
+| Fleet convergence | `fleet control`, `fleet sync --local`, `fleet runner` | Explicit desired repository, optional separate receipt repository and current-user schedule |
 | Advanced recovery | `recover`, `recover --complete`, `recover --rollback` | The machine's one pending operation; bare `recover` only inspects |
 
 A checkout is the project root discovered within the current Git worktree.
@@ -257,7 +259,7 @@ program before switching executables; neither update nor recovery resets a check
 
 0 success; 2 invalid invocation; 3 invalid/missing configuration; 4 blocked task,
 stale plan or missing consent; 5 external/filesystem/setup failure; 6 busy lock;
-7 failed observational check; 8 pending/conflicting recovery; 10 internal invariant;
+7 failed observational check; 8 pending/conflicting recovery; 9 incomplete fleet rollout; 10 internal invariant;
 130 interruption. Typed error codes refine these classes.
 
 The [accepted amendment](../rfcs/plans/upgrade-readiness/accepted-surface.md)
@@ -337,9 +339,9 @@ requires a live expiry of at most five minutes.
 | Action | Payload |
 |---|---|
 | `capabilities` | Empty object |
-| `inspect` | Authorized `scope` alias |
-| `prepare` | `scope`, optional `acquire` (`exact` or `cached`), optional `artifacts` |
-| `apply` | `scope` and exact local `plan` digest from preparation |
+| `inspect` | Authorized `scope` alias and optional `rollout: true` for a granted rollout scope |
+| `prepare` | `scope`, optional `acquire` (`exact` or `cached`), optional `artifacts`, optional exact desired `profile` |
+| `apply` | `scope`, exact local `plan` digest from preparation, and the same `profile` if preparing a rollout |
 | `receipt` | Target `operation` ID and signed intent `digest` |
 | `cancel-request` | Target accepted `operation` ID and signed intent `digest` |
 
@@ -368,3 +370,39 @@ timeout leaves delivery unknown. A separate signed receipt query can publish
 the verified already-complete result after a disconnect. An unfinished
 filesystem journal requires ordinary local recovery. Receipts record
 `host_load: not_verified` because agent discovery is a separate observation.
+
+## Fleet rollouts
+
+A rollout grant permits exactly one controller-owned contribution per registered
+scope. The `profile` RPC field contains a portable declaration and exact lock
+with their SHA-256 revision. A null profile withdraws that contribution.
+Without the field, RPC reconciliation retains the existing selection. The
+device verifies local source permissions, exact package data, scope generation
+and the prepared plan before ordinary journaled activation. Device-side
+settings, pins and other independent contributions retain their own authority.
+
+The approved control repository has one linear signed intent ref,
+`refs/heads/mask-fleet`. Each signed revision binds the channel, controller,
+epoch, sequence, prior intent digest, operation, frozen devices and scopes,
+portable desired profiles, authorization expiry and optional source publication.
+Desired revisions use `mask-desired@mask.invalid`. Compare-and-swap publication
+checks the expected parent. Existing OpenSSH signing and Git transports are
+separate. Device pull validates the history and locally observed sequence floor.
+
+The result includes `data.operation_id`, `data.desired_revision`,
+`data.device_results`, `data.complete` and `data.installed_everywhere`. A verified
+device receipt is tied to the exact request, device identity, scope, package
+bytes and observation time. Possible outcomes include `applied_verified`,
+`not_applicable`, `queued_offline`, `preparing`, `blocked`,
+`recovery_required`, `unknown`, `canceled` and `superseded`. Historical receipts
+describe their recorded revision and observation. `host_load` remains
+`not_verified`. `operation show` and `operation wait` can succeed as observations
+while `complete` is false. Remote recovery appears in its device row and makes
+an aggregate rollout incomplete.
+
+The device-side runner uses an independently configured receipt repository.
+Receipts are written under
+`refs/heads/mask-receipts/DEVICE_ID/OPERATION_ID`. Controller reports verify the
+recorded device signature against the frozen target. Removing a receipt can
+make evidence unavailable, and cannot establish a different device outcome.
+See the [rollout guide](../guides/fleet-rollouts.md).

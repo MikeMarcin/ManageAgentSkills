@@ -34,3 +34,46 @@ qualification guard compared eight declared project, machine and SSH control
 files and observed no byte changes. These checks exercised disposable enrollment
 and filesystem reconciliation. Production rollout and offline catch-up are
 tracked under RFC-MASK-0013.
+## Two-device rollout and catch-up
+
+Candidate `d1d87be996cd240d3cd23e11a82468b0a9b56adb` ran the same
+controller CLI against distinct macOS 26.6.2 arm64 and native Windows 11
+build 26200 devices. Windows received a disposable source archive with
+verified SHA-256
+`cf609c79d7d138041a01615f831d7f6d3fae4b999f182341e9117992f4ae3bde`.
+The runtime versions matched the table above. The Mac endpoint was an
+unprivileged high-port loopback listener. Both devices used disposable MASK
+homes, separately generated device identities, explicitly mapped personal
+scopes and an unrelated local pin. All Git publication used disposable bare
+repositories. The GitHub-shaped fixture URL resolved through a local Git
+adapter. Device delivery used actual host-key-pinned SSH.
+
+| Public path | Operation | Observed result |
+|---|---|---|
+| `fleet install fleet-shared --mode tap --all-devices --scope user` | `d7a8b27b6715c1ee769a20be1767867b` | Both devices verified the same exact tap payload. |
+| `fleet install URL --mode copy --into curated --all-devices --scope user` | `59d4c21a63ef18f2c45f6b81adae234e` | Both devices verified the curated copy. Its isolated Git commit omitted unrelated staged work and the authoring checkout stayed unchanged. |
+| `fleet update fixture/fleet-shared --all-devices --scope user` with the Mac listener stopped | `163238a36813aee1bbd2e6bb6d674e28` | Exit 9. Windows returned an exact receipt and the Mac stayed queued. A newer approved update later superseded the queued Mac row. |
+| Second `fleet update`, then `fleet sync --all` after restoring the Mac listener | `574980626a100ec2b2dca87115662a10` | Windows verified while the Mac stayed queued. Both verified the newest exact payload after sync, and the earlier Mac delivery remained superseded. |
+| `fleet remove fixture/fleet-shared --all-devices --scope user` | `b38a08834e494ba62d06d921d093502e` | Both verified removal. Their local pins and the separate curated fleet contribution remained present. |
+| Tap reinstall with a controlled Mac destination collision | `189e5e1cc33c25d14079d56675006481` | Exit 9. The Mac reported a blocker and retained the unmanaged marker. Windows returned a successful receipt. |
+
+The latest approved desired digest was
+`sha256:2a4ba31681ed9e0ac8f632f2ab38d2cb40fbda24e8673785ed1fe82153e5b2ae`.
+Both devices verified the exact selected payload digest
+`sha256:37e6fc9ee482c8e493e54471de634dcf175304673bde97102c587b613120195a`.
+The Mac receipt operation was `5fb2a6fc336240928c8220da77489721` and Windows
+was `059f14e285aa40d2bc5b5922a4dd093f`. The controller verified the signed
+receipt, scope, desired digest and matching filesystem bindings for each.
+No agent host loading was observed.
+
+Native Windows also ran the foreground pull and scheduler-adapter tests
+from the same archive. The macOS focused tests exercised the same public
+foreground pull against separate desired and receipt repositories, and
+injected scheduler operations verified ownership and disable behavior. Native
+scheduler registration and removal remain open. The authorization for this
+run covered disposable fixtures and existing SSH access.
+
+The Mac listener stopped and its fixture root was removed. Windows checkout,
+archives, keys and MASK fixture state were removed. The local qualification
+guard compared eight declared live project, machine and SSH files and found
+no byte changes.

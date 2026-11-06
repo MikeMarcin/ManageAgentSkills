@@ -2,9 +2,8 @@
 
 The controller can verify the identity, authorization and current capabilities of
 a device over SSH. The device can reconcile a registered scope against its exact
-local lock and sign the outcome. The rollout layer in
-[RFC-MASK-0013](../rfcs/RFC-MASK-0013-fleet-rollouts-and-continuous-sync.md) chooses
-and delivers new desired profiles across devices.
+local lock and sign the outcome. A separately granted rollout scope can also
+accept approved fleet contributions. See the [rollout guide](fleet-rollouts.md).
 
 ## Prepare identities and a device grant
 
@@ -43,7 +42,10 @@ Set `scopes` to an object keyed by your chosen aliases. Each scope has `scope`
 (`true` only if the device may receive private package bytes from that source).
 Use an empty object for scopes or sources when granting only capabilities or
 when there are no applicable sources. The device binds the registered physical
-identity locally. The descriptor omits the physical consumer paths and key files.
+identity locally. Add `"rollout": true` to a scope to permit the controller to
+change its fleet-owned profile. That grant also needs `inspect`, `prepare`,
+`apply`, and `receipt` in `actions`. Use one rollout alias per physical scope.
+The descriptor omits the physical consumer paths and key files.
 
 ## Review the SSH binding
 
