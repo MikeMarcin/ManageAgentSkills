@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0148"
+  ],
+  "reserve_for": "windows-untrusted-skill-link-repair",
+  "purpose": "",
+  "created": "2026-11-06T07:01:15.670854+00:00",
+  "base": "d683fe0d9df2bcbf8d5987a5b47905dc6c80611d"
+}
