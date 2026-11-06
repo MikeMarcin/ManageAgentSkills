@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0008"
 title: "True version pinning, immutable deployment artifacts and recoverable migration"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
@@ -93,3 +93,13 @@ Automatic garbage collection is not required. Retain artifacts referenced by any
 ## Live authorization
 
 Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+
+## Integrated and verified scope
+
+The exact store, lock and recovery behavior is verified on the current
+tap-based implementation. Use `mask upgrade` for selected pinned updates.
+The original pre-tap migration ran under the historical implementation,
+and RFC-MASK-0021 replaced its entry point before the owner retired pre-tap
+configuration, deployment and recovery in `7ccf671`. Its historical
+acceptance remains recorded separately from the supported tap model.
+[Closeout](../issues/60-done/MASK-0069-close-8.md) · [Native evidence](../development/targeting-acceptance.md)
