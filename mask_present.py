@@ -1259,7 +1259,29 @@ def render_exact(data, output):
     return lines
 
 
+def render_fleet(data, output):
+    lines = [headline(output)]
+    identity = data.get('identity') or data.get('device')
+    if identity:
+        lines.append(f"  {clean(identity['name'])} ({clean(identity['id'])}), {clean(identity['fingerprint'])}")
+    policy = data.get('authority')
+    if policy:
+        lines.append(f"  Controller {clean(policy['controller']['name'])}, epoch {policy['epoch']}")
+        lines.append('  Actions: ' + ', '.join(policy['actions']))
+        for alias, scope in sorted(policy['scopes'].items()):
+            lines.append(f"  {alias} ({scope['scope']}):")
+            lines.extend(f"    {name}: {clean(source['repository'])}" +
+                         (' (forwarding allowed)' if source['forward'] else '')
+                         for name, source in sorted(scope['sources'].items()))
+        if policy.get('revoked'):
+            lines.append('  Authority revoked.')
+    return lines + plan_guard(data, output)
+
+
 RENDERERS = {
+    'fleet.controller.init': render_fleet, 'fleet.controller.show': render_fleet,
+    'fleet.device.init': render_fleet, 'fleet.device.descriptor': render_fleet,
+    'fleet.device.authorize': render_fleet, 'fleet.device.revoke-controller': render_fleet,
     'diff': render_exact, 'update.report': render_exact, 'report': render_exact,
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,

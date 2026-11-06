@@ -292,13 +292,14 @@ HOOK_EVENTS = ('applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commi
                'p4-pre-submit', 'post-index-change')
 
 
-def contained_run(command, environment, *, timeout, max_output, max_error=65536, monitor=None, family='git', name='Git', cwd=None, input=None):
+def contained_run(command, environment, *, timeout, max_output, max_error=65536, monitor=None, family='git', name='Git', cwd=None, input=None, input_file=None):
     """Run one owned process tree (POSIX process group or Windows Job) with bounded wall time and output.
 
     Returns ``(returncode, stdout, stderr)``. Timeout, output overflow, read failure or
     interruption terminates the whole tree before raising; an unconfirmed termination is
     ``recovery.required``. Error codes are ``<family>.timeout`` and so on. ``input`` bytes,
-    when given, are written to the child's stdin, which is then closed.
+    when given, are written to the child's stdin, which is then closed. An open
+    input_file can be used instead for providers requiring file-backed stdin.
     """
     options = dict(start_new_session=True) if os.name != 'nt' else dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
     job = None
@@ -309,7 +310,9 @@ def contained_run(command, environment, *, timeout, max_output, max_error=65536,
         except OSError:
             fail(family + '.containment_unavailable', f'Windows Job Object containment is unavailable; {name} was not started.', 4)
         options['creationflags'] |= CREATE_SUSPENDED
-    stdin = subprocess.DEVNULL if input is None else subprocess.PIPE
+    if input is not None and input_file is not None:
+        raise ValueError('Choose bytes or a file for stdin.')
+    stdin = input_file if input_file is not None else subprocess.DEVNULL if input is None else subprocess.PIPE
     def start():
         return subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, cwd=cwd, **options)
     try:

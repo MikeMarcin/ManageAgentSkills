@@ -691,8 +691,9 @@ def main(argv=None):
             args = parser.parse_args(mask_cli.normalize(argv))
             args.invocation_argv = argv
             if not hasattr(args, 'command'):
-                members = [name.split('.')[1] for name in mask_cli.definitions(COMMANDS) if name.startswith(f"{getattr(args, 'group', '')}.")]
-                command_path = f'mask {args.group}' if members else 'mask'
+                prefix = getattr(args, 'command_prefix', ())
+                members = mask_cli.subcommands(mask_cli.definitions(COMMANDS), prefix) if prefix else []
+                command_path = ' '.join(('mask', *prefix))
                 raise MaskError('invocation.invalid', f"A subcommand is required for '{command_path}'." if members else 'A command is required.', 2,
                                 details=dict(command_path=command_path, subcommands=members))
             output = result(args.command, getattr(args, 'dry_run', False))

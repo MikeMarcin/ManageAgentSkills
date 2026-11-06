@@ -25,6 +25,12 @@ COMMANDS = {
     'untap': (True, False, [('name', 'pos')]),
     'update': (True, True, [('stash', 'flag')]),
     'update.report': (False, False, SCOPES + [('skill', 'repeat'), ('allow-ref-rebind', 'flag'), ('independent', 'flag'), ('limit', 'int'), ('offset', 'int'), ('output', 'value')]),
+    'fleet.controller.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
+    'fleet.controller.show': (False, False, []),
+    'fleet.device.init': (True, False, [('name', 'pos'), ('signing-key', 'required')]),
+    'fleet.device.authorize': (True, False, [('policy', 'required')]),
+    'fleet.device.revoke-controller': (True, False, []),
+    'fleet.device.descriptor': (False, False, []),
     'report': (False, False, [('operation', 'pos'), ('format', 'value'), ('output', 'value'), ('limit', 'int'), ('offset', 'int')]),
     'diff': (False, False, [('id', 'pos'), ('from', 'required'), ('to', 'required'), ('patch', 'flag')]),
     'cleanup': (True, False, []),
@@ -60,6 +66,11 @@ KEEP = ('config.show', 'config.set', 'inventory', 'skill.where-used', 'skill.val
         'launch', 'workspace.forget', 'link.adopt', 'recover', 'tap.transport', 'lock', 'self.status', 'self.install', 'self.uninstall')
 
 HELP = {
+    'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
+    'fleet.device.init': ('Bind a stable device identity to a distinct local OpenSSH signing key.', None),
+    'fleet.device.authorize': ('Review a local policy granting a controller access to registered scopes and approved sources.', 'mask fleet device authorize --policy FILE --dry-run --json'),
+    'fleet.device.revoke-controller': ('Withdraw the local device grant for the enrolled controller.', None),
+    'fleet.device.descriptor': ('Show the public device and authority descriptor for enrollment.', None),
     'report': ('Render a saved local update-impact receipt in text, JSON or offline HTML.', 'mask report RECEIPT.json --format html'),
     'update.report': ('Explain the guarded upgrade candidate from cached taps without fetching or applying it.', 'mask update report --all --json'),
     'diff': ('Compare raw files at two full cached or locked commit IDs. Text patches are opt-in and bounded.', 'mask diff TAP/ID --from OLD_COMMIT --to NEW_COMMIT'),
@@ -105,7 +116,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    return command in ('user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
+    return command in ('fleet.device.authorize', 'fleet.device.revoke-controller', 'user.export', 'user.import', 'profile.subscribe', 'profile.unsubscribe', 'register', 'repair', 'pin', 'unpin', 'cleanup', 'unregister', 'tap', 'update', 'bundle.install', 'bundle.uninstall', 'bundle.upgrade') or RENAMES.get(command, command) in engine.GUARDED
 
 
 def parser(engine, common, parser_type, add_argument, help_entries):
@@ -114,19 +125,21 @@ def parser(engine, common, parser_type, add_argument, help_entries):
     for name, shape in common:
         add_argument(root, name, shape)
     sub = root.add_subparsers(dest='group', parser_class=parser_type)
-    groups, leaves = {}, {}
+    groups, leaves = {(): sub}, {}
     for command, (mutates, _, arguments) in definitions(engine).items():
         parts = command.split('.')
-        # tap also has a useful bare form; normalize its advanced subcommands before parsing.
-        if len(parts) == 2 and parts[0] not in ('tap', 'update'):
-            if parts[0] not in groups:
-                group = sub.add_parser(parts[0], add_help=False, allow_abbrev=False)
-                for name, shape in common:
-                    add_argument(group, name, shape)
-                groups[parts[0]] = group.add_subparsers(dest='subcommand', parser_class=parser_type)
-            parent, name = groups[parts[0]], parts[-1]
-        else:
-            parent, name = sub, command
+        # A bare tap/update command coexists with normalized advanced aliases.
+        if parts[0] in ('tap', 'update'):
+            parts = [command]
+        for depth in range(1, len(parts)):
+            prefix = tuple(parts[:depth])
+            if prefix not in groups:
+                group = groups[prefix[:-1]].add_parser(prefix[-1], add_help=False, allow_abbrev=False)
+                group.set_defaults(command_prefix=prefix)
+                for option, shape in common:
+                    add_argument(group, option, shape)
+                groups[prefix] = group.add_subparsers(dest=f'subcommand_{depth}', parser_class=parser_type)
+        parent, name = groups[tuple(parts[:-1])], parts[-1]
         description, examples = HELP.get(command, help_entries.get(RENAMES.get(command, command), (None, None)))
         for old, new in (('mask source dev-link', 'mask skill dev-link'), ('mask source ', 'mask tap '), ('source fetch', 'tap fetch'), ('mask project register', 'mask register'), ('mask user register', 'mask register --user')):
             description = description.replace(old, new) if description else description
@@ -243,6 +256,9 @@ def dispatch(args, output, leaves):
     validate(args)
     public = args.command
     home = mask.machine_home(args)
+    if public.startswith('fleet.'):
+        import mask_fleet
+        return mask_fleet.dispatch(args, output, home)
     if public in ('install', 'upgrade'):
         state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
         if public == 'upgrade':
@@ -380,18 +396,22 @@ def capabilities(output, leaves, mask):
                                        retired_paths=True, compatible_locks=True, entrypoints=['register','install','uninstall','repair','upgrade','status','launch','bundle.install','bundle.upgrade','bundle.uninstall'], host_load='not_verified'))
 
 
+def subcommands(commands, prefix):
+    width = len(prefix)
+    return list(dict.fromkeys(parts[width] for command in commands
+                             if len(parts := command.split('.')) > width and tuple(parts[:width]) == prefix))
+
+
 def help_text(parser, leaves, argv, mask):
     words = [word for word in argv if not word.startswith('-')]
-    key = '.'.join(words[:2])
-    if key in leaves:
-        return leaves[key].format_help().replace('mask tap.', 'mask tap ').replace('mask update.', 'mask update ')
-    if words and words[0] in leaves:
-        return leaves[words[0]].format_help().replace('mask tap.', 'mask tap ')
     commands = definitions(mask.COMMANDS)
-    if words:
-        members = [name for name in commands if name.startswith(words[0] + '.')]
+    for width in range(len(words), 0, -1):
+        key = '.'.join(words[:width])
+        if key in leaves:
+            return leaves[key].format_help().replace('mask tap.', 'mask tap ').replace('mask update.', 'mask update ')
+        members = subcommands(commands, tuple(words[:width]))
         if members:
-            return '\n'.join(['Commands:'] + ['  mask ' + name.replace('.', ' ') for name in members]) + '\n'
+            return '\n'.join(['Commands:'] + ['  mask ' + ' '.join([*words[:width], name]) for name in members]) + '\n'
     return f'''MASK {mask.VERSION} — manage agent skills
 
 Shared resources (independent of your checkout):

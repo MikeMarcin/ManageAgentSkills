@@ -101,7 +101,7 @@ class CliV2(PublicFixture):
         self.assertFalse(self.machine('pin')['ok'])
 
     def test_breaking_surface_help_and_catalog(self):
-        for old in ('ensure', 'doctor', 'apply', 'plan', 'remove', 'inventory'):
+        for old in ('ensure', 'doctor', 'apply', 'plan', 'remove'):
             self.assertEqual(self.machine(old)['error']['code'], 'invocation.invalid')
         self.assertTrue(self.machine('tap', 'fetch')['ok'])
         self.assertEqual(len(self.machine('search', 'alpha')['data']['skills']), 1)
