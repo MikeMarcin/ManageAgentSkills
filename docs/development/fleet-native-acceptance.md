@@ -77,3 +77,36 @@ The Mac listener stopped and its fixture root was removed. Windows checkout,
 archives, keys and MASK fixture state were removed. The local qualification
 guard compared eight declared live project, machine and SSH files and found
 no byte changes.
+
+## Current-user native scheduler qualification
+
+The owner authorized one disposable per-user entry at a time on each host.
+Each fixture began with a foreground baseline. The controller then published
+two newer signed revisions while an even newer upstream version remained
+unapproved. The native job reconciled the last approved revision and
+published its receipt to a separate disposable Git repository.
+
+| Native scheduler | Product candidate | Approved operation and receipt | Observed result |
+|---|---|---|---|
+| macOS launchd, current GUI user | `213a50609f1284d6752aeb7d73fc7a1288d6da1c` | Operation `7cea37aa697c4f9aa15f2c7eb2fd1036`, receipt `672228a8f08345cdbc441397253a598e` | Guarded registration succeeded. launchd recorded one run and exit 0. The exact newest bytes and signed receipt matched. Guarded disable removed the service and plist. |
+| Windows Task Scheduler, current interactive user | `d683fe0d9df2bcbf8d5987a5b47905dc6c80611d` | Diagnostic operation `2b223a4921774bbb873caa0e65303adb`, receipt `bd26f77608cd4f38b0906bd672184d9a` | The exact archive passed reviewed registration, timed execution with exit 0, signed receipt publication and guarded removal. A second fixture added a read-only observer after the same runner returned. It verified the exact newest bytes through the managed link from inside the scheduled current-user process. |
+
+Both platform fixtures used payload digest
+`sha256:ccf48968d7d8fc5735910113556ac132c3ba770715b4c608cd35fdaf8aad9db6`.
+Neither scheduled run published a receipt for the superseded revision or
+deployed the unapproved upstream version. On Windows, the diagnostic
+observer's linked-file SHA-256 matched the directly read immutable artifact.
+The independent SSH process saw the exact recorded link target and could
+read the direct artifact. Windows refused its traversal of the same link
+with WinError 448. This qualifies the scheduled current-user scope. An
+independent session's access depends on Windows reparse-point trust.
+
+The initial Mac preview exceeded its output bound while listing the whole
+GUI domain. The first Windows attempts exposed the scheduler's XML encoding,
+current-user name normalization and provider discovery differences. MASK now
+inspects the exact launchd service, normalizes the native Windows export
+and binds the reviewed Windows signing executable. The corrected runs
+required no changes to host permissions, credentials or PATH. An independent
+post-cleanup query verified the Mac service and plist and all four exact
+Windows task names were absent. All scheduler fixture roots and transfers
+were removed. Agent host discovery remains unobserved.

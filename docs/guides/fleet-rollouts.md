@@ -104,5 +104,8 @@ Each device uses its own Git credentials for exact source acquisition.
 Use the same command with `--approve-plan HASH` to enable it. The default
 interval is 300 seconds. `fleet runner status` reports ownership and next
 poll, and `fleet runner disable` previews and removes the owned entry with the
-same approval flow. The launchd and Windows Task Scheduler adapters await
-native registration qualification. Foreground sync works without a schedule.
+same approval flow. The Windows preview binds the absolute signing executable
+the task will use. Native qualification exercised launchd and Windows Task
+Scheduler in the current user’s session. Foreground sync works without a
+schedule. See the [native evidence](../development/fleet-native-acceptance.md#current-user-native-scheduler-qualification)
+for the Windows link-traversal distinction across session types.

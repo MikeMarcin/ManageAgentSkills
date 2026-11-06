@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0054"
 title: "Add opt-in native scheduled convergence and offline catch-up"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0053"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-runner","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0013-AC03","outcome":"pass","revision":"c7680f8f1b1c1a2c774f8b1baac40fe8bee519fc","evidence":{"kind":"observation","detail":"Authenticated Git CAS, replay and public exact rollback tests remain unchanged. tests.test_fleet_control passed again in the r2 focused gate."}},{"criterion":"RFC-MASK-0013-AC04","outcome":"pass","revision":"d1d87be996cd240d3cd23e11a82468b0a9b56adb","evidence":{"kind":"observation","detail":"The recorded native two-device rollout, cancellation/lost acknowledgement fixtures and exact offline supersession establish independent device outcomes."}},{"criterion":"RFC-MASK-0013-AC05","outcome":"pass","revision":"d683fe0d9df2bcbf8d5987a5b47905dc6c80611d","evidence":{"kind":"observation","detail":"Authorized native launchd at 213a506 and native Windows Task Scheduler at d683fe0. Actual scheduler execution, latest approved exact bytes and signed receipts, guarded removal and independent absence passed on both. On Windows the scheduled current-user process read the exact link bytes while a separate SSH token observed WinError 448. See the exact native scheduler evidence table."}}]
 ---
 
 # MASK-0054: Add opt-in native scheduled convergence and offline catch-up
@@ -45,7 +46,12 @@ scheduler checks exercised ownership, disable and bounded retry. Controller
 push and native offline catch-up are recorded in the
 [native rollout report](../../development/fleet-native-acceptance.md#two-device-rollout-and-catch-up).
 
-AC05 remains open for an actual current-user launchd and Windows Task Scheduler
-registration, invocation and removal. Existing native authority covers
-disposable checkout fixtures and excludes host scheduler changes. The private
-rollout checkpoint records a scoped temporary procedure for later authorization.
+Under the owner's r2 authorization, the
+[native scheduler qualification](../../development/fleet-native-acceptance.md#current-user-native-scheduler-qualification)
+verified reviewed enable, actual current-user scheduler invocation, newest
+exact approved filesystem bytes and receipt, guarded disable and independent
+absence on macOS and Windows. The separate SSH process hit WinError 448 when
+traversing the scheduled user's Windows link. The actual scheduled process
+read the same link and matched the direct artifact SHA-256. Initial adapter
+refusals were corrected at `213a50609f1284d6752aeb7d73fc7a1288d6da1c`
+and `d683fe0d9df2bcbf8d5987a5b47905dc6c80611d`.
