@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0043"
 title: "Compose subscribed profile and local selection contributions"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0042"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"subscriptions","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0010-AC01","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Native macOS and Windows public fixtures used two independent source, machine and personal roots. The imported lock and native link bytes matched, and the export excluded local state and paths."}},{"criterion":"RFC-MASK-0010-AC04","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"Layered public CLI fixtures verified positive target union, frozen offline revision, unsubscription and local replace, plus unapproved source, missing exact commit and conflicting artifact refusals."}},{"criterion":"RFC-MASK-0010-AC05","outcome":"pass","revision":"52e725ed214d57630787fd1e1ad7ecae44058063","evidence":{"kind":"command","detail":"One public user import --apply acquired the exact approved commit and registered a new personal home. Interrupted first import rolled back exact absence or completed its frozen controls through public recover. Seven tests passed on Windows and as part of 23 macOS checks."}}]
 ---
 
 # MASK-0043: Compose subscribed profile and local selection contributions
