@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0049"
 title: "Add fixed-entrypoint SSH and exact artifact transfer"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0048"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-ssh","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
