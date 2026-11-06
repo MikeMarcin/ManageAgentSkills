@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0149"
+  ],
+  "reserve_for": "fleet-command-maintenance",
+  "purpose": "",
+  "created": "2026-11-06T07:14:52.491281+00:00",
+  "base": "80e2fc4130e9ac5b9fe8cf6164c35fdaac76cf93"
+}
