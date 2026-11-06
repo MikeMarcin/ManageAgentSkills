@@ -315,6 +315,7 @@ class FleetMaintenanceTests(FleetRpcFixture):
         for name in ('current-dirty', 'current-diverged'):
             self.cli(self.device_home, 'upgrade', '--project', projects[name], '--no-update', env=self.env)
         self.git(projects['current-dirty'], 'add', '.mask.lock.json')
+        self.cli(self.device_home, 'pin', 'fixture/alpha', '--project', projects['current-diverged'], env=self.env)
         for name in ('stale-dirty', 'stale-diverged'):
             path = projects[name] / '.mask.lock.json'
             path.write_bytes(path.read_bytes() + b'\n')
@@ -338,7 +339,10 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertEqual(group['canonical'][1], 'primary')
         rows = {row['scope']: row for row in preview['plan']['targets']}
         self.assertEqual(rows['primary']['status'], 'planned')
-        self.assertEqual(rows['primary']['request']['candidate']['lock']['packages'][0]['commit'], selected)
+        canonical_lock = rows['primary']['request']['candidate']['lock']
+        self.assertEqual(canonical_lock['packages'][0]['commit'], selected)
+        diverged_lock = json.loads((projects['current-diverged'] / '.mask.lock.json').read_text())
+        self.assertNotEqual(diverged_lock, canonical_lock)
         for name in ('current-dirty', 'current-diverged'):
             self.assertEqual((rows[name]['status'], rows[name]['reason']), ('not_applicable', 'fleet.scope_current'))
             self.assertNotIn('request', rows[name])
