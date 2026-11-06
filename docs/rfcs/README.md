@@ -59,3 +59,5 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 | RFC-MASK-0023 | Auto-Verified | Selected workflow requirement profiles |
 
 | RFC-MASK-0024 | Auto-Verified | Opt-in commits of upgraded project selections and locks |
+
+| RFC-MASK-0025 | Implementing | Fleet command defaults and approved program and skill maintenance |

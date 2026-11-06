@@ -1,0 +1,33 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "fleet-command-maintenance",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0025"
+    ],
+    "issues": [
+      "MASK-0149"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "fleet-command-maintenance",
+      "outcome": "A controller reviews fleet install, exact skill upgrades with shared project commits, and separately authorized program updates.",
+      "work": [
+        {
+          "issue": "MASK-0149"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "Default install resolves one exact already approved package and affects only authorized personal targets.",
+        "Fleet upgrades preserve pins and local ownership, reuse one project controls commit across eligible checkouts and report uncertain delivery truthfully.",
+        "Fleet program updates reach one reviewed exact revision through separate device authority and checked recovery.",
+        "Public disposable macOS and Windows evidence and cleanup are recorded."
+      ],
+      "boundary": "No real user enrollment, live publication, credential changes or scheduled tasks."
+    }
+  ]
+}
