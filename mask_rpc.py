@@ -35,7 +35,9 @@ OPERATION_STATES = {'prepare': {'prepared', 'canceled'}, 'apply': {'applied_veri
                     'cancel-request': {'cancel_recorded'}}
 PAYLOADS = {'capabilities': (), 'inspect': ('scope',), 'prepare': ('scope',),
             'apply': ('scope', 'plan'), 'receipt': ('operation', 'digest'),
-            'cancel-request': ('operation', 'digest')}
+            'cancel-request': ('operation', 'digest'),
+            'program-inspect': ('origin', 'candidate'), 'program-update': ('origin', 'candidate', 'observed'),
+            'upgrade-inspect': ('scope',), 'upgrade-apply': ('scope', 'observed', 'candidate', 'commit')}
 
 
 def invalid(message):
@@ -112,6 +114,9 @@ def intent_shape(intent):
         digest(payload['digest'])
         if payload['operation'] == intent['id']:
             invalid('A query or cancellation cannot name itself.')
+    if action.startswith(('program-', 'upgrade-')):
+        import mask_fleet_maintenance
+        mask_fleet_maintenance.validate_payload(action, payload)
     return intent
 
 
@@ -559,7 +564,11 @@ def perform(home, intent, device, policy):
     if action == 'capabilities':
         return dict(device=fleet.public(device), authority=fleet.public_authority(policy), generation=state_at(home)['generation'],
                     adapters=selection.read_policy(home)[0]['enabled_agents'], max_frame=MAX_FRAME,
-                    max_transfer=artifacts.MAX_TRANSFER, signing_provider='openssh-sshsig-ed25519')
+                    max_transfer=artifacts.MAX_TRANSFER, signing_provider='openssh-sshsig-ed25519',
+                    maintenance=1)
+    if action.startswith(('program-', 'upgrade-')):
+        import mask_fleet_maintenance
+        return mask_fleet_maintenance.perform(home, intent, device, policy)
     if action == 'receipt':
         return receipt(home, intent, policy)
     if action == 'inspect':

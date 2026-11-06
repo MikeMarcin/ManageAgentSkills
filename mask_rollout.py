@@ -25,9 +25,10 @@ PRESENT = {'selected', 'overridden', 'deployed'}
 DISCONNECTED = {'fleet.transport_unknown', 'fleet.response_unverified'}
 
 
-def choose_devices(args, home):
+def choose_devices(args, home, *, default_all=False):
     names = getattr(args, 'device', [])
-    if bool(names) == bool(getattr(args, 'all_devices', False)):
+    all_devices = getattr(args, 'all_devices', False) or getattr(args, 'all', False)
+    if (names and all_devices) or (not names and not all_devices and not default_all):
         c.fail('invocation.invalid', 'Select --all-devices or one or more --device NAME values.', 2)
     if len(set(names)) != len(names):
         c.fail('invocation.invalid', 'Device names must be unique.', 2)
@@ -452,7 +453,9 @@ def previous_profile(home, history, previous, key):
 def rollout(home, signer, history, args, output, stack):
     action = args.command.rsplit('.', 1)[-1]
     config = c.config(c.read_json(home / 'config.json'))
-    peers = choose_devices(args, home)
+    peers = choose_devices(args, home, default_all=action == 'install')
+    if action == 'install' and not hasattr(args, 'scope') and not hasattr(args, 'project_alias'):
+        args.scope = 'user'
     targets = [frozen_target(peer, args, signer) for peer in peers]
     effective = history.effective()
     previous_profiles = {key: previous_profile(home, history, effective.get(key), key)
@@ -461,6 +464,8 @@ def rollout(home, signer, history, args, output, stack):
     source_effect = upstream = None
     if action == 'install':
         mode = getattr(args, 'mode', None) or history.control.get('import_mode')
+        if mode is None and not args.input.startswith('https://') and not hasattr(args, 'into'):
+            mode = 'tap'
         if mode not in ('tap', 'copy'):
             c.fail('fleet.mode_required', 'Choose --mode tap or --mode copy, or configure a reviewed default.', 4)
         row = resolve_input(home, config, args.input, ref=getattr(args, 'ref', None), path=getattr(args, 'path', None))

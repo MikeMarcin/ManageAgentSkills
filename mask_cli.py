@@ -33,7 +33,8 @@ COMMANDS = {
     'fleet.control.configure': (True, False, [('repository', 'pos'), ('epoch', 'int'), ('import-mode', 'value'), ('receipts', 'value')]),
     'fleet.install': (True, True, [('input', 'pos'), ('mode', 'value'), ('into', 'value'),
                                    ('ref', 'value'), ('path', 'value')] + FLEET_TARGET),
-    'fleet.update': (True, True, [('input', 'pos')] + FLEET_TARGET),
+    'fleet.update': (True, True, [('input', 'optional'), ('all', 'flag')] + FLEET_TARGET),
+    'fleet.upgrade': (True, True, [('all', 'flag')] + FLEET_TARGET),
     'fleet.remove': (True, True, [('input', 'pos')] + FLEET_TARGET),
     'fleet.sync': (True, True, [('device', 'repeat'), ('all', 'flag'), ('local', 'flag'), ('timeout', 'int')]),
     'fleet.operation.show': (False, True, [('operation', 'pos')]),
@@ -93,8 +94,9 @@ HELP = {
     'fleet.controller.init': ('Bind a stable controller identity to an existing local OpenSSH signing key.', None),
     'fleet.controller.show': ('Show the public local controller signing identity.', None),
     'fleet.control.configure': ('Review the private Git repository and epoch for signed fleet desired state.', 'mask fleet control configure REPOSITORY --dry-run --json'),
-    'fleet.install': ('Install one exact skill contribution on authorized enrolled devices.', 'mask fleet install TAP/SKILL --mode tap --all-devices --scope user --dry-run'),
-    'fleet.update': ('Update a fleet-selected skill to the exact candidate from the cached tap.', 'mask fleet update TAP/SKILL --all-devices --scope user --dry-run'),
+    'fleet.install': ('Install one exact skill contribution. Defaults to authorized personal scopes on enrolled devices.', 'mask fleet install SKILL --dry-run'),
+    'fleet.update': ('Update the MASK program on enrolled devices. An explicit SOURCE/ID retains the fleet skill rollout command.', 'mask fleet update --all --dry-run\nmask fleet update TAP/SKILL --all-devices --scope user --dry-run'),
+    'fleet.upgrade': ('Upgrade skills in authorized scopes and propagate one project controls commit per repository.', 'mask fleet upgrade --all --dry-run'),
     'fleet.remove': ('Withdraw a fleet-owned contribution and preserve independent local selections.', 'mask fleet remove TAP/SKILL --all-devices --scope user --dry-run'),
     'fleet.sync': ('Deliver the latest approved desired state to enrolled devices, or pull it on this device.', 'mask fleet sync --all\nmask fleet sync --local'),
     'fleet.operation.show': ('Show signed rollout results from the recorded operation.', 'mask fleet operation show OPERATION_ID'),
@@ -160,7 +162,7 @@ def definitions(engine):
 
 
 def guarded(command, engine):
-    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove',
+    if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove',
                    'fleet.operation.cancel', 'fleet.operation.rollback',
                    'fleet.runner.enable', 'fleet.runner.disable'):
         return True
@@ -460,7 +462,7 @@ def capabilities(output, leaves, mask):
                          scopes=['project', 'user'], default_scope='current_checkout', aggregate_scope='all_registered',
                          deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap --autocrlf'), pinned_deployment=True, per_binding_targeting=True, targets=mask.ADAPTERS,
                          bundles=dict(flat=True, source_index=1, contributions='explicit_local', upgrade='definition_and_unheld_versions', ordinary_upgrade='installed_receipts', uninstall='named_local_contribution', recursive=False),
-                         fleet=dict(protocol=mask_fleet.PROTOCOL, actions=list(mask_fleet.ACTIONS), max_frame=mask_rpc.MAX_FRAME,
+                         fleet=dict(protocol=mask_fleet.PROTOCOL, actions=list(mask_fleet.SUPPORTED_ACTIONS), max_frame=mask_rpc.MAX_FRAME,
                                     max_transfer=mask_fleet_artifacts.MAX_TRANSFER, signing='openssh-sshsig-ed25519'),
                          adapter_contracts=mask.adapters.capabilities(), python_minimum='3.11', program_root=str(mask.PROGRAM_ROOT),
                          workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1',

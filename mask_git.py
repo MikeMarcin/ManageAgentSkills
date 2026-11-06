@@ -49,7 +49,7 @@ def parents(path):
     return {'/'.join(parts[:index]) for index in range(1, len(parts))}
 
 
-def blocking_paths(root, candidate, local, timeout=30):
+def blocking_paths(root, candidate, local, timeout=30, *, objects=None, before='HEAD'):
     """The local changes a fast-forward from HEAD to ``candidate`` would touch.
 
     A path blocks when the update changes it, or when one side has a file where the other has a directory.
@@ -59,7 +59,7 @@ def blocking_paths(root, candidate, local, timeout=30):
         return []
     folded = c.git(root, 'config', '--bool', '--get', 'core.ignorecase', optional=True, timeout=timeout) == 'true'
     key = str.casefold if folded else str
-    incoming = {key(path) for path in paths(c.git(root, 'diff', '--name-only', '--no-renames', '-z', 'HEAD', candidate, binary=True, timeout=timeout))}
+    incoming = {key(path) for path in paths(c.git(objects or root, 'diff', '--name-only', '--no-renames', '-z', before, candidate, binary=True, timeout=timeout))}
     folders = set().union(*(parents(path) for path in incoming))
     return sorted(path for path in local if key(path) in incoming or key(path) in folders or parents(key(path)) & incoming)
 

@@ -78,7 +78,8 @@ def restore_launcher(pending, side):
 
 
 RUNTIME_MODULES = ('mask.py', 'mask_core.py', 'mask_fs.py', 'mask_git.py', 'mask_install.py', 'mask_ensure.py', 'mask_integration.py', 'mask_report.py', 'mask_present.py', 'mask_sources.py', 'mask_packages.py', 'mask_process.py', 'mask_provenance.py', 'mask_resolve.py', 'mask_store.py', 'mask_pinned.py', 'mask_selection.py', 'mask_adapters.py', 'mask_consent.py', 'mask_task.py', 'mask_bundles.py', 'mask_upgrade_commit.py', 'mask_upgrade_groups.py', 'mask_workflow.py', 'mask_setup.py', 'mask_repair.py', 'mask_update.py', 'mask_cli.py', 'mask_lifecycle.py', 'mask_cleanup.py', 'mask_pin.py', 'mask_progress.py', 'mask_identity.py', 'mask_profiles.py', 'mask_fleet.py', 'mask_rpc.py', 'mask_transport.py', 'mask_fleet_artifacts.py', 'mask_control.py', 'mask_rollout.py', 'mask_fleet_copy.py',
-                   'mask_fleet_receipts.py', 'mask_runner.py', 'mask_fleet_schedule.py')
+                   'mask_fleet_receipts.py', 'mask_runner.py', 'mask_fleet_schedule.py', 'mask_fleet_maintenance.py',
+                   'mask_fleet_commit.py')
 # Annotation keywords: changing only these never changes what a document must contain.
 ANNOTATIONS = {'$comment', 'description', 'title', 'examples'}
 # Schemas that describe MASK's own command output; no saved file is validated against them.
@@ -329,8 +330,6 @@ def dispatch(args, output, home, root):
     if args.command == 'self.status':
         output['data'] = dict(program_root=str(root), interpreter=sys.executable, launchers=state['launchers'], path_command=shutil.which('mask'))
         return
-    intent = dict(operation=args.command, selected=[], links=[], manifests=[], before_state=state, after_state=copy.deepcopy(state), config=config)
-    planned = dict(applicable=True, blockers=[], would_change=False, intent=intent)
     if args.command == 'self.install':
         return install(args, output, home, root, state, config)
     if args.command == 'self.uninstall':
@@ -382,18 +381,26 @@ def dispatch(args, output, home, root):
         c.fail('plan.stale', 'Local changes in the program checkout moved during update; run it again.', 4)
     if now:
         output['data']['preserved'] = [path for path in now if path not in blocking]
-    planned['would_change'] = True
+    advance_program(home, root, config, state, observed['revision'], observed['candidate'], migration,
+                    output, timeout, blocking=blocking if stashing else ())
+
+
+def advance_program(home, root, config, state, before, candidate, migration, output, timeout, *, blocking=()):
+    """Journal the reviewed program candidate for ordinary completion or recovery."""
+    intent = dict(operation='update', selected=[], links=[], manifests=[], before_state=state,
+                  after_state=copy.deepcopy(state), config=config)
+    planned = dict(applicable=True, blockers=[], would_change=True, intent=intent)
     pending = fs.make_pending(planned, home)
-    pending['git'] = dict(scope='program', root=str(root), before=observed['revision'], candidate=observed['candidate'])
+    pending['git'] = dict(scope='program', root=str(root), before=before, candidate=candidate)
     if migration['requires_consent']:
         pending['git']['consent'] = migration['plan_hash']  # Recovery completes this approved candidate without asking again.
-    if stashing:  # Journaled before Git runs, so an interruption names the stash it may have made.
-        pending['git']['stash'] = dict(message=g.stash_message(observed['revision'], observed['candidate']), paths=blocking)
+    if blocking:  # Journaled before Git runs, so an interruption names the stash it may have made.
+        pending['git']['stash'] = dict(message=g.stash_message(before, candidate), paths=blocking)
     fs.validate_pending(pending, home)
     c.atomic_text(home / 'pending.json', c.text_json(pending), None)
-    if stashing:
+    if blocking:
         g.stash(root, pending, home, output, timeout)
         output['data']['stash'] = g.stash_report(root, pending['git']['stash'], timeout)
-    g.advance(root, observed['candidate'], pending, home, output, timeout)
+    g.advance(root, candidate, pending, home, output, timeout)
     fs.execute(planned, home, output, pending=pending)
-    output['data'].update(program_after=observed['candidate'], next_invocation_required=True)
+    output['data'].update(program_after=candidate, next_invocation_required=True)

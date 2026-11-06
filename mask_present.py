@@ -1299,6 +1299,24 @@ def render_fleet(data, output):
 
 def fleet_rollout_lines(data):
     lines = []
+    if data.get('kind') in ('program', 'upgrade'):
+        plan = data['plan']
+        if data['kind'] == 'program':
+            lines.append('  MASK program revision ' + clean(plan['candidate']['candidate']))
+        for group in plan.get('groups', []):
+            lines.append(f"  Repository {clean(group['repository'])} ({clean(group['reason'])})")
+        for row in data.get('device_results', plan['targets']):
+            scope = '/' + clean(row['scope']) if row.get('scope') else ''
+            reason = f" ({clean(row['reason'])})" if row.get('reason') else ''
+            commit = row.get('receipt', {}).get('commit')
+            effect = f" {clean(commit)}" if commit else ''
+            lines.append(f"  {clean(row['name'])}{scope}: {clean(row['status'])}{reason}{effect}")
+            if not data.get('device_results'):
+                for change in row.get('changes', []):
+                    lines.append(f"    {clean(change['coordinate'])} {clean(change['before_commit'])} → {clean(change['after_commit'])}")
+        if 'complete' in data:
+            lines.append('  All requested effects verified.' if data['complete'] else '  Some requested effects remain incomplete.')
+        return lines
     if data.get('control'):
         control = data['control']
         lines.append(f"  Desired Git repository {clean(control['repository'])}, epoch {control['epoch']}")
@@ -1345,7 +1363,7 @@ def render_fleet_rollout(data, output):
 
 
 RENDERERS = {
-    **dict.fromkeys(('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync',
+    **dict.fromkeys(('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove', 'fleet.sync',
                      'fleet.operation.show', 'fleet.operation.wait', 'fleet.operation.cancel', 'fleet.operation.rollback',
                      'fleet.runner.enable', 'fleet.runner.disable', 'fleet.runner.status',
                      'fleet.runner.tick'), render_fleet_rollout),
@@ -1682,7 +1700,7 @@ def render_error(output):
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
     if error['code'] == 'fleet.probe_incomplete':
         lines.extend(fleet_device_lines(data))
-    if output['command'] in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync',
+    if output['command'] in ('fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove', 'fleet.sync',
                              'fleet.operation.cancel', 'fleet.operation.rollback',
                              'fleet.runner.enable', 'fleet.runner.disable'):
         lines.extend(fleet_rollout_lines(data))

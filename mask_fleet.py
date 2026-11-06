@@ -22,6 +22,7 @@ RECEIPT = 'mask-receipt@mask.invalid'
 SIGNING_PROVIDER = ContextVar('fleet_signing_provider', default=None)
 PROTOCOL = 'mask.rpc.v1'
 ACTIONS = ('capabilities', 'inspect', 'prepare', 'apply', 'receipt', 'cancel-request')
+SUPPORTED_ACTIONS = ACTIONS + ('program-inspect', 'program-update', 'upgrade-inspect', 'upgrade-apply')
 RECORD_BYTES = 256 * 1024
 PUBLIC_FIELDS = ('schema_version', 'kind', 'id', 'name', 'key', 'fingerprint')
 ED25519_PREFIX = b'\0\0\0\x0bssh-ed25519\0\0\0\x20'
@@ -94,19 +95,19 @@ def record(raw):
         invalid('Invalid bounded UTF-8 fleet record.')
 
 
-def data(path, *, missing=False):
+def data(path, *, missing=False, limit=RECORD_BYTES):
     c.parents_safe(Path(path.anchor), path)
     if missing and c.kind(path) == 'missing':
         return None
-    return record(resolve.regular_bytes(path, RECORD_BYTES))
+    return record(resolve.regular_bytes(path, limit))
 
 
-def put(path, value, expected):
+def put(path, value, expected, *, limit=RECORD_BYTES):
     raw = c.read_text(path, 'fleet', missing=True)
     if (record(raw.encode('utf-8')) if raw is not None else None) != expected:
         c.fail('state.drift', 'Fleet state changed since it was read.', 4)
     encoded = c.text_json(value)
-    if len(encoded.encode('utf-8')) > RECORD_BYTES:
+    if len(encoded.encode('utf-8')) > limit:
         invalid('Fleet record exceeds its byte limit.')
     return c.atomic_text(path, encoded, raw)
 
@@ -232,25 +233,34 @@ def init(args, output, home, role):
 
 def authority(value, *, local=False):
     c.fields(value, ('schema_version', 'controller', 'epoch', 'minimum_sequence', 'actions', 'scopes'),
-             ('revoked',) if local else (), 'fleet')
+             ('program_origin', 'revoked') if local else ('program_origin',), 'fleet')
     identity(value['controller'], 'controller')
     number(value['epoch'], minimum=1)
     number(value['minimum_sequence'], minimum=1)
     actions = value['actions']
-    if not isinstance(actions, list) or not actions or len(actions) > len(ACTIONS) or any(
-            action not in ACTIONS for action in actions) or len(set(actions)) != len(actions):
+    if not isinstance(actions, list) or not actions or len(actions) > len(SUPPORTED_ACTIONS) or any(
+            action not in SUPPORTED_ACTIONS for action in actions) or len(set(actions)) != len(actions):
         invalid('Choose a unique set of supported fleet actions.')
+    if ('program_origin' in value) != bool({'program-inspect', 'program-update'} & set(actions)):
+        invalid('A program grant requires its own explicit program_origin.')
+    if 'program_origin' in value and sources.repository(value['program_origin']) != value['program_origin']:
+        invalid('Program authority requires a canonical credential-free repository identity.')
     scopes = value['scopes']
     if not isinstance(scopes, dict) or len(scopes) > 32:
         invalid('Device policy may grant at most 32 scope aliases.')
     for alias, scope in scopes.items():
         token(alias)
         fields = ('scope', 'sources') + (('root',) if local else ())
-        c.fields(scope, fields, ('rollout', 'root_identity') if local else ('rollout',), 'fleet')
+        scope_options = ('rollout', 'upgrade', 'commit')
+        c.fields(scope, fields, (*scope_options, 'root_identity') if local else scope_options, 'fleet')
         if 'rollout' in scope and scope['rollout'] is not True:
             invalid('Omit rollout unless explicitly granting desired profile changes.')
         if scope['scope'] not in ('project', 'user'):
             invalid('A fleet scope must be project or user.')
+        if 'upgrade' in scope and scope['upgrade'] is not True:
+            invalid('Omit upgrade unless explicitly granting skill upgrades.')
+        if 'commit' in scope and (scope['commit'] is not True or scope['scope'] != 'project' or not scope.get('upgrade')):
+            invalid('A Git commit grant requires a project scope with explicit upgrade authority.')
         if local and (not isinstance(scope['root'], str) or not 1 <= len(scope['root']) <= 4096 or
                       not Path(scope['root']).is_absolute()):
             invalid('Device scope roots require absolute local paths.')
@@ -285,7 +295,7 @@ def current_authority(home, *, missing=False):
 
 
 def public_authority(value):
-    return dict(value, scopes={alias: {key: scope[key] for key in ('scope', 'sources', 'rollout') if key in scope}
+    return dict(value, scopes={alias: {key: scope[key] for key in ('scope', 'sources', 'rollout', 'upgrade', 'commit') if key in scope}
                                for alias, scope in value['scopes'].items()})
 
 
@@ -307,7 +317,7 @@ def bind_authority(home, proposed):
     state = c.state(c.read_json(home / 'state.json', 'state', default=c.empty_state()))
     config = c.config(c.read_json(home / 'config.json')) if any(
         scope['sources'] for scope in proposed['scopes'].values()) else None
-    scopes, rollout_roots = {}, set()
+    scopes, rollout_roots, upgrade_roots = {}, set(), set()
     for alias, scope in proposed['scopes'].items():
         if 'root_identity' in scope:
             invalid('MASK observes the physical scope identity during authorization.')
@@ -316,6 +326,10 @@ def bind_authority(home, proposed):
             if root in rollout_roots:
                 invalid('Each physical consumer may have only one rollout scope alias.')
             rollout_roots.add(root)
+        if scope.get('upgrade'):
+            if root in upgrade_roots:
+                invalid('Each physical consumer may have only one upgrade scope alias.')
+            upgrade_roots.add(root)
         for name, grant in scope['sources'].items():
             approved = sources.selected(config, name)
             if sources.repository(approved['repository']) != grant['repository']:
@@ -370,6 +384,9 @@ def dispatch(args, output, home):
     if command.startswith('fleet.runner.') or command == 'fleet.sync' and getattr(args, 'local', False):
         import mask_runner
         return mask_runner.dispatch(args, output, home)
+    if command == 'fleet.upgrade' or command == 'fleet.update' and not getattr(args, 'input', None):
+        import mask_fleet_maintenance
+        return mask_fleet_maintenance.dispatch(args, output, home)
     if command in ('fleet.install', 'fleet.update', 'fleet.remove', 'fleet.sync') or command.startswith('fleet.operation.'):
         import mask_rollout
         return mask_rollout.dispatch(args, output, home)

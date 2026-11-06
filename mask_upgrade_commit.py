@@ -231,7 +231,7 @@ def control_entries(root, commit, paths, timeout):
     return updates
 
 
-def propagate(row, observed, final, canonical, timeout):
+def propagate(row, observed, final, canonical, timeout, *, received=None):
     """Give a grouped member the canonical commit: fast-forward to it, or cherry-pick it.
 
     The fast-forward moves only the member's checked-out branch (or its detached HEAD) to that very
@@ -252,14 +252,13 @@ def propagate(row, observed, final, canonical, timeout):
     failure = None
     try:
         recheck(root, observed, final, timeout)
-        if c.git(root, 'cat-file', '-e', source + '^{commit}', timeout=timeout, optional=True) is None:
-            c.git(root, 'fetch', '--no-tags', '--no-write-fetch-head', '--quiet', canonical['root'], canonical['branch'],
-                  timeout=timeout, mutating=True)
-            if c.git(root, 'cat-file', '-e', source + '^{commit}', timeout=timeout, optional=True) is None:
-                c.fail('upgrade.commit_failed', 'The canonical commit could not be fetched from the canonical checkout.', 5,
-                       root=str(root), commit=source)
-        parent = c.git(root, 'rev-parse', source + '^', timeout=timeout)
-        updates = control_entries(root, source, row['paths'], timeout)
+        if received is not None:
+            from mask_fleet_commit import import_exact
+            import_exact(root, received, final, timeout)
+            parent = received['parent']
+            updates = received['updates']
+        else:
+            parent, updates = local_propagation_objects(root, source, canonical, row['paths'], timeout)
         if parent == observed['head']:
             row['propagation'] = 'fast_forward'
             recheck(root, observed, final, timeout)
@@ -269,7 +268,13 @@ def propagate(row, observed, final, canonical, timeout):
             row['after_head'] = row['commit'] = source
         else:
             row['propagation'] = 'cherry_pick'
-            message = c.git(root, 'log', '-1', '--format=%B', source, timeout=timeout)
+            if received is None:
+                message = c.git(root, 'log', '-1', '--format=%B', source, timeout=timeout)
+                reuse = ('-C', source)
+            else:
+                name, email, date = received['author']
+                message = received['message']
+                reuse = ('--author', f'{name} <{email}>', '--date', date, '-m', message)
             with tempfile.TemporaryDirectory(prefix='mask-upgrade-index-') as temporary:
                 index = Path(temporary) / 'index'
                 c.git(root, 'read-tree', observed['head'], timeout=timeout, index=index)
@@ -277,7 +282,7 @@ def propagate(row, observed, final, canonical, timeout):
                 tree = c.git(root, 'write-tree', timeout=timeout, index=index)
                 recheck(root, observed, final, timeout)
                 try:
-                    c.git(root, 'commit', '-C', source, '--no-status', timeout=timeout, index=index, mutating=True, commit_hooks=True)
+                    c.git(root, 'commit', *reuse, '--no-status', timeout=timeout, index=index, mutating=True, commit_hooks=True)
                 except c.MaskError as error:
                     failure = error
             after = c.git(root, 'rev-parse', '--verify', 'HEAD^{commit}', timeout=timeout)
@@ -318,3 +323,13 @@ def propagate(row, observed, final, canonical, timeout):
             row['status'] = 'unknown'
         if isinstance(failure, KeyboardInterrupt):
             raise
+
+
+def local_propagation_objects(root, source, canonical, paths, timeout):
+    if c.git(root, 'cat-file', '-e', source + '^{commit}', timeout=timeout, optional=True) is None:
+        c.git(root, 'fetch', '--no-tags', '--no-write-fetch-head', '--quiet', canonical['root'], canonical['branch'],
+              timeout=timeout, mutating=True)
+        if c.git(root, 'cat-file', '-e', source + '^{commit}', timeout=timeout, optional=True) is None:
+            c.fail('upgrade.commit_failed', 'The canonical commit could not be fetched from the canonical checkout.', 5,
+                   root=str(root), commit=source)
+    return c.git(root, 'rev-parse', source + '^', timeout=timeout), control_entries(root, source, paths, timeout)
