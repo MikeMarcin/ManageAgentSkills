@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0025"
 title: "Fleet command defaults and approved program and skill maintenance"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-11-05"
 metadata: {"milestone_plan":{"id":"fleet-command-maintenance","path":"docs/rfcs/plans/fleet-command-maintenance/milestone-plan.json"}}

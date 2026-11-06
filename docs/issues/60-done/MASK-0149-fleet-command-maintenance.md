@@ -13,7 +13,7 @@ acceptance: [{"criterion":"AC1","outcome":"pass","revision":"baa86711f80c6d28a83
 # MASK-0149: Implement and verify fleet command maintenance
 
 [RFC-MASK-0025](../../rfcs/RFC-MASK-0025-fleet-command-maintenance.md)
-owns AC1–AC4. RFC_BASE_SHA: `80e2fc4130e9ac5b9fe8cf6164c35fdaac76cf93`.
+owns AC1–AC4. RFC_BASE_SHA: 80e2fc4130e9ac5b9fe8cf6164c35fdaac76cf93
 Planned card: MASK-0149. The new commands use the existing enrolled endpoint,
 identity and signed transport.
 
