@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0050"
 title: "Verify native remote invocation and enrollment boundaries"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0049"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-native","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0012-AC01","outcome":"pass","revision":"a46dd0d3ccab7920d5fdd77d71917d79c0514960","evidence":{"kind":"artifact","detail":"Actual strict SSH on native macOS and Windows authenticated explicit signed enrollment, refused a wrong host key and missing noninteractive login, and refused local revocation.","path":"docs/development/fleet-native-acceptance.md"}},{"criterion":"RFC-MASK-0012-AC04","outcome":"pass","revision":"a46dd0d3ccab7920d5fdd77d71917d79c0514960","evidence":{"kind":"artifact","detail":"Exact candidate 12 fixture tests on native Windows and macOS included exact Git and explicitly granted signed forwarding with denial and integrity controls; live SSH fixtures independently verified locked filesystem effects.","path":"docs/development/fleet-native-acceptance.md"}},{"criterion":"RFC-MASK-0012-AC05","outcome":"pass","revision":"a46dd0d3ccab7920d5fdd77d71917d79c0514960","evidence":{"kind":"artifact","detail":"Native high-port loopback macOS SSH and aito-main-win Windows OpenSSH with bash default plus native cmd.exe and PowerShell invocation. Spaced Unicode path, process exit, disconnect status and fixture cleanup recorded.","path":"docs/development/fleet-native-acceptance.md"}},{"criterion":"RFC-MASK-0012-AC06","outcome":"pass","revision":"a46dd0d3ccab7920d5fdd77d71917d79c0514960","evidence":{"kind":"artifact","detail":"Signed capability and recovered durable receipt verified over both actual native SSH links; independent native fixture tests exercised signature refusal.","path":"docs/development/fleet-native-acceptance.md"}}]
 ---
 
 # MASK-0050: Verify native remote invocation and enrollment boundaries
