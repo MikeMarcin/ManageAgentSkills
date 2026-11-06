@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0052"
 title: "Compose one-request copy or tap installation and fan-out"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0013"]
 depends_on: ["MASK-0051", "MASK-0068", "MASK-0072"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-install","stage":"D — personal fleet workflow","provisional_id":false,"milestone_plan":{"id":"fleet-skill-rollouts","path":"docs/rfcs/plans/fleet-skill-rollouts/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0013-AC01","outcome":"pass","revision":"968bd72418ea6cd1447e67a79372de5b0030beeb","evidence":{"kind":"command","detail":"Exact candidate 968bd72 composed name-selected tap and GitHub tree-URL curated copy against disposable bare remotes, then verified signed filesystem receipts on actual macOS and Windows. Source staging remained unchanged."}},{"criterion":"RFC-MASK-0013-AC02","outcome":"pass","revision":"968bd72418ea6cd1447e67a79372de5b0030beeb","evidence":{"kind":"command","detail":"tests.test_fleet_install exercised explicit rollout authorization, ordinary apply/remove and an independent local pin, and refused conflicting bytes. Native pair preserved an unrelated pinned binding in each signed projection."}},{"criterion":"RFC-MASK-0013-AC07","outcome":"pass","revision":"968bd72418ea6cd1447e67a79372de5b0030beeb","evidence":{"kind":"command","detail":"Native rollout persisted exact update while the Mac listener was stopped, then returned matching receipt after sync. Independent Windows delivery completed. Historical receipt checks, cancellation and renderer truthfulness are continued in MASK-0053."}}]
 ---
 
 # MASK-0052: Compose one-request copy or tap installation and fan-out
