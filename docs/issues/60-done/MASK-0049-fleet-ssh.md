@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0049"
 title: "Add fixed-entrypoint SSH and exact artifact transfer"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0048"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-ssh","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0012-AC02","outcome":"pass","revision":"b533966da916e1ecfab80d1ce36dc53e56aae5bf","evidence":{"kind":"command","detail":"Production fixed launcher exercised with spaced Unicode path under native POSIX shell. Windows fixed PowerShell encoded literal shape and ignored config forwarding covered by focused fixture checks; actual native SSH follows MASK-0050. python3 -B -m unittest -v tests.test_fleet_transport tests.test_fleet_rpc tests.test_fleet_identity"}},{"criterion":"RFC-MASK-0012-AC03","outcome":"pass","revision":"b533966da916e1ecfab80d1ce36dc53e56aae5bf","evidence":{"kind":"command","detail":"Fixture timeout returned operation ID, digest and unknown; signed response must bind request. Reconciliation suite checks journaled apply and query. python3 -B -m unittest -v tests.test_fleet_transport tests.test_fleet_rpc tests.test_fleet_identity"}},{"criterion":"RFC-MASK-0012-AC04","outcome":"pass","revision":"b533966da916e1ecfab80d1ce36dc53e56aae5bf","evidence":{"kind":"command","detail":"Real fixture bare Git exact-commit acquisition and separately signed forwarding survived unavailable source auth; malformed relative paths, digest mismatch, unselected package and disabled forwarding failed before store publication. python3 -B -m unittest -v tests.test_fleet_transport tests.test_fleet_rpc tests.test_fleet_identity"}}]
 ---
 
 # MASK-0049: Add fixed-entrypoint SSH and exact artifact transfer
