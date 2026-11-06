@@ -553,7 +553,8 @@ def timeout_option(args):
 
 
 def sync(home, signer, history, args, output):
-    peers = choose_devices(SimpleNamespace(device=getattr(args, 'device', []), all_devices=getattr(args, 'all', False)), home)
+    devices = getattr(args, 'device', [])
+    peers = choose_devices(SimpleNamespace(device=devices, all_devices=getattr(args, 'all', False) or not devices), home)
     selected = {peer['device']['id'] for peer in peers}
     pairs = [(entry, target) for entry, target in history.effective().values()
              if target['device'] in selected and entry['action'] != 'cancel']

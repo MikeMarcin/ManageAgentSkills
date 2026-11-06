@@ -307,6 +307,7 @@ def snapshot(home, control, signer):
 
 
 def publish(history, value, signer):
+    validate(value, history.control, signer)
     if len(history.events) >= MAX_HISTORY:
         invalid('Control history has reached its revision limit.')
     expected = event(history.control, signer, history.events, value['action'], value['operation'],

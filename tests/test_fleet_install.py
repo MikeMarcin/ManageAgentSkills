@@ -1,5 +1,6 @@
 """Exact rollout contributions use the device's ordinary subprocess RPC and journal."""
 import mask_core as core
+import mask_fleet_copy as curated
 import mask_fleet as fleet
 import mask_rollout as rollout
 import mask_rpc as rpc
@@ -87,3 +88,37 @@ class FleetInstallTests(FleetRpcFixture):
         self.assertFalse((self.personal / '.agents/skills/beta').exists())
         self.assertEqual((project / '.mask.json').read_bytes(), declaration)
         self.assertEqual((self.device_home / 'user.json').read_bytes(), personal)
+
+    def test_curated_publication_resumes_after_source_only_effect(self):
+        authoring = self.base / 'curated authoring'
+        repository = self.base / 'curated.git'
+        authoring.mkdir()
+        repository.mkdir()
+        self.git(repository, 'init', '--bare', '-q')
+        self.git(authoring, 'init', '-q', '-b', 'main')
+        self.git(authoring, 'config', 'user.name', 'Fixture')
+        self.git(authoring, 'config', 'user.email', 'fixture@example.invalid')
+        seed = authoring / 'skills/seed'
+        seed.mkdir(parents=True)
+        (seed / 'SKILL.md').write_bytes(b'---\nname: seed\ndescription: Fixture\n---\n')
+        self.git(authoring, 'add', 'skills')
+        self.git(authoring, 'commit', '-qm', 'Fixture curated parent')
+        self.git(authoring, 'remote', 'add', 'origin', str(repository))
+        self.git(authoring, 'push', '-q', 'origin', 'main')
+        self.cli(self.controller_home, 'tap', 'curated', repository, '--checkout', authoring, env=self.env)
+        (authoring / 'unrelated.txt').write_text('staged fixture work')
+        self.git(authoring, 'add', 'unrelated.txt')
+        index = self.git(authoring, 'ls-files', '--stage')
+        config = core.config(core.read_json(self.controller_home / 'config.json'))
+        upstream = rollout.resolve_input(self.controller_home, config, 'fixture/alpha')
+        effects = []
+        for label, expected in [('first', 'published'), ('resume', 'already_published')]:
+            scratch = self.base / label
+            scratch.mkdir()
+            row, effect, endpoint, observed = curated.prepare(self.controller_home, config, upstream, 'curated', scratch)
+            self.assertEqual(curated.publish(config, scratch, row, effect, endpoint, observed), expected)
+            effects.append(effect)
+        self.assertEqual(effects[0], effects[1])
+        self.assertEqual(self.git(authoring, 'ls-files', '--stage'), index)
+        self.assertFalse((authoring / 'skills/alpha').exists())
+        self.assertFalse((self.controller_home / 'fleet' / 'control.json').exists())
