@@ -16,7 +16,7 @@ Skills are passive data unless the user approves a declared setup action.
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
 | Fleet device transport | `fleet controller`, `fleet device`, `fleet ping`, `fleet capability` | Explicit enrolled peer or the active local fleet |
 | Fleet rollout | `fleet install`, `fleet update SOURCE/ID`, `fleet remove`, `fleet sync`, `fleet operation` | Frozen enrolled devices and an authorized personal or mapped project scope |
-| Fleet maintenance | `fleet upgrade [--all]`, `fleet update [--all]` | Explicitly authorized skill scopes or the separately granted MASK program origin |
+| Fleet maintenance | `fleet upgrade [--all]`, `fleet update` | Explicitly authorized skill scopes or the separately granted MASK program origin |
 | Fleet convergence | `fleet control`, `fleet sync --local`, `fleet runner` | Explicit desired repository, optional separate receipt repository and current-user schedule |
 | Advanced recovery | `recover`, `recover --complete`, `recover --rollback` | The machine's one pending operation; bare `recover` only inspects |
 

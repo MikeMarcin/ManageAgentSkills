@@ -23,12 +23,17 @@ maintenance to `fleet upgrade`. Previous fleet acceptance remains historical.
   fleet contributions. Project upgrades use one canonical commit per eligible
   repository with exact fast-forward or cherry-pick. They preserve unrelated
   edits and block controls drift. No project Git commit occurs in personal scope.
-- AC3. `fleet update` and `fleet update --all` review one exact program revision
-  with distinct device authority, an approved origin, and the checked local
+- AC3. Bare `fleet update` reviews one exact program revision for all active
+  enrolled devices. Repeated `--device NAME` options select a subset. The update
+  requires distinct device authority, an approved origin and the checked local
   updater. Incompatible, blocked, disconnected and unknown peers remain visible.
   `fleet update SOURCE/ID` retains its signed rollout meaning.
 - AC4. Prove the public paths in disposable macOS and Windows fixture checkouts.
   Record exact source, signed receipts, convergence or pending states, and
   cleanup. Production enrollment and publication are outside this milestone.
+
+The owner amended AC3 to remove the redundant `--all` spelling from
+`fleet update`. The [native verification record](../development/fleet-native-acceptance.md#fleet-command-maintenance)
+preserves the commands exercised at their original revisions.
 
 Closeout: [MASK-0149](../issues/60-done/MASK-0149-fleet-command-maintenance.md).

@@ -151,15 +151,16 @@ approved tap before reviewing an install or skill upgrade.
 mask tap fetch agentskills
 mask fleet install code-simplifier --dry-run
 mask fleet upgrade --all --dry-run
-mask fleet update --all --dry-run
+mask fleet update --dry-run
 ```
 
 Run the same command with `--approve-plan HASH` to apply the reviewed effects.
 Bare fleet install targets authorized personal scopes. Fleet upgrade updates
 skills in granted scopes and propagates one canonical controls commit per
-eligible project repository. Fleet update advances the MASK program through a
-separate device grant. See the [enrollment guide](docs/guides/fleet-enrollment.md)
-and [rollout guide](docs/guides/fleet-rollouts.md).
+eligible project repository. Bare fleet update targets all active enrolled
+devices and advances the MASK program through a separate device grant.
+See the [enrollment guide](docs/guides/fleet-enrollment.md) and
+[rollout guide](docs/guides/fleet-rollouts.md).
 
 ## Learn more
 

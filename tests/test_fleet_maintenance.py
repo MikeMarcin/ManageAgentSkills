@@ -97,6 +97,8 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.assertTrue(applied['complete'])
         legacy = self.public('update', 'fixture/alpha', '--all-devices', '--scope', 'user', '--dry-run')
         self.assertEqual(legacy['data']['action'], 'update')
+        invalid = self.public('update', 'fixture/alpha', '--all', '--scope', 'user', '--dry-run', code=2)
+        self.assertEqual(invalid['error']['code'], 'invocation.invalid')
         refused = self.public('install', 'https://github.com/fixture/skills/tree/main/alpha', '--dry-run', code=4)
         self.assertEqual(refused['error']['code'], 'fleet.mode_required')
         # Both the local selection and the controller contribution own alpha.
@@ -137,13 +139,21 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.git(self.base, 'clone', '--bare', str(author), str(bare))
         controller = self.base / 'controller-program'
         device = self.base / 'device-program'
-        for root in (controller, device):
+        desktop = self.base / 'desktop-program'
+        for root in (controller, device, desktop):
             self.git(self.base, 'clone', '-q', str(bare), str(root))
             self.identity(root)
         self.policy['epoch'] += 1
         self.policy.update(program_origin=bare.as_uri(), actions=[*fleet.ACTIONS, 'program-inspect', 'program-update'])
         self.authorize(self.policy)
         self.set_peer('laptop', self.device, self.policy, self.device_home, device / 'mask.py')
+        desktop_home = self.base / 'desktop'
+        desktop_key = self.key('desktop key')
+        desktop_device = self.cli(desktop_home, 'fleet', 'device', 'init', 'desktop',
+                                  '--signing-key', desktop_key)['data']['identity']
+        desktop_policy = dict(self.policy, scopes={})
+        self.approve(desktop_home, desktop_policy)
+        self.set_peer('desktop', desktop_device, desktop_policy, desktop_home, desktop / 'mask.py')
         (author / 'change.txt').write_text('reviewed\n', encoding='utf-8')
         self.git(author, 'add', 'change.txt')
         self.git(author, 'commit', '-qm', 'reviewed program change')
@@ -153,21 +163,31 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.git(device, 'add', 'unrelated.txt')
         program = controller / 'mask.py'
         (device / 'change.txt').write_text('local work\n', encoding='utf-8')
-        overlap = self.public('update', '--dry-run', program=program)['data']['plan']['targets'][0]
+        overlap = self.public('update', '--device', 'laptop', '--dry-run', program=program)['data']['plan']['targets'][0]
         self.assertEqual((overlap['status'], overlap['reason']), ('blocked', 'source.dirty'))
         self.assertEqual((device / 'change.txt').read_text(encoding='utf-8'), 'local work\n')
         (device / 'change.txt').unlink()
-        preview = self.public('update', '--all', '--dry-run', program=program)['data']
+        preview = self.public('update', '--dry-run', program=program)['data']
         self.assertEqual(preview['plan']['candidate']['candidate'], after)
+        self.assertEqual([row['name'] for row in preview['plan']['targets']], ['desktop', 'laptop'])
+        selected = self.public('update', '--device', 'laptop', '--dry-run', program=program)['data']
+        self.assertEqual([row['name'] for row in selected['plan']['targets']], ['laptop'])
+        self.assertEqual(selected['plan']['selection']['devices'], ['laptop'])
+        approved = preview['plan_hash']
+        invalid = self.public('update', '--all', '--approve-plan', approved, program=program, code=2)
+        self.assertEqual(invalid['error']['code'], 'invocation.invalid')
+        self.assertEqual(invalid['transaction'], 'not_started')
+        self.assertFalse((self.controller_home / 'fleet' / 'maintenance-plans').exists())
         self.assertEqual(self.git(device, 'rev-parse', 'HEAD'), before)
+        self.assertEqual(self.git(desktop, 'rev-parse', 'HEAD'), before)
         self.assertFalse((device / 'change.txt').exists())
         self.assertEqual(self.git(device, 'rev-parse', 'refs/remotes/origin/main'), before)
-        approved = preview['plan_hash']
         lost = self.public('update', '--approve-plan', approved, program=program, drop='program-update', code=9)
-        self.assertEqual(lost['data']['device_results'][0]['status'], 'unknown')
+        self.assertEqual([row['status'] for row in lost['data']['device_results']], ['unknown', 'unknown'])
         self.assertEqual(self.git(device, 'rev-parse', 'HEAD'), after)
+        self.assertEqual(self.git(desktop, 'rev-parse', 'HEAD'), after)
         retried = self.public('update', '--approve-plan', approved, program=program)['data']
-        self.assertEqual(retried['device_results'][0]['receipt']['after'], after)
+        self.assertEqual([row['receipt']['after'] for row in retried['device_results']], [after, after])
         self.assertEqual(self.git(device, 'diff', '--cached', '--name-only'), 'unrelated.txt')
         self.assertEqual(self.git(controller, 'rev-parse', 'HEAD'), before)
         fleet_source = author / 'mask_fleet.py'

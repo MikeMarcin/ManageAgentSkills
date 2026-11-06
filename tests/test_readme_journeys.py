@@ -59,7 +59,7 @@ FLEET_UPDATE = (
     'mask tap fetch agentskills',
     'mask fleet install code-simplifier --dry-run',
     'mask fleet upgrade --all --dry-run',
-    'mask fleet update --all --dry-run',
+    'mask fleet update --dry-run',
 )
 EVERYDAY = {
     'Add a skill here': 'mask install ID',

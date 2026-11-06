@@ -78,7 +78,17 @@ class FleetIdentityTests(FleetFixture):
         missing = self.cli(self.device_home, 'fleet', 'device', code=2)
         self.assertIn('authorize', missing['error']['details']['subcommands'])
         capabilities = self.cli(self.device_home, 'capabilities')
-        self.assertIn('fleet.device.authorize', [row['name'] for row in capabilities['data']['commands']])
+        commands = {row['name']: row for row in capabilities['data']['commands']}
+        self.assertIn('fleet.device.authorize', commands)
+        update_flags = {flag for argument in commands['fleet.update']['arguments'] for flag in argument['flags']}
+        upgrade_flags = {flag for argument in commands['fleet.upgrade']['arguments'] for flag in argument['flags']}
+        self.assertNotIn('--all', update_flags)
+        self.assertTrue({'--all-devices', '--device', '--scope'} <= update_flags)
+        self.assertIn('--all', upgrade_flags)
+        help_run = subprocess.run([sys.executable, '-B', str(ENTRY), 'fleet', 'update', '--help'],
+                                  capture_output=True, check=True, encoding='utf-8', timeout=10)
+        self.assertIn('mask fleet update --dry-run', help_run.stdout)
+        self.assertNotIn('mask fleet update --all ', help_run.stdout)
         self.assertEqual(capabilities['data']['fleet']['protocol'], 'mask.rpc.v1')
         revoke = self.cli(self.device_home, 'fleet', 'device', 'revoke-controller', '--dry-run')
         self.cli(self.device_home, 'fleet', 'device', 'revoke-controller', '--approve-plan', revoke['data']['plan_hash'])

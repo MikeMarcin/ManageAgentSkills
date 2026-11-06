@@ -62,8 +62,8 @@ mask tap fetch agentskills
 mask fleet upgrade --all --dry-run
 mask fleet upgrade --all --approve-plan HASH
 
-mask fleet update --all --dry-run
-mask fleet update --all --approve-plan HASH
+mask fleet update --dry-run
+mask fleet update --approve-plan HASH
 ```
 
 Both bare forms select active enrolled devices. Use repeated `--device NAME`
