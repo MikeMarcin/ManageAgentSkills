@@ -6,7 +6,7 @@ status: "Backlog"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0044", "MASK-0045", "MASK-0046"]
 closeout_for: ["RFC-MASK-0011"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "close-11", "stage": "C — explainability", "provisional_id": false, "closeout": true}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"close-11","stage":"C — explainability","provisional_id":false,"closeout":true,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # MASK-0072: Verify and close RFC-MASK-0011

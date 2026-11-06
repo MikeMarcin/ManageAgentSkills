@@ -1,0 +1,54 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "fleet-portable-composition",
+  "scope": {
+    "rfcs": [
+      "RFC-MASK-0010",
+      "RFC-MASK-0011"
+    ],
+    "issues": [
+      "MASK-0041",
+      "MASK-0043",
+      "MASK-0045",
+      "MASK-0046",
+      "MASK-0071",
+      "MASK-0072"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "portable-composition-and-impact",
+      "outcome": "Recreate personal selections and exact locks across machines, compose explicit local profile subscriptions, and explain where and how exact updates affect selected consumers.",
+      "work": [
+        {
+          "issue": "MASK-0041"
+        },
+        {
+          "issue": "MASK-0043"
+        },
+        {
+          "issue": "MASK-0071"
+        },
+        {
+          "issue": "MASK-0045"
+        },
+        {
+          "issue": "MASK-0046"
+        },
+        {
+          "issue": "MASK-0072"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "The public portable export and import path reproduces exact artifacts across two disposable machine roots and is exercised on native macOS and Windows.",
+        "Explicit subscription composition retains local ownership and frozen source authority; conflicts, offline freshness and missing prerequisites remain visible.",
+        "Read-only inventory and impact identify layered exact deployments and pinned unaffected consumers, preview the executable guarded candidate and safely render offline reports.",
+        "Both RFC acceptance tables record exact direct evidence and the documentation structure gate passes."
+      ],
+      "boundary": "Stage C as authored in the retained fleet ROADMAP. Historical bundles and legacy inventory are already accepted dependencies. Fleet receipt integration awaits Stage D and cannot be represented as live evidence here."
+    }
+  ]
+}

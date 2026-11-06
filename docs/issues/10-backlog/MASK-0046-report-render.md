@@ -5,7 +5,7 @@ title: "Add compact text JSON and offline HTML report renderers"
 status: "Backlog"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0045"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "report-render", "stage": "C — explainability", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"report-render","stage":"C — explainability","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # MASK-0046: Add compact text JSON and offline HTML report renderers

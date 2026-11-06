@@ -5,7 +5,7 @@ title: "Compose subscribed profile and local selection contributions"
 status: "Backlog"
 rfcs: ["RFC-MASK-0010"]
 depends_on: ["MASK-0042"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "subscriptions", "stage": "C — portable composition", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"subscriptions","stage":"C — portable composition","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # MASK-0043: Compose subscribed profile and local selection contributions

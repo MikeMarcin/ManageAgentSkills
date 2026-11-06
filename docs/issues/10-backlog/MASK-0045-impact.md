@@ -5,7 +5,7 @@ title: "Explain exact content diffs and selected consumer impact"
 status: "Backlog"
 rfcs: ["RFC-MASK-0011"]
 depends_on: ["MASK-0044", "MASK-0069", "MASK-0070", "MASK-0071"]
-metadata: {"packet": "mask-readiness-fleet-2026-09-05", "packet_key": "impact", "stage": "C — explainability", "provisional_id": false}
+metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"impact","stage":"C — explainability","provisional_id":false,"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # MASK-0045: Explain exact content diffs and selected consumer impact

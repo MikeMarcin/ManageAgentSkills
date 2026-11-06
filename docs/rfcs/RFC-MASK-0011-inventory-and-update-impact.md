@@ -4,6 +4,7 @@ title: "Where-used inventory, update diffs and deployment impact reports"
 status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
+metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0011: Where-used inventory, update diffs and deployment impact reports

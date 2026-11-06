@@ -4,6 +4,7 @@ title: "Portable personal selections, reusable bundles and profile composition"
 status: "Implementing"
 owner: "MikeMarcin"
 created: "2026-09-05"
+metadata: {"milestone_plan":{"id":"fleet-portable-composition","path":"docs/rfcs/plans/fleet-portable-composition/milestone-plan.json"}}
 ---
 
 # RFC-MASK-0010: Portable personal selections, reusable bundles and profile composition
