@@ -22,7 +22,18 @@ import mask, mask_core, mask_rpc, mask_transport
 
 def exchange(peer, packet, *, timeout, signed=False):
     launcher = peer['launcher']
-    run = subprocess.run([launcher['python'], '-B', launcher['program'], '--home',
+    if os.environ.get('MASK_FLEET_OFFLINE') == peer['name']:
+        mask_core.fail('fleet.transport_unknown', 'Fixture peer is disconnected.', 4)
+    prefix = [launcher['python'], '-B', launcher['program']]
+    if os.environ.get('MASK_FLEET_FAIL_TAP_RECEIPT') == peer['name'] and packet['intent']['action'] == 'tap-apply':
+        prefix = [launcher['python'], '-B', '-c', '''
+import mask, mask_fleet_taps
+def refuse_receipt(*args):
+    raise OSError("Fixture loses receipt publication after catalog commit.")
+mask_fleet_taps.save_result = refuse_receipt
+raise SystemExit(mask.main())
+''']
+    run = subprocess.run([*prefix, '--home',
                           launcher['home'], 'rpc', '--stdio'], input=mask_rpc.frame(packet),
                          capture_output=True, timeout=timeout)
     if run.returncode:
@@ -43,8 +54,12 @@ class FleetMaintenanceTests(FleetRpcFixture):
         self.cli(self.controller_home, 'tap', 'fixture', URI, '--pin-transport', env=self.env)
         self.cli(self.controller_home, 'tap', 'fetch', 'fixture', env=self.env)
 
-    def public(self, *args, code=0, program=ENTRY, drop=None):
-        env = self.env if not drop else dict(self.env, MASK_FLEET_DROP=drop)
+    def public(self, *args, code=0, program=ENTRY, drop=None, offline=None, fail_tap_receipt=None):
+        env = dict(self.env)
+        for name, value in (('MASK_FLEET_DROP', drop), ('MASK_FLEET_OFFLINE', offline),
+                            ('MASK_FLEET_FAIL_TAP_RECEIPT', fail_tap_receipt)):
+            if value:
+                env[name] = value
         run = subprocess.run([sys.executable, '-B', '-c', BRIDGE, str(program.parent), '--home',
                               str(self.controller_home), 'fleet', *args, '--json'],
                              env=env, capture_output=True, encoding='utf-8', timeout=160)

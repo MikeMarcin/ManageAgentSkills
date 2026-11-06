@@ -158,14 +158,14 @@ def contribution(previous, coordinate, action, row, config):
     return control.desired_profile(result, lock), None
 
 
-def validate_sources(target, peer, allow_forward):
+def validate_sources(target, peer, allow_forward, catalog=None):
     profile = target['profile']
     if not profile:
         return
     if len(fleet.signed_bytes(profile)) > fleet.RECORD_BYTES // 2:
         target['blocked'] = 'fleet.profile_limit'
         return
-    grants = peer['authority']['scopes'][target['scope']]['sources']
+    grants = fleet.effective_scope(peer['authority'], target['scope'], catalog or {})['sources']
     for row in profile['lock']['packages']:
         grant = grants.get(row['source'])
         if grant is None or grant['repository'] != row['repository']:
@@ -174,6 +174,25 @@ def validate_sources(target, peer, allow_forward):
         if allow_forward and not grant['forward']:
             target['blocked'] = 'fleet.artifact_forward_denied'
             return
+
+
+def validate_rollout_sources(target, peer, signer, allow_forward, timeout):
+    validate_sources(target, peer, allow_forward)
+    policy = peer['authority']
+    if (target.get('blocked') != 'fleet.source_denied' or
+            target['scope'] not in policy.get('tap_management', {}).get('scopes', [])):
+        return
+    static = policy['scopes'][target['scope']]['sources']
+    if not all(row['source'] in static or fleet.tap_granted(policy, row['repository'])
+               for row in target['profile']['lock']['packages']):
+        return
+    from mask_fleet_taps import inspect
+    row = inspect(peer, signer, None, timeout)
+    if row['status'] != 'observed':
+        target['blocked'] = row['reason']
+        return
+    del target['blocked']
+    validate_sources(target, peer, allow_forward, row['observation']['taps'])
 
 
 def peer_for(home, target, signer):
@@ -500,6 +519,7 @@ def rollout(home, signer, history, args, output, stack):
     details = dict(input=args.input, coordinate=coordinate, mode=mode, forward=forward, resolution=row)
     if upstream is not None:
         details['upstream'] = upstream
+    timeout = timeout_option(args)
     for peer, target in zip(peers, targets):
         if 'blocked' in target:
             continue
@@ -508,7 +528,7 @@ def rollout(home, signer, history, args, output, stack):
         if blocker:
             target['blocked'] = blocker
         else:
-            validate_sources(target, peer, forward)
+            validate_rollout_sources(target, peer, signer, forward, timeout)
     proposal = dict(head=history.head, control=c.digest(history.control), action=action,
                     targets=sorted(targets, key=control.target_key), input=details, source_effect=source_effect)
     if copy is not None:

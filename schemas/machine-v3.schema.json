@@ -88,6 +88,11 @@
               "pinned"
             ],
             "description": "derived (the default): transport follows convention and `transport` is the last one that worked. pinned: `transport` is the only one tried."
+          },
+          "fleet_owner": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "description": "Fleet controller ID for a centrally created binding."
           }
         }
       }
@@ -101,6 +106,34 @@
         "pattern": "^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$"
       },
       "description": "Hosts on which this machine treats HTTPS and SSH spellings as one tap identity, in addition to the built-in forge hosts (RFC-MASK-0022). A project file can never set this."
+    },
+    "fleet_tap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "plan", "name", "status", "before", "after", "changed"],
+      "properties": {
+        "operation": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "plan": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "status": {"const": "applied_verified"},
+        "before": {"$ref": "#/properties/fleet_tap/$defs/binding"},
+        "after": {"$ref": "#/properties/fleet_tap/$defs/binding"},
+        "changed": {"type": "boolean"}
+      },
+      "$defs": {
+        "binding": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["repository", "ref", "packages"],
+          "properties": {
+            "repository": {"type": "string", "minLength": 1},
+            "ref": {"type": "string", "minLength": 1},
+            "packages": {"type": "string", "minLength": 1},
+            "fleet_owner": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      },
+      "description": "Last committed fleet tap result, stored atomically with the catalog for retry after a lost receipt."
     }
   },
   "$comment": "Machine configuration v3 (RFC-MASK-0021): every skill source is a tap. There is no live source block and no legacy_source. Repository is a normalized credential-free HTTPS, SSH or local file identity; transport must match it; cache and authoring are machine-local absolute paths. An authoring checkout is for publishing and explicit dev-link only. line_endings (MASK-0109 amendment) is the tap's byte policy: exact, or absent in an entry written before it existed, keeps exact bytes; autocrlf is the explicit tap add --autocrlf opt-in to Git core.autocrlf=true conversion of authoring bytes. tap add and doctor --migrate write it. Runtime additionally validates URI/ref/path safety and catalog ownership. Versions 1 and 2 remain readable."

@@ -262,7 +262,8 @@ def failure_row(error, *, dispatch=False):
         status = 'unknown'
     elif code in rollout.DISCONNECTED:
         status = 'unknown' if dispatch else 'offline'
-    elif code in ('fleet.maintenance_incompatible', 'fleet.program_incompatible', 'rpc.version_unsupported'):
+    elif code in ('fleet.maintenance_incompatible', 'fleet.program_incompatible', 'fleet.tap_management_incompatible',
+                  'rpc.version_unsupported'):
         status = 'incompatible'
     elif code == 'recovery.required':
         status = 'recovery_required'
@@ -275,17 +276,19 @@ def target(peer, scope=None):
     return dict(name=peer['name'], device=peer['device']['id'], binding=rollout.binding_digest(peer), scope=scope)
 
 
-def inspect_target(peer, signer, action, payload, timeout, target):
+def inspect_target(peer, signer, action, payload, timeout, target, *, capability='maintenance'):
     try:
         caps = transport.probe(peer, signer, timeout=timeout)
-        if caps.get('maintenance') != 1:
-            return dict(target, **failure_row('fleet.maintenance_incompatible'))
+        if caps.get(capability) != 1:
+            return dict(target, **failure_row('fleet.' + capability + '_incompatible'))
         result, _ = exchange(peer, signer, action, payload, c.digest(payload), timeout)
         if result['status'] == 'refused':
             return dict(target, **failure_row(result['error']['code']))
         return dict(target, status='observed', observation=result['data'])
     except c.MaskError as error:
         return dict(target, **failure_row(error))
+    except OSError:
+        return dict(target, **failure_row('fleet.probe_io_failed'))
 
 
 def program_plan(peers, signer, timeout):
@@ -307,7 +310,7 @@ def program_plan(peers, signer, timeout):
         return dict(kind='program', candidate=payload, targets=list(executor.map(inspect, peers)))
 
 
-def send_update(home, signer, digest, row, action, timeout):
+def send_update(home, signer, digest, row, action, timeout, *, verify_receipt=None):
     peer = transport.peer_at(home, row['name'], missing=True, active=False)
     if peer is None or peer['revoked'] or rollout.binding_digest(peer) != row['binding']:
         return dict(row, **failure_row('fleet.binding_changed'))
@@ -321,6 +324,8 @@ def send_update(home, signer, digest, row, action, timeout):
         fleet.verify(proof['response'], proof['signature'], peer['device'], fleet.RECEIPT)
         if proof['response']['data'].get('operation') != expected:
             c.fail('fleet.response_unverified', 'Saved maintenance receipt does not bind this request.', 4)
+        if verify_receipt is not None:
+            verify_receipt(proof['response']['data'], row)
         return dict(row, status='applied_verified', receipt=proof['response']['data'])
     try:
         response, proof = exchange(peer, signer, action, payload, digest, timeout)
@@ -329,6 +334,8 @@ def send_update(home, signer, digest, row, action, timeout):
         receipt = response['data']
         if receipt.get('operation') != expected or receipt.get('status') != 'applied_verified':
             c.fail('fleet.response_unverified', 'Signed maintenance receipt does not bind the reviewed device request.', 4)
+        if verify_receipt is not None:
+            verify_receipt(receipt, row)
         fleet.put(receipt_path, dict(proof=proof), None)
         return dict(row, status='applied_verified', receipt=receipt)
     except c.MaskError as error:
@@ -402,6 +409,7 @@ def scope_observation(home, alias, policy):
         c.fail('fleet.upgrade_denied', 'The device did not grant skill upgrades in this scope.', 4)
     state, config = rpc.state_at(home), config_at(home)
     root, record = fleet.local_scope(scope, state)
+    scope = fleet.effective_scope(policy, alias, (config or {}).get('sources', {}))
     if record.get('dev_links'):
         c.fail('dev_link.active', 'Fleet cannot upgrade development links.', 4)
     declaration, locked = resolve.read_exact_lock(root, scope['scope'], home, config, verify=False)
@@ -433,6 +441,8 @@ def scope_observation(home, alias, policy):
     data = dict(observation=observation, declaration=declaration, lock=locked,
                 contribution=contribution['revision'] if contribution else None,
                 scope_type=scope['scope'], git=description)
+    if alias in policy.get('tap_management', {}).get('scopes', []):
+        data['tap_sources'] = fleet.managed_taps(policy, config['sources'])
     if len(fleet.signed_bytes(data)) > fleet.RECORD_BYTES // 3:
         c.fail('fleet.scope_limit', 'The exact upgrade controls exceed the bounded fleet observation size.', 4)
     return data, root, scope, state, config, git_before, timeout
@@ -723,7 +733,9 @@ def upgrade_plan(home, args, peers, signer, timeout):
         return memo[key]
 
     def plan_row(row, candidate, commit=None):
-        scope_sources(by_peer[row['name']]['authority']['scopes'][row['scope']], config, candidate['lock'])
+        scope = fleet.effective_scope(by_peer[row['name']]['authority'], row['scope'],
+                                      row['observation'].get('tap_sources', {}))
+        scope_sources(scope, config, candidate['lock'])
         row['changes'] = mask_update.changes(row['observation']['lock'], candidate['lock'])
         row.update(status='planned', request=dict(scope=row['scope'], observed=row['observation']['observation'],
                                                   candidate=candidate, commit=commit))
@@ -819,7 +831,7 @@ def contribution_plan(history, rows, peers, signer, candidate_for):
             proposed = dict(target, name=peer['name'], identity=peer['device'], binding=row['binding'],
                             device_epoch=peer['authority']['epoch'],
                             profile=control.desired_profile(candidate['declaration'], candidate['lock']))
-            rollout.validate_sources(proposed, peer, False)
+            rollout.validate_sources(proposed, peer, False, row.get('observation', {}).get('tap_sources', {}))
             if 'blocked' in proposed:
                 raise c.MaskError(proposed['blocked'], 'Fleet profile upgrade is outside its current scope grant.', 4)
             if row['status'] == 'planned' and row['observation']['contribution'] == profile['revision']:

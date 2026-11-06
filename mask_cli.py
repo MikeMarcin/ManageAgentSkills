@@ -35,6 +35,9 @@ COMMANDS = {
                                    ('ref', 'value'), ('path', 'value')] + FLEET_TARGET),
     'fleet.update': (True, True, [('input', 'optional')] + FLEET_TARGET),
     'fleet.upgrade': (True, True, [('all', 'flag')] + FLEET_TARGET),
+    'fleet.tap': (True, True, [('name', 'optional'), ('url', 'optional'), ('ref', 'value'), ('packages', 'value'),
+                               ('device', 'repeat'), ('timeout', 'int')]),
+    'fleet.untap': (True, True, [('name', 'pos'), ('device', 'repeat'), ('timeout', 'int')]),
     'fleet.remove': (True, True, [('input', 'pos')] + FLEET_TARGET),
     'fleet.sync': (True, True, [('device', 'repeat'), ('all', 'flag'), ('local', 'flag'), ('timeout', 'int')]),
     'fleet.operation.show': (False, True, [('operation', 'pos')]),
@@ -97,6 +100,8 @@ HELP = {
     'fleet.install': ('Install one exact skill contribution. Defaults to authorized personal scopes on enrolled devices.', 'mask fleet install SKILL --dry-run'),
     'fleet.update': ('Update the MASK program on all active enrolled devices by default. Use --device NAME to select devices. Preview reads devices over signed SSH and the approved program origin over Git. An explicit SOURCE/ID retains the fleet skill rollout command.', 'mask fleet update --dry-run\nmask fleet update TAP/SKILL --all-devices --scope user --dry-run'),
     'fleet.upgrade': ('Upgrade skills in authorized scopes and propagate one project controls commit per repository. Preview reads devices over signed SSH, the controller’s fetched tap catalogs and the configured desired-state repository.', 'mask fleet upgrade --all --dry-run'),
+    'fleet.tap': ('List centrally managed taps, or review adding NAME URL to all active enrolled devices or selected --device names.', 'mask fleet tap\nmask fleet tap team https://github.com/owner/skills.git --dry-run'),
+    'fleet.untap': ('Review removing an unused fleet-owned tap. A device subset retains the controller tap.', 'mask fleet untap team --dry-run'),
     'fleet.remove': ('Withdraw a fleet-owned contribution and preserve independent local selections.', 'mask fleet remove TAP/SKILL --all-devices --scope user --dry-run'),
     'fleet.sync': ('Deliver the latest approved desired state to enrolled devices, or pull it on this device.', 'mask fleet sync --all\nmask fleet sync --local'),
     'fleet.operation.show': ('Show signed rollout results from the recorded operation.', 'mask fleet operation show OPERATION_ID'),
@@ -163,6 +168,7 @@ def definitions(engine):
 
 def guarded(command, engine):
     if command in ('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove',
+                   'fleet.tap', 'fleet.untap',
                    'fleet.operation.cancel', 'fleet.operation.rollback',
                    'fleet.runner.enable', 'fleet.runner.disable'):
         return True
@@ -463,7 +469,8 @@ def capabilities(output, leaves, mask):
                          deployment_model='taps', line_endings=dict(default='exact', values=['exact', 'autocrlf'], opt_in='tap --autocrlf'), pinned_deployment=True, per_binding_targeting=True, targets=mask.ADAPTERS,
                          bundles=dict(flat=True, source_index=1, contributions='explicit_local', upgrade='definition_and_unheld_versions', ordinary_upgrade='installed_receipts', uninstall='named_local_contribution', recursive=False),
                          fleet=dict(protocol=mask_fleet.PROTOCOL, actions=list(mask_fleet.SUPPORTED_ACTIONS), max_frame=mask_rpc.MAX_FRAME,
-                                    max_transfer=mask_fleet_artifacts.MAX_TRANSFER, signing='openssh-sshsig-ed25519'),
+                                    max_transfer=mask_fleet_artifacts.MAX_TRANSFER, signing='openssh-sshsig-ed25519',
+                                    tap_management=1),
                          adapter_contracts=mask.adapters.capabilities(), python_minimum='3.11', program_root=str(mask.PROGRAM_ROOT),
                          workflow=dict(readiness='workflow_readiness_v1', requirement_profiles='workflow_requirement_profiles_v1',
                                        profile_selection='status --check --workflow-profile SKILL=PROFILE', scope_contracts=['project','user'],

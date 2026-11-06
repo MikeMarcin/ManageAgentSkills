@@ -59,6 +59,35 @@ MASK checkout. The controller must use the same program origin. A program
 grant can use an empty `scopes` object. Change the epoch and review the device
 policy and controller binding again when adding maintenance grants.
 
+### Delegate tap management
+
+Add `tap-inspect` and `tap-apply` to `actions` alongside `capabilities`. Add a
+top-level `tap_management` object such as this one.
+
+```json
+{
+  "repositories": ["ssh://git@git.example.com/owner/skills.git"],
+  "namespaces": ["https://github.com/your-org"],
+  "scopes": ["personal"]
+}
+```
+
+Supply at least one exact canonical network repository or forge namespace.
+Namespace grants use HTTPS identities on GitHub, GitLab, Bitbucket or
+Codeberg and match complete, case-sensitive path components. A namespace can
+include nested groups. It covers repositories beneath that path, so grant
+only a namespace you trust to supply skills. Omit either repository list if
+unused. An empty `scopes` list delegates catalog management alone.
+
+Name existing scope aliases to make fleet-owned taps from this grant
+available to their existing rollout and upgrade permissions. Package bytes
+are acquired using that device’s own Git transport and credentials. A
+delegated source never enables forwarding. An explicit static grant for the
+same alias takes precedence.
+
+Review the policy on the device and its binding on the controller once.
+Subsequent tap operations within that policy use the existing enrollment.
+
 ## Review the SSH binding
 
 Create the controller's binding file from the device's verified

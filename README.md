@@ -159,6 +159,11 @@ Bare fleet install targets authorized personal scopes. Fleet upgrade updates
 skills in granted scopes and propagates one canonical controls commit per
 eligible project repository. Bare fleet update targets all active enrolled
 devices and advances the MASK program through a separate device grant.
+With a device’s central tap grant, use `mask fleet tap` to list managed taps,
+`mask fleet tap NAME URL --dry-run` to review an addition, and
+`mask fleet untap NAME --dry-run` to review removal. Repeat `--device NAME` to
+target a subset. Fetch a newly added tap on the controller before using it to
+resolve skills.
 See the [enrollment guide](docs/guides/fleet-enrollment.md) and
 [rollout guide](docs/guides/fleet-rollouts.md).
 

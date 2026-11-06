@@ -15,6 +15,7 @@ Skills are passive data unless the user approves a declared setup action.
 | Selection | `install SKILL ...`, `uninstall SKILL ...`, `list`, `pin SKILL`, `unpin SKILL` | Current checkout |
 | Maintenance | `upgrade [SKILL ...]`, `repair`, `status` | Current checkout |
 | Fleet device transport | `fleet controller`, `fleet device`, `fleet ping`, `fleet capability` | Explicit enrolled peer or the active local fleet |
+| Fleet catalog | `fleet tap [NAME URL]`, `fleet untap NAME` | Fleet-owned taps on all active peers or repeated `--device NAME` |
 | Fleet rollout | `fleet install`, `fleet update SOURCE/ID`, `fleet remove`, `fleet sync`, `fleet operation` | Frozen enrolled devices and an authorized personal or mapped project scope |
 | Fleet maintenance | `fleet upgrade [--all]`, `fleet update` | Explicitly authorized skill scopes or the separately granted MASK program origin |
 | Fleet convergence | `fleet control`, `fleet sync --local`, `fleet runner` | Explicit desired repository, optional separate receipt repository and current-user schedule |
@@ -260,7 +261,7 @@ program before switching executables; neither update nor recovery resets a check
 
 0 success; 2 invalid invocation; 3 invalid/missing configuration; 4 blocked task,
 stale plan or missing consent; 5 external/filesystem/setup failure; 6 busy lock;
-7 failed observational check; 8 pending/conflicting recovery; 9 incomplete fleet rollout or maintenance; 10 internal invariant;
+7 failed observational check; 8 pending/conflicting recovery; 9 incomplete fleet rollout, maintenance or catalog operation; 10 internal invariant;
 130 interruption. Typed error codes refine these classes.
 
 The [accepted amendment](../rfcs/plans/upgrade-readiness/accepted-surface.md)
@@ -349,6 +350,8 @@ requires a live expiry of at most five minutes.
 | `program-update` | Same `origin` and `candidate`, with the reviewed `observed` digest |
 | `upgrade-inspect` | Granted `scope` alias |
 | `upgrade-apply` | Granted `scope`, reviewed `observed` digest, exact `candidate` controls and nullable `commit` authority. A co-owned contribution also binds the exact `profile` and its published `desired` sequence and revision. |
+| `tap-inspect` | Null `change` for inventory, or `change` with `kind`, `name` and, for an addition, exact `repository`, `ref` and `packages` |
+| `tap-apply` | Exact inspected `change` with the reviewed `observed` digest |
 
 Preparation can retrieve an exact approved commit using the device's own Git
 authentication. Forwarding uses a signed request with up to 32 selected
@@ -430,3 +433,21 @@ reports `offline`, failed verification or delivery can report `unknown`, and
 incompatible or unauthorized scopes have their own reported reasons.
 
 See [fleet maintenance commands](../guides/fleet-rollouts.md#upgrade-skills-or-update-the-mask-program).
+
+## Fleet tap catalogs
+
+Compatible peers advertise `tap_management: 1` in signed capabilities. The
+separate grant bounds the repositories and aliases eligible for dynamic source
+authority. The enrollment descriptor remains stable as the catalog changes.
+Existing static sources take precedence. Delegated sources carry
+`forward: false` and use the device’s ordinary exact acquisition.
+
+The approval hash binds the operation, frozen device observations and the
+controller catalog effect. The device atomically replaces its catalog with
+the new binding and committed result. A signed receipt binds the plan and
+request and describes the before and after bindings. A stale observation
+refuses a new mutation. Reapplying an approved plan within seven days can
+recover previously committed receipts, including after a lost response.
+Current catalog inspection is a separate signed read.
+
+See [central tap commands](../guides/fleet-rollouts.md#manage-taps-centrally).

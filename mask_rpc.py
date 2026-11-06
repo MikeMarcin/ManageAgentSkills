@@ -37,7 +37,8 @@ PAYLOADS = {'capabilities': (), 'inspect': ('scope',), 'prepare': ('scope',),
             'apply': ('scope', 'plan'), 'receipt': ('operation', 'digest'),
             'cancel-request': ('operation', 'digest'),
             'program-inspect': ('origin', 'candidate'), 'program-update': ('origin', 'candidate', 'observed'),
-            'upgrade-inspect': ('scope',), 'upgrade-apply': ('scope', 'observed', 'candidate', 'commit')}
+            'upgrade-inspect': ('scope',), 'upgrade-apply': ('scope', 'observed', 'candidate', 'commit'),
+            'tap-inspect': ('change',), 'tap-apply': ('change', 'observed')}
 
 
 def invalid(message):
@@ -118,6 +119,9 @@ def intent_shape(intent):
     if action.startswith(('program-', 'upgrade-')):
         import mask_fleet_maintenance
         mask_fleet_maintenance.validate_payload(action, payload)
+    if action in fleet.TAP_ACTIONS:
+        import mask_fleet_taps
+        mask_fleet_taps.validate_payload(action, payload)
     return intent
 
 
@@ -220,6 +224,7 @@ def authorized_scope(home, intent, policy):
     if record.get('dev_links'):
         c.fail('dev_link.active', 'Fleet cannot act on authoring links.', 4)
     config = c.config(c.read_json(home / 'config.json'))
+    scope = fleet.effective_scope(policy, alias, config['sources'])
     declaration, locked = resolve.read_exact_lock(root, scope['scope'], home, config, verify=False)
     subscriptions = record.get('profiles', {})
     layers = profiles.layers(declaration, locked, subscriptions)
@@ -571,7 +576,10 @@ def perform(home, intent, device, policy):
         return dict(device=fleet.public(device), authority=fleet.public_authority(policy), generation=state_at(home)['generation'],
                     adapters=selection.read_policy(home)[0]['enabled_agents'], max_frame=MAX_FRAME,
                     max_transfer=artifacts.MAX_TRANSFER, signing_provider='openssh-sshsig-ed25519',
-                    maintenance=1)
+                    maintenance=1, tap_management=1)
+    if action in fleet.TAP_ACTIONS:
+        import mask_fleet_taps
+        return mask_fleet_taps.perform(home, intent, device, policy)
     if action.startswith(('program-', 'upgrade-')):
         import mask_fleet_maintenance
         return mask_fleet_maintenance.perform(home, intent, device, policy)

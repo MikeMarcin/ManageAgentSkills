@@ -2,8 +2,8 @@
 
 Use [fleet enrollment](fleet-enrollment.md) to authorize each device and scope.
 Each device needs a compatible MASK program, a registered local scope with a
-rollout grant, and local approval for the same tap identities. Enrollment and
-tap approval happen once per device or when its grant changes.
+rollout grant, and either static approval for the same tap identities or a
+central tap grant covering the repository and scope.
 
 ## Set up the control repository
 
@@ -20,6 +20,44 @@ The controller publishes a signed, linear history to `refs/heads/mask-fleet`.
 Plans bind the control head, exact skill resolution, scope and enrolled device
 identities. A competing publication or changed tap resolution requires a fresh
 preview. Devices added after approval are excluded from that operation.
+
+## Manage taps centrally
+
+With [central tap delegation](fleet-enrollment.md#delegate-tap-management)
+in place, run these commands on the controller.
+
+```sh
+mask fleet tap --json
+mask fleet tap team https://github.com/your-org/skills.git --dry-run --json
+mask fleet tap team https://github.com/your-org/skills.git --approve-plan HASH --json
+mask tap fetch team
+mask fleet untap team --dry-run --json
+```
+
+The default selection is all active enrolled devices. Repeat `--device NAME`
+to select a subset. Additions default to ref `main` and package directory
+`skills`. Supply `--ref` or `--packages` for a different catalog layout.
+Review the exact alias, repository and targets before approving.
+
+An addition also approves the same binding in the controller’s catalog
+after at least one device verifies it. A matching local controller tap
+is reused with its existing ownership and transport. A conflicting binding
+blocks additions. Device-local taps stay independently owned, even if their
+repository matches. Each machine continues to choose or pin its own
+transport. Tap mutations only change catalogs. Fetch explicitly on the
+controller before resolving skills.
+
+Removal requires a fleet-owned, unused tap. A local declaration, lock,
+profile or static grant that references the tap blocks removal. A subset
+removal retains the controller tap for other devices. A removal across the
+active fleet removes an unused fleet-owned controller tap after every selected
+device verifies removal. Local controller taps and cached Git data stay in place.
+
+In JSON, inspect `data.complete`, `data.device_results` and
+`data.controller_result` after approval. An incomplete operation exits 9.
+Retry a lost acknowledgement with the same command and hash. If a device
+was offline during preview, review a fresh plan once it returns. Receipts
+describe the approved operation. Use `fleet tap` for current catalog state.
 
 ## Install a skill
 

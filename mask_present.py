@@ -1292,6 +1292,12 @@ def render_fleet(data, output):
             lines.extend(f"    {name}: {clean(source['repository'])}" +
                          (' (forwarding allowed)' if source['forward'] else '')
                          for name, source in sorted(scope['sources'].items()))
+        tap_grant = policy.get('tap_management')
+        if tap_grant:
+            lines.append('  Central tap delegation')
+            lines.extend('    Repository ' + clean(value) for value in tap_grant.get('repositories', []))
+            lines.extend('    Namespace ' + clean(value) for value in tap_grant.get('namespaces', []))
+            lines.append('    Skill scopes ' + (', '.join(tap_grant['scopes']) or '(catalog only)'))
         if policy.get('revoked'):
             lines.append('  Authority revoked.')
     return lines + plan_guard(data, output)
@@ -1364,6 +1370,45 @@ def render_fleet_rollout(data, output):
     return [headline(output)] + fleet_rollout_lines(data) + plan_guard(data, output)
 
 
+def fleet_tap_lines(data):
+    def label(name, row):
+        reason = f" ({clean(row['reason'])})" if row.get('reason') else ''
+        return f"  {clean(name)}: {clean(row['status'])}{reason}"
+
+    def taps(entries):
+        return [f"    {clean(name)}: {clean(entry['repository'])}" for name, entry in sorted(entries.items())]
+
+    plan = data.get('plan')
+    if plan:
+        change = plan['change']
+        lines = [f"  Tap {clean(change['name'])} · {clean(change['kind'])}"]
+        if change['kind'] == 'add':
+            lines.append(f"    {clean(change['repository'])} · {clean(change['ref'])} · {clean(change['packages'])}")
+        controller = data.get('controller_result', plan['controller'])
+        lines.append(label('Controller catalog', controller))
+        rows = data.get('device_results', plan['targets'])
+        for row in rows:
+            lines.append(label(row['name'], row))
+            details = row.get('receipt', row.get('observation', {}))
+            if change['kind'] == 'remove' and details.get('before'):
+                lines.append('    ' + clean(details['before']['repository']))
+        lines.append('  Catalog changes only.')
+    elif 'controller_taps' in data:
+        lines = ['  Controller catalog'] + taps(data['controller_taps'])
+        for row in data['device_results']:
+            lines.append(label(row['name'], row))
+            lines.extend(taps(row.get('observation', {}).get('taps', {})))
+    else:
+        return []
+    if data.get('complete') is False:
+        lines.append('  Some catalog results remain incomplete.')
+    return lines
+
+
+def render_fleet_taps(data, output):
+    return [headline(output)] + fleet_tap_lines(data) + plan_guard(data, output)
+
+
 RENDERERS = {
     **dict.fromkeys(('fleet.control.configure', 'fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove', 'fleet.sync',
                      'fleet.operation.show', 'fleet.operation.wait', 'fleet.operation.cancel', 'fleet.operation.rollback',
@@ -1375,6 +1420,7 @@ RENDERERS = {
     'fleet.device.enroll': render_fleet, 'fleet.device.revoke': render_fleet,
     'fleet.device.show': render_fleet, 'fleet.device.list': render_fleet,
     'fleet.ping': render_fleet, 'fleet.capability': render_fleet,
+    'fleet.tap': render_fleet_taps, 'fleet.untap': render_fleet_taps,
     'diff': render_exact, 'update.report': render_exact, 'report': render_exact,
     'user.export': render_profile, 'user.import': render_profile, 'profile.inspect': render_profile,
     'profile.subscribe': render_profile, 'profile.unsubscribe': render_profile,
@@ -1702,6 +1748,9 @@ def render_error(output):
     lines = [f"error: {clean(message)}", f"  code: {clean(error['code'])}"]
     if error['code'] == 'fleet.probe_incomplete':
         lines.extend(fleet_device_lines(data))
+    if output['command'] in ('fleet.tap', 'fleet.untap'):
+        lines.extend(fleet_tap_lines(data))
+        lines.extend(plan_guard(data, output))
     if output['command'] in ('fleet.install', 'fleet.update', 'fleet.upgrade', 'fleet.remove', 'fleet.sync',
                              'fleet.operation.cancel', 'fleet.operation.rollback',
                              'fleet.runner.enable', 'fleet.runner.disable'):

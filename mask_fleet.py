@@ -12,6 +12,7 @@ import re
 import shutil
 import tempfile
 import uuid
+from urllib.parse import urlsplit
 
 import mask_core as c
 import mask_resolve as resolve
@@ -22,7 +23,8 @@ RECEIPT = 'mask-receipt@mask.invalid'
 SIGNING_PROVIDER = ContextVar('fleet_signing_provider', default=None)
 PROTOCOL = 'mask.rpc.v1'
 ACTIONS = ('capabilities', 'inspect', 'prepare', 'apply', 'receipt', 'cancel-request')
-SUPPORTED_ACTIONS = ACTIONS + ('program-inspect', 'program-update', 'upgrade-inspect', 'upgrade-apply')
+TAP_ACTIONS = ('tap-inspect', 'tap-apply')
+SUPPORTED_ACTIONS = ACTIONS + ('program-inspect', 'program-update', 'upgrade-inspect', 'upgrade-apply') + TAP_ACTIONS
 RECORD_BYTES = 256 * 1024
 PUBLIC_FIELDS = ('schema_version', 'kind', 'id', 'name', 'key', 'fingerprint')
 ED25519_PREFIX = b'\0\0\0\x0bssh-ed25519\0\0\0\x20'
@@ -231,9 +233,68 @@ def init(args, output, home, role):
         output['transaction'] = 'committed'
 
 
+def tap_repository(value):
+    if not isinstance(value, str) or len(value) > 1024:
+        invalid('Expected a bounded network tap repository.')
+    identity = sources.repository(value)
+    if identity.startswith('file:') or len(identity) > 1024:
+        invalid('Central taps require a credential-free network repository.')
+    return identity
+
+
+def tap_namespace(value):
+    if not isinstance(value, str) or len(value) > 512 or sources.spelling(value) != value:
+        invalid('Expected a canonical HTTPS forge namespace.')
+    parsed = urlsplit(value)
+    if (parsed.scheme != 'https' or parsed.netloc not in sources.FORGE_HOSTS or not
+            re.fullmatch(r'(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+', parsed.path)):
+        invalid('Tap namespaces require a supported forge host and exact path components.')
+    return value
+
+
+def validate_tap_management(grant, scopes):
+    c.fields(grant, ('scopes',), ('repositories', 'namespaces'), 'fleet', versions=())
+    if not grant.get('repositories') and not grant.get('namespaces'):
+        invalid('Tap management requires an exact repository or forge namespace.')
+    for name, check in (('repositories', tap_repository), ('namespaces', tap_namespace), ('scopes', token)):
+        entries = grant.get(name, [])
+        if (not isinstance(entries, list) or len(entries) > 32 or
+                any(check(entry) != entry for entry in entries) or len(set(entries)) != len(entries)):
+            invalid('Tap management requires unique canonical repository, namespace and scope values.')
+    if not set(grant['scopes']) <= scopes.keys():
+        invalid('Tap management names an undeclared scope alias.')
+
+
+def tap_granted(policy, repository):
+    grant = policy.get('tap_management', {})
+    return repository in grant.get('repositories', []) or any(
+        repository.startswith(prefix + '/') for prefix in grant.get('namespaces', []))
+
+
+def managed_taps(policy, catalog):
+    owner = policy['controller']['id']
+    result = {}
+    for name, entry in catalog.items():
+        if entry.get('fleet_owner') == owner:
+            repository = tap_repository(entry['repository'])
+            if tap_granted(policy, repository):
+                result[name] = dict(repository=repository, fleet_owner=owner)
+    return result
+
+
+def effective_scope(policy, alias, catalog):
+    scope = policy['scopes'][alias]
+    if alias not in policy.get('tap_management', {}).get('scopes', []):
+        return scope
+    dynamic = {name: dict(repository=entry['repository'], forward=False)
+               for name, entry in managed_taps(policy, catalog).items()}
+    return dict(scope, sources={**dynamic, **scope['sources']})
+
+
 def authority(value, *, local=False):
+    options = ('program_origin', 'tap_management')
     c.fields(value, ('schema_version', 'controller', 'epoch', 'minimum_sequence', 'actions', 'scopes'),
-             ('program_origin', 'revoked') if local else ('program_origin',), 'fleet')
+             (*options, 'revoked') if local else options, 'fleet')
     identity(value['controller'], 'controller')
     number(value['epoch'], minimum=1)
     number(value['minimum_sequence'], minimum=1)
@@ -248,6 +309,12 @@ def authority(value, *, local=False):
     scopes = value['scopes']
     if not isinstance(scopes, dict) or len(scopes) > 32:
         invalid('Device policy may grant at most 32 scope aliases.')
+    if ('tap_management' in value) != bool(set(TAP_ACTIONS) & set(actions)):
+        invalid('Tap actions require their own explicit tap_management grant.')
+    if 'tap_management' in value:
+        if not set(TAP_ACTIONS) <= set(actions) or 'capabilities' not in actions:
+            invalid('Tap management requires both tap actions and the capability probe.')
+        validate_tap_management(value['tap_management'], scopes)
     for alias, scope in scopes.items():
         token(alias)
         fields = ('scope', 'sources') + (('root',) if local else ())
@@ -378,6 +445,9 @@ def descriptor(home):
 
 def dispatch(args, output, home):
     command = args.command
+    if command in ('fleet.tap', 'fleet.untap'):
+        import mask_fleet_taps
+        return mask_fleet_taps.dispatch(args, output, home)
     if command == 'fleet.control.configure':
         import mask_control
         return mask_control.configure(args, output, home)

@@ -578,7 +578,7 @@ def unsupported(what, **details):
 
 def config(value):
     """Machine configuration v3: a tap catalog."""
-    fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), ('forge_hosts',), versions=(3,))
+    fields(value, ('schema_version', 'default_targets', 'git_timeout_seconds', 'sources'), ('forge_hosts', 'fleet_tap'), versions=(3,))
     targets = string_set(value['default_targets'], 'config', targets=True)
     timeout = value['git_timeout_seconds']
     if type(timeout) is not int or not 1 <= timeout <= 600:

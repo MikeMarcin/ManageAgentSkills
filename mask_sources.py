@@ -252,7 +252,11 @@ def validate_config(value):
         c.fail('config.invalid', 'Expected a bounded approved source catalog.')
     for name, entry in value['sources'].items():
         alias(name)
-        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'), ('line_endings', 'transport_policy'), family='source')
+        c.fields(entry, ('repository', 'transport', 'cache', 'ref', 'packages', 'authoring'),
+                 ('line_endings', 'transport_policy', 'fleet_owner'), family='source')
+        if 'fleet_owner' in entry and (not isinstance(entry['fleet_owner'], str) or not re.fullmatch(
+                r'[0-9a-f]{32}', entry['fleet_owner'])):
+            c.fail('config.invalid', 'Invalid fleet tap ownership.')
         if entry.get('transport_policy', 'derived') not in TRANSPORT_POLICIES:
             c.fail('config.invalid', 'A tap transport policy is derived or pinned.')
         if line_endings(entry) not in LINE_ENDINGS:
@@ -266,6 +270,9 @@ def validate_config(value):
             c.fail('config.invalid', 'Source cache must be an absolute machine-local path.')
         if entry['authoring'] is not None and (not isinstance(entry['authoring'], str) or not Path(entry['authoring']).is_absolute()):
             c.fail('config.invalid', 'Authoring checkout must be an absolute machine-local path.')
+    if 'fleet_tap' in value:
+        from mask_fleet_taps import validate_receipt
+        validate_receipt(value['fleet_tap'])
 
 
 def cache_path(home, name, identity):
