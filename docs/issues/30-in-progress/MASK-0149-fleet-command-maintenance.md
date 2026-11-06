@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0149"
 title: "Implement and verify fleet command maintenance"
-status: "Ready"
+status: "In Progress"
 rfcs: ["RFC-MASK-0025"]
 depends_on: ["MASK-0074", "MASK-0146"]
 closeout_for: ["RFC-MASK-0025"]
