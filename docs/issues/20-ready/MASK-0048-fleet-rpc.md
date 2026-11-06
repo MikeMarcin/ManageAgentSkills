@@ -2,7 +2,7 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0048"
 title: "Implement bounded remote protocol and idempotent local dispatch"
-status: "Backlog"
+status: "Ready"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0047"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-rpc","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
