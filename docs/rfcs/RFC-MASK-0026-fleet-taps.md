@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0026"
 title: "Centrally managed fleet taps"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-11-06"
 metadata: {"milestone_plan":{"id":"fleet-taps","path":"docs/rfcs/plans/fleet-taps/milestone-plan.json"}}
@@ -19,7 +19,8 @@ remains historical.
   verified per-device results, with incomplete delivery and lost-ack retry
   distinguishable from convergence. The preview describes the controller catalog
   effect. Tap changes leave caches and deployments alone.
-- AC2. A device can grant exact network repositories and named scope aliases once.
+- AC2. A device can grant exact network repositories or trusted forge namespaces
+  and name scope aliases once.
   Signed requests preserve the enrolled binding and independently granted static
   sources. Centrally added taps become effective sources only in those aliases
   and never grant forwarding. Local bindings, transport choices, references,
@@ -30,4 +31,4 @@ remains historical.
   commands and is validated as a portable package. Existing fleet behavior retains
   its prior acceptance.
 
-Closeout: [MASK-0150](../issues/30-in-progress/MASK-0150-fleet-taps.md).
+Closeout: [MASK-0150](../issues/60-done/MASK-0150-fleet-taps.md).

@@ -62,4 +62,4 @@ Reconcile live IDs before adopting packet IDs. Keep original packet IDs in prove
 
 | RFC-MASK-0025 | Auto-Verified | Fleet command defaults and approved program and skill maintenance |
 
-| RFC-MASK-0026 | Implementing | Centrally managed fleet taps |
+| RFC-MASK-0026 | Auto-Verified | Centrally managed fleet taps |

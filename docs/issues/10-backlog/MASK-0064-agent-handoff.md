@@ -55,3 +55,14 @@ bundles in ordinary/default/aggregate upgrade. ASK-0096 completed at
 `b879f8136489a98cfa26e0aae1da7e7e268c589b` passes 22 public commands, all four
 skills ready, all 16 packages preserved, manual-safe uninstall/reinstall and
 combined aggregate derived-fixture upgrade. Broader MASK-0064 remains Backlog.
+
+
+## Bounded fleet guidance handoff — 2026-11-06
+
+Canonical AgentSkills ASK-0132 completed at `a856c8b532eb68f5a19eaa20a6d693f266dc1b87`.
+Source `4a28361df3e56f08f2e1ed088aa3f9995e96dab9` supplies capability-gated central tap
+management, enrollment, install, upgrade and program update guidance.
+MASK `733df16981838e6b9b307cf6a0db80927b73d34c` verified the committed portable package,
+advertised options and signed fixture rollout. See the
+[handoff record](../../development/agent-skills-handoff.md#central-fleet-guidance-handoff).
+The remaining MASK-0064 prerequisites and broader provenance scope stay open.

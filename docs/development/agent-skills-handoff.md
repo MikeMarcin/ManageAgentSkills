@@ -59,3 +59,18 @@ runtime acceptance. The verifier ended and its temporary tree/remotes/machine ro
 were cleaned. No source push/publication, real consumer deployment, credential or
 permission change, running-host loading or native Windows acceptance is claimed.
 Broader MASK-0064 stays Backlog.
+
+
+## Central fleet guidance handoff
+
+AgentSkills ASK-0132 closed at `a856c8b532eb68f5a19eaa20a6d693f266dc1b87` for canonical
+`manage-agent-skills` source `4a28361df3e56f08f2e1ed088aa3f9995e96dab9`. The skill branches
+to a fleet reference covering enrollment, bounded tap delegation, rollout,
+skill upgrades and program updates. It checks capabilities before acting and
+reports per-device incomplete outcomes from reviewed plans.
+
+ManageAgentSkills `733df16981838e6b9b307cf6a0db80927b73d34c` checked the documented options
+against public capabilities. A disposable Git tap validated and installed
+the package for both adapters with byte-for-byte agreement for the canonical
+entrypoint and reference. The public fleet fixtures exercised the signed tap,
+fetch, install and upgrade path. Broader MASK-0064 remains Backlog.
