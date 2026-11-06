@@ -1,7 +1,7 @@
 ---
 id: "RFC-MASK-0009"
 title: "Per-skill scope-specific agent targeting and advertised compatibility"
-status: "Implementing"
+status: "Auto-Verified"
 owner: "MikeMarcin"
 created: "2026-09-05"
 metadata: {"milestone_plan":{"id":"pin-target-prerequisites","path":"docs/rfcs/plans/pin-target-prerequisites/milestone-plan.json"}}
@@ -85,3 +85,12 @@ Each candidate deployment gets a stable outcome: selected, deployed, not_applica
 ## Live authorization
 
 Accepted for implementation by the owner’s 2026-09-05 import-and-implement request. Follow the live card dependencies; native and external acceptance remain open until directly exercised.
+
+## Integrated and verified scope
+
+Project and personal agent selection, physical links, compatibility and
+collision behavior are verified on native macOS and Windows. Current
+`project set-agents` and `user set-agents` apply by default and support a
+guarded preview. The closeout separates historical v1 target preservation
+from current tap declarations and records the scope of prelaunch evidence.
+[Closeout](../issues/60-done/MASK-0070-close-9.md) · [Native evidence](../development/targeting-acceptance.md)
