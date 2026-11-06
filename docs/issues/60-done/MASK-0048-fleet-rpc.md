@@ -2,10 +2,11 @@
 schema: "implement-rfc.card.v1"
 id: "MASK-0048"
 title: "Implement bounded remote protocol and idempotent local dispatch"
-status: "In Progress"
+status: "Done"
 rfcs: ["RFC-MASK-0012"]
 depends_on: ["MASK-0047"]
 metadata: {"packet":"mask-readiness-fleet-2026-09-05","packet_key":"fleet-rpc","stage":"D — enrolled fleet foundation","provisional_id":false,"milestone_plan":{"id":"fleet-enrolled-transport","path":"docs/rfcs/plans/fleet-enrolled-transport/milestone-plan.json"}}
+acceptance: [{"criterion":"RFC-MASK-0012-AC02","outcome":"pass","revision":"741df6468f1b840d685e98358d3e36270b51dbe7","evidence":{"kind":"command","detail":"Public mask rpc --stdio subprocess: bounded frame, duplicate JSON, wrong action, shell/path, wrong identity, scope, expiry and version gates. python3 -B -m unittest -v tests.test_fleet_rpc tests.test_pinned_recovery"}},{"criterion":"RFC-MASK-0012-AC03","outcome":"pass","revision":"741df6468f1b840d685e98358d3e36270b51dbe7","evidence":{"kind":"command","detail":"Public RPC duplicate and sequence tests; kill after link vs after state; ordinary pending journal, rollback, receipt-only recovery, exact ID/digest and cancellation. All 17 pinned recovery regression tests passed. python3 -B -m unittest -v tests.test_fleet_rpc tests.test_pinned_recovery"}},{"criterion":"RFC-MASK-0012-AC06","outcome":"pass","revision":"741df6468f1b840d685e98358d3e36270b51dbe7","evidence":{"kind":"command","detail":"Native OpenSSH synthetic keys through subprocess RPC; tampered request and stale/other request receipt refused; exact device signature verified. python3 -B -m unittest -v tests.test_fleet_rpc tests.test_pinned_recovery"}}]
 ---
 
 # MASK-0048: Implement bounded remote protocol and idempotent local dispatch
