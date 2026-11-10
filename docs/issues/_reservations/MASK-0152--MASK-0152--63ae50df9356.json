@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0152"
+  ],
+  "reserve_for": "fleet-scope-rebind",
+  "purpose": "",
+  "created": "2026-11-10T09:15:47.444228+00:00",
+  "base": "12e7c70adb03101375bbb7695c2424c3a256f7e0"
+}
