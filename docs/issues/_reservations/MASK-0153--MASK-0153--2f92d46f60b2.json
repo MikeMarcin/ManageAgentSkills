@@ -1,0 +1,10 @@
+{
+  "schema": "implement-rfc.reservation.v1",
+  "ids": [
+    "MASK-0153"
+  ],
+  "reserve_for": "fleet-trusted-source-setup",
+  "purpose": "Run controller-reviewed setup for fleet-granted sources",
+  "created": "2026-11-13T08:42:11.470880+00:00",
+  "base": "165ca569012107d2ae6285dbbf2ef8c35b9aea75"
+}
