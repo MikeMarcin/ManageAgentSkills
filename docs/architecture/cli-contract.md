@@ -107,10 +107,13 @@ setup scripts/inputs/interpreter and observed replacement bytes. No declaration,
 lock, registration or deployment changes occur before approval. Cache preparation
 may remain after refusal and is reported separately.
 
-Ordinary owned effects need no prompt. `--dry-run` never fetches, writes or runs
-setup. `--approve-plan HASH` approves exactly the previewed task; changed inputs
-refuse with `plan.stale`. JSON and redirected invocations never prompt. Decline
-aborts the task before consumer writes. There is no blanket yes/repair/yolo flag.
+Ordinary owned effects need no prompt. Local `--dry-run` never fetches, writes
+or runs setup. Fleet previews may contact enrolled peers/Git and retain exact
+granted content in device caches/stores outside discovery, as reported in the
+plan; they never change consumer files or run package code. `--approve-plan HASH`
+approves exactly the previewed task; changed inputs refuse with `plan.stale`.
+JSON and redirected invocations never prompt. Decline aborts the task before
+consumer writes. There is no blanket yes/repair/yolo flag.
 Directories, symlinks and unsafe or unowned skill targets remain protected; only
 validated regular native-role replacements enter the reviewed backup path.
 
@@ -348,10 +351,21 @@ requires a live expiry of at most five minutes.
 | `cancel-request` | Target accepted `operation` ID and signed intent `digest` |
 | `program-inspect` | Canonical `origin` and exact Git `candidate` |
 | `program-update` | Same `origin` and `candidate`, with the reviewed `observed` digest |
-| `upgrade-inspect` | Granted `scope` alias |
-| `upgrade-apply` | Granted `scope`, reviewed `observed` digest, exact `candidate` controls and nullable `commit` authority. A co-owned contribution also binds the exact `profile` and its published `desired` sequence and revision. |
+| `upgrade-inspect` | Granted `scope` alias; optional exact `candidate` controls plus original `observed` digest and optional matching `profile` inspect the complete task without consumer changes or script execution. |
+| `upgrade-apply` | Granted `scope`, reviewed `observed` digest, exact `candidate` controls, nullable `commit` authority and reviewed `task` digest (required for setup/replacement). A co-owned contribution also binds the exact `profile` and its published `desired` sequence and revision. |
 | `tap-inspect` | Null `change` for inventory, or `change` with `kind`, `name` and, for an addition, exact `repository`, `ref` and `packages` |
 | `tap-apply` | Exact inspected `change` with the reviewed `observed` digest |
+
+The `upgrade_setup: 1` capability advertises exact upgrade task inspection. Its
+response includes task actions, full setup/input/interpreter fingerprints,
+workflow observations and cache/store preparation disclosure. The device
+recomputes the reviewed task before consumer effects, checks source grants for
+each affected setup/role package (including profile layers), and uses ordinary
+staged setup and replacement backups. Incomplete setup cannot yield an
+`applied_verified` maintenance receipt. Repeating an accepted task with setup
+still required refuses with `fleet.setup_outcome_unknown`; resolve ordinary
+local recovery/repair and review a fresh task. Older no-task requests retain
+ordinary upgrades but cannot authorize setup or repair replacement.
 
 Preparation can retrieve an exact approved commit using the device's own Git
 authentication. Forwarding uses a signed request with up to 32 selected

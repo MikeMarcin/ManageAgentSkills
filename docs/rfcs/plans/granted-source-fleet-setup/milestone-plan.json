@@ -1,0 +1,30 @@
+{
+  "schema": "implement-rfc.milestone-plan.v1",
+  "id": "granted-source-fleet-setup",
+  "scope": {
+    "rfcs": [],
+    "issues": [
+      "MASK-0153"
+    ]
+  },
+  "coverage": "complete",
+  "unplanned_work": [],
+  "milestones": [
+    {
+      "id": "granted-source-fleet-setup",
+      "outcome": "Existing device source, scope and upgrade grants permit exact controller-reviewed setup and native role repairs without new per-device consent.",
+      "work": [
+        {
+          "issue": "MASK-0153"
+        }
+      ],
+      "depends_on": [],
+      "exit_criteria": [
+        "Fleet preview discloses exact setup and native role repair effects, and signed apply uses ordinary setup and recovery machinery.",
+        "Source, scope, action, signature, freshness and input checks reject unauthorized or changed work; role replacements retain backups and interrupted setup is not replayed.",
+        "Public CLI and signed transport fixtures pass, current fleet guidance and RFC-MASK-0012 reflect the owner amendment, and the leaf leaves no live mutations or running commands."
+      ],
+      "boundary": "MASK-0153 only; no AgentSkills edits, live fleet mutations, publication or push by the engineering leaf."
+    }
+  ]
+}

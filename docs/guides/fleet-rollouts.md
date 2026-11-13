@@ -108,8 +108,12 @@ Both bare forms select active enrolled devices. Use repeated `--device NAME`
 to review a subset. `fleet upgrade` uses the controller's fetched tap catalogs
 and explicitly granted scopes. Add `--scope user` or `--project-alias ALIAS` to
 narrow the scope. It preserves held versions and existing selections, including
-the membership of installed bundles. Setup or role replacement that needs
-local review blocks the affected scope. Eligible fleet-owned contributions
+the membership of installed bundles. The existing source, scope and upgrade
+grants allow controller-reviewed setup and native-role repairs from those
+sources. The preview discloses the exact scripts, inputs, interpreter, roles and
+backup/replacements; its hash binds the task signed for device application.
+Missing or invalid consumer inputs, ungranted sources and changed observations
+block the affected scope. Eligible fleet-owned contributions
 advance through the signed desired repository. When the same skill is selected
 both locally and by the fleet, the two matching locks can advance together.
 
@@ -133,10 +137,18 @@ retains the existing single fleet-contribution update.
 
 The previews contact enrolled devices over signed SSH. Program previews read
 the approved Git origin and can use disposable Git storage to check an exact
-candidate. A maintenance retry with the same approved hash resumes the frozen
+candidate. Skill upgrade previews can acquire exact granted content into each
+device’s cache/store outside discovery; they report that preparation, never run
+setup and never change consumer files. Devices advertise `upgrade_setup: 1` for
+this exact task inspection. Upgrade MASK first if that capability is unavailable.
+A maintenance retry with the same approved hash resumes the frozen
 scope and uses durable receipts. A device that was offline during inspection
 needs a fresh preview once it returns. Exit 9 means a requested effect remains
-incomplete. Resolve a device's ordinary MASK recovery before retrying.
+incomplete. Resolve a device's ordinary MASK recovery before retrying. Failed or
+interrupted package setup leaves any already committed locks/links in place and
+never silently reruns under the same accepted task. Inspect and repair it locally,
+then review a new task; an unresolved attempt reports
+`fleet.setup_outcome_unknown`. A lost completed receipt is safe to query/retry.
 
 ## Read the results and catch up
 

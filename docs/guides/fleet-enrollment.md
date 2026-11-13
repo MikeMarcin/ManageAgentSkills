@@ -51,7 +51,12 @@ For `fleet upgrade`, grant the actions `upgrade-inspect` and
 `upgrade-apply`, and add `"upgrade": true` to each allowed scope. Give an
 eligible project scope `"commit": true` to allow a canonical controls commit
 or its propagation. Use one upgrade alias per physical scope. Updating a
-fleet-owned contribution also requires the rollout grant.
+fleet-owned contribution also requires the rollout grant. The existing source,
+scope and upgrade grants trust the controller to review that source’s exact
+declared setup scripts and native-role repairs. No new per-device fingerprint
+approval is needed: approve the disclosed task with the controller’s
+`fleet upgrade --approve-plan HASH`. Only already granted sources qualify; a
+successful SSH login or a tap catalog entry alone grants no setup authority.
 
 For `fleet update`, grant `program-inspect` and `program-update` and set the
 top-level `program_origin` to the canonical repository identity of the device’s
@@ -133,8 +138,15 @@ The device runs its ordinary planner against the authorized local scope.
 `prepare` retrieves exact approved commits with the device's Git credentials
 or accepts explicitly allowed, digest-checked files for its existing lock.
 `apply` requires the prepared generation and matching local plan. It uses MASK's
-usual writer lock and filesystem journal. Package setup remains a local reviewed
-action. Exact preparation may retain verified content outside discovery.
+usual writer lock and filesystem journal. Ordinary rollout `apply` does not run
+package setup. Fleet upgrade’s exact candidate inspection can fetch granted
+commits and retain verified content in the device’s cache/store outside discovery;
+it does not change consumer files or run package scripts. Its preview reports
+this preparation and discloses setup code/package fingerprints, consumer input
+hashes, interpreter, generated roles and backup/replacement effects. Signed
+`upgrade-apply` binds the reviewed task hash, which the device recomputes before
+consumer writes. Setup then uses the ordinary frozen staging, validation and
+recovery machinery. Native role replacements keep durable backups.
 
 If delivery times out, query the device using the operation ID and signed intent
 digest. A complete deployment can produce its durable signed receipt after
@@ -142,6 +154,13 @@ the connection is lost. A partially applied local journal reports recovery
 required, and ordinary `mask recover` can inspect it. A receipt describes the
 filesystem, effective agent bindings and package digests observed on the device.
 Agent discovery and current session loading are separate observations.
+
+A failed or interrupted setup can leave already committed locks and links in
+place. It never becomes a verified upgrade receipt. Recover the ordinary journal
+locally and inspect incomplete setup before reviewing a new fleet task. Retrying
+the same accepted task never silently reruns package code; unresolved setup
+reports `fleet.setup_outcome_unknown`. A lost final acknowledgement can reuse the
+completed signed receipt without executing setup again.
 
 See the [wire contract](../architecture/cli-contract.md#fleet-rpc) and the
 [native verification record](../development/fleet-native-acceptance.md).

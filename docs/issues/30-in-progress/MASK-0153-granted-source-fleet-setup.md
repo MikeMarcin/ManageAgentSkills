@@ -5,6 +5,7 @@ title: Run controller-reviewed fleet setup for locally granted sources
 status: "In Progress"
 rfcs: []
 depends_on: []
+metadata: {"milestone_plan":{"id":"granted-source-fleet-setup","path":"docs/rfcs/plans/granted-source-fleet-setup/milestone-plan.json"}}
 ---
 
 The owner explicitly approved amending fleet trust: a device's existing source

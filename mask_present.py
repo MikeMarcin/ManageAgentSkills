@@ -1322,6 +1322,15 @@ def fleet_rollout_lines(data):
             if not data.get('device_results'):
                 for change in row.get('changes', []):
                     lines.append(f"    {clean(change['coordinate'])} {clean(change['before_commit'])} → {clean(change['after_commit'])}")
+                for action in row.get('task', {}).get('actions', []):
+                    if action['kind'] == 'setup.run':
+                        lines.append(f"    Setup {clean(action['coordinate'])}:{clean(action['action'])} ({clean(action['fingerprint'])})")
+                        lines.append(f"      {clean(action['interpreter'])} {clean(action['path'])}")
+                        lines.append('      Roles: ' + ', '.join(clean(role) for role in action['native_roles']))
+                    elif action['kind'] == 'file.backup_replace':
+                        lines.append(f"    Back up and replace {clean(action['path'])} ({clean(action['before_sha256'])})")
+                if row.get('task', {}).get('preparation'):
+                    lines.append('    Exact granted content verified in device cache/store; no consumer files or setup changed during preview.')
         if 'complete' in data:
             lines.append('  All requested effects verified.' if data['complete'] else '  Some requested effects remain incomplete.')
         return lines

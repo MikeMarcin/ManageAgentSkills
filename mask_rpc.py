@@ -98,7 +98,8 @@ def intent_shape(intent):
         invalid('Unsupported RPC action.')
     payload = intent['payload']
     optional = {'prepare': ('acquire', 'artifacts', 'profile'), 'apply': ('profile',), 'inspect': ('rollout',),
-                'upgrade-apply': ('profile', 'desired')}.get(action, ())
+                'upgrade-inspect': ('candidate', 'observed', 'profile'),
+                'upgrade-apply': ('profile', 'desired', 'task')}.get(action, ())
     c.fields(payload, PAYLOADS[action], optional, family='rpc')
     if action == 'prepare' and payload.get('acquire', 'exact') not in ('cached', 'exact'):
         invalid('Unsupported exact artifact acquisition policy.')
@@ -399,7 +400,7 @@ def plan_scope(home, state, config, root, intent, subscriptions):
     return planned
 
 
-def commit_plan(home, intent, record, planned):
+def commit_plan(home, intent, record, planned, *, output=None):
     """Commit a verified projection in the ordinary filesystem journal."""
     fs.ensure_applicable(planned, intent['payload']['plan'])
     pending = fs.make_pending(planned, home)
@@ -416,7 +417,8 @@ def commit_plan(home, intent, record, planned):
         result['observed_at'] = int(time.time())
     committed = dict(record, status='applied_verified', result=result)
     pending['fleet'] = dict(before=record, after=committed)
-    output = dict(data={}, actions=planned['actions'])
+    if output is None:
+        output = dict(data={}, actions=planned['actions'])
     fs.execute(planned, home, output, pending=pending)
     return committed
 
@@ -576,7 +578,7 @@ def perform(home, intent, device, policy):
         return dict(device=fleet.public(device), authority=fleet.public_authority(policy), generation=state_at(home)['generation'],
                     adapters=selection.read_policy(home)[0]['enabled_agents'], max_frame=MAX_FRAME,
                     max_transfer=artifacts.MAX_TRANSFER, signing_provider='openssh-sshsig-ed25519',
-                    maintenance=1, tap_management=1)
+                    maintenance=1, upgrade_setup=1, tap_management=1)
     if action in fleet.TAP_ACTIONS:
         import mask_fleet_taps
         return mask_fleet_taps.perform(home, intent, device, policy)

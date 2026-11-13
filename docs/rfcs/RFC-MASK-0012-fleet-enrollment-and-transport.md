@@ -97,3 +97,28 @@ records the shipped framing and limits, and the
 two SSH host runs from fixture transport and interruption checks. The
 [closeout](../issues/60-done/MASK-0073-close-12.md) records all six
 criteria. Desired-profile rollout and offline delivery continue in RFC-MASK-0013.
+
+## Owner amendment: source-granted setup (2026-11-13)
+
+The owner explicitly extended existing source, scope and upgrade grants in
+[MASK-0153](../issues/30-in-progress/MASK-0153-granted-source-fleet-setup.md). A
+granted source is trusted to provide its declared setup and native-role repairs
+when the controller reviews the exact device task. A separate fresh fingerprint
+consent on every device is not required. This amendment preserves the historical
+acceptance above and does not claim new native transport or agent-loading evidence.
+
+Fleet upgrade inspects the exact candidate on the device before controller
+approval, disclosing scripts/package fingerprints, consumer inputs, interpreter,
+generated roles and backup/replacement effects. Inspection may retain exact
+granted content in cache/store outside discovery; no consumer writes or package
+execution occur during preview. Signed apply binds the task digest and recomputes
+local observations before writes. Each affected setup/role package, including
+composed contributions, must match the locally granted source identity. Scope,
+action, signature, expiry, input, Git ownership and recovery checks remain.
+
+Execution uses ordinary frozen staged setup, typed role destinations, bounded
+processes, output validation, journals and durable replacement backups. Failed or
+interrupted setup cannot become a verified upgrade or be silently rerun by
+replaying the same accepted request. Ordinary local recovery/repair and a fresh
+review remain available. No generic exec, new credential authority, source grant
+or force overwrite is introduced.

@@ -36,6 +36,13 @@ def validate_payload(action, value):
             rpc.invalid('Program maintenance requires an exact commit and canonical repository identity.')
     if 'observed' in value:
         rpc.digest(value['observed'])
+    if action == 'upgrade-inspect' and (('candidate' in value) != ('observed' in value) or
+                                      'profile' in value and 'candidate' not in value):
+        rpc.invalid('Exact upgrade inspection binds a candidate and its original observation.')
+    if 'task' in value:
+        rpc.digest(value['task'])
+    if action == 'upgrade-inspect' and 'candidate' in value:
+        c.fields(value['candidate'], ('declaration', 'lock'), family='rpc', versions=())
     if action == 'upgrade-apply':
         c.fields(value['candidate'], ('declaration', 'lock'), family='rpc', versions=())
         if ('profile' in value) != ('desired' in value):
@@ -232,6 +239,16 @@ def perform(home, intent, device, policy):
     action = intent['action']
     if action.endswith('-inspect'):
         rpc.pending_guard(home)
+        if action == UPGRADE[0] and 'candidate' in intent['payload']:
+            with c.writer_lock(home, name='lifecycle.lock'):
+                upgrade_prepare(home, intent, policy, None)
+                with c.writer_lock(home):
+                    rpc.recheck_authority(home, intent, device, policy)
+                    rpc.pending_guard(home)
+                    task = upgrade_action(home, intent, policy)
+                    task['preparation'] = dict(acquire='exact', retained='device-cache-and-store',
+                                               consumer_changes=False, package_code_executed=False)
+                    return task
         return program_action(home, intent, device, policy) if action in PROGRAM else upgrade_action(home, intent, policy)
     with c.writer_lock(home, name='lifecycle.lock'):
         if action in PROGRAM:
@@ -262,7 +279,7 @@ def failure_row(error, *, dispatch=False):
         status = 'unknown'
     elif code in rollout.DISCONNECTED:
         status = 'unknown' if dispatch else 'offline'
-    elif code in ('fleet.maintenance_incompatible', 'fleet.program_incompatible', 'fleet.tap_management_incompatible',
+    elif code in ('fleet.maintenance_incompatible', 'fleet.upgrade_setup_incompatible', 'fleet.program_incompatible', 'fleet.tap_management_incompatible',
                   'rpc.version_unsupported'):
         status = 'incompatible'
     elif code == 'recovery.required':
@@ -510,24 +527,20 @@ def upgrade_prepare(home, intent, policy, receipt):
     _, contribution_layers = proposed_profiles(intent, scope, config, record)
     layers.extend(contribution_layers)
     # Acquire only the individually granted local choices. Other profile layers stay owned.
-    rpc.prepare_artifacts(home, {'payload': {}, 'expires': int(time.time()) + 120},
+    rpc.prepare_artifacts(home, intent,
                           (state, config, root, scope, layers, record.get('profiles', {})))
 
 
 def activate_upgrade(home, intent, state, root, scope, config, declaration, locked, before):
     import mask_fs as fs
-    import mask_setup as setup
 
     record = c.consumer_records(state)[str(root)]
     subscriptions, contribution_layers = proposed_profiles(intent, scope, config, record)
     planned = fs.plan(config, state, [root], home=home, proposals={str(root): declaration},
                       lock_proposals={str(root): locked}, operation='upgrade', retire_files=False,
-                      profile_proposals={str(root): subscriptions} if subscriptions is not None else None)
+                      profile_proposals={str(root): subscriptions} if subscriptions is not None else None,
+                      repair_roles=True)
     fs.ensure_applicable(planned)
-    if (setup.proposals(planned, repair=True) or any(item['state'] in ('missing', 'invalid')
-            for report in planned.get('workflow_readiness', []) for skill in report['skills'] for item in skill['inputs'])
-            or any(row.get('repair') for row in planned['intent'].get('native_roles', []))):
-        c.fail('fleet.local_setup_required', 'Review setup or replacement through the local upgrade command.', 4)
     before_links = record['links']
     after_links = c.consumer_records(planned['intent']['after_state'])[str(root)]['links']
     import mask_resolve as resolve
@@ -536,17 +549,105 @@ def activate_upgrade(home, intent, state, root, scope, config, declaration, lock
     if any(resolve.coordinate(link['resolution']) not in allowed for effect in planned['intent']['links']
            for link in (before_links.get(effect['relative']), after_links.get(effect['relative'])) if link):
         c.fail('fleet.local_drift', 'Reconcile unrelated links before applying the reviewed fleet upgrade.', 4)
+    import mask_setup as setup
+    rows = setup.proposals(planned, repair=True)
+    for action in rows:
+        packages = [row for control in locks for row in control['packages']
+                    if resolve.coordinate(row) == action['coordinate']]
+        if not packages:
+            c.fail('fleet.local_drift', 'Reconcile unrelated native roles before fleet upgrade.', 4)
+        for role in action.get('native_roles', []):
+            producers = [link['resolution'] for link in after_links.values()
+                         if link['skill'] == action['skill'] and link['target'] == role['agent']]
+            if not producers or any(resolve.coordinate(row) != action['coordinate'] for row in producers):
+                c.fail('fleet.local_drift', 'A setup role belongs to another package contribution.', 4)
+        scope_sources(scope, config, dict(packages=packages))
+    for effect in planned['intent'].get('native_roles', []):
+        packages = [link['resolution'] for links in (before_links, after_links) for link in links.values()
+                    if link['skill'] == effect['skill'] and link['target'] == effect['agent']]
+        if not packages or any(resolve.coordinate(row) not in allowed for row in packages):
+            c.fail('fleet.local_drift', 'Reconcile unrelated native roles before fleet upgrade.', 4)
+        if effect['after'] is not None:
+            producer = next(skill['package']['coordinate'] for report in planned.get('workflow_readiness', [])
+                            for skill in report['skills'] if skill['skill'] == effect['skill'])
+            if any(resolve.coordinate(row) != producer for row in packages):
+                c.fail('fleet.local_drift', 'A native role belongs to another package contribution.', 4)
+        scope_sources(scope, config, dict(packages=packages))
     return planned
 
 
+def upgrade_task(planned):
+    """Use the ordinary task review to bind setup, inputs and replacement before-bytes."""
+    from types import SimpleNamespace
+    import mask
+    import mask_lifecycle as lifecycle
+    import mask_setup as setup
+
+    rows = setup.proposals(planned, repair=True)
+    output = mask.result('fleet.upgrade', dry_run=True)
+    lifecycle.review(SimpleNamespace(command='fleet.upgrade'), output, planned, rows)
+    inputs = [item for report in planned.get('workflow_readiness', []) for skill in report['skills']
+              for item in skill['inputs'] if item['state'] in ('missing', 'invalid')]
+    if inputs or any(row['state'] == 'blocked' for row in rows):
+        c.fail('workflow.incomplete', 'Required consumer inputs or setup are unavailable; no consumer changes were applied.', 4,
+               inputs=inputs, setup=rows)
+    # Include all role observations, including absent generated destinations, and passive input checks.
+    # Bind this scope, not the device-wide generation: another reviewed scope may apply first.
+    intent = planned['intent']
+    projection = {key: value for key, value in intent.items() if key not in ('before_state', 'after_state')}
+    for side in ('before_state', 'after_state'):
+        projection[side] = {root: c.consumer_records(intent[side])[root] for root in intent['selected']}
+    planned['plan_hash'] = c.digest(dict(task=projection, setup=[row.get('fingerprint', row) for row in rows],
+                                       actions=output['data']['review']['actions'],
+                                       readiness=planned.get('workflow_readiness', [])))
+    task = dict(plan_hash=planned['plan_hash'], actions=output['data']['review']['actions'], setup=rows,
+                workflow_readiness=planned.get('workflow_readiness', []))
+    return task, rows
+
+
+def execute_upgrade_setup(home, root, config, task, rows):
+    import mask
+    import mask_fs as fs
+    import mask_setup as setup
+
+    observed = {(skill['skill'], role['agent'], role['name']): role.get('observed_sha256')
+                for report in task['workflow_readiness'] for skill in report['skills'] for role in skill['roles']}
+    for row in rows:
+        row.update(state='granted', granted_by='approve-plan')
+
+    def replan(staged=None):
+        planned = fs.plan(config, rpc.state_at(home), [root], home=home, operation='ensure',
+                          repair_roles=True, retire_files=False, staged_roles=staged)
+        fs.ensure_applicable(planned)
+        for report in planned.get('workflow_readiness', []):
+            for skill in report['skills']:
+                for role in skill['roles']:
+                    group = [row for row in rows if row['state'] == 'granted' and row['skill'] == skill['skill'] and
+                             dict(agent=role['agent'], name=role['name']) in row['native_roles']]
+                    if group and role.get('observed_sha256') != observed[(skill['skill'], role['agent'], role['name'])]:
+                        setup.stale(group, staged is not None, 'a reviewed role destination changed')
+        return planned
+
+    output = mask.result('fleet.upgrade')
+    output['data']['setup'] = dict(actions=rows)
+    setup.execute(output, home, replan, rows)
+    final = replan()
+    if any(not entry['complete'] for entry in final.get('workflow_readiness', [])):
+        c.fail('workflow.incomplete', 'Fleet setup did not complete workflow readiness.', 4)
+    return output
+
+
 def execute_scope(home, planned, desired_intent, key):
+    import mask
     import mask_fs as fs
 
+    output = mask.result('fleet.upgrade')
+    output['actions'] = list(planned['actions'])
     if desired_intent is None:
-        fs.execute(planned, home, {'data': {}, 'actions': planned['actions']})
-        return
+        fs.execute(planned, home, output)
+        return output
     if not planned['would_change']:
-        return
+        return output
     # The ordinary fleet journal owns the profile and the ordinary pinned
     # journal owns its matching local lock. Both publish in one transaction.
     payload = {name: desired_intent['payload'][name] for name in ('scope', 'profile')}
@@ -558,7 +659,8 @@ def execute_scope(home, planned, desired_intent, key):
     if previous and previous['status'] != 'accepted':
         c.fail('fleet.operation_conflict', 'The combined profile and local lock transition already has a recorded outcome.', 4)
     fleet.put(path, record, previous)
-    rpc.commit_plan(home, journal_intent, record, planned)
+    rpc.commit_plan(home, journal_intent, record, planned, output=output)
+    return output
 
 
 def upgrade_action(home, intent, policy):
@@ -567,7 +669,7 @@ def upgrade_action(home, intent, policy):
 
     payload = intent['payload']
     alias = payload['scope']
-    if intent['action'] == UPGRADE[0]:
+    if intent['action'] == UPGRADE[0] and 'candidate' not in payload:
         return scope_observation(home, alias, policy)[0]
     key = c.digest(observation_facts(intent))
     path = durable_path(home, 'upgrade-results', key)
@@ -577,6 +679,11 @@ def upgrade_action(home, intent, policy):
     before, root, scope, state, config, git_before, timeout = scope_observation(home, alias, policy)
     declaration, locked = verify_upgrade_pair(before, payload['candidate'])
     scope_sources(scope, config, locked)
+    if intent['action'] == UPGRADE[0]:
+        if before['observation'] != payload['observed']:
+            c.fail('plan.stale', 'Skill scope changed during exact candidate inspection.', 4)
+        planned = activate_upgrade(home, intent, state, root, scope, config, declaration, locked, before)
+        return upgrade_task(planned)[0]
     commit = payload['commit']
     if receipt is None and before['observation'] != payload['observed']:
         c.fail('plan.stale', 'Skill scope changed since the controller reviewed it.', 4)
@@ -627,16 +734,27 @@ def upgrade_action(home, intent, policy):
         desired_intent = dict(intent, sequence=desired['sequence'], revision=desired['revision'])
         rpc.sequence_guard(home, desired_intent)
     planned = activate_upgrade(home, intent, state, root, scope, config, declaration, locked, before)
+    task, setup_rows = upgrade_task(planned)
+    if receipt is None:
+        needs_review = setup_rows or any(row.get('repair') for row in planned['intent'].get('native_roles', []))
+        if (('task' in payload and payload['task'] != task['plan_hash']) or
+                ('task' not in payload and needs_review)):
+            c.fail('plan.stale' if 'task' in payload else 'fleet.local_setup_required',
+                   'Review the exact device setup and native role task before fleet apply.', 4)
+    elif setup_rows:
+        # A lost setup reply or failed launch is never permission to execute package code again.
+        c.fail('fleet.setup_outcome_unknown', 'Inspect and repair the interrupted setup locally, then review a new fleet plan.', 4)
     if scope_observation(home, alias, policy)[0]['observation'] != before['observation']:
         c.fail('plan.stale', 'Skill scope changed during exact artifact preparation.', 4)
     if receipt is None:
-        receipt = dict(operation=key, status='accepted', changed=planned['would_change'] or bool(commit),
+        receipt = dict(operation=key, status='accepted', changed=planned['would_change'] or bool(commit) or bool(setup_rows),
                        before_head=git_before['head'] if git_before else None,
                        git_before=git_fingerprint(git_before) if git_before else None)
         fleet.put(path, receipt, None)
     if desired_intent is not None:
         rpc.sequence_guard(home, desired_intent, advance=True)
-    execute_scope(home, planned, desired_intent, key)
+    activation = execute_scope(home, planned, desired_intent, key)
+    setup_output = execute_upgrade_setup(home, root, config, task, setup_rows)
     if git_row and git_row['status'] == 'planned':
         if received is None:
             commits.execute(git_row, git_before, final, timeout)
@@ -647,6 +765,11 @@ def upgrade_action(home, intent, policy):
         if git_row['status'] != 'committed' or git_row['error']:
             c.fail('fleet.commit_outcome_unknown', 'The skills were applied but the Git result requires inspection.', 4)
     result = dict(receipt, status='applied_verified', host_load='not_verified')
+    if setup_rows:
+        result['setup'] = setup_output['data']['setup']
+    backups = activation['data'].get('backups', []) + setup_output['data'].get('backups', [])
+    if backups:
+        result['backups'] = backups
     if git_row:
         result['commit'] = git_row['commit']
         result['propagation'] = git_row.get('propagation') or (
@@ -810,6 +933,40 @@ def upgrade_plan(home, args, peers, signer, timeout):
     settings = control.settings(home, missing=True)
     with control.snapshot(home, settings, signer) if settings else nullcontext(None) as history:
         contributions = contribution_plan(history, rows, by_peer, signer, candidate_for)
+
+    def inspect_task(row):
+        if row['status'] != 'planned':
+            return row
+        payload = {name: row['request'][name] for name in ('scope', 'observed', 'candidate', 'profile')
+                   if name in row['request']}
+        exact = inspect_target(by_peer[row['name']], signer, UPGRADE[0], payload, timeout,
+                               target(by_peer[row['name']], row['scope']), capability='upgrade_setup')
+        if exact['status'] != 'observed':
+            row.update(status=exact['status'], reason=exact['reason'])
+            row.pop('request')
+        else:
+            row['task'] = exact['observation']
+            row['request']['task'] = row['task']['plan_hash']
+        return row
+
+    by_device = {}
+    for row in rows:
+        by_device.setdefault(row['device'], []).append(row)
+
+    def inspect_device(device_rows):
+        # Exact acquisition/planning shares one device writer lock across its scope aliases.
+        for row in device_rows:
+            inspect_task(row)
+
+    with ThreadPoolExecutor(max_workers=min(8, len(by_device))) as executor:
+        list(executor.map(inspect_device, by_device.values()))
+    if contributions:
+        blocked = {tuple(target_ref(row)) for row in rows if row['status'] not in ('planned', 'not_applicable')}
+        contributions['batches'] = [[target for target in batch if tuple(control.target_key(target)) not in blocked]
+                                    for batch in contributions['batches']]
+        contributions['batches'] = [batch for batch in contributions['batches'] if batch]
+        if not contributions['batches']:
+            contributions = None
     for row in rows:
         if 'observation' in row:
             row['observation'].pop('declaration')

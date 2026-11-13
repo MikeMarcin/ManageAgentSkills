@@ -20,7 +20,7 @@ def review(args, output, planned, rows):
     for entry in planned.get('workflow_readiness', []):
         for skill in entry['skills']:
             for role in skill['roles']:
-                if role.get('observed_sha256') and (role['state'] == 'modified' or
+                if role.get('observed_sha256') and (role['state'] in ('modified', 'setup_required') or
                         any(write['root'] == entry['root'] and write['relative'] == role['path'] and write.get('repair')
                             for write in planned['intent'].get('native_roles', []))):
                     path = str(Path(entry['root']) / role['path'])
