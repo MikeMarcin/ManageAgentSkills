@@ -101,7 +101,7 @@ criteria. Desired-profile rollout and offline delivery continue in RFC-MASK-0013
 ## Owner amendment: source-granted setup (2026-11-13)
 
 The owner explicitly extended existing source, scope and upgrade grants in
-[MASK-0153](../issues/30-in-progress/MASK-0153-granted-source-fleet-setup.md). A
+[MASK-0153](../issues/60-done/MASK-0153-granted-source-fleet-setup.md). A
 granted source is trusted to provide its declared setup and native-role repairs
 when the controller reviews the exact device task. A separate fresh fingerprint
 consent on every device is not required. This amendment preserves the historical
