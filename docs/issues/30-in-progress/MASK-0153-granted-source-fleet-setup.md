@@ -2,7 +2,7 @@
 schema: implement-rfc.card.v1
 id: MASK-0153
 title: Run controller-reviewed fleet setup for locally granted sources
-status: Ready
+status: "In Progress"
 rfcs: []
 depends_on: []
 ---
